@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Float, MeshDistortMaterial, Environment, Sparkles } from "@react-three/drei";
 import { InfoModal } from "@/components/info-modal";
+import { AquaInfoModal } from "@/components/aqua-info-modal";
 import * as THREE from "three";
 
 // A 3D Background that changes based on the hovered topic
@@ -85,11 +86,7 @@ export function HowItWorks() {
               onMouseEnter={() => setHoveredTopic("aqua")}
               onMouseLeave={() => setHoveredTopic(null)}
             >
-              <InfoModal 
-                triggerText="What is Aqua?" 
-                title="What is Aqua?"
-                content="Aqua is the decentralized liquidity layer for the new web. By holding Aqua on your Bank Rock, you're tapping into a network that automatically allocates capital to the most efficient agentic strategies, generating yield while you sleep."
-              />
+              <AquaInfoModal triggerText="What is Aqua?" />
             </div>
             <div
               onMouseEnter={() => setHoveredTopic("control")}
