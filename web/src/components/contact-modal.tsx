@@ -49,6 +49,10 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
     ? "w-full bg-black text-white py-4 rounded-full font-semibold hover:bg-neutral-800 active:scale-[0.98] transition-all"
     : "w-full bg-white text-black border border-black/10 py-4 rounded-full font-semibold hover:bg-neutral-50 active:scale-[0.98] transition-all shadow-sm";
 
+  const messageLabel = variant === "light" 
+    ? "How would you like to sponsor?" 
+    : "Why do you deserve an OG Rock?";
+
   const modalContent = (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 md:p-12 text-black text-left cursor-default">
       <div 
@@ -114,13 +118,13 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
                 id="message"
                 rows={4} 
                 className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus:border-black transition-all resize-none placeholder-transparent" 
-                placeholder="Message"
+                placeholder={messageLabel}
               ></textarea>
               <label 
                 htmlFor="message" 
                 className="absolute left-4 top-2 text-xs font-bold uppercase tracking-wider text-neutral-400 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-focus:top-2 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase"
               >
-                Message
+                {messageLabel}
               </label>
             </div>
             <button 
