@@ -19,6 +19,8 @@ Target integrations are Aqua and Privy. Exact sponsor prize eligibility and requ
 9. NFC cloning-safe authorization.
 10. Explorer links and honest risk disclosure.
 11. An MCP Server allowing an AI agent to read the rock's state.
+12. WebXR (AR) visualization of the physical rock.
+13. Proof of physical tap using NTAG 424 DNA signatures.
 
 ## Strong target
 
@@ -35,22 +37,19 @@ After the must-have path works:
 - fiat on-ramp;
 - guaranteed or projected yield;
 - native iOS or Android application;
-- cross-chain abstraction;
 - strategy marketplace;
-- AI portfolio management;
 - production manufacturing;
-- cryptographic NFC hardware;
 - support for arbitrary tokens or contracts.
 
 ## Three-minute demo story
 
-### 0:00–0:25 — The object
+### 0:00–0:25 — The object & AR Hologram
 
 Show the physical rock.
 
 “This is not a hardware wallet. It is a physical interface to a self-custodial liquidity account.”
 
-Tap it with a phone and open its public page.
+Tap it with a phone. The NTAG 424 DNA tag mathematically proves the tap. The public page opens. Tap "AR View" and point the camera at the rock to see its live token balances floating around it in Augmented Reality.
 
 ### 0:25–0:55 — Privy onboarding
 
@@ -72,11 +71,17 @@ Use a second account to execute a small testnet swap against the selected rock. 
 
 Transfer control to a second Privy account. Emphasize that thanks to ERC-4337 and Paymasters, the recipient claims the rock with **zero gas fees** and no complex setup.
 
-### 2:30–2:50 — The AI Oracle (MCP)
+### 2:30–2:55 — The AI Oracle & Agentic Strategies (MCP)
 
-Open a chat interface with an AI agent (e.g., Claude Desktop). Ask the agent to "Analyze my Bank Rock." The agent connects via the Bank Rock MCP Server, reads the live onchain data, and replies with a summary of the liquidity status and tailored advice.
+Open a chat interface with an AI agent (e.g., Claude Desktop). Say, "I want to fund this rock with 50 USDC but keep it low risk." The agent connects via the Bank Rock MCP Server, bridges the funds from an L2 (Cross-chain Abstraction), and automatically generates and ships a customized Aqua strategy. 
 
-### 2:50–3:00 — Platform potential
+### 2:55–3:10 — Rock-to-Rock Bumping (P2P Swap)
+
+Show two phones next to each other. "Bump" the rocks/phones to generate a short-range QR handshake, executing an instant, zero-slippage OTC swap between the two Rock Accounts.
+
+### 3:10–3:20 — Gamification & Forging
+
+Show that because the Rock hit $1,000 in volume, its AR visual permanently evolves from Granite to Obsidian.
 
 Close with the reusable primitive:
 

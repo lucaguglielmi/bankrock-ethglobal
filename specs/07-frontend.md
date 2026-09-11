@@ -2,7 +2,7 @@
 
 ## Direction
 
-A mobile-first web application with a tactile, restrained visual identity. The interface should combine the permanence of stone with the movement of water without resembling a generic crypto dashboard.
+A highly polished, spacious, and minimalist web application inspired by high-end modern design (like parallel.ai). The interface should be distinctly white, clean, and rely on excellent typography, subtle SVG state interactions, and premium Three.js artifacts rather than generic crypto tropes.
 
 ## Technology preference
 
@@ -18,15 +18,16 @@ This file defines direction, not an implementation commitment.
 
 ## Primary routes
 
-- / — short product explanation and manual rock lookup
-- /r/{rockId} — public rock page opened from NFC
-- /r/{rockId}/awaken — activation flow
-- /r/{rockId}/fund — funding and top-up flow
-- /r/{rockId}/trade — visitor swap flow
-- /r/{rockId}/manage — owner strategy controls and Cash In flow
-- /r/{rockId}/give — ownership handover (sponsored gas)
-- /collection — rocks controlled by the signed-in user
-- /oracle — AI chat interface connected via MCP
+- / — Landing page explaining the product with high-end interactive visuals.
+- /shop — Shop page (delivery at crypto conference or standard shipping).
+- /dashboard — Bank rock dashboard (controllable via MCP) for the signed-in user.
+- /r/{rockId} — Public rock page opened from NFC, featuring a WebXR AR toggle.
+- /r/{rockId}/awaken — Activation flow.
+- /r/{rockId}/fund — Funding and top-up flow.
+- /r/{rockId}/trade — Visitor swap flow.
+- /r/{rockId}/manage — Owner strategy controls and Cash In flow.
+- /r/{rockId}/give — Ownership handover (sponsored gas).
+- /oracle — AI chat interface connected via MCP.
 
 ## Public rock page
 
@@ -48,14 +49,16 @@ Supporting sections:
 
 ## Visual language
 
-- Stone provides shape, texture and identity.
-- Water provides motion and state.
-- Actual balances appear as the reservoir.
-- Aqua strategies appear as separate flowing channels.
-- Fees may accumulate as sediment or layers, but exact numeric values remain visible.
-- Status must never rely on colour or animation alone.
-
-Avoid excessive glassmorphism, neon gradients and trading-terminal density.
+- **Aesthetic:** Very white and spacious design, maximizing whitespace.
+- **Typography:** Excellent, crisp typography tailored for high legibility and premium feel.
+- **Animations:** 
+  - Subtle text animations (e.g., smallshift letter by letter).
+  - Elegant loading animations (e.g., an on-screen show while data fetches).
+  - Heavy use of SVG animations for cool interactions between states.
+- **Three.js & WebXR Artifacts:** A subtle but incredibly polished 3D artifact to anchor the landing page.
+  - On the public rock page (`/r/{rockId}`), include a **Dynamic WebXR (AR) View** toggle. Users can place the 3D rock in their physical environment using their camera, with live token balances and yield stats floating around it as data holograms.
+  - **Dynamic Metadata (Gamification):** The 3D rock visual evolves based on its on-chain success (e.g., changes texture from "Granite" to "Obsidian" or "Gold" when TVL or volume milestones are met). Must be aggressively optimized for mobile.
+- **Color Palette:** Avoid excessive glassmorphism, neon gradients, and trading-terminal density. Keep it clean and minimal.
 
 ## Component policy
 
@@ -91,13 +94,8 @@ No inline styling. Product screens should use tokens and shared components.
 
 ## Writing style
 
-Use verbs from the physical metaphor only where they remain clear:
+Microcopy must be short, clean, and highly effective at communicating with beginners and non-crypto native users. 
 
-- Awaken
-- Fill
-- Open a stream
-- Trade
-- Give
-- Replace tag
-
-Always pair unfamiliar language with precise financial meaning. For example: “Open a stream — create an Aqua liquidity strategy.”
+- Use plain English instead of crypto jargon (e.g., "Top Up" instead of "Deposit", "Give" instead of "Transfer").
+- Always pair unfamiliar language with precise, simple meanings if it cannot be avoided.
+- Focus on the experience and the physical nature of the object.

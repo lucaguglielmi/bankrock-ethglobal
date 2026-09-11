@@ -8,14 +8,13 @@ It may identify a rock and open its public page. It must never contain a wallet 
 
 ## Assumed hardware
 
-The existing rocks may contain ordinary writable NFC tags rather than cryptographically secure tags. The design therefore assumes that:
+**Decision: Cryptographic NFC Tags (NTAG 424 DNA)**
 
-- tag contents can be read;
-- the public URL may be copied;
-- the identifier may be cloned onto another tag;
-- the tag may become unreadable or be physically lost.
+To elevate the security narrative and provide a magical UX, the project assumes the use of **NTAG 424 DNA** tags. These tags generate a unique, cryptographically signed URL on every tap.
 
-The product remains safe under all four conditions.
+- The tag contents (URL) are dynamic and change on every scan.
+- The server mathematically verifies the signature to prove the user physically tapped the real rock.
+- URL cloning is impossible, as a copied URL will have an invalid or already-used counter/signature.
 
 ## Tag payload
 
@@ -34,15 +33,16 @@ Avoid placing wallet addresses or claim secrets directly on the tag.
 
 ## Registration protection
 
-An unactivated rock must not be claimable solely because someone scanned it first.
+Because we use NTAG 424 DNA, the physical tap itself is mathematically proven. 
 
-**Decision: Separate One-Time Activation Code (PIN)**
+**Decision: Cryptographic Tap Proof (No PIN required)**
 
-The physical rock will be paired with a randomly generated, single-use activation code (e.g., a 6-digit PIN printed on a card included in the packaging). 
+We no longer need a cumbersome, separate 6-digit PIN code printed on a card. 
 
-- The creator generates the PIN and saves its hash in the database during registration.
-- The recipient enters the PIN on the rock's web page to claim it.
-- The creator retains the ability to revoke or reissue the PIN before it is used if the packaging is lost.
+- The creator registers the tag's master key in the database during provisioning.
+- When a recipient taps the rock, the tag generates a signed URL containing a unique counter.
+- The server verifies the signature. If valid and the rock is in a "gift pending" state, the recipient is instantly authorized to claim it.
+- This provides a seamless "tap to claim" experience while perfectly protecting against URL copying or first-scanner theft.
 
 ## Public scan behaviour
 
@@ -82,6 +82,14 @@ The owner can:
 
 A lost flag warns scanners but does not automatically move or freeze assets.
 
-## Future secure edition
+## Future hardware evolution
 
-A later hardware edition may use tags capable of producing cryptographically verifiable dynamic messages. This could strengthen proof of physical presence, but it is not required for the hackathon and must not be assumed for the current rocks.
+While NTAG 424 DNA solves physical presence perfectly, future iterations could integrate active hardware components (like secure enclaves or displays) if the physical form factor changes, but NTAG 424 DNA is the gold standard for the current passive rock form factor.
+
+## Invisible Security (UX First)
+
+Security must be high-end but never get in the way of the user experience. We achieve this through:
+
+- **Passkeys (Biometrics):** Via Privy, users authenticate using FaceID/TouchID (Passkeys) instead of writing down complex mnemonic seed phrases or passwords. 
+- **Passive Risk Scoring:** The system should silently evaluate claim requests (e.g., flagging unusual IPs or rapid, repeated claims across multiple rocks) and only introduce friction or CAPTCHAs if the risk score is high.
+- **Progressive Security:** For low-value operations (like checking balance), require zero friction. For high-value operations (withdrawing all liquidity), require a biometric step-up, but seamlessly integrated into the flow without redirecting to intimidating security pages.

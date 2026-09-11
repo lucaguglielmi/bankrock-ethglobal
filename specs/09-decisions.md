@@ -40,11 +40,11 @@
 
 **Consequence:** faster development and less contract security risk during the hackathon. Custom apps are deferred.
 
-### D-007 — Separate one-time activation code
+### D-007 — Cryptographic NFC Tags (NTAG 424 DNA)
 
-**Decision:** rocks are paired with a randomly generated, single-use activation PIN.
+**Decision:** The project assumes the use of NTAG 424 DNA tags instead of standard NTAG213 tags.
 
-**Consequence:** prevents first-scanner theft and ensures the intended recipient can safely claim the dormant funded rock.
+**Consequence:** The tag generates a unique, cryptographically signed URL on every tap. This mathematically proves physical presence, completely preventing URL cloning and removing the need for a separate, clumsy PIN code for activation.
 
 ### D-008 — MCP AI Integration (Read-Only MVP)
 

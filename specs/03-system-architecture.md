@@ -12,11 +12,13 @@ A native application is not required for the hackathon.
 
 Privy supplies user authentication, embedded wallet creation, recovery and transaction signing. The Privy wallet acts as the human owner's signer or controller.
 
-### Bank Rock MCP Server
+### Bank Rock MCP Server & Connectors
 
 An AI-facing Model Context Protocol (MCP) server that exposes the rock's state to external AI agents (like Claude or Gemini). 
 It allows agents to read liquidity, strategies, and historical fees, and return tailored insights. 
 *(Future scope: exposing read-write tools to prepare transactions for owner signing).*
+
+**See also:** [`11-mcp-and-connectors.md`](11-mcp-and-connectors.md) for a comprehensive list of all MCP servers (Web3, Privy, Database, Telemetry) powering the system.
 
 ### Rock Registry
 
@@ -50,9 +52,11 @@ The Rock Account:
 
 Aqua records the virtual balances for each maker, application and strategy hash. A Bank Rock strategy includes the public rock ID or an immutable derivative as its salt, allowing activity to be attributed to the physical object.
 
-### Indexer and application database
+### Indexer, Database, and Dynamic Metadata Engine
 
-The backend indexes contract events and maintains presentation data such as names, photos, gift messages, and the one-time activation codes.
+The backend indexes contract events and maintains presentation data such as names, photos, and gift messages. 
+
+**Dynamic Metadata (Forging):** The backend monitors the rock's on-chain success (e.g., trading volume, TVL duration). When milestones are hit, the backend permanently updates the rock's digital presentation metadata, causing the 3D WebXR artifact to visually evolve (e.g., from Granite to Obsidian).
 
 **Stack:**
 - **Database:** Supabase (PostgreSQL) or Vercel Postgres, accessed via Next.js Server Actions.
@@ -64,6 +68,21 @@ It is not authoritative for:
 - Rock Account control;
 - Aqua balances;
 - completed trades.
+
+### Telemetry & Observability
+
+A dedicated logging and monitoring layer ensuring the system is self-aware and debuggable.
+
+- **Structured Logging:** All server actions emit structured JSON logs.
+- **AI Agent Integration:** The Bank Rock MCP Server exposes a specific tool to query these logs and server metrics in real-time. This allows an AI agent to proactively read the server state, fix errors, and debug issues without manual human intervention.
+
+### Cross-Chain Intent Protocol
+
+A bridge layer (e.g., Across, LayerZero, CCIP) abstracts the underlying network of the Rock Account. This allows users to fund rocks or buy tokens using liquidity from any supported chain (e.g., Base, Optimism, Arbitrum) seamlessly, without needing to bridge funds manually first.
+
+### P2P OTC Engine (Rock-to-Rock Bumping)
+
+A peer-to-peer settlement layer allowing two physical rocks in close proximity to execute a gasless, zero-slippage swap between their respective Smart Accounts. A QR-code handshake established via the frontend generates a deterministic, single-use atomic swap payload executed by the Paymaster.
 
 ## Trust boundaries
 
@@ -77,6 +96,7 @@ It is not authoritative for:
 | Rock Account | Asset custody and authorized execution | Offchain metadata |
 | Aqua | Virtual liquidity accounting and strategy execution | Guaranteed yield or price safety |
 | MCP Server | Providing structured read-only rock state to AI agents | Executing unauthorized transactions or hallucinated financial claims |
+| Telemetry | Observing and recording system state for AI agents | Source of truth for financial balances |
 
 ## High-level transaction path
 
@@ -92,7 +112,5 @@ It is not authoritative for:
 
 - Holding private keys on NFC hardware.
 - Treating physical possession as sufficient financial authorization.
-- Cross-chain liquidity orchestration.
 - Fiat custody.
-- Automated investment advice.
 - A permissionless strategy marketplace.

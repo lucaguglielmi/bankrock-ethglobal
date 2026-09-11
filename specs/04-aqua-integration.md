@@ -42,6 +42,14 @@ Strategy data should include:
 
 A strategy is immutable after it is shipped. Parameter changes therefore require docking the old strategy and shipping a new one.
 
+## Cross-Chain Abstraction
+
+**Decision: Intent-Based Bridging (LayerZero / Across)**
+
+To maximize UX, users should not care which chain the Bank Rock resides on. We will integrate a cross-chain intent protocol (e.g., Across, LayerZero, or CCIP) in combination with our Paymaster.
+- If a user taps a rock on Base, they can buy tokens from it using funds on Arbitrum or Optimism in a single, seamless click.
+- The cross-chain bridge handles the transport and swaps, fulfilling the Aqua strategy on the destination chain.
+
 ## Showing shared liquidity
 
 A single strategy would technically integrate Aqua but would fail to communicate its distinctive value. The demo should ship at least two strategies from the same Rock Account and overlapping token balance.
@@ -73,11 +81,10 @@ Advantages:
 
 A Custom Bank Rock Aqua App is explicitly deferred to post-hackathon development.
 
-## Financial correctness
+## Financial correctness and Idle Yield
 
-- Aqua does not itself guarantee passive yield.
-- Earnings in the MVP come from executed trading fees.
-- No projected APY should be displayed.
-- Yield-bearing assets may be explored after the hackathon.
-- All token and strategy contracts must be allowlisted for the demo.
-- The UI must expose liquidity and smart-contract risk.
+- **Idle Yield Generation:** The Rock Account will automatically deploy idle stablecoins into a yield protocol (e.g., Aave v3 or Morpho) to earn passive yield.
+- The AI Oracle (MCP) monitors the yield and can notify the owner to switch strategies.
+- Aqua does not itself guarantee passive yield; earnings in Aqua come from executed trading fees.
+- All token, yield, and strategy contracts must be allowlisted for the demo.
+- The UI must expose liquidity and smart-contract risk cleanly.

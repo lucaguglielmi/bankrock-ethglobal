@@ -28,7 +28,7 @@ Registration does not create or fund a wallet.
 2. The public rock page detects that the rock is unactivated.
 3. User chooses **Awaken this rock**.
 4. Privy authenticates the user and creates or restores their embedded wallet.
-5. The user completes the separate claim proof.
+5. The server mathematically verifies the NTAG 424 DNA signature.
 6. The system creates or links the Rock Account.
 7. The user funds it with the supported testnet token pair.
 8. The Rock Account approves Aqua.
@@ -73,7 +73,7 @@ Preferred target experience:
 3. A pending handover is created.
 4. Recipient physically receives and taps the rock.
 5. Recipient signs in through Privy (Email, Passkey, or Social).
-6. Recipient proves access to the separate claim secret (PIN).
+6. The server mathematically verifies the NTAG 424 DNA signature to prove physical possession.
 7. Current owner approves the handover, or a previously signed handover policy completes it.
 8. Control of the ERC-4337 Smart Account updates its owner signing key. **Gas is 100% sponsored by a Paymaster**, ensuring the recipient pays zero fees and requires no native tokens.
 9. The account address and history remain completely stable.
@@ -110,3 +110,20 @@ Preferred target experience:
 3. The AI agent seamlessly connects to the Bank Rock MCP Server.
 4. The MCP provides the rock's current balances, Aqua strategy, and historical fees.
 5. The AI agent analyzes the data and responds with a natural language summary and recommendations (e.g., "Your rock earned 5 USDC this week. I recommend tightening the spread based on current volatility.").
+
+## Flow J — Agentic Strategy Creation
+
+1. Owner tells their AI Oracle: "I want to fund this rock with 50 USDC but keep it very low risk."
+2. The AI Oracle (via MCP) automatically calculates the optimal Aqua strategy parameters for the requested risk profile.
+3. The AI prepares the transaction data and prompts the owner for approval.
+4. The owner taps a button to sign the transaction via Privy.
+5. The AI monitors the strategy over time, sending push notifications if rebalancing is recommended.
+
+## Flow K — Rock-to-Rock Bumping (P2P OTC Swaps)
+
+1. Two Bank Rock owners are in the same physical room.
+2. They select "Bump" on their respective web interfaces.
+3. One phone generates a short-range QR code (the handshake), and the other scans it.
+4. The frontend prepares a zero-slippage, zero-fee OTC (Over-The-Counter) swap between their two Smart Accounts.
+5. Both users approve the swap via Privy.
+6. The assets are exchanged instantly on-chain, bypassing standard liquidity pools.
