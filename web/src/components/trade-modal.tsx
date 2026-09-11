@@ -18,12 +18,20 @@ type TokenType = "USDC" | "WETH";
 const ETH_PRICE_USDC = 2500; // 1 WETH = 2,500 USDC
 const MAKER_FEE_RATE = 0.0005; // 0.05% Aqua maker fee
 
-interface TradeModalProps {
+export interface TradeDetails {
+  inAmount: string;
+  inSymbol: string;
+  outAmount: string;
+  outSymbol: string;
+  txHash: string;
+}
+
+export interface TradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   rockId: string;
   currentReserve: number;
-  onTradeSuccess: (deltaLiquidity: number, earnedFee: number) => void;
+  onTradeSuccess: (deltaLiquidity: number, earnedFee: number, details?: TradeDetails) => void;
 }
 
 function TradeModalInner({
@@ -136,12 +144,21 @@ function TradeModalInner({
       // If user swaps USDC for WETH -> user sends USDC to rock's reserve (+USDC)
       // If user swaps WETH for USDC -> rock gives user USDC (-USDC)
       const deltaLiquidity = fromToken === "USDC" ? inputNumber : -outputAmount;
-      onTradeSuccess(deltaLiquidity, feeInUSDC);
+      const formattedIn = inputNumber.toLocaleString("en-US", { maximumFractionDigits: fromToken === "USDC" ? 2 : 4 });
+      const formattedOut = outputAmount.toLocaleString("en-US", { maximumFractionDigits: toToken === "USDC" ? 2 : 4 });
+
+      onTradeSuccess(deltaLiquidity, feeInUSDC, {
+        inAmount: formattedIn,
+        inSymbol: fromToken,
+        outAmount: formattedOut,
+        outSymbol: toToken,
+        txHash: generatedTxHash,
+      });
 
       setLastTradeSummary({
-        inAmount: inputNumber.toLocaleString("en-US", { maximumFractionDigits: fromToken === "USDC" ? 2 : 4 }),
+        inAmount: formattedIn,
         inSymbol: fromToken,
-        outAmount: outputAmount.toLocaleString("en-US", { maximumFractionDigits: toToken === "USDC" ? 2 : 4 }),
+        outAmount: formattedOut,
         outSymbol: toToken,
         feeEarnedUSDC: feeInUSDC,
       });

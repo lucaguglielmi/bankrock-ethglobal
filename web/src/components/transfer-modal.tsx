@@ -19,7 +19,7 @@ interface TransferModalProps {
   onClose: () => void;
   rockId: string;
   currentOwner: string;
-  onTransferSuccess: (newOwner: string) => void;
+  onTransferSuccess: (newOwner: string, txHash?: string) => void;
 }
 
 function TransferModalInner({
@@ -89,7 +89,7 @@ function TransferModalInner({
       setTxHash(generatedTx);
 
       // Call callback to update owner state in parent
-      onTransferSuccess(trimmedRecipient);
+      onTransferSuccess(trimmedRecipient, generatedTx);
       setStep("success");
     } catch (err) {
       console.error("Transfer execution failed:", err);

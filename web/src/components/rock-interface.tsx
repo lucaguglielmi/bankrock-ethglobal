@@ -3,9 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { verifyNtagSignature } from "@/actions/verify-ntag";
-import { TradeModal } from "@/components/trade-modal";
+import { TradeModal, type TradeDetails } from "@/components/trade-modal";
 import { TransferModal } from "@/components/transfer-modal";
-import { ExternalLink, Check, Sparkles, ShieldCheck, Copy } from "lucide-react";
+import { DemoSwitcher, type DemoScenario } from "@/components/demo-switcher";
+import { RockActivity, type ActivityEvent } from "@/components/rock-activity";
+import { ExternalLink, Check, Sparkles, ShieldCheck, ShieldAlert, Copy } from "lucide-react";
 
 interface RockInterfaceProps {
   rockId: string;
@@ -22,6 +24,34 @@ interface VerificationResult {
   error?: string;
 }
 
+const INITIAL_EVENTS: ActivityEvent[] = [
+  {
+    id: "init-aqua",
+    type: "trade",
+    title: "Aqua Constant Product Reserve Seeded",
+    description: "Initial liquidity pool configured with 1,250.00 USDC and 0.50 WETH maker balance.",
+    detail: "Maker Strategy Hash: 0x9f8b...4a2c",
+    txHash: "0x89f72b9a4c51e038db4f11467a98bce19d45e5229348cbe78216ba7b11d9f041",
+    timestamp: "2 hours ago",
+  },
+  {
+    id: "init-safe",
+    type: "awaken",
+    title: "Safe Smart Account Deployed",
+    description: "ERC-4337 Safe account instantiated via Pimlico Paymaster on Base Sepolia with dual gas sponsorship.",
+    txHash: "0x3c9a1be963cc7947db4cd9910eed30a2c79bc8a39aed5177968041348136a5f2",
+    timestamp: "2 hours ago",
+  },
+  {
+    id: "init-hardware",
+    type: "hardware",
+    title: "Physical Tag Cryptographic Pairing",
+    description: "NXP NTAG 424 DNA AES-128 CMAC key bound to Safe account ownership authority.",
+    detail: "UID: 04A1B2C3D4E5F6 • Tap Counter: #42",
+    timestamp: "Tuscan Workshop, Florence",
+  },
+];
+
 export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
   const { authenticated, login, user } = usePrivy();
   const [step, setStep] = useState<"scanning" | "unactivated" | "authenticating" | "awakening" | "active">("scanning");
@@ -32,6 +62,8 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
   const [liquidity, setLiquidity] = useState<number>(1250.0);
   const [earnedFees, setEarnedFees] = useState<number>(12.4);
   const [customOwnerAddress, setCustomOwnerAddress] = useState<string | null>(null);
+  const [events, setEvents] = useState<ActivityEvent[]>(INITIAL_EVENTS);
+  const [currentScenario, setCurrentScenario] = useState<DemoScenario>("active_maker");
 
   // Derive current owner address reactively without setState in an effect
   const ownerAddress = customOwnerAddress || user?.wallet?.address || "0x71C8564E688172F6e1a90c0071C8097b6De81F26";
@@ -158,15 +190,75 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
     };
   }, [authenticated, step, startAwakening]);
 
-  // Trade callback: updates pool liquidity and earned fees live
-  const handleTradeSuccess = (deltaLiquidity: number, feeUSDC: number) => {
+  // Trade callback: updates pool liquidity, earned fees, and appends to provenance activity live
+  const handleTradeSuccess = (deltaLiquidity: number, feeUSDC: number, details?: TradeDetails) => {
     setLiquidity((prev) => Math.max(0, prev + deltaLiquidity));
     setEarnedFees((prev) => prev + feeUSDC);
+    if (details) {
+      setEvents((prev) => [
+        {
+          id: `trade-${Date.now()}`,
+          type: "trade",
+          title: "Aqua Maker Swap",
+          description: `Swapped ${details.inAmount} ${details.inSymbol} for ${details.outAmount} ${details.outSymbol}`,
+          detail: `+${feeUSDC.toFixed(4)} USDC fee accrued to reserve`,
+          txHash: details.txHash,
+          timestamp: "Just now",
+        },
+        ...prev,
+      ]);
+    }
   };
 
-  // Transfer callback: updates the owner
-  const handleTransferSuccess = (newOwner: string) => {
+  // Transfer callback: updates the owner and appends to provenance activity live
+  const handleTransferSuccess = (newOwner: string, txHash?: string) => {
+    const oldOwner = ownerAddress;
     setCustomOwnerAddress(newOwner);
+    setEvents((prev) => [
+      {
+        id: `transfer-${Date.now()}`,
+        type: "transfer",
+        title: "Ownership Transferred",
+        description: `Safe Smart Account control transferred from ${formatShortAddress(oldOwner)} to ${formatShortAddress(newOwner)} with zero gas.`,
+        detail: "Physical NTAG 424 DNA re-keyed",
+        txHash: txHash || undefined,
+        timestamp: "Just now",
+      },
+      ...prev,
+    ]);
+  };
+
+  // Demo Switcher Scenarios for ETHGlobal Judges
+  const handleSelectScenario = (scenario: DemoScenario) => {
+    setCurrentScenario(scenario);
+    if (scenario === "dormant") {
+      setStep("unactivated");
+      setVerificationResult(null);
+    } else if (scenario === "verified_nfc") {
+      setStep("active");
+      setVerificationResult({ isAuthentic: true });
+    } else if (scenario === "cloned_nfc") {
+      setStep("active");
+      setVerificationResult({
+        isAuthentic: false,
+        error: "CMAC Signature Mismatch: Suspected clone or replayed counter",
+      });
+    } else if (scenario === "active_maker") {
+      setStep("active");
+      setVerificationResult({ isAuthentic: true });
+      setLiquidity(1250.0);
+      setEarnedFees(12.4);
+    }
+  };
+
+  const handleResetDemo = () => {
+    setCurrentScenario("active_maker");
+    setStep("active");
+    setVerificationResult({ isAuthentic: true });
+    setLiquidity(1250.0);
+    setEarnedFees(12.4);
+    setCustomOwnerAddress(null);
+    setEvents(INITIAL_EVENTS);
   };
 
   const copyOwnerAddress = () => {
@@ -187,6 +279,11 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
       <div className="flex flex-col items-center justify-center p-12 text-center">
         <div className="animate-pulse w-16 h-16 bg-neutral-200 rounded-full mb-6"></div>
         <h2 className="text-2xl font-bold tracking-tight">Verifying physical rock...</h2>
+        <DemoSwitcher
+          currentScenario={currentScenario}
+          onSelectScenario={handleSelectScenario}
+          onReset={handleResetDemo}
+        />
       </div>
     );
   }
@@ -204,6 +301,11 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
             <ShieldCheck className="w-4 h-4 text-green-600" />
             Physical authenticity verified (SDM)
           </div>
+        ) : verificationResult?.error || currentScenario === "cloned_nfc" ? (
+          <div className="bg-amber-50 text-amber-800 px-4 py-2 rounded-lg text-sm font-medium mb-8 flex items-center gap-2 border border-amber-200">
+            <ShieldAlert className="w-4 h-4 text-amber-600" />
+            {verificationResult?.error || "⚠ Cryptographic CMAC Mismatch (Cloned Tag Detected)"}
+          </div>
         ) : urlParams.c ? (
           <div className="bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm font-medium mb-8">
             ⚠ Signature verification failed
@@ -216,6 +318,13 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
         >
           Awaken this rock
         </button>
+
+        {/* Demo Switcher for Judges */}
+        <DemoSwitcher
+          currentScenario={currentScenario}
+          onSelectScenario={handleSelectScenario}
+          onReset={handleResetDemo}
+        />
       </div>
     );
   }
@@ -285,12 +394,17 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {verificationResult?.isAuthentic && (
+            {verificationResult?.isAuthentic ? (
               <div className="text-xs font-mono font-bold uppercase tracking-widest text-blue-600 flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 Verified Physical
               </div>
-            )}
+            ) : verificationResult?.isAuthentic === false || currentScenario === "cloned_nfc" ? (
+              <div className="bg-amber-50 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-amber-200">
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                Clone / Replay Detected
+              </div>
+            ) : null}
           </div>
         </header>
 
@@ -368,6 +482,9 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           </button>
         </div>
 
+        {/* Provenance & On-Chain Activity Timeline */}
+        <RockActivity rockId={rockId} events={events} />
+
         {/* Modals */}
         <TradeModal
           isOpen={isTradeOpen}
@@ -383,6 +500,13 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           rockId={rockId}
           currentOwner={ownerAddress}
           onTransferSuccess={handleTransferSuccess}
+        />
+
+        {/* Demo Switcher for Judges */}
+        <DemoSwitcher
+          currentScenario={currentScenario}
+          onSelectScenario={handleSelectScenario}
+          onReset={handleResetDemo}
         />
       </div>
     );
