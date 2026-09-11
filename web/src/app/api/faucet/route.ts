@@ -18,24 +18,49 @@ const walletClient = createWalletClient({
   transport: http(),
 });
 
+import { logger } from "@/lib/telemetry";
+
 export async function POST(req: Request) {
+  const start = Date.now();
+
   try {
     const { address } = await req.json();
 
     if (!address) {
+      logger.warn("Faucet request missing destination address", {
+        action: "FAUCET_REQUEST_INVALID",
+        statusCode: 400,
+      });
       return NextResponse.json({ error: "Address is required" }, { status: 400 });
     }
 
-    // A real implementation would fund testnet ERC-20 tokens.
-    // For this 1-click testnet faucet MVP, we just send test ETH (or call a mint function on a mock ERC-20).
+    logger.info("Processing faucet funding request", {
+      action: "FAUCET_REQUEST_START",
+      recipient: address,
+      chain: "Base Sepolia (84532)",
+    });
+
+    // Funds testnet ETH to the user or newly deployed Safe account
     const hash = await walletClient.sendTransaction({
       to: address as `0x${string}`,
       value: parseEther("0.01"),
     });
 
+    const latencyMs = Date.now() - start;
+    logger.info("Faucet funding broadcasted successfully", {
+      action: "FAUCET_FUNDED",
+      recipient: address,
+      txHash: hash,
+      latencyMs,
+    });
+
     return NextResponse.json({ success: true, txHash: hash });
   } catch (error) {
-    console.error("Faucet error:", error);
+    const latencyMs = Date.now() - start;
+    logger.error("Faucet transaction failed", error, {
+      action: "FAUCET_FAILED",
+      latencyMs,
+    });
     return NextResponse.json({ error: "Failed to fund account" }, { status: 500 });
   }
 }
