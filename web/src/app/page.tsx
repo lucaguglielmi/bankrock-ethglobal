@@ -4,6 +4,7 @@ import { RockCanvasDynamic } from "@/components/rock-canvas-dynamic";
 import { ArrowRight } from "lucide-react";
 import { LoginButton } from "@/components/login-button";
 import { NewsletterSignup } from "@/components/newsletter-signup";
+import { AboutRocks } from "@/components/about-rocks";
 
 export default function Home() {
   return (
@@ -65,6 +66,7 @@ export default function Home() {
             <p className="text-xl text-neutral-600 leading-relaxed font-medium">
               Every Bank Rock is handpicked from the riverbeds near Florence, bridging the birthplace of classical finance with the frontier of agentic, self-custodial DeFi.
             </p>
+            <AboutRocks />
           </div>
 
           <div className="relative aspect-square bg-white rounded-3xl p-12 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-neutral-100 overflow-hidden group">
