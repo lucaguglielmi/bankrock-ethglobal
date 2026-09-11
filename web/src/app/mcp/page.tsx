@@ -144,31 +144,7 @@ npm run dev`;
 
   return (
     <main className="flex min-h-screen flex-col bg-white text-black font-sans selection:bg-black selection:text-white">
-      {/* Navbar */}
-      <nav className="w-full flex justify-between items-center z-50 p-6 md:px-12 fixed top-0 bg-white/70 backdrop-blur-md border-b border-black/5">
-        <Link href="/" className="text-xl font-bold tracking-tighter hover:opacity-70 transition-opacity">
-          Bank Rock
-        </Link>
-        <div className="flex gap-6 md:gap-8 items-center">
-          <Link href="/shop" className="text-sm font-medium hover:opacity-50 transition-opacity">
-            Shop
-          </Link>
-          <Link
-            href="/mcp"
-            className="text-sm font-semibold text-black border-b border-black pb-0.5"
-          >
-            AI Oracle
-          </Link>
-          <Link
-            href="/rock/1"
-            className="text-sm font-medium text-neutral-500 hover:text-black transition-colors flex items-center gap-1"
-          >
-            Live Demo
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-          <LoginButton />
-        </div>
-      </nav>
+
 
       {/* Content Container */}
       <div className="pt-32 pb-24 px-6 md:px-12 max-w-5xl mx-auto w-full flex flex-col gap-20">

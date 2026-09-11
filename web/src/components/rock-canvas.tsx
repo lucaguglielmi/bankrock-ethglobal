@@ -7,16 +7,22 @@ import * as THREE from "three";
 
 function RockMesh() {
   const meshRef = useRef<THREE.Mesh>(null);
+  const resinRef = useRef<THREE.Mesh>(null);
 
   useFrame((state, delta) => {
     if (meshRef.current) {
       meshRef.current.rotation.y += delta * 0.15;
       meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.3) * 0.1;
     }
+    if (resinRef.current) {
+      resinRef.current.rotation.y -= delta * 0.1;
+      resinRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.4) * 0.2;
+    }
   });
 
   return (
     <Float speed={2} rotationIntensity={0.6} floatIntensity={1.2}>
+      {/* Main Stone */}
       <mesh ref={meshRef} position={[0, 0, 0]} castShadow receiveShadow>
         <icosahedronGeometry args={[1.5, 4]} />
         <MeshDistortMaterial
@@ -25,6 +31,21 @@ function RockMesh() {
           metalness={0.25}
           distort={0.4}
           speed={1.5}
+        />
+      </mesh>
+      {/* Aqua Liquid Resin */}
+      <mesh ref={resinRef} position={[0, 0, 0]} receiveShadow>
+        <icosahedronGeometry args={[1.65, 5]} />
+        <MeshDistortMaterial
+          color="#0066ff"
+          roughness={0.1}
+          metalness={0.8}
+          transparent={true}
+          opacity={0.6}
+          distort={0.6}
+          speed={2.5}
+          clearcoat={1}
+          clearcoatRoughness={0.1}
         />
       </mesh>
     </Float>

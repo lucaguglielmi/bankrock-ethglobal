@@ -5,24 +5,12 @@ import { ArrowRight } from "lucide-react";
 import { LoginButton } from "@/components/login-button";
 import { NewsletterSignup } from "@/components/newsletter-signup";
 import { AboutRocks } from "@/components/about-rocks";
-
+import { HowItWorksDynamic } from "@/components/how-it-works-dynamic";
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col bg-white text-black font-sans selection:bg-black selection:text-white">
       
-      {/* Navbar */}
-      <nav className="w-full flex justify-between items-center z-50 p-6 md:px-12 fixed top-0 bg-white/50 backdrop-blur-md border-b border-black/5">
-        <div className="text-xl font-bold tracking-tighter">Bank Rock</div>
-        <div className="flex gap-8 items-center">
-          <Link href="/shop" className="text-sm font-medium hover:opacity-50 transition-opacity">
-            Shop
-          </Link>
-          <Link href="/mcp" className="text-sm font-medium hover:opacity-50 transition-opacity">
-            AI Oracle
-          </Link>
-          <LoginButton />
-        </div>
-      </nav>
+
 
       {/* Hero Section */}
       <section className="relative w-full h-[100vh] flex flex-col items-center justify-center pt-20 overflow-hidden">
@@ -135,6 +123,9 @@ export default function Home() {
 
         </div>
       </section>
+
+      {/* How It Works Section */}
+      <HowItWorksDynamic />
 
       {/* Newsletter Signup */}
       <NewsletterSignup />
