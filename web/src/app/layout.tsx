@@ -40,6 +40,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { VersionCheck } from "@/components/version-check";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -52,6 +54,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans bg-white text-black selection:bg-black selection:text-white">
         <ClientProviders>{children}</ClientProviders>
+        <VersionCheck />
       </body>
     </html>
   );
