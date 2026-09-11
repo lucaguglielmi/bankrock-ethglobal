@@ -57,7 +57,6 @@ Supporting sections:
   - Heavy use of SVG animations for cool interactions between states.
 - **Three.js & WebXR Artifacts:** A subtle but incredibly polished 3D artifact to anchor the landing page.
   - On the public rock page (`/r/{rockId}`), include a **Dynamic WebXR (AR) View** toggle. Users can place the 3D rock in their physical environment using their camera, with live token balances and yield stats floating around it as data holograms.
-  - **Dynamic Metadata (Gamification):** The 3D rock visual evolves based on its on-chain success (e.g., changes texture from "Granite" to "Obsidian" or "Gold" when TVL or volume milestones are met). Must be aggressively optimized for mobile.
 - **Color Palette:** Avoid excessive glassmorphism, neon gradients, and trading-terminal density. Keep it clean and minimal.
 
 ## Component policy

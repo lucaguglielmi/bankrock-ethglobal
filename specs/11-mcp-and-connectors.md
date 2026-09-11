@@ -43,7 +43,7 @@ This document defines the list of required MCP servers and connectors to interac
 
 ## 5. Bank Rock Oracle MCP (The "Master" Server)
 
-**Purpose:** The single, unified interface exposed to the user-facing AI (e.g., in the `/oracle` route or Claude Desktop). Rather than the client AI managing the complexity of Web3, Privy, and the DB individually, this Master MCP orchestrates the underlying Connectors to provide high-level, domain-specific tools.
+**Purpose:** The single, unified interface exposed to the user's external AI client (e.g., ChatGPT, Claude Desktop, Antigravity). Rather than the client AI managing the complexity of Web3, Privy, and the DB individually, this Master MCP orchestrates the underlying Connectors to provide high-level, domain-specific tools. *Note: Bank Rock does NOT host its own in-app AI agent; it only provides the MCP server for the user's preferred agent to connect to.*
 **Implementation:** A bespoke TypeScript MCP Server hosted as part of our backend infrastructure.
 **Key Tools:**
 - `get_rock_status(rockId)` — aggregates data from the DB, Privy, and Web3 to return a unified health and ownership state.

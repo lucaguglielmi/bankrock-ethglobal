@@ -52,11 +52,9 @@ The Rock Account:
 
 Aqua records the virtual balances for each maker, application and strategy hash. A Bank Rock strategy includes the public rock ID or an immutable derivative as its salt, allowing activity to be attributed to the physical object.
 
-### Indexer, Database, and Dynamic Metadata Engine
+### Indexer and application database
 
-The backend indexes contract events and maintains presentation data such as names, photos, and gift messages. 
-
-**Dynamic Metadata (Forging):** The backend monitors the rock's on-chain success (e.g., trading volume, TVL duration). When milestones are hit, the backend permanently updates the rock's digital presentation metadata, causing the 3D WebXR artifact to visually evolve (e.g., from Granite to Obsidian).
+The backend indexes contract events and maintains presentation data such as names, photos, gift messages, and the one-time activation codes.
 
 **Stack:**
 - **Database:** Supabase (PostgreSQL) or Vercel Postgres, accessed via Next.js Server Actions.
@@ -79,10 +77,6 @@ A dedicated logging and monitoring layer ensuring the system is self-aware and d
 ### Cross-Chain Intent Protocol
 
 A bridge layer (e.g., Across, LayerZero, CCIP) abstracts the underlying network of the Rock Account. This allows users to fund rocks or buy tokens using liquidity from any supported chain (e.g., Base, Optimism, Arbitrum) seamlessly, without needing to bridge funds manually first.
-
-### P2P OTC Engine (Rock-to-Rock Bumping)
-
-A peer-to-peer settlement layer allowing two physical rocks in close proximity to execute a gasless, zero-slippage swap between their respective Smart Accounts. A QR-code handshake established via the frontend generates a deterministic, single-use atomic swap payload executed by the Paymaster.
 
 ## Trust boundaries
 

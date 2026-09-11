@@ -73,17 +73,9 @@ Transfer control to a second Privy account. Emphasize that thanks to ERC-4337 an
 
 ### 2:30–2:55 — The AI Oracle & Agentic Strategies (MCP)
 
-Open a chat interface with an AI agent (e.g., Claude Desktop). Say, "I want to fund this rock with 50 USDC but keep it low risk." The agent connects via the Bank Rock MCP Server, bridges the funds from an L2 (Cross-chain Abstraction), and automatically generates and ships a customized Aqua strategy. 
+Open an external chat interface with an AI agent (e.g., ChatGPT or Claude Desktop). Say, "I want to fund this rock with 50 USDC but keep it low risk." The user's external agent connects via the Bank Rock MCP Server, bridges the funds from an L2 (Cross-chain Abstraction), and automatically generates and ships a customized Aqua strategy. *Note: We do not run our own AI agent in the app; we simply expose the MCP server for the user's preferred agent to connect to.*
 
-### 2:55–3:10 — Rock-to-Rock Bumping (P2P Swap)
-
-Show two phones next to each other. "Bump" the rocks/phones to generate a short-range QR handshake, executing an instant, zero-slippage OTC swap between the two Rock Accounts.
-
-### 3:10–3:20 — Gamification & Forging
-
-Show that because the Rock hit $1,000 in volume, its AR visual permanently evolves from Granite to Obsidian.
-
-Close with the reusable primitive:
+### 2:55–3:10 — Platform potential
 
 “Bank Rock binds physical objects to programmable, self-custodial liquidity, and makes them conversational via AI. Rocks are the first interface; art, cards, products and installations can use the same model.”
 

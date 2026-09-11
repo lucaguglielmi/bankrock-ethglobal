@@ -111,19 +111,12 @@ Preferred target experience:
 4. The MCP provides the rock's current balances, Aqua strategy, and historical fees.
 5. The AI agent analyzes the data and responds with a natural language summary and recommendations (e.g., "Your rock earned 5 USDC this week. I recommend tightening the spread based on current volatility.").
 
-## Flow J — Agentic Strategy Creation
+## Flow J — Agentic Strategy Creation (via External AI Client)
 
-1. Owner tells their AI Oracle: "I want to fund this rock with 50 USDC but keep it very low risk."
-2. The AI Oracle (via MCP) automatically calculates the optimal Aqua strategy parameters for the requested risk profile.
-3. The AI prepares the transaction data and prompts the owner for approval.
-4. The owner taps a button to sign the transaction via Privy.
-5. The AI monitors the strategy over time, sending push notifications if rebalancing is recommended.
+*Note: Bank Rock does not host an in-app AI agent. Instead, it exposes a Master Oracle MCP Server that the user can connect to via their own external AI client (e.g., ChatGPT, Claude Desktop).*
 
-## Flow K — Rock-to-Rock Bumping (P2P OTC Swaps)
-
-1. Two Bank Rock owners are in the same physical room.
-2. They select "Bump" on their respective web interfaces.
-3. One phone generates a short-range QR code (the handshake), and the other scans it.
-4. The frontend prepares a zero-slippage, zero-fee OTC (Over-The-Counter) swap between their two Smart Accounts.
-5. Both users approve the swap via Privy.
-6. The assets are exchanged instantly on-chain, bypassing standard liquidity pools.
+1. Owner connects their preferred AI client to the Bank Rock MCP Server.
+2. Owner tells their AI: "I want to fund this rock with 50 USDC but keep it very low risk."
+3. The AI (via MCP tools) automatically calculates the optimal Aqua strategy parameters for the requested risk profile.
+4. The AI prepares the transaction data and prompts the owner for approval, providing a direct link or payload for the Bank Rock app.
+5. The owner reviews the payload and taps a button to sign the transaction via Privy.
