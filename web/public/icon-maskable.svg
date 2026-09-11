@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Full Bleed Black Canvas for Android Adaptive Masking -->
+  <rect width="512" height="512" fill="#000000" />
+  
+  <!-- Safe Zone Concentric Rings (Centered within 80% area) -->
+  <circle cx="256" cy="256" r="160" stroke="#ffffff" stroke-opacity="0.2" stroke-width="2" stroke-dasharray="6 6" />
+  <circle cx="256" cy="256" r="124" stroke="#ffffff" stroke-opacity="0.35" stroke-width="3" />
+  <circle cx="256" cy="256" r="88" stroke="#ffffff" stroke-opacity="0.55" stroke-width="4" />
+  
+  <!-- Organic Florentine River Stone Silhouette -->
+  <path 
+    d="M 256 186 
+       C 310 186, 336 215, 336 256 
+       C 336 300, 304 326, 256 326 
+       C 205 326, 176 300, 176 256 
+       C 176 215, 205 186, 256 186 Z" 
+    fill="#ffffff" 
+  />
+  
+  <!-- Inner Cryptographic NTAG 424 Core -->
+  <circle cx="256" cy="256" r="12" fill="#000000" />
+</svg>

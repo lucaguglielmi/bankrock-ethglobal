@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Minimalist Black Canvas -->
+  <rect width="512" height="512" rx="112" fill="#000000" />
+  
+  <!-- Concentric NFC / Liquidity Orbit Rings -->
+  <circle cx="256" cy="256" r="200" stroke="#ffffff" stroke-opacity="0.15" stroke-width="2" stroke-dasharray="8 8" />
+  <circle cx="256" cy="256" r="156" stroke="#ffffff" stroke-opacity="0.28" stroke-width="3" />
+  <circle cx="256" cy="256" r="112" stroke="#ffffff" stroke-opacity="0.5" stroke-width="4" />
+  
+  <!-- Organic Florentine River Stone Silhouette -->
+  <path 
+    d="M 256 168 
+       C 324 168, 356 204, 356 256 
+       C 356 312, 316 344, 256 344 
+       C 192 344, 156 312, 156 256 
+       C 156 204, 192 168, 256 168 Z" 
+    fill="#ffffff" 
+  />
+  
+  <!-- Inner Cryptographic NTAG 424 Core -->
+  <circle cx="256" cy="256" r="14" fill="#000000" />
+</svg>
