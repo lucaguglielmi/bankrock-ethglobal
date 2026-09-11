@@ -98,7 +98,7 @@ export function HowItWorks() {
               <InfoModal 
                 triggerText="How do I control the rock?" 
                 title="How do I control the rock?"
-                content="Control is entirely physical and cryptographic. Tap your NFC-enabled smartphone against the resin-sealed portion of the Bank Rock. This triggers a secure connection, opening the interface to manage your position, rebalance, or withdraw funds instantly."
+                content="Control is entirely physical and cryptographic. Tap your NFC-enabled smartphone against the resin-sealed portion of the Bank Rock to securely open the interface. Alternatively, you can copy the setup prompt to your favorite AI agent and control the rock via the Model Context Protocol (MCP). Your agent can perform on-chain operations, manage your liquidity, and rebalance your portfolio entirely on your behalf."
               />
             </div>
           </div>
