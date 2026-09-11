@@ -20,7 +20,7 @@ export function AnimatedText({ text, className = "", delay = 0 }: AnimatedTextPr
     }),
   };
 
-  const child = {
+  const child: import("framer-motion").Variants = {
     visible: {
       opacity: 1,
       y: 0,
