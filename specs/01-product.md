@@ -46,6 +46,7 @@ These remain secondary until the primary gift flow works end to end.
 5. **Financial honesty:** show fees, risks and balances precisely. Do not promise APY or guaranteed growth.
 6. **Tangible history:** activation, strategies, trades and transfers should make the object feel persistent.
 7. **Small-value friendly:** the initial experience should work with tiny balances and sponsored or minimized transaction friction.
+8. **Progressive disclosure & optimistic UI:** hide technical details (hex addresses, raw gas) unless explicitly requested. Use optimistic updates to make the physical-to-digital bridge feel instantaneous.
 
 ## Success measures for the hackathon
 

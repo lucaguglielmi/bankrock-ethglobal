@@ -30,7 +30,7 @@ Registration does not create or fund a wallet.
 4. Privy authenticates the user and creates or restores their embedded wallet.
 5. The server mathematically verifies the NTAG 424 DNA signature.
 6. The system creates or links the Rock Account.
-7. The user funds it with the supported testnet token pair.
+7. The user funds it with the supported testnet token pair **(via a built-in 1-click testnet faucet to eliminate onboarding friction)**.
 8. The owner selects a predefined liquidity personality and deposit amounts.
 9. **Atomic UserOperation Batching (1-Click Launch):** The user approves once via Privy. The ERC-4337 Smart Account executes a batched call (`executeBatch`) bundling `tokenA.approve(Aqua)`, `tokenB.approve(Aqua)`, and `Aqua.ship(strategyHash, SwapVM bytecode)` into a single atomic transaction.
 10. The application confirms the live Aqua strategy and updates available virtual liquidity immediately.
@@ -74,7 +74,7 @@ Preferred target experience:
 4. Recipient physically receives and taps the rock.
 5. Recipient signs in through Privy (Email, Passkey, or Social).
 6. The server mathematically verifies the NTAG 424 DNA signature to prove physical possession.
-7. Current owner approves the handover, or a previously signed handover policy completes it.
+7. The system applies the **asynchronous pre-signed handover policy** (created in step 3), completing the transfer instantly without requiring the original owner to be online.
 8. Control of the ERC-4337 Smart Account updates its owner signing key. **Gas is 100% sponsored by a Paymaster**, ensuring the recipient pays zero fees and requires no native tokens.
 9. The account address and history remain completely stable.
 10. Both parties receive a transfer receipt.
