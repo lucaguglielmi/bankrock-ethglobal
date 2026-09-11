@@ -136,7 +136,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
-        if (name === "get_rock_status":
+        if (name === "get_rock_status") {
       return {
         content: [{ type: "text", text: `Mock: Rock ${args?.rockId} is healthy and active. Owner is currently verified.` }],
       };

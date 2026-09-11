@@ -15,8 +15,8 @@ export default function Home() {
           <Link href="/shop" className="text-sm font-medium hover:opacity-50 transition-opacity">
             Shop
           </Link>
-          <Link href="/developers" className="text-sm font-medium hover:opacity-50 transition-opacity">
-            Developers
+          <Link href="/mcp" className="text-sm font-medium hover:opacity-50 transition-opacity">
+            AI Oracle
           </Link>
           <LoginButton />
         </div>
@@ -88,9 +88,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-12">
           <div className="text-4xl font-black tracking-tighter">Bank Rock</div>
           <div className="flex gap-8 text-neutral-400 font-medium">
+            <Link href="/mcp" className="hover:text-white transition-colors">AI Oracle</Link>
+            <Link href="/shop" className="hover:text-white transition-colors">Shop</Link>
             <Link href="#" className="hover:text-white transition-colors">Twitter</Link>
-            <Link href="#" className="hover:text-white transition-colors">GitHub</Link>
-            <Link href="#" className="hover:text-white transition-colors">Terms</Link>
+            <Link href="https://github.com/lucaguglielmi/bankrock-ethglobal" className="hover:text-white transition-colors">GitHub</Link>
           </div>
         </div>
       </footer>

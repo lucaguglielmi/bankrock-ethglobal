@@ -57,7 +57,7 @@ export async function verifyNtagSignature(params: VerifyNtagParams): Promise<Ver
         message: "Invalid CMAC signature.",
       };
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("NTAG Verification Error:", error);
     return {
       success: false,

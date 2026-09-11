@@ -1,7 +1,7 @@
-import { createSmartAccountClient, createPaymaster } from "permissionless";
 import { toSafeSmartAccount } from "permissionless/accounts";
 import { createPublicClient, http, encodeFunctionData } from "viem";
 import { baseSepolia } from "viem/chains";
+import { createPimlicoClient } from "permissionless/clients/pimlico";
 
 // ERC-20 ABI subset
 const erc20Abi = [
@@ -37,25 +37,25 @@ export const publicClient = createPublicClient({
 });
 
 // Dual Paymaster setup
-export const verifyingPaymaster = createPaymaster({
+export const verifyingPaymaster = createPimlicoClient({
   transport: http("https://api.pimlico.io/v2/84532/rpc?apikey=API_KEY"),
 });
 
-export const erc20Paymaster = createPaymaster({
+export const erc20Paymaster = createPimlicoClient({
   transport: http("https://api.pimlico.io/v2/84532/rpc?apikey=API_KEY"),
   // Context for ERC-20 paymaster would go here
 });
 
-export async function createRockAccount(signer: any) {
+export async function createRockAccount(signer: Parameters<typeof toSafeSmartAccount>[0]["owners"][0]) {
   return await toSafeSmartAccount({
     client: publicClient,
-    owner: signer,
+    owners: [signer],
     version: "1.4.1",
   });
 }
 
 export async function launchStrategy(
-  smartAccountClient: any,
+  smartAccountClient: { sendTransaction: (args: { calls: Array<{ to: `0x${string}`; data: `0x${string}`; value: bigint }> }) => Promise<`0x${string}`> },
   tokenA: `0x${string}`,
   tokenB: `0x${string}`,
   aquaContract: `0x${string}`,
@@ -74,7 +74,7 @@ export async function launchStrategy(
           functionName: "approve",
           args: [aquaContract, amountA],
         }),
-        value: 0n,
+        value: BigInt(0),
       },
       {
         to: tokenB,
@@ -83,7 +83,7 @@ export async function launchStrategy(
           functionName: "approve",
           args: [aquaContract, amountB],
         }),
-        value: 0n,
+        value: BigInt(0),
       },
       {
         to: aquaContract,
@@ -92,7 +92,7 @@ export async function launchStrategy(
           functionName: "ship",
           args: [strategyHash, bytecode],
         }),
-        value: 0n,
+        value: BigInt(0),
       },
     ],
   });

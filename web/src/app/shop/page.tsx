@@ -9,7 +9,14 @@ export default function Shop() {
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
-        <div className="text-xl font-bold tracking-tighter">Bank Rock</div>
+        <div className="flex gap-6 md:gap-8 items-center">
+          <Link href="/mcp" className="text-sm font-medium hover:opacity-50 transition-opacity">
+            AI Oracle
+          </Link>
+          <Link href="/" className="text-xl font-bold tracking-tighter">
+            Bank Rock
+          </Link>
+        </div>
       </nav>
 
       <div className="flex-1 flex flex-col items-center z-10 w-full max-w-4xl mx-auto">

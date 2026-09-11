@@ -1,0 +1,132 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+/**
+ * @title BankRockRegistry
+ * @author BankRock Team
+ * @notice The immutable registry for Bank Rock objects.
+ *
+ * @dev 
+ *   Welcome to the Bank Rock smart contract! 
+ *   If you're reading this on Etherscan or via a CLI, you're awesome.
+ * 
+ *        _.._
+ *      /   _ \
+ *     |  /` | |
+ *     | |   | |
+ *      \ \_ / /
+ *       `--'
+ *   
+ *   We built this contract to be extremely friendly for developers.
+ *   Try calling `getRockStatusJSON(id)` to get a perfectly formatted 
+ *   JSON string of the rock's state right in your terminal! No ABI parsing needed.
+ */
+contract BankRockRegistry {
+    // Custom descriptive errors (save gas and give crystal clear feedback)
+    error RockAlreadyAwakened(uint256 rockId);
+    error UnauthorizedTapper(address caller, address expectedOwner);
+    error InvalidNFCSequence();
+
+    struct Rock {
+        address smartAccount;
+        address currentOwner;
+        uint256 awakenedAt;
+        bool isAwake;
+    }
+
+    mapping(uint256 => Rock) public rocks;
+
+    event RockAwakened(uint256 indexed rockId, address indexed owner, address smartAccount);
+    event RockPoked(address indexed poker, string message);
+
+    /**
+     * @notice Registers a new physical rock on-chain.
+     */
+    function awakenRock(uint256 rockId, address smartAccount) external {
+        if (rocks[rockId].isAwake) {
+            revert RockAlreadyAwakened(rockId);
+        }
+
+        rocks[rockId] = Rock({
+            smartAccount: smartAccount,
+            currentOwner: msg.sender,
+            awakenedAt: block.timestamp,
+            isAwake: true
+        });
+
+        emit RockAwakened(rockId, msg.sender, smartAccount);
+    }
+
+    /**
+     * @notice A fun function just for developers poking the contract.
+     * @return A greeting message from the rock.
+     */
+    function poke() external returns (string memory) {
+        string memory msg_ = "The rock acknowledges your presence. Keep building!";
+        emit RockPoked(msg.sender, msg_);
+        return msg_;
+    }
+
+    /**
+     * @notice A developer-delight feature! Returns the rock's state as a fully 
+     * formatted JSON string. Perfect for CLI users `cast call` or Etherscan `Read Contract`
+     * tab. You don't even need the ABI to read the state beautifully!
+     */
+    function getRockStatusJSON(uint256 rockId) external view returns (string memory) {
+        Rock memory r = rocks[rockId];
+        
+        if (!r.isAwake) {
+            return '{"status": "unawakened", "message": "This rock is still asleep."}';
+        }
+
+        // We use string.concat to build a clean JSON response directly on-chain
+        return string.concat(
+            '{',
+            '"rockId": "', _uint2str(rockId), '",',
+            '"status": "awake",',
+            '"smartAccount": "', _toAsciiString(r.smartAccount), '",',
+            '"owner": "', _toAsciiString(r.currentOwner), '",',
+            '"awakenedAt": ', _uint2str(r.awakenedAt),
+            '}'
+        );
+    }
+
+    // --- Internal Helpers ---
+
+    function _uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
+        if (_i == 0) return "0";
+        uint256 j = _i;
+        uint256 len;
+        while (j != 0) {
+            len++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(len);
+        uint256 k = len;
+        while (_i != 0) {
+            k = k - 1;
+            uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            _i /= 10;
+        }
+        return string(bstr);
+    }
+
+    function _toAsciiString(address x) internal pure returns (string memory) {
+        bytes memory s = new bytes(40);
+        for (uint i = 0; i < 20; i++) {
+            bytes1 b = bytes1(uint8(uint(uint160(x)) / (2**(8*(19 - i)))));
+            bytes1 hi = bytes1(uint8(b) / 16);
+            bytes1 lo = bytes1(uint8(b) - 16 * uint8(hi));
+            s[2*i] = _char(hi);
+            s[2*i+1] = _char(lo);
+        }
+        return string.concat("0x", string(s));
+    }
+
+    function _char(bytes1 b) internal pure returns (bytes1 c) {
+        if (uint8(b) < 10) return bytes1(uint8(b) + 0x30);
+        else return bytes1(uint8(b) + 0x57);
+    }
+}
