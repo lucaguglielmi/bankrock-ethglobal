@@ -21,11 +21,12 @@ This file defines direction, not an implementation commitment.
 - / — short product explanation and manual rock lookup
 - /r/{rockId} — public rock page opened from NFC
 - /r/{rockId}/awaken — activation flow
-- /r/{rockId}/fund — funding flow
+- /r/{rockId}/fund — funding and top-up flow
 - /r/{rockId}/trade — visitor swap flow
-- /r/{rockId}/manage — owner strategy controls
-- /r/{rockId}/give — ownership handover
+- /r/{rockId}/manage — owner strategy controls and Cash In flow
+- /r/{rockId}/give — ownership handover (sponsored gas)
 - /collection — rocks controlled by the signed-in user
+- /oracle — AI chat interface connected via MCP
 
 ## Public rock page
 
@@ -72,6 +73,7 @@ Reusable components should be created before route-specific versions:
 - WalletAction
 - EmptyState
 - ExplorerLink
+- OracleChatInterface (AI interaction layer)
 
 No inline styling. Product screens should use tokens and shared components.
 

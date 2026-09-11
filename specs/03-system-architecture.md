@@ -12,6 +12,12 @@ A native application is not required for the hackathon.
 
 Privy supplies user authentication, embedded wallet creation, recovery and transaction signing. The Privy wallet acts as the human owner's signer or controller.
 
+### Bank Rock MCP Server
+
+An AI-facing Model Context Protocol (MCP) server that exposes the rock's state to external AI agents (like Claude or Gemini). 
+It allows agents to read liquidity, strategies, and historical fees, and return tailored insights. 
+*(Future scope: exposing read-write tools to prepare transactions for owner signing).*
+
 ### Rock Registry
 
 A contract or minimally trusted registry binds:
@@ -27,18 +33,18 @@ Only immutable or ownership-critical facts belong onchain. Rich presentation met
 
 ### Rock Account
 
-Preferred architecture: one persistent smart account per physical rock.
+**Decision: Smart Account Architecture (ERC-4337)**
+
+Each physical rock maps to a persistent smart account (e.g., Safe configured via permissionless.js or Alto). This ensures the Rock Account address and its assets remain stable, even when the controller changes.
 
 The Rock Account:
 
 - holds the rock's ERC-20 balances;
 - approves Aqua;
 - calls Aqua ship and dock operations;
-- is controlled by the owner's Privy wallet;
-- can transfer control without changing the Rock Account address;
+- is controlled by the current owner's Privy embedded wallet;
+- transfers control to a new Privy wallet during gifting by replacing the signing key (owner) on the smart account, preserving the Rock Account address and assets;
 - restricts arbitrary execution where practical.
-
-This architecture is a proposal pending an implementation spike. Aqua compatibility and safe ownership transfer must be proven before it becomes final.
 
 ### Aqua and Bank Rock strategy
 
@@ -46,7 +52,11 @@ Aqua records the virtual balances for each maker, application and strategy hash.
 
 ### Indexer and application database
 
-The backend indexes contract events and maintains presentation data such as names, photos and gift messages.
+The backend indexes contract events and maintains presentation data such as names, photos, gift messages, and the one-time activation codes.
+
+**Stack:**
+- **Database:** Supabase (PostgreSQL) or Vercel Postgres, accessed via Next.js Server Actions.
+- **Indexer:** A lightweight indexer like Ponder to listen for onchain events and synchronize them with the database, or simple RPC polling via viem for MVP scope.
 
 It is not authoritative for:
 
@@ -66,6 +76,7 @@ It is not authoritative for:
 | Rock Registry | Object identity and lifecycle | Custody of trading funds |
 | Rock Account | Asset custody and authorized execution | Offchain metadata |
 | Aqua | Virtual liquidity accounting and strategy execution | Guaranteed yield or price safety |
+| MCP Server | Providing structured read-only rock state to AI agents | Executing unauthorized transactions or hallucinated financial claims |
 
 ## High-level transaction path
 

@@ -18,6 +18,7 @@ Target integrations are Aqua and Privy. Exact sponsor prize eligibility and requ
 8. Updated balances and fee information after confirmation.
 9. NFC cloning-safe authorization.
 10. Explorer links and honest risk disclosure.
+11. An MCP Server allowing an AI agent to read the rock's state.
 
 ## Strong target
 
@@ -67,15 +68,19 @@ If ready, show two streams sharing the reserve.
 
 Use a second account to execute a small testnet swap against the selected rock. Show confirmation, changed token composition and fee accounting.
 
-### 2:10–2:40 — Gift or transfer
+### 2:10–2:30 — Gift or transfer (Zero Gas)
 
-Transfer control to a second Privy account, or show the fully implemented handover transaction. Emphasize that copying the NFC tag cannot transfer ownership.
+Transfer control to a second Privy account. Emphasize that thanks to ERC-4337 and Paymasters, the recipient claims the rock with **zero gas fees** and no complex setup.
 
-### 2:40–3:00 — Platform potential
+### 2:30–2:50 — The AI Oracle (MCP)
+
+Open a chat interface with an AI agent (e.g., Claude Desktop). Ask the agent to "Analyze my Bank Rock." The agent connects via the Bank Rock MCP Server, reads the live onchain data, and replies with a summary of the liquidity status and tailored advice.
+
+### 2:50–3:00 — Platform potential
 
 Close with the reusable primitive:
 
-“Bank Rock binds physical objects to programmable, self-custodial liquidity. Rocks are the first interface; art, cards, products and installations can use the same model.”
+“Bank Rock binds physical objects to programmable, self-custodial liquidity, and makes them conversational via AI. Rocks are the first interface; art, cards, products and installations can use the same model.”
 
 ## Acceptance test
 

@@ -36,14 +36,13 @@ Avoid placing wallet addresses or claim secrets directly on the tag.
 
 An unactivated rock must not be claimable solely because someone scanned it first.
 
-Acceptable MVP approaches:
+**Decision: Separate One-Time Activation Code (PIN)**
 
-1. Separate single-use activation code supplied with the rock.
-2. Creator preassigns an intended recipient.
-3. Creator remains online to approve first activation.
-4. Tamper-evident printed QR or code paired with the NFC rock.
+The physical rock will be paired with a randomly generated, single-use activation code (e.g., a 6-digit PIN printed on a card included in the packaging). 
 
-Preferred MVP: separate one-time activation code plus creator-side ability to revoke it before use.
+- The creator generates the PIN and saves its hash in the database during registration.
+- The recipient enters the PIN on the rock's web page to claim it.
+- The creator retains the ability to revoke or reissue the PIN before it is used if the packaging is lost.
 
 ## Public scan behaviour
 

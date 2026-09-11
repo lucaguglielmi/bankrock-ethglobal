@@ -14,7 +14,8 @@ Each rock has:
 - a dedicated onchain account or equivalent isolated ownership boundary;
 - token balances controlled by its current owner;
 - one or more Aqua liquidity strategies;
-- a public history of activation, trades, earnings and ownership transfers.
+- a public history of activation, trades, earnings and ownership transfers;
+- a dedicated **MCP (Model Context Protocol) Server**, allowing AI agents to converse with the rock, query its liquidity status, and suggest optimal strategies.
 
 The experience should feel like awakening, filling and passing on a living object—not configuring a DeFi account.
 
@@ -32,6 +33,7 @@ This is more distinctive than gifting a token balance because the recipient rece
 - An educational object for explaining liquidity and market making.
 - A collectible whose visible history reflects how it has circulated.
 - A reusable physical interface for a creator or community treasury.
+- An AI-managed portfolio object: the user queries their AI agent to monitor the rock's earnings and get recommendations on strategy adjustments via MCP.
 
 These remain secondary until the primary gift flow works end to end.
 

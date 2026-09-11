@@ -24,9 +24,11 @@ Official references:
 | Water level | Actual and available maker balances |
 | Flow history | Aqua and app events |
 
-## Initial strategy direction
+## Strategy direction
 
-The MVP should use a two-token strategy with predictable behaviour and testnet liquidity. The starting candidate is a small constant-product or fixed-rate strategy using test tokens representing USDC and WETH.
+**Decision: Constant-product strategy**
+
+The MVP will use a simple, two-token constant-product (AMM-like) strategy. This provides predictable behaviour and is easy to reason about during a fast-paced hackathon. The strategy will use test tokens representing USDC and WETH.
 
 Strategy data should include:
 
@@ -58,38 +60,18 @@ The UI must show:
 
 The design must not add virtual strategy values together and present the result as owned capital.
 
-## Custom Aqua App versus SwapVM
+## SwapVM vs Custom Aqua App
 
-### Custom Aqua App
+**Decision: SwapVM program for MVP**
 
-Advantages:
-
-- strongest demonstration of Aqua understanding;
-- rock ID can be a first-class strategy field;
-- tailored events and fee logic;
-- distinctive technical submission.
-
-Costs:
-
-- more contract code and security risk;
-- callback and reentrancy behaviour must be implemented carefully;
-- more testing required.
-
-### SwapVM program
+Given the time constraints of the hackathon, we will use an existing **SwapVM** program instead of deploying a custom Aqua App. 
 
 Advantages:
+- Faster route to a working swap.
+- Less custom contract surface to test and secure.
+- Immediate compatibility with standard Aqua interactions.
 
-- faster route to a working swap;
-- less custom contract surface;
-- existing programmable instructions.
-
-Costs:
-
-- weaker Bank Rock-specific protocol contribution;
-- object attribution may live mainly in metadata;
-- less compelling for an Aqua-focused prize.
-
-Current recommendation: begin with a SwapVM proof of compatibility, then implement a minimal custom Bank Rock Aqua App only if the core tap-to-trade flow is stable.
+A Custom Bank Rock Aqua App is explicitly deferred to post-hackathon development.
 
 ## Financial correctness
 

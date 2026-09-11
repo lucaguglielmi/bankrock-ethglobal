@@ -28,42 +28,48 @@
 
 ## Proposed decisions requiring proof
 
-### P-001 — One persistent smart account per rock
+### D-005 — One persistent smart account per rock
 
-**Proposal:** each physical rock maps to a smart account controlled by the owner's Privy wallet.
+**Decision:** each physical rock maps to an ERC-4337 smart account controlled by the owner's Privy wallet.
 
-**Why:** stable address, isolated funds and transferable control.
+**Consequence:** stable address, isolated funds and seamless ownership transfer without moving assets.
 
-**Proof required:** demonstrate ERC-20 approvals, Aqua ship/dock calls, swap settlement and safe controller transfer from the chosen account implementation.
+### D-006 — SwapVM for MVP
 
-### P-002 — Custom Bank Rock Aqua App
+**Decision:** the MVP will use an existing SwapVM program rather than a Custom Aqua App.
 
-**Proposal:** create a minimal Aqua App whose immutable strategy includes the rock identity.
+**Consequence:** faster development and less contract security risk during the hackathon. Custom apps are deferred.
 
-**Why:** stronger protocol integration and precise rock-level attribution.
+### D-007 — Separate one-time activation code
 
-**Proof required:** working swap, callback safety, reentrancy protection and tests. Start with SwapVM if it reduces early integration risk.
+**Decision:** rocks are paired with a randomly generated, single-use activation PIN.
 
-### P-003 — Separate one-time activation code
+**Consequence:** prevents first-scanner theft and ensures the intended recipient can safely claim the dormant funded rock.
 
-**Proposal:** pair ordinary NFC tags with a single-use secret supplied outside the tag.
+### D-008 — MCP AI Integration (Read-Only MVP)
 
-**Why:** prevents first-scanner theft of dormant funded rocks.
+**Decision:** The Bank Rock backend will include an MCP (Model Context Protocol) Server.
 
-**Proof required:** threat-model review and recovery flow.
+**Consequence:** Allows external AI agents (like Claude or Gemini) to connect to the rock, read its live onchain data (liquidity, fees, strategy), and provide conversational advice to the owner. The MVP scope is read-only for security.
+
+### D-009 — Zero-Gas UX via Paymasters
+
+**Decision:** The entire lifecycle (especially gifting) will use ERC-4337 Paymasters to sponsor 100% of the gas fees for the user.
+
+**Consequence:** Recipients claiming a Bank Rock do not need to onboard with native tokens, dramatically improving the consumer experience.
 
 ## Open product questions
 
-1. Is the hackathon's main story gifting, a public micro-exchange, or both? Current recommendation: gifting as the product, public tap-to-trade as the demonstration.
-2. Should a dormant gift earn fees before the recipient claims it? Current preference: yes, controlled by the giver until handover.
-3. Which two testnet tokens and which supported network provide the most reliable Aqua demo?
-4. Should anyone be allowed to trade with a rock, or only invited visitors?
-5. Are rock names globally unique, edition-local or cosmetic?
-6. What information remains after an owner requests privacy?
-7. What fee, if any, does Bank Rock itself charge?
-8. Is the initial custom strategy AMM-like, fixed-price or time-limited?
-9. Does ownership transfer preserve the maker address in the selected account architecture?
-10. Which sponsor-specific requirements must be reflected in the final demo?
+1. **Is the hackathon's main story gifting, a public micro-exchange, or both?** Gifting is the core product journey; public tap-to-trade is the primary demonstration of the liquidity.
+2. **Should a dormant gift earn fees before the recipient claims it?** Yes, the rock is active and controlled by the giver until the handover is complete.
+3. **Which two testnet tokens and which supported network provide the most reliable Aqua demo?** Base Sepolia or Arbitrum Sepolia, using test USDC and test WETH.
+4. **Should anyone be allowed to trade with a rock, or only invited visitors?** Anyone who scans the rock can trade with it to maximize demo interactivity.
+5. **Are rock names globally unique, edition-local or cosmetic?** Cosmetic. The public rock ID is the only globally unique identifier.
+6. **What information remains after an owner requests privacy?** The public rock ID, active strategies, and total balances (as they are onchain). Only presentation metadata (name, photo) is hidden.
+7. **What fee, if any, does Bank Rock itself charge?** Zero for the MVP.
+8. **Is the initial custom strategy AMM-like, fixed-price or time-limited?** Constant-product (AMM-like).
+9. **Does ownership transfer preserve the maker address in the selected account architecture?** Yes, the ERC-4337 smart account architecture explicitly guarantees this.
+10. **Which sponsor-specific requirements must be reflected in the final demo?** The demo must clearly highlight Privy onboarding and 1inch/Aqua liquidity provision.
 
 ## Implementation spikes
 

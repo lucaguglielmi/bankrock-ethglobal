@@ -72,14 +72,12 @@ Preferred target experience:
 2. Owner chooses an expiry and optionally adds a message.
 3. A pending handover is created.
 4. Recipient physically receives and taps the rock.
-5. Recipient signs in through Privy.
-6. Recipient proves access to the separate claim secret.
+5. Recipient signs in through Privy (Email, Passkey, or Social).
+6. Recipient proves access to the separate claim secret (PIN).
 7. Current owner approves the handover, or a previously signed handover policy completes it.
-8. Control of the Rock Account changes.
-9. The account address and history remain stable.
+8. Control of the ERC-4337 Smart Account updates its owner signing key. **Gas is 100% sponsored by a Paymaster**, ensuring the recipient pays zero fees and requires no native tokens.
+9. The account address and history remain completely stable.
 10. Both parties receive a transfer receipt.
-
-If stable account-control transfer is not viable in the MVP, use an explicit dock–transfer–reship migration and label it as a fallback rather than pretending the account stayed unchanged.
 
 ## Flow F — Lost or copied tag
 
@@ -88,3 +86,27 @@ If stable account-control transfer is not viable in the MVP, use an explicit doc
 - Scanning a copied tag exposes only public information.
 - Financial actions still require Privy authentication and owner authorization.
 - A replacement tag may point to the existing Rock Account after verification.
+
+## Flow G — Top Up the rock
+
+1. Owner authenticates via Privy.
+2. Owner selects **Top Up** on the rock's management page.
+3. User is presented with a simplified fiat on-ramp (via Privy integration or similar) or a cross-chain deposit flow.
+4. User completes the payment flow (e.g., Apple Pay).
+5. The Rock Account receives the new tokens and optionally autoships them into the active Aqua strategy.
+
+## Flow H — Cash In
+
+1. Owner authenticates via Privy.
+2. Owner selects **Cash In** to extract their liquidity.
+3. The interface docks the active Aqua strategies.
+4. Assets are routed to a fiat off-ramp (simulated for MVP) or swapped to stablecoins and sent to an external exchange wallet.
+5. This abstracts the DeFi complexity of removing liquidity.
+
+## Flow I — AI Query (via MCP)
+
+1. Owner interacts with their personal AI agent (e.g., in an MCP-supported chat interface).
+2. Owner says, "Check the status of my Bank Rock and tell me if I should adjust my strategy."
+3. The AI agent seamlessly connects to the Bank Rock MCP Server.
+4. The MCP provides the rock's current balances, Aqua strategy, and historical fees.
+5. The AI agent analyzes the data and responds with a natural language summary and recommendations (e.g., "Your rock earned 5 USDC this week. I recommend tightening the spread based on current volatility.").

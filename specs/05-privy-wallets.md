@@ -53,22 +53,17 @@ For the MVP, every high-risk action should require an explicit owner signature. 
 
 Ownership transfer must not mean transferring an embedded wallet's private key.
 
-Preferred flow:
+**Decision: ERC-4337 Controller Update with Paymasters**
 
-- current Privy wallet authorizes a controller change;
-- recipient authenticates and supplies their destination wallet;
-- Rock Account updates its controller;
-- account address, funds and Aqua maker identity remain stable.
+Because the Rock Account is an ERC-4337 Smart Account, we can seamlessly transfer ownership while sponsoring 100% of the gas costs via a Paymaster:
 
-Fallback flow if Aqua or account compatibility prevents this:
+- current Privy wallet authorizes a controller (owner signing key) change;
+- recipient authenticates and supplies their destination Privy embedded wallet address;
+- Rock Account updates its owner signing key to the new recipient;
+- **Gas is sponsored by a Paymaster**, so the recipient does not need any native tokens to claim the rock;
+- account address, funds and Aqua maker identity remain completely stable.
 
-- dock active strategies;
-- transfer assets;
-- establish a new Rock Account;
-- reship equivalent strategies;
-- preserve provenance through registry events.
-
-The fallback changes the economic account and must be described honestly in the interface.
+This avoids the complexity of the "dock, transfer, reship" fallback entirely.
 
 ## Failure states
 

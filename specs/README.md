@@ -14,14 +14,14 @@ Working line: **Liquidity you can hold.**
 
 | Document | Purpose | Status |
 | --- | --- | --- |
-| [01-product.md](./01-product.md) | Product proposition, audience and principles | Draft |
-| [02-user-flows.md](./02-user-flows.md) | Activation, funding, trading, gifting and recovery | Draft |
-| [03-system-architecture.md](./03-system-architecture.md) | Components, trust boundaries and data ownership | Draft |
-| [04-aqua-integration.md](./04-aqua-integration.md) | Aqua model and Bank Rock strategy design | Draft |
-| [05-privy-wallets.md](./05-privy-wallets.md) | Authentication, wallets and ownership | Draft |
-| [06-nfc-security.md](./06-nfc-security.md) | Tag behaviour, cloning threat and claim security | Draft |
-| [07-frontend.md](./07-frontend.md) | Mobile-first interface and design-system direction | Draft |
-| [08-mvp-and-demo.md](./08-mvp-and-demo.md) | Hackathon scope, demo story and acceptance criteria | Draft |
+| [01-product.md](./01-product.md) | Product proposition, audience and principles | Active |
+| [02-user-flows.md](./02-user-flows.md) | Activation, funding, trading, gifting and recovery | Active |
+| [03-system-architecture.md](./03-system-architecture.md) | Components, trust boundaries and data ownership | Active |
+| [04-aqua-integration.md](./04-aqua-integration.md) | Aqua model and Bank Rock strategy design | Active |
+| [05-privy-wallets.md](./05-privy-wallets.md) | Authentication, wallets and ownership | Active |
+| [06-nfc-security.md](./06-nfc-security.md) | Tag behaviour, cloning threat and claim security | Active |
+| [07-frontend.md](./07-frontend.md) | Mobile-first interface and design-system direction | Active |
+| [08-mvp-and-demo.md](./08-mvp-and-demo.md) | Hackathon scope, demo story and acceptance criteria | Active |
 | [09-decisions.md](./09-decisions.md) | Open questions and architectural decisions | Active |
 
 ## Spec rules
