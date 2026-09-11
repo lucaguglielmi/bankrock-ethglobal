@@ -16,16 +16,16 @@ To achieve an automated "push to main and go live" workflow, we utilize the foll
 - **Configuration:** No custom configuration required; Vercel detects the Next.js preset automatically. Ensure the root directory in Vercel is set to `web`.
 
 ### 2. Master Oracle MCP Server
-- **Provider:** Railway (or Render)
-- **Framework:** Node.js (TypeScript)
-- **Pipeline:** Railway's GitHub integration.
+- **Provider:** Cloudflare Workers
+- **Framework:** Node.js / TypeScript
+- **Pipeline:** Cloudflare's native GitHub integration (Wrangler Action).
 - **Workflow:**
   - Auto-deploys on pushes to `main`.
-- **Configuration:** Point the Railway service root directory to `mcp`. Ensure the start command is `npm run start` and the build command is `npm run build`.
+- **Configuration:** Deploy the MCP server as a Cloudflare Worker since it synergizes perfectly with the Cloudflare D1 database.
 
 ### 3. Database
-- **Provider:** Supabase
-- **Pipeline:** Manual migration execution via the Supabase CLI or SQL editor. We do not automatically apply database migrations on push to `main` to prevent accidental data loss.
+- **Provider:** Cloudflare D1
+- **Pipeline:** Manual migration execution via Wrangler CLI or Cloudflare dashboard. We do not automatically apply database migrations on push to `main` to prevent accidental data loss.
 
 ### 4. Smart Contracts
 - **Provider:** Target testnets (e.g., Base Sepolia)

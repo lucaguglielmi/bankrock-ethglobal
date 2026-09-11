@@ -57,7 +57,7 @@ Aqua records the virtual balances for each maker, application and strategy hash.
 The backend indexes contract events and maintains presentation data such as names, photos, gift messages, and the one-time activation codes.
 
 **Stack:**
-- **Database:** Supabase (PostgreSQL) or Vercel Postgres, accessed via Next.js Server Actions.
+- **Database:** Cloudflare D1 (Serverless SQLite), accessed via Next.js Server Actions or Cloudflare Workers.
 - **Indexer:** A lightweight indexer like Ponder to listen for onchain events and synchronize them with the database, or simple RPC polling via viem for MVP scope.
 
 It is not authoritative for:
