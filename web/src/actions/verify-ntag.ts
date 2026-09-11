@@ -3,6 +3,7 @@
 import crypto from "crypto";
 
 import { logger } from "@/lib/telemetry";
+import { verifyAndIncrementCounter } from "@/lib/counter-store";
 
 export interface VerifyNtagParams {
   uid?: string;
@@ -57,11 +58,28 @@ export async function verifyNtagSignature(params: VerifyNtagParams): Promise<Ver
     const latencyMs = Date.now() - start;
 
     if (isValid) {
+      // Atomic counter persistence check: reject replays or decremented counters
+      const counterCheck = await verifyAndIncrementCounter(
+        params.rockId || 1,
+        uid,
+        readCount
+      );
+
+      if (!counterCheck.valid) {
+        return {
+          success: true,
+          isAuthentic: false,
+          message: counterCheck.reason || "Replay attack detected: PICC counter is not fresh.",
+          latencyMs,
+        };
+      }
+
       logger.info("Physical NTAG 424 DNA verified successfully", {
         action: "NFC_CMAC_VERIFIED",
         rockId: params.rockId,
         uid,
         readCount,
+        previousCounter: counterCheck.previousCounter,
         cmac: params.c?.slice(0, 10) + "...",
         latencyMs,
       });

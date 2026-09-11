@@ -129,6 +129,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["rockId"],
         },
       },
+      {
+        name: "run_aqua_keeper",
+        description: "Evaluates and executes an autonomous rebalance on the 1inch Aqua liquidity pool for a Bank Rock, harvesting fees and re-centering inventory.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            rockId: { type: "string", description: "The Rock ID to evaluate or rebalance (e.g. '1')" },
+            execute: { type: "boolean", description: "Whether to execute the rebalance (true) or just dry-run evaluation (false)" },
+            thresholdPercent: { type: "number", description: "Deviation threshold percentage to trigger rebalance (default: 3.0)" },
+          },
+          required: ["rockId"],
+        },
+      },
     ],
   };
 });
@@ -360,6 +373,45 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       return {
         content: [{ type: "text", text: JSON.stringify(optimization, null, 2) }],
+      };
+    }
+
+    if (name === "run_aqua_keeper") {
+      const rockId = String(args?.rockId || "1");
+      const shouldExecute = Boolean(args?.execute);
+      const threshold = Number(args?.thresholdPercent || 3.0);
+
+      const res = await fetch(`${LIVE_API_URL}/api/keeper?rockId=${encodeURIComponent(rockId)}&threshold=${threshold}`);
+      const evalData = await res.json() as any;
+
+      if (shouldExecute && evalData.needsRebalance) {
+        const execRes = await fetch(`${LIVE_API_URL}/api/keeper`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rockId }),
+        });
+        const execData = await execRes.json();
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              mode: "EXECUTED",
+              initialEvaluation: evalData,
+              rebalanceResult: execData,
+            }, null, 2)
+          }],
+        };
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            mode: shouldExecute ? "SKIPPED_ALREADY_BALANCED" : "DRY_RUN_EVALUATION",
+            evaluation: evalData,
+          }, null, 2)
+        }],
       };
     }
 
