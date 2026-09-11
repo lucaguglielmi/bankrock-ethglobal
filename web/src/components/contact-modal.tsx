@@ -113,6 +113,21 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
               </label>
             </div>
             <div className="relative group">
+              <input 
+                required 
+                type="text" 
+                id="skill"
+                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus:border-black transition-all placeholder-transparent" 
+                placeholder="What's something you can do very well?" 
+              />
+              <label 
+                htmlFor="skill" 
+                className="absolute left-4 top-2 text-xs font-bold uppercase tracking-wider text-neutral-400 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-focus:top-2 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase"
+              >
+                What's something you can do very well?
+              </label>
+            </div>
+            <div className="relative group">
               <textarea 
                 required 
                 id="message"
