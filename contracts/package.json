@@ -4,12 +4,13 @@
   "main": "index.js",
   "scripts": {
     "compile": "hardhat compile",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "hardhat test",
+    "deploy": "node scripts/deploy.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Bank Rock smart contracts for ERC-4337 Safe Registry and 1inch Aqua liquidity positions.",
   "devDependencies": {
     "hardhat": "^3.16.0"
   },

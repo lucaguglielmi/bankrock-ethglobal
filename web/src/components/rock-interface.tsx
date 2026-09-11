@@ -7,6 +7,8 @@ import { TradeModal, type TradeDetails } from "@/components/trade-modal";
 import { TransferModal } from "@/components/transfer-modal";
 import { DemoSwitcher, type DemoScenario } from "@/components/demo-switcher";
 import { RockActivity, type ActivityEvent } from "@/components/rock-activity";
+import { AquaPositionCard } from "@/components/aqua-position-card";
+import { PrivyOnboardingModal } from "@/components/privy-onboarding-modal";
 import { ExternalLink, Check, Sparkles, ShieldCheck, ShieldAlert, Copy } from "lucide-react";
 
 interface RockInterfaceProps {
@@ -67,10 +69,12 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
 
   // Derive current owner address reactively without setState in an effect
   const ownerAddress = customOwnerAddress || user?.wallet?.address || "0x71C8564E688172F6e1a90c0071C8097b6De81F26";
+  const smartAccountAddress = "0x89F735F4C74F878D3aAc6e60b134d115e5E29631";
 
   // Modals state
   const [isTradeOpen, setIsTradeOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
   // Awakening flow state
   const [awakeningStage, setAwakeningStage] = useState<string>("");
@@ -171,11 +175,26 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
 
   const handleAwaken = async () => {
     if (!authenticated) {
-      setStep("authenticating");
-      login();
+      setIsOnboardingOpen(true);
       return;
     }
     await startAwakening();
+  };
+
+  const handlePositionUpdated = (newLiquidity: number) => {
+    const delta = newLiquidity - liquidity;
+    setLiquidity(newLiquidity);
+    setEvents((prev) => [
+      {
+        id: `aqua-rebalance-${Date.now()}`,
+        type: "trade",
+        title: "1inch Aqua Reserve Rebalanced",
+        description: `Deposited +${delta.toFixed(2)} USDC to Aqua Maker reserve with zero gas.`,
+        detail: "Bytecode shipped via ERC-4337 UserOperation",
+        timestamp: "Just now",
+      },
+      ...prev,
+    ]);
   };
 
   useEffect(() => {
@@ -325,6 +344,12 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           onSelectScenario={handleSelectScenario}
           onReset={handleResetDemo}
         />
+
+        <PrivyOnboardingModal
+          isOpen={isOnboardingOpen}
+          onClose={() => setIsOnboardingOpen(false)}
+          rockId={rockId}
+        />
       </div>
     );
   }
@@ -461,7 +486,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
         </div>
 
         {/* Primary Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 w-full">
+        <div className="flex flex-col sm:flex-row gap-4 w-full mb-8">
           <button
             onClick={() => setIsTradeOpen(true)}
             className="flex-1 bg-black text-white px-8 py-4 rounded-full font-bold text-base hover:bg-neutral-800 transition-all shadow-lg text-center cursor-pointer active:scale-[0.99]"
@@ -471,7 +496,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           <button
             onClick={() => {
               if (!authenticated) {
-                login();
+                setIsOnboardingOpen(true);
               } else {
                 setIsTransferOpen(true);
               }
@@ -481,6 +506,15 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
             Give this rock
           </button>
         </div>
+
+        {/* 1inch Aqua Liquidity Position & Strategy Manager */}
+        <AquaPositionCard
+          rockId={rockId}
+          smartAccountAddress={smartAccountAddress}
+          liquidityUSDC={liquidity}
+          earnedFeesUSDC={earnedFees}
+          onPositionUpdated={handlePositionUpdated}
+        />
 
         {/* Provenance & On-Chain Activity Timeline */}
         <RockActivity rockId={rockId} events={events} />
@@ -500,6 +534,12 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           rockId={rockId}
           currentOwner={ownerAddress}
           onTransferSuccess={handleTransferSuccess}
+        />
+
+        <PrivyOnboardingModal
+          isOpen={isOnboardingOpen}
+          onClose={() => setIsOnboardingOpen(false)}
+          rockId={rockId}
         />
 
         {/* Demo Switcher for Judges */}

@@ -24,7 +24,9 @@ pragma solidity ^0.8.24;
 contract BankRockRegistry {
     // Custom descriptive errors (save gas and give crystal clear feedback)
     error RockAlreadyAwakened(uint256 rockId);
+    error RockNotAwakened(uint256 rockId);
     error UnauthorizedTapper(address caller, address expectedOwner);
+    error InvalidNewOwner();
     error InvalidNFCSequence();
 
     struct Rock {
@@ -37,6 +39,7 @@ contract BankRockRegistry {
     mapping(uint256 => Rock) public rocks;
 
     event RockAwakened(uint256 indexed rockId, address indexed owner, address smartAccount);
+    event RockOwnershipTransferred(uint256 indexed rockId, address indexed previousOwner, address indexed newOwner);
     event RockPoked(address indexed poker, string message);
 
     /**
@@ -55,6 +58,42 @@ contract BankRockRegistry {
         });
 
         emit RockAwakened(rockId, msg.sender, smartAccount);
+    }
+
+    /**
+     * @notice Transfers ownership of the rock to a new custodian.
+     * @dev Can be called by either the currentOwner or the rock's smartAccount (via 4337 UserOp).
+     */
+    function transferOwnership(uint256 rockId, address newOwner) external {
+        Rock storage r = rocks[rockId];
+        if (!r.isAwake) {
+            revert RockNotAwakened(rockId);
+        }
+        if (msg.sender != r.currentOwner && msg.sender != r.smartAccount) {
+            revert UnauthorizedTapper(msg.sender, r.currentOwner);
+        }
+        if (newOwner == address(0)) {
+            revert InvalidNewOwner();
+        }
+
+        address previousOwner = r.currentOwner;
+        r.currentOwner = newOwner;
+
+        emit RockOwnershipTransferred(rockId, previousOwner, newOwner);
+    }
+
+    /**
+     * @notice Checks if a given rock ID is already awakened.
+     */
+    function isAwakened(uint256 rockId) external view returns (bool) {
+        return rocks[rockId].isAwake;
+    }
+
+    /**
+     * @notice Returns full Rock struct data.
+     */
+    function getRock(uint256 rockId) external view returns (Rock memory) {
+        return rocks[rockId];
     }
 
     /**

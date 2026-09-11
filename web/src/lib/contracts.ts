@@ -43,6 +43,38 @@ export const BANK_ROCK_REGISTRY_ABI = [
     outputs: [{ name: "", type: "string" }],
   },
   {
+    type: "function",
+    name: "isAwakened",
+    stateMutability: "view",
+    inputs: [{ name: "rockId", type: "uint256" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "getRock",
+    stateMutability: "view",
+    inputs: [{ name: "rockId", type: "uint256" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "smartAccount", type: "address" },
+          { name: "currentOwner", type: "address" },
+          { name: "awakenedAt", type: "uint256" },
+          { name: "isAwake", type: "bool" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "poke",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
     type: "event",
     name: "RockAwakened",
     inputs: [
