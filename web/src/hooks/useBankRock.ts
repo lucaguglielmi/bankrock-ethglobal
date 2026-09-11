@@ -1,40 +1,46 @@
 "use client";
 
 import { useReadContract, useWriteContract } from "wagmi";
+import { BANK_ROCK_REGISTRY_ABI, BANK_ROCK_REGISTRY_ADDRESS, AQUA_ADDRESSES } from "@/lib/contracts";
+import { baseSepolia } from "viem/chains";
 
-// TODO: Replace with actual deployed ABI and address
-const BANK_ROCK_ABI = [
-  {
-    type: "function",
-    name: "balanceOf",
-    stateMutability: "view",
-    inputs: [{ name: "account", type: "address" }],
-    outputs: [{ type: "uint256" }],
-  },
-] as const;
+export function useRockOnchainState(rockId: string | number | undefined) {
+  const numericId = rockId !== undefined ? BigInt(rockId) : undefined;
 
-const BANK_ROCK_ADDRESS = "0x0000000000000000000000000000000000000000";
-
-export function useBankRockBalance(address: `0x${string}` | undefined) {
   return useReadContract({
-    address: BANK_ROCK_ADDRESS,
-    abi: BANK_ROCK_ABI,
-    functionName: "balanceOf",
-    args: address ? [address] : undefined,
+    address: BANK_ROCK_REGISTRY_ADDRESS,
+    abi: BANK_ROCK_REGISTRY_ABI,
+    functionName: "rocks",
+    args: numericId !== undefined ? [numericId] : undefined,
+    chainId: baseSepolia.id,
     query: {
-      enabled: !!address,
+      enabled: numericId !== undefined,
     },
   });
 }
 
-export function useBankRockActions() {
+export function useRockActions() {
   const { writeContractAsync, isPending } = useWriteContract();
 
-  // Scaffolded write actions for future integration
-  const lockFunds = async (amount: bigint) => {
-    // await writeContractAsync({ ... })
-    console.log("Mock lock funds", amount);
+  const awakenOnchain = async (rockId: number | string, smartAccount: `0x${string}`) => {
+    return await writeContractAsync({
+      address: BANK_ROCK_REGISTRY_ADDRESS,
+      abi: BANK_ROCK_REGISTRY_ABI,
+      functionName: "awakenRock",
+      args: [BigInt(rockId), smartAccount],
+      chainId: baseSepolia.id,
+    });
   };
 
-  return { lockFunds, isPending };
+  const transferOnchain = async (rockId: number | string, newOwner: `0x${string}`) => {
+    return await writeContractAsync({
+      address: BANK_ROCK_REGISTRY_ADDRESS,
+      abi: BANK_ROCK_REGISTRY_ABI,
+      functionName: "transferOwnership",
+      args: [BigInt(rockId), newOwner],
+      chainId: baseSepolia.id,
+    });
+  };
+
+  return { awakenOnchain, transferOnchain, isPending, contractAddresses: AQUA_ADDRESSES };
 }

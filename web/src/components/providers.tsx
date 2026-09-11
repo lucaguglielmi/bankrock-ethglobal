@@ -3,15 +3,16 @@
 import { PrivyProvider } from "@privy-io/react-auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, createConfig } from "@privy-io/wagmi";
-import { base, mainnet, optimism } from "viem/chains";
+import { baseSepolia, base, mainnet, optimism } from "viem/chains";
 import { http } from "wagmi";
 
 const queryClient = new QueryClient();
 
-// Configure Wagmi
+// Configure Wagmi with Base Sepolia as primary testnet
 export const wagmiConfig = createConfig({
-  chains: [base, mainnet, optimism],
+  chains: [baseSepolia, base, mainnet, optimism],
   transports: {
+    [baseSepolia.id]: http(),
     [base.id]: http(),
     [mainnet.id]: http(),
     [optimism.id]: http(),
@@ -26,11 +27,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
+        defaultChain: baseSepolia,
+        supportedChains: [baseSepolia, base],
         loginMethods: ["email", "wallet", "google", "apple"],
         appearance: {
           theme: "light",
           accentColor: "#000000",
-          logo: "https://bankrock-ethglobal.pages.dev/favicon.ico", // Placeholder logo
+          logo: "https://bankrock-ethglobal.pages.dev/icon-192.png",
         },
         embeddedWallets: {
           ethereum: {
