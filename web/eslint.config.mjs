@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "generate_map.js",
+    "inject_map.js",
   ]),
 ]);
 

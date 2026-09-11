@@ -3,32 +3,38 @@
 import { PrivyProvider } from "@privy-io/react-auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, createConfig } from "@privy-io/wagmi";
-import { baseSepolia, base, mainnet, optimism } from "viem/chains";
+import { baseSepolia, base, mainnet, optimism, arbitrum, polygon } from "viem/chains";
 import { http } from "wagmi";
+
+import { BankRockAuthProvider, isValidPrivyAppId } from "@/context/auth-context";
 
 const queryClient = new QueryClient();
 
-// Configure Wagmi with Base Sepolia as primary testnet
+// Configure Wagmi with Base Sepolia as primary testnet + cross-chain source networks
 export const wagmiConfig = createConfig({
-  chains: [baseSepolia, base, mainnet, optimism],
+  chains: [baseSepolia, base, arbitrum, optimism, polygon, mainnet],
   transports: {
     [baseSepolia.id]: http(),
     [base.id]: http(),
-    [mainnet.id]: http(),
+    [arbitrum.id]: http(),
     [optimism.id]: http(),
+    [polygon.id]: http(),
+    [mainnet.id]: http(),
   },
 });
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  // Use the environment variable if present. Fallback to a mock 24-char hex string to pass validation.
-  const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "clp1234567890abcdef123456";
+  const rawAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+  const isRealApp = isValidPrivyAppId(rawAppId);
+  // Use real App ID if provided, otherwise pass mock string so SDK initializes without crashing
+  const appId = isRealApp ? (rawAppId as string) : "clp1234567890abcdef123456";
 
   return (
     <PrivyProvider
       appId={appId}
       config={{
         defaultChain: baseSepolia,
-        supportedChains: [baseSepolia, base],
+        supportedChains: [baseSepolia, base, arbitrum, optimism, polygon, mainnet],
         loginMethods: ["email", "wallet", "google", "apple"],
         appearance: {
           theme: "light",
@@ -44,7 +50,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     >
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={wagmiConfig}>
-          {children}
+          <BankRockAuthProvider isRealPrivyConfigured={isRealApp}>
+            {children}
+          </BankRockAuthProvider>
         </WagmiProvider>
       </QueryClientProvider>
     </PrivyProvider>

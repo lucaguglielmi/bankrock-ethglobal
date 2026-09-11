@@ -146,7 +146,16 @@ export function useRockOnchainEvents(rockId: string | number | undefined) {
   }, [rockId]);
 
   useEffect(() => {
-    fetchEvents();
+    let isMounted = true;
+    const run = async () => {
+      if (isMounted) {
+        await fetchEvents();
+      }
+    };
+    run();
+    return () => {
+      isMounted = false;
+    };
   }, [fetchEvents]);
 
   // Watch for live RockAwakened events

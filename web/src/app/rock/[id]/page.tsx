@@ -1,6 +1,4 @@
 import { RockInterface } from "@/components/rock-interface";
-import { LoginButton } from "@/components/login-button";
-import Link from "next/link";
 
 interface PageProps {
   params: Promise<{ id: string }>;

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { AnimatedText } from "@/components/animated-text";
 import { RockCanvasDynamic } from "@/components/rock-canvas-dynamic";
 import { ArrowRight } from "lucide-react";
-import { LoginButton } from "@/components/login-button";
 import { NewsletterSignup } from "@/components/newsletter-signup";
 import { AboutRocks } from "@/components/about-rocks";
 import { HowItWorksDynamic } from "@/components/how-it-works-dynamic";

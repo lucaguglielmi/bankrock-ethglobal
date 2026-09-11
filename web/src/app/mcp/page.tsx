@@ -13,7 +13,6 @@ import {
   ExternalLink,
   Code,
 } from "lucide-react";
-import { LoginButton } from "@/components/login-button";
 
 export default function McpPage() {
   const [copiedPrompt, setCopiedPrompt] = useState(false);

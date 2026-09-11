@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/context/auth-context";
 import { verifyNtagSignature } from "@/actions/verify-ntag";
 import { TradeModal, type TradeDetails } from "@/components/trade-modal";
 import { TransferModal } from "@/components/transfer-modal";
+import { CrossChainModal } from "@/components/cross-chain-modal";
 import { DemoSwitcher, type DemoScenario } from "@/components/demo-switcher";
 import { RockActivity, type ActivityEvent } from "@/components/rock-activity";
 import { AquaPositionCard } from "@/components/aqua-position-card";
 import { PrivyOnboardingModal } from "@/components/privy-onboarding-modal";
 import { useRockOnchainEvents } from "@/hooks/useBankRock";
-import { ExternalLink, Check, Sparkles, ShieldCheck, ShieldAlert, Copy } from "lucide-react";
+import { ExternalLink, Check, Sparkles, ShieldCheck, ShieldAlert, Copy, Globe, ArrowRight } from "lucide-react";
 
 interface RockInterfaceProps {
   rockId: string;
@@ -56,10 +57,11 @@ const INITIAL_EVENTS: ActivityEvent[] = [
 ];
 
 export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
-  const { authenticated, login, user } = usePrivy();
+  const { authenticated, user, address } = useAuth();
   const [step, setStep] = useState<"scanning" | "unactivated" | "authenticating" | "awakening" | "active">("scanning");
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [, setError] = useState<string | null>(null);
+  const [onboardingAction, setOnboardingAction] = useState<"awaken" | "transfer" | null>(null);
 
   // Core Product State
   const [liquidity, setLiquidity] = useState<number>(1250.0);
@@ -69,7 +71,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
   const [currentScenario, setCurrentScenario] = useState<DemoScenario>("active_maker");
 
   // Derive current owner address reactively without setState in an effect
-  const ownerAddress = customOwnerAddress || user?.wallet?.address || "0x71C8564E688172F6e1a90c0071C8097b6De81F26";
+  const ownerAddress = customOwnerAddress || user?.wallet?.address || address || "0x71C8564e688172f6E1a90C0071C8097b6De81b47";
   const smartAccountAddress = "0x89F735F4C74F878D3aAc6e60b134d115e5E29631";
 
   // Live on-chain event indexer hook with real-time websocket/polling updates
@@ -90,6 +92,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
   const [isTradeOpen, setIsTradeOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isCrossChainOpen, setIsCrossChainOpen] = useState(false);
 
   // Awakening flow state
   const [awakeningStage, setAwakeningStage] = useState<string>("");
@@ -132,7 +135,8 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
     // Target wallet address to fund
     const targetAddress =
       user?.wallet?.address ||
-      "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
+      address ||
+      "0x71C8564e688172f6E1a90C0071C8097b6De81b47";
 
     try {
       // Stage 1: Deploy Safe Account
@@ -186,10 +190,11 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
       console.error("Awakening failed:", err);
       setStep("active");
     }
-  }, [user?.wallet?.address]);
+  }, [user?.wallet?.address, address]);
 
   const handleAwaken = async () => {
     if (!authenticated) {
+      setOnboardingAction("awaken");
       setIsOnboardingOpen(true);
       return;
     }
@@ -256,6 +261,30 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
         description: `Safe Smart Account control transferred from ${formatShortAddress(oldOwner)} to ${formatShortAddress(newOwner)} with zero gas.`,
         detail: "Physical NTAG 424 DNA re-keyed",
         txHash: txHash || undefined,
+        timestamp: "Just now",
+      },
+      ...prev,
+    ]);
+  };
+
+  // Cross-chain deposit callback: updates reserve and records bridge event
+  const handleCrossChainDepositSuccess = (
+    amount: number,
+    token: "USDC" | "ETH",
+    sourceChainName: string,
+    txHash: string
+  ) => {
+    if (token === "USDC") {
+      setLiquidity((prev) => prev + amount);
+    }
+    setEvents((prev) => [
+      {
+        id: `cross-chain-${Date.now()}`,
+        type: "trade",
+        title: `Cross-Chain Deposit (${sourceChainName})`,
+        description: `Bridged +${amount.toFixed(2)} ${token} directly into Safe via Across Protocol intent solver.`,
+        detail: "Across Relayer fill settled on Base Sepolia",
+        txHash: txHash,
         timestamp: "Just now",
       },
       ...prev,
@@ -362,8 +391,15 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
 
         <PrivyOnboardingModal
           isOpen={isOnboardingOpen}
-          onClose={() => setIsOnboardingOpen(false)}
+          onClose={() => {
+            setIsOnboardingOpen(false);
+            setOnboardingAction(null);
+          }}
           rockId={rockId}
+          onAuthenticated={() => {
+            setOnboardingAction(null);
+            startAwakening();
+          }}
         />
       </div>
     );
@@ -501,7 +537,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
         </div>
 
         {/* Primary Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 w-full mb-8">
+        <div className="flex flex-col sm:flex-row gap-4 w-full mb-3">
           <button
             onClick={() => setIsTradeOpen(true)}
             className="flex-1 bg-black text-white px-8 py-4 rounded-full font-bold text-base hover:bg-neutral-800 transition-all shadow-lg text-center cursor-pointer active:scale-[0.99]"
@@ -511,6 +547,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           <button
             onClick={() => {
               if (!authenticated) {
+                setOnboardingAction("transfer");
                 setIsOnboardingOpen(true);
               } else {
                 setIsTransferOpen(true);
@@ -519,6 +556,30 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
             className="flex-1 bg-neutral-100 text-black px-8 py-4 rounded-full font-bold text-base hover:bg-neutral-200 transition-all text-center border border-neutral-200 cursor-pointer active:scale-[0.99]"
           >
             Give this rock
+          </button>
+        </div>
+
+        {/* Cross-Chain Deposit Action */}
+        <div className="w-full mb-8">
+          <button
+            onClick={() => setIsCrossChainOpen(true)}
+            className="w-full bg-white hover:bg-neutral-50 text-neutral-800 hover:text-black py-3 px-5 rounded-2xl border border-neutral-200 hover:border-neutral-400 font-semibold text-sm transition-all shadow-sm flex items-center justify-between cursor-pointer group"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="w-7 h-7 rounded-full bg-neutral-100 group-hover:bg-black group-hover:text-white flex items-center justify-center text-xs transition-colors">
+                <Globe className="w-3.5 h-3.5" />
+              </span>
+              <div className="text-left">
+                <div className="font-bold text-neutral-900 leading-snug">Deposit from other chains</div>
+                <div className="text-[11px] text-neutral-500 font-normal">
+                  Arbitrum, Optimism, Ethereum, Polygon via Across Protocol
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-blue-600 font-bold font-mono">
+              <span className="hidden sm:inline">~15-30s Intent Fill</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
           </button>
         </div>
 
@@ -551,10 +612,28 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           onTransferSuccess={handleTransferSuccess}
         />
 
+        <CrossChainModal
+          isOpen={isCrossChainOpen}
+          onClose={() => setIsCrossChainOpen(false)}
+          rockId={rockId}
+          smartAccountAddress={smartAccountAddress}
+          onDepositSuccess={handleCrossChainDepositSuccess}
+        />
+
         <PrivyOnboardingModal
           isOpen={isOnboardingOpen}
-          onClose={() => setIsOnboardingOpen(false)}
+          onClose={() => {
+            setIsOnboardingOpen(false);
+            setOnboardingAction(null);
+          }}
           rockId={rockId}
+          onAuthenticated={() => {
+            const action = onboardingAction;
+            setOnboardingAction(null);
+            if (action === "transfer") {
+              setIsTransferOpen(true);
+            }
+          }}
         />
 
         {/* Demo Switcher for Judges */}

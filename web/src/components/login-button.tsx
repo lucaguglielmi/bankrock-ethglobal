@@ -1,19 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { usePrivy } from "@privy-io/react-auth";
-import { useAccount } from "wagmi";
+import { useAuth } from "@/context/auth-context";
 import { Check, Copy } from "lucide-react";
 
 export function LoginButton() {
-  const { ready, authenticated, login, logout, user } = usePrivy();
-  const { address } = useAccount();
+  const { ready, authenticated, login, logout, user, address, isEmbedded, isDemoMode } = useAuth();
   const [copied, setCopied] = useState(false);
 
-  // Disable button if Privy SDK isn't ready
-  const disableLogin = !ready || (authenticated && !user);
   const activeAddress = address || user?.wallet?.address;
-  const isEmbedded = user?.wallet?.walletClientType === "privy";
 
   const handleCopy = () => {
     if (activeAddress) {
@@ -40,7 +35,10 @@ export function LoginButton() {
         <div className="flex items-center gap-2 bg-neutral-100/90 border border-neutral-200/80 rounded-full px-3 py-1.5 text-xs">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500" title="Base Sepolia Testnet" />
           {isEmbedded && (
-            <span className="text-[10px] font-mono bg-black text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+            <span
+              className="text-[10px] font-mono bg-black text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
+              title={isDemoMode ? "High-fidelity Demo Embedded Wallet on Base Sepolia" : "Privy Embedded Signer"}
+            >
               Embedded
             </span>
           )}
@@ -62,7 +60,7 @@ export function LoginButton() {
           )}
         </div>
         <button
-          onClick={logout}
+          onClick={() => logout()}
           className="px-3.5 py-1.5 rounded-full border border-neutral-300 hover:border-black text-xs font-medium transition-colors cursor-pointer"
         >
           Log out
@@ -73,9 +71,8 @@ export function LoginButton() {
 
   return (
     <button
-      disabled={disableLogin}
-      onClick={login}
-      className="px-4 py-2 rounded-full bg-black text-white hover:bg-black/80 text-sm font-medium transition-colors disabled:opacity-50"
+      onClick={() => login()}
+      className="px-4 py-2 rounded-full bg-black text-white hover:bg-black/80 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50"
     >
       Connect Wallet
     </button>

@@ -1,22 +1,30 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/context/auth-context";
 import { X, KeyRound, Shield, Coins, ArrowRight, CheckCircle2 } from "lucide-react";
 
 interface PrivyOnboardingModalProps {
   isOpen: boolean;
   onClose: () => void;
   rockId: string;
+  onAuthenticated?: () => void;
 }
 
-export function PrivyOnboardingModal({ isOpen, onClose, rockId }: PrivyOnboardingModalProps) {
-  const { login } = usePrivy();
+export function PrivyOnboardingModal({ isOpen, onClose, rockId, onAuthenticated }: PrivyOnboardingModalProps) {
+  const { login } = useAuth();
 
   if (!isOpen) return null;
 
-  const handleStart = () => {
-    onClose();
-    login();
+  const handleStart = async () => {
+    try {
+      await login();
+      onClose();
+      onAuthenticated?.();
+    } catch (err) {
+      console.error("Authentication failed:", err);
+      onClose();
+      onAuthenticated?.();
+    }
   };
 
   return (
