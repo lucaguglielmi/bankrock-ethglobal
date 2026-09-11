@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AnimatedText } from "@/components/animated-text";
-import { RockCanvas } from "@/components/rock-canvas";
+import { RockCanvasDynamic } from "@/components/rock-canvas-dynamic";
 import { ArrowRight } from "lucide-react";
 import { LoginButton } from "@/components/login-button";
 import { NewsletterSignup } from "@/components/newsletter-signup";
@@ -28,7 +28,7 @@ export default function Home() {
         
         {/* 3D Canvas Background */}
         <div className="absolute inset-0 z-0 opacity-80 mix-blend-multiply pointer-events-auto">
-          <RockCanvas />
+          <RockCanvasDynamic />
         </div>
 
         <div className="z-10 flex flex-col items-center justify-center text-center w-full max-w-5xl mx-auto px-6 pointer-events-none">
