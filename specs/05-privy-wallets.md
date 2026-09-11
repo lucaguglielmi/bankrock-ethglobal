@@ -41,13 +41,46 @@ The preferred Rock Account should only accept actions authorized by its current 
 
 High-risk actions include:
 
-- withdrawing tokens;
-- changing the controller;
-- approving new contracts;
-- docking or shipping strategies;
-- granting delegated execution rights.
+- withdrawing tokens to an external wallet;
+- changing the controller (owner signing key);
+- approving untrusted contracts;
+- revoking or issuing delegated execution rights.
 
-For the MVP, every high-risk action should require an explicit owner signature. Automated execution is out of scope unless constrained by an auditable policy.
+Every high-risk action strictly requires an explicit owner signature from the current Privy embedded wallet.
+
+### Delegated Execution: Scoped Session Keys for MCP AI Agent
+
+To enable the Model Context Protocol (MCP) AI agent to assist the owner without introducing financial vulnerability, the Rock Account supports an **ERC-7579 / ERC-4337 Scoped Session Key Module**:
+
+- **Key Issuance:** The owner's Privy wallet issues an ephemeral session key credential stored within the MCP runtime environment.
+- **Strict Smart Contract Guardrails:**
+  - *Target Restraint:* The session key is cryptographically restricted to invoking only the official Aqua and SwapVM contracts.
+  - *Method Restraint:* May only invoke `ship` and `dock` methods to rebalance liquidity.
+  - *Zero External Transfer Rights:* The session key has zero permission to call `transfer`, `transferFrom`, or `approve` on any ERC-20 token toward an external address.
+  - *Slippage & Parameter Ceilings:* Rebalancing operations must adhere to onchain pricing envelopes (e.g., maximum slippage tolerance of 2%).
+  - *Time Expiry:* The session key automatically expires after a bounded duration (default: 24 hours), after which re-authorization by the owner is required.
+
+## Atomic UserOperation Batching (1-Click Strategy Setup)
+
+Standard DeFi interactions require repetitive token approvals followed by contract deposits. Bank Rock leverages ERC-4337 native batch execution (`executeBatch`):
+
+- In a single user interaction, the Privy wallet signs one UserOperation that bundles:
+  1. `USDC.approve(AquaContract, depositAmount)`
+  2. `WETH.approve(AquaContract, depositAmount)`
+  3. `Aqua.ship(strategyHash, SwapVMBytecode)`
+- This executes atomically: either all approvals and strategy registrations succeed, or the entire operation reverts, preventing "approved but un-deposited" stranded token states.
+
+## Gas and Paymaster Architecture
+
+Bank Rock employs a **Dual-Mode Paymaster Strategy**:
+
+1. **Verifying Paymaster (Onboarding & Gifting):** 
+   - When a recipient claims a gifted rock or a new user awakens an unactivated rock, their Privy wallet possesses 0 native gas tokens. 
+   - A Verifying Paymaster sponsors 100% of the UserOperation gas fees.
+2. **ERC-20 Token Paymaster ("Self-Sustaining Rock"):**
+   - As visitors execute swaps against the rock's Aqua strategy, the Rock Account accumulates trading fees in ERC-20 tokens (e.g., test USDC).
+   - Once fees are accrued, subsequent operational UserOperations (such as strategy rebalancing or docking) can pay their own gas fees directly using the accumulated USDC via an ERC-20 Paymaster.
+   - The rock mathematically pays for its own maintenance using its earned yield.
 
 ## Ownership transfer
 

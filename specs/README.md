@@ -23,6 +23,10 @@ Working line: **Liquidity you can hold.**
 | [07-frontend.md](./07-frontend.md) | Mobile-first interface and design-system direction | Active |
 | [08-mvp-and-demo.md](./08-mvp-and-demo.md) | Hackathon scope, demo story and acceptance criteria | Active |
 | [09-decisions.md](./09-decisions.md) | Open questions and architectural decisions | Active |
+| [10-telemetry-and-observability.md](./10-telemetry-and-observability.md) | Structured logging, metrics, and agent-ready telemetry | Active |
+| [11-mcp-and-connectors.md](./11-mcp-and-connectors.md) | Model Context Protocol servers and agent tools | Active |
+| [12-deployment.md](./12-deployment.md) | Cloudflare Pages, Workers, D1 database and CI/CD | Active |
+| [13-after-the-hackathon-ideas.md](./13-after-the-hackathon-ideas.md) | Post-hackathon hardware security & social recovery roadmap | Roadmap |
 
 ## Spec rules
 

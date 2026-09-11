@@ -31,9 +31,9 @@ Registration does not create or fund a wallet.
 5. The server mathematically verifies the NTAG 424 DNA signature.
 6. The system creates or links the Rock Account.
 7. The user funds it with the supported testnet token pair.
-8. The Rock Account approves Aqua.
-9. The owner selects a predefined liquidity personality.
-10. The application ships the Aqua strategy and shows its confirmed status.
+8. The owner selects a predefined liquidity personality and deposit amounts.
+9. **Atomic UserOperation Batching (1-Click Launch):** The user approves once via Privy. The ERC-4337 Smart Account executes a batched call (`executeBatch`) bundling `tokenA.approve(Aqua)`, `tokenB.approve(Aqua)`, and `Aqua.ship(strategyHash, SwapVM bytecode)` into a single atomic transaction.
+10. The application confirms the live Aqua strategy and updates available virtual liquidity immediately.
 
 The UI must distinguish pending, confirmed and failed onchain operations.
 

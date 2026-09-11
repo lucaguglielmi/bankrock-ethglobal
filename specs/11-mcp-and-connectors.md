@@ -51,4 +51,5 @@ This document defines the list of required MCP servers and connectors to interac
 - `explain_recent_fees(rockId)` — retrieves and decodes recent on-chain events and logs to explain where a user's funds went.
 - `simulate_cross_chain_intent(rockId, sourceChain, amount)` — calculates fees and routing to fund the rock from another L2.
 - `optimize_idle_yield(rockId)` — analyzes Aave/Morpho rates and suggests yield allocation strategies for the rock's idle capital.
-- `generate_agentic_strategy(rockId, riskProfile)` — dynamically calculates optimal Aqua strategy parameters based on a natural-language risk assessment and prepares a transaction payload for user signature.
+- `generate_agentic_strategy(rockId, riskProfile)` — dynamically calculates optimal Aqua strategy parameters based on a natural-language risk assessment and prepares a transaction payload for user review.
+- `execute_agentic_rebalance(rockId, sessionKeyProof, strategyParams)` — executes a live rebalancing UserOperation directly onchain using the owner's delegated ERC-7579/4337 Scoped Session Key. The smart account guarantees the rebalance cannot exceed bounded slippage or move tokens outside Aqua.

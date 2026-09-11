@@ -42,8 +42,12 @@ Each physical rock maps to a persistent smart account (e.g., Safe configured via
 The Rock Account:
 
 - holds the rock's ERC-20 balances;
-- approves Aqua;
-- calls Aqua ship and dock operations;
+- approves Aqua and calls Aqua `ship` and `dock` operations;
+- executes operations via **Atomic UserOperation Batching (`executeBatch`)**, bundling ERC-20 approvals and strategy launch into a single user signature;
+- supports a **Dual-Mode Paymaster Model**:
+  - *Verifying Paymaster:* sponsors 100% of gas fees for onboarding, awakening, and gift claims for zero-balance users.
+  - *ERC-20 Token Paymaster ("Self-Sustaining Rock"):* allows operational gas fees to be paid directly from accrued trading fees (e.g., in test USDC) once liquidity begins trading;
+- supports an **ERC-7579 / ERC-4337 Scoped Session Key Module** for the MCP AI runtime, permitting automated rebalancing while strictly prohibiting unauthorized withdrawals or external contract interactions;
 - is controlled by the current owner's Privy embedded wallet;
 - transfers control to a new Privy wallet during gifting by replacing the signing key (owner) on the smart account, preserving the Rock Account address and assets;
 - restricts arbitrary execution where practical.
