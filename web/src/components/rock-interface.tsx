@@ -286,8 +286,8 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
 
           <div className="flex flex-wrap items-center gap-2">
             {verificationResult?.isAuthentic && (
-              <div className="bg-neutral-100 text-black text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 border border-neutral-200">
-                <ShieldCheck className="w-3.5 h-3.5 text-black" />
+              <div className="text-xs font-mono font-bold uppercase tracking-widest text-blue-600 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5" />
                 Verified Physical
               </div>
             )}

@@ -47,8 +47,8 @@ export function NewsletterSignup() {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-neutral-100/60 blur-[120px] rounded-full pointer-events-none z-0" />
 
       <div className="max-w-4xl mx-auto flex flex-col items-center text-center relative z-10">
-        <div className="inline-flex items-center gap-2 bg-neutral-100 border border-neutral-200 text-neutral-800 text-xs font-semibold px-3.5 py-1.5 rounded-full uppercase tracking-wider mb-6">
-          <Sparkles className="w-3.5 h-3.5 text-neutral-500" />
+        <div className="inline-flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-widest text-blue-600 mb-6">
+          <Sparkles className="w-3.5 h-3.5" />
           <span>Genesis Batch</span>
         </div>
 

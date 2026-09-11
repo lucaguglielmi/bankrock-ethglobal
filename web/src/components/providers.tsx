@@ -20,7 +20,7 @@ export const wagmiConfig = createConfig({
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   // Use the environment variable if present. Fallback to a mock 24-char hex string to pass validation.
-  const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "000000000000000000000000";
+  const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "clp1234567890abcdef123456";
 
   return (
     <PrivyProvider

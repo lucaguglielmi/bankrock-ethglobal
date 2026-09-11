@@ -174,8 +174,8 @@ npm run dev`;
       <div className="pt-32 pb-24 px-6 md:px-12 max-w-5xl mx-auto w-full flex flex-col gap-20">
         {/* Hero Section */}
         <section className="flex flex-col items-start gap-6">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-black/10 bg-neutral-50 text-xs font-semibold uppercase tracking-wider text-neutral-600">
-            <Sparkles className="w-3.5 h-3.5 text-black" />
+          <div className="inline-flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-widest text-blue-600">
+            <Sparkles className="w-3.5 h-3.5" />
             Model Context Protocol · Agentic Infrastructure
           </div>
 
