@@ -27,6 +27,7 @@ Working line: **Liquidity you can hold.**
 | [11-mcp-and-connectors.md](./11-mcp-and-connectors.md) | Model Context Protocol servers and agent tools | Active |
 | [12-deployment.md](./12-deployment.md) | Cloudflare Pages, Workers, D1 database and CI/CD | Active |
 | [13-after-the-hackathon-ideas.md](./13-after-the-hackathon-ideas.md) | Post-hackathon hardware security & social recovery roadmap | Roadmap |
+| [14-progressive-web-app.md](./14-progressive-web-app.md) | PWA conversion, mobile standalone UX, and contextual notification policy | Active |
 
 ## Spec rules
 

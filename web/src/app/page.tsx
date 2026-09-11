@@ -3,6 +3,7 @@ import { AnimatedText } from "@/components/animated-text";
 import { RockCanvas } from "@/components/rock-canvas";
 import { ArrowRight } from "lucide-react";
 import { LoginButton } from "@/components/login-button";
+import { NewsletterSignup } from "@/components/newsletter-signup";
 
 export default function Home() {
   return (
@@ -82,6 +83,9 @@ export default function Home() {
 
         </div>
       </section>
+
+      {/* Newsletter Signup */}
+      <NewsletterSignup />
 
       {/* Footer */}
       <footer className="w-full bg-black text-white py-24 px-6 md:px-12 z-10 relative">
