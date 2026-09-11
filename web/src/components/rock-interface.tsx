@@ -9,6 +9,7 @@ import { DemoSwitcher, type DemoScenario } from "@/components/demo-switcher";
 import { RockActivity, type ActivityEvent } from "@/components/rock-activity";
 import { AquaPositionCard } from "@/components/aqua-position-card";
 import { PrivyOnboardingModal } from "@/components/privy-onboarding-modal";
+import { useRockOnchainEvents } from "@/hooks/useBankRock";
 import { ExternalLink, Check, Sparkles, ShieldCheck, ShieldAlert, Copy } from "lucide-react";
 
 interface RockInterfaceProps {
@@ -70,6 +71,20 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
   // Derive current owner address reactively without setState in an effect
   const ownerAddress = customOwnerAddress || user?.wallet?.address || "0x71C8564E688172F6e1a90c0071C8097b6De81F26";
   const smartAccountAddress = "0x89F735F4C74F878D3aAc6e60b134d115e5E29631";
+
+  // Live on-chain event indexer hook with real-time websocket/polling updates
+  const { events: onchainEvents, isLoading: isSyncingEvents } = useRockOnchainEvents(rockId);
+
+  // Merge live on-chain indexed events with session activity events (deduplicating by txHash)
+  const displayEvents = [
+    ...events.filter(
+      (e) => !onchainEvents.some((oe) => oe.txHash && e.txHash && oe.txHash.toLowerCase() === e.txHash.toLowerCase())
+    ),
+    ...onchainEvents.map((oe) => ({
+      ...oe,
+      isOnchain: true,
+    })),
+  ];
 
   // Modals state
   const [isTradeOpen, setIsTradeOpen] = useState(false);
@@ -517,7 +532,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
         />
 
         {/* Provenance & On-Chain Activity Timeline */}
-        <RockActivity rockId={rockId} events={events} />
+        <RockActivity rockId={rockId} events={displayEvents} isSyncing={isSyncingEvents} />
 
         {/* Modals */}
         <TradeModal

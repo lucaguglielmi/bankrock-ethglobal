@@ -2,6 +2,8 @@
 
 import { ExternalLink, ArrowRightLeft, Gift, Sparkles, Cpu, MapPin, CheckCircle2 } from "lucide-react";
 
+const TX_HASH_REGEX = /^0x[0-9a-fA-F]{64}$/;
+
 export interface ActivityEvent {
   id: string;
   type: "trade" | "transfer" | "awaken" | "hardware";
@@ -10,14 +12,17 @@ export interface ActivityEvent {
   detail?: string;
   txHash?: string;
   timestamp: string;
+  blockNumber?: string;
+  isOnchain?: boolean;
 }
 
 interface RockActivityProps {
   rockId: string;
   events: ActivityEvent[];
+  isSyncing?: boolean;
 }
 
-export function RockActivity({ rockId, events }: RockActivityProps) {
+export function RockActivity({ rockId, events, isSyncing = false }: RockActivityProps) {
   return (
     <div className="w-full mt-12 pt-10 border-t border-neutral-100">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
@@ -27,9 +32,9 @@ export function RockActivity({ rockId, events }: RockActivityProps) {
             Cryptographic lineage from Tuscan riverbed to Base Sepolia smart account #{rockId}.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-[11px] font-mono text-neutral-400 bg-neutral-50 px-3 py-1.5 rounded-full border border-neutral-200 self-start sm:self-auto">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          <span>Live Ledger</span>
+        <div className="flex items-center gap-2 text-[11px] font-mono text-neutral-500 bg-neutral-50 px-3 py-1.5 rounded-full border border-neutral-200 self-start sm:self-auto">
+          <span className={`w-1.5 h-1.5 rounded-full ${isSyncing ? "bg-amber-500 animate-spin" : "bg-green-500 animate-pulse"}`} />
+          <span>{isSyncing ? "Syncing On-Chain..." : "Base Sepolia Indexer"}</span>
         </div>
       </div>
 
@@ -81,13 +86,22 @@ export function RockActivity({ rockId, events }: RockActivityProps) {
                 </div>
               )}
 
-              {event.txHash && (
+              {event.txHash && TX_HASH_REGEX.test(event.txHash) && (
                 <div className="mt-3 pt-2.5 border-t border-neutral-200/60 flex items-center justify-between text-xs">
-                  <span className="text-[11px] text-neutral-400 font-mono">UserOperation</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-neutral-400 font-mono">
+                      {event.isOnchain ? "On-Chain Tx" : "UserOperation"}
+                    </span>
+                    {event.isOnchain && (
+                      <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded font-mono">
+                        BaseScan Verified
+                      </span>
+                    )}
+                  </div>
                   <a
-                    href={`https://sepolia.basescan.org/tx/${event.txHash}`}
+                    href={`https://sepolia.basescan.org/tx/${encodeURIComponent(event.txHash)}`}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 font-mono text-[11px] text-neutral-700 hover:text-black font-medium hover:underline"
                   >
                     <span>{event.txHash.slice(0, 10)}...{event.txHash.slice(-8)}</span>

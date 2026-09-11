@@ -1,6 +1,7 @@
 "use client";
 
-import { useReadContract, useWriteContract } from "wagmi";
+import { useEffect, useState, useCallback } from "react";
+import { useReadContract, useWriteContract, useWatchContractEvent } from "wagmi";
 import { BANK_ROCK_REGISTRY_ABI, BANK_ROCK_REGISTRY_ADDRESS, AQUA_ADDRESSES } from "@/lib/contracts";
 import { baseSepolia } from "viem/chains";
 
@@ -103,4 +104,77 @@ export function useRockActions() {
   };
 
   return { awakenOnchain, transferOnchain, isPending, contractAddresses: AQUA_ADDRESSES };
+}
+
+export interface OnchainIndexedEvent {
+  id: string;
+  type: "awaken" | "transfer" | "trade" | "hardware";
+  title: string;
+  description: string;
+  detail?: string;
+  txHash?: `0x${string}`;
+  blockNumber: string;
+  logIndex: number;
+  timestamp: string;
+}
+
+export function useRockOnchainEvents(rockId: string | number | undefined) {
+  const [events, setEvents] = useState<OnchainIndexedEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchEvents = useCallback(async () => {
+    if (!rockId || rockId === "new") return;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/events?rockId=${encodeURIComponent(rockId)}`);
+      if (!res.ok) {
+        throw new Error(`Events API responded with status ${res.status}`);
+      }
+      const data = await res.json();
+      if (data.success && Array.isArray(data.events)) {
+        setEvents(data.events);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load on-chain events";
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [rockId]);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
+  // Watch for live RockAwakened events
+  useWatchContractEvent({
+    address: BANK_ROCK_REGISTRY_ADDRESS,
+    abi: BANK_ROCK_REGISTRY_ABI,
+    eventName: "RockAwakened",
+    chainId: baseSepolia.id,
+    onLogs() {
+      fetchEvents();
+    },
+  });
+
+  // Watch for live RockOwnershipTransferred events
+  useWatchContractEvent({
+    address: BANK_ROCK_REGISTRY_ADDRESS,
+    abi: BANK_ROCK_REGISTRY_ABI,
+    eventName: "RockOwnershipTransferred",
+    chainId: baseSepolia.id,
+    onLogs() {
+      fetchEvents();
+    },
+  });
+
+  return {
+    events,
+    isLoading,
+    error,
+    refetch: fetchEvents,
+  };
 }
