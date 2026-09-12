@@ -84,12 +84,12 @@ export function useRockActions() {
   const { writeContractAsync, isPending } = useWriteContract();
 
   const awakenOnchain = async (rockId: number | string, smartAccount: `0x${string}`, nfcPubKey?: string) => {
-    const args = nfcPubKey ? [BigInt(rockId), smartAccount, nfcPubKey] : [BigInt(rockId), smartAccount];
+    // If nfcPubKey is provided, we should call bindNFC separately, but for now we'll just awaken
     return await writeContractAsync({
       address: BANK_ROCK_REGISTRY_ADDRESS,
       abi: BANK_ROCK_REGISTRY_ABI,
       functionName: "awakenRock",
-      args,
+      args: [BigInt(rockId), smartAccount],
       chainId: baseSepolia.id,
     });
   };
