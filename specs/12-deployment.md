@@ -113,15 +113,20 @@ are worth recording because both look like "the deploy is broken" and neither wa
 | The first run past install | The "Fail early if Cloudflare credentials are missing" step | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` were not set as repository secrets. **Nothing else failed** — install, Node 22 setup and the guard all behaved, and the guard did its job: it stopped before `wrangler` could emit a confusing auth error |
 
 | **Run 16**, on `9c5bc1a` | Nowhere — it succeeded | …and `bank-rock.com` still served the *old* build. The run published to the **Pages** project `bankrock-ethglobal`, and `bankrock-ethglobal.pages.dev` did serve the new one (`/r/1` → 200, Inter, build version `1789220402685`). But the custom domain is attached to the **Worker** `web`, which was still on version `1789198731586`. A green deploy that changes nothing a user can see is the most expensive kind of green, and this one was caused by the pipeline publishing to a surface no domain points at |
+| **Run 19**, on `de0412b` (the first run that targets the Worker) | The "Build and deploy the Worker" step, inside `wrangler deploy` | `Authentication error [code: 10000]` on `/accounts/…/workers/services/web`. The migration step *before* it succeeded, so the token has **D1: Edit** but not **Workers Scripts: Edit** — it was created for the Pages deploy. The build itself completed (`.open-next/worker.js` was produced). Nothing in the repository can fix this: the token has to be extended or replaced in the Cloudflare dashboard, then the workflow re-run |
 
-**Reading of it.** Three distinct failures, one after another, each hiding the next:
+**Reading of it.** Four distinct failures, one after another, each hiding the next:
 
 1. removing `@cloudflare/next-on-pages` (D-016) cleared **B-2** for both workflows at once;
 2. the two missing GitHub secrets were an operator action, not code — spec 16 §2.3.1 and spec 18
    Part 2 step 0. `workflow_dispatch` exists so that step 0 can be verified by re-running the same
    commit rather than by pushing a no-op;
 3. the pipeline was publishing to the wrong surface. Fixed by deploying the Worker (`npm run
-   deploy`), which is what `wrangler.jsonc` describes and what the custom domains are attached to.
+   deploy`), which is what `wrangler.jsonc` describes and what the custom domains are attached to;
+4. the token was scoped for the wrong surface too. Publishing a Worker needs **Account → Workers
+   Scripts: Edit**, and attaching its custom domains needs **Zone (`bank-rock.com`) → Workers
+   Routes: Edit** and **DNS: Edit** (spec 16 §2.3.1). Wrangler's own hint on the token
+   ("Please ensure it has the correct permissions") is the only warning it gives before the 10000.
 
 **The check that catches the third one, and which no green tick substitutes for:** after a deploy,
 read `NEXT_PUBLIC_APP_VERSION` from the live apex and confirm it changed. `next.config.ts` sets it
