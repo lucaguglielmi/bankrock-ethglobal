@@ -39,14 +39,17 @@ import {
   encodeArchiveRock,
   encodeAwaken,
   encodeCancelHandover,
+  encodeClearLost,
+  encodeMarkLost,
   encodeInitiateHandover,
   encodeSwapOwner,
   messageHashFor,
   parseRockId,
   pimlicoApiKey,
   pimlicoRpcUrl,
+  readRock,
   registryAddress,
-  ROCK_ACCOUNT_SALT_NONCE,
+  rockAccountSaltFor,
   type SignedAttestation,
 } from "@/lib/rock-account";
 import { useAuth } from "@/context/auth-context";
@@ -73,6 +76,9 @@ export interface UseRockActions {
   claimHandover(rockId: string, attestation: SignedAttestation): Promise<Capability<{ txHash: Hex }>>;
   cancelHandover(rockId: string): Promise<Capability<{ txHash: Hex }>>;
   archiveRock(rockId: string): Promise<Capability<{ txHash: Hex }>>;
+  /** Flow F: the owner's informational lost flag. It freezes nothing on chain. */
+  markLost(rockId: string): Promise<Capability<{ txHash: Hex }>>;
+  clearLost(rockId: string): Promise<Capability<{ txHash: Hex }>>;
   isPending: boolean;
   availability: RockActionsAvailability;
 }
@@ -103,6 +109,8 @@ type SmartAccountClient = RockAccountClient;
 async function buildSmartAccountClient(params: {
   provider: unknown;
   ownerAddress: Address;
+  /** `rockAccountSaltFor(uidHash)`: one account per physical rock, per owner. */
+  saltNonce: bigint;
 }): Promise<Capability<RockAccountClient>> {
   const key = pimlicoApiKey();
   if (key.state === "UNAVAILABLE") return unavailable(key.reason);
@@ -127,7 +135,7 @@ async function buildSmartAccountClient(params: {
       owners: [owner],
       version: "1.4.1",
       entryPoint: { address: ENTRY_POINT_07_ADDRESS, version: "0.7" },
-      saltNonce: ROCK_ACCOUNT_SALT_NONCE,
+      saltNonce: params.saltNonce,
     });
 
     const paymaster = createPimlicoClient({
@@ -210,17 +218,63 @@ export function useRockActions(): UseRockActions {
     );
   }, [wallets, authenticated, address]);
 
-  /** Builds the signed-in user's smart account client, or explains why it cannot. */
+  /**
+   * Builds the Rock Account client for one tag.
+   *
+   * The salt is the tag's own hash, so the client is bound to a physical rock rather than to the
+   * user in general (spec 03, D-005).
+   */
   const smartAccountFor = useCallback(
-    async (): Promise<Capability<SmartAccountClient>> => {
+    async (uidHash: `0x${string}`): Promise<Capability<SmartAccountClient>> => {
       if (!authenticated || !activeWallet) return unavailable(SIGNED_OUT_REASON);
+
+      let saltNonce: bigint;
+      try {
+        saltNonce = rockAccountSaltFor(uidHash);
+      } catch (err) {
+        return unavailable(err instanceof Error ? err.message : String(err));
+      }
+
       const provider = await activeWallet.getEthereumProvider();
       return buildSmartAccountClient({
         provider,
         ownerAddress: getAddress(activeWallet.address),
+        saltNonce,
       });
     },
     [authenticated, activeWallet],
+  );
+
+  /**
+   * Builds the client for a rock that already exists on chain, and refuses if the address it
+   * derives is not the account the registry records.
+   *
+   * A mismatch means this wallet is not the account's owner, or the tag hash has changed: sending
+   * anyway would either revert or act from the wrong account. Saying so is the only honest answer.
+   */
+  const ownerClientFor = useCallback(
+    async (
+      rockId: string,
+    ): Promise<Capability<{ client: SmartAccountClient; smartAccount: Address }>> => {
+      const rock = await readRock(rockId);
+      if (rock.state === "UNAVAILABLE") return unavailable(rock.reason);
+      if (rock.value.state === "dormant") {
+        return unavailable("This rock has not been awakened yet");
+      }
+
+      const clientCapability = await smartAccountFor(rock.value.uidHash);
+      if (clientCapability.state === "UNAVAILABLE") return unavailable(clientCapability.reason);
+
+      const derived = getAddress(clientCapability.value.account.address);
+      if (derived !== getAddress(rock.value.smartAccount)) {
+        return unavailable(
+          "This wallet does not control this rock's Rock Account — sign in with the owner's account",
+        );
+      }
+
+      return real({ client: clientCapability.value, smartAccount: derived });
+    },
+    [smartAccountFor],
   );
 
   /** Runs one registry call as a sponsored UserOperation from the Rock Account. */
@@ -233,25 +287,24 @@ export function useRockActions(): UseRockActions {
       if (id === null) return unavailable(`"${rockId}" is not a rock id`);
       if (registry.state === "UNAVAILABLE") return unavailable(registry.reason);
 
-      const clientCapability = await smartAccountFor();
-      if (clientCapability.state === "UNAVAILABLE") return unavailable(clientCapability.reason);
-      const client = clientCapability.value;
+      const owner = await ownerClientFor(rockId);
+      if (owner.state === "UNAVAILABLE") return unavailable(owner.reason);
 
       try {
-        const txHash = await client.sendTransaction({
+        const txHash = await owner.value.client.sendTransaction({
           to: registry.value,
           data,
           value: BigInt(0),
         });
 
-        return real({ txHash, smartAccount: getAddress(client.account.address) });
+        return real({ txHash, smartAccount: owner.value.smartAccount });
       } catch (err) {
         return unavailable(
           `The operation was not accepted: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     },
-    [registry, smartAccountFor],
+    [registry, ownerClientFor],
   );
 
   const withPending = useCallback(
@@ -276,10 +329,21 @@ export function useRockActions(): UseRockActions {
         // The attestation names the wallet the tap authorises. If it does not name the wallet
         // that is signed in, the rock would be credited to someone else — refuse rather than
         // send a transaction whose outcome contradicts what the user was shown.
-        const clientCapability = await smartAccountFor();
+        // The salt is the tag, so the account this builds is the one that tag maps to for this
+        // owner — the same derivation the verifier ran when it signed `att.smartAccount`.
+        const clientCapability = await smartAccountFor(attestation.message.uidHash);
         if (clientCapability.state === "UNAVAILABLE") return unavailable(clientCapability.reason);
         const client = clientCapability.value;
         const smartAccount = getAddress(client.account.address);
+
+        // `awakenRock` requires `att.smartAccount == smartAccount`, so a disagreement here is a
+        // transaction that reverts at best. It usually means the tap was verified for a different
+        // wallet than the one signed in.
+        if (smartAccount !== getAddress(attestation.message.smartAccount)) {
+          return unavailable(
+            "This tap names a different Rock Account than this wallet derives — tap the rock again while signed in",
+          );
+        }
 
         // The registry requires `att.smartAccount == smartAccount` and credits `att.subject`, so
         // both are checked here against what is actually about to be submitted.
@@ -345,14 +409,19 @@ export function useRockActions(): UseRockActions {
             recipient,
             currentOwner: getAddress(activeWallet.address),
             smartAccount: result.value.smartAccount,
-            build: () => smartAccountFor(),
+            build: async () => {
+              const owner = await ownerClientFor(rockId);
+              return owner.state === "UNAVAILABLE"
+                ? unavailable(owner.reason)
+                : real(owner.value.client);
+            },
             token,
           });
         }
 
         return real({ txHash: result.value.txHash });
       }),
-    [withPending, sendFromRockAccount, getAccessToken, activeWallet, smartAccountFor],
+    [withPending, sendFromRockAccount, getAccessToken, activeWallet, ownerClientFor],
   );
 
   const claimHandover = useCallback(
@@ -413,12 +482,42 @@ export function useRockActions(): UseRockActions {
     [withPending, sendFromRockAccount, getAccessToken],
   );
 
+  /**
+   * Flow F. Informational on chain: it records what the owner says about the object and gates
+   * nothing. The UI must not present it as a freeze.
+   */
+  const markLost = useCallback(
+    (rockId: string) =>
+      withPending(async (): Promise<Capability<{ txHash: Hex }>> => {
+        const id = parseRockId(rockId);
+        if (id === null) return unavailable(`"${rockId}" is not a rock id`);
+        const result = await sendFromRockAccount(rockId, encodeMarkLost(id));
+        if (result.state === "UNAVAILABLE") return unavailable(result.reason);
+        return real({ txHash: result.value.txHash });
+      }),
+    [withPending, sendFromRockAccount],
+  );
+
+  const clearLost = useCallback(
+    (rockId: string) =>
+      withPending(async (): Promise<Capability<{ txHash: Hex }>> => {
+        const id = parseRockId(rockId);
+        if (id === null) return unavailable(`"${rockId}" is not a rock id`);
+        const result = await sendFromRockAccount(rockId, encodeClearLost(id));
+        if (result.state === "UNAVAILABLE") return unavailable(result.reason);
+        return real({ txHash: result.value.txHash });
+      }),
+    [withPending, sendFromRockAccount],
+  );
+
   return {
     awaken,
     initiateHandover,
     claimHandover,
     cancelHandover,
     archiveRock,
+    markLost,
+    clearLost,
     isPending,
     availability,
   };

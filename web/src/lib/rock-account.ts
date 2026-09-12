@@ -16,6 +16,7 @@
 import {
   createPublicClient,
   encodeFunctionData,
+  getAddress,
   http,
   keccak256,
   toHex,
@@ -24,10 +25,17 @@ import {
   type Hex,
 } from "viem";
 import { sepolia } from "viem/chains";
-import { addresses, chain, getPublicClient, SAFE_SENTINEL_OWNER } from "@/lib/chain";
+import { toSafeSmartAccount } from "permissionless/accounts";
+import {
+  addresses,
+  chain,
+  ENTRY_POINT_07_ADDRESS,
+  getPublicClient,
+  SAFE_SENTINEL_OWNER,
+} from "@/lib/chain";
 import { BANK_ROCK_REGISTRY_ABI } from "@/lib/chain/abi/registry";
 import { ERC20_ABI } from "@/lib/chain/abi/erc20";
-import { env, real, unavailable, type Capability } from "@/lib/demo";
+import { env, optionalEnv, real, unavailable, type Capability } from "@/lib/demo";
 
 /* -------------------------------------------------------------------------- */
 /* Attestation                                                                 */
@@ -436,6 +444,29 @@ export function encodeArchiveRock(rockId: bigint): Hex {
 }
 
 /**
+ * The owner's own statement that the physical tag is lost or copied (Flow F).
+ *
+ * Informational only: on chain it freezes nothing, blocks no handover and gates nothing. It exists
+ * so a reader of the registry can see what the owner said. The UI must not present it as a
+ * security control — possession was never the authorisation for spending in the first place.
+ */
+export function encodeMarkLost(rockId: bigint): Hex {
+  return encodeFunctionData({
+    abi: BANK_ROCK_REGISTRY_ABI,
+    functionName: "markLost",
+    args: [rockId],
+  });
+}
+
+export function encodeClearLost(rockId: bigint): Hex {
+  return encodeFunctionData({
+    abi: BANK_ROCK_REGISTRY_ABI,
+    functionName: "clearLost",
+    args: [rockId],
+  });
+}
+
+/**
  * The next rock id nobody has awakened yet.
  *
  * Pure, so the rule is testable and stated once: one above the highest id that has ever been
@@ -510,18 +541,89 @@ export function pimlicoRpcUrl(apiKey: string): string {
 }
 
 /**
- * Salt for the counterfactual Safe address.
+ * Salt for the counterfactual Safe address: the tag's own identity.
  *
- * Zero, so a signed-in user has exactly one Rock Account address, derived from their Privy wallet
- * alone. It has to be independent of the rock id: the attestation binds `smartAccount` at the
- * moment of the tap, and the tap is also what decides which rock id is being awakened (a tag
- * whose rock was archived awakens a different id). An address that depended on the rock id could
- * not be quoted to the verifier before that is settled.
+ * One Rock Account per physical rock, per owner (spec 03, D-005). The salt is `keccak256(uid)` —
+ * the same `uidHash` the registry binds and the attestation signs — read as a uint256, so:
  *
- * This is a deliberate narrowing of spec 03's "each physical rock maps to a persistent smart
- * account": one account per owner, not one per rock. The account address still survives a
- * handover — the claim swaps its Safe owner rather than moving assets — so the property spec 03
- * actually depends on (stable address, stable assets across ownership changes) holds. A per-rock
- * account needs a two-step tap, and that is a product decision, not a refactor.
+ *  - two rocks held by the same person have two accounts, and their balances never pool;
+ *  - the account address is derivable by anyone who knows the tag hash and the owner, which is
+ *    what lets the verifier quote `smartAccount` inside the signed attestation before any
+ *    transaction exists;
+ *  - the address follows the *tag*, not the rock id. A tag whose rock was archived awakens a new
+ *    rock id into the same account for the same owner, which is the behaviour the archive-and-
+ *    rehearse flow needs.
+ *
+ * It deliberately does not include the rock id: the id is not settled at the moment of the tap
+ * (an archived rock's tag awakens a different one), and the attestation must name the account.
+ *
+ * Throws on a malformed hash rather than salting with a coerced value — a wrong salt is a
+ * different account, and that failure would surface much later as "your rock is empty".
  */
-export const ROCK_ACCOUNT_SALT_NONCE = BigInt(0);
+export function rockAccountSaltFor(uidHash: `0x${string}`): bigint {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(uidHash)) {
+    throw new Error(`uidHash must be a 32-byte hex string, got "${uidHash}"`);
+  }
+  return BigInt(uidHash);
+}
+
+/**
+ * Derives a Rock Account address without deploying anything and without a signer.
+ *
+ * Counterfactual: the address is a CREATE2 prediction from (owner, salt), so it exists and can be
+ * quoted — to the verifier, to a faucet, to a UI — long before the first UserOperation deploys it.
+ *
+ * Server-safe: it takes an owner *address*, not a wallet, so the NFC verifier can derive exactly
+ * the address the client will build and sign it into the attestation. Nothing here can sign or
+ * send.
+ *
+ * It is not free, and callers on a latency-sensitive path should know why: `toSafeSmartAccount`
+ * reads `proxyCreationCode()` from the Safe proxy factory before it can predict the address, so
+ * derivation costs one RPC round trip. The result is fully determined by (owner, salt) on a given
+ * chain, so it is cached here for the life of the isolate, and the read is given a short timeout
+ * and a single retry: an unreachable RPC must fail quickly as UNAVAILABLE rather than hang a tap.
+ */
+const derivedAddressCache = new Map<string, Address>();
+
+function derivationClient() {
+  const rpcUrl = optionalEnv("SEPOLIA_RPC_URL");
+  return createPublicClient({
+    chain: sepolia,
+    transport: http(rpcUrl, { timeout: 5_000, retryCount: 1 }),
+  });
+}
+
+export async function computeRockAccountAddress(params: {
+  ownerAddress: Address;
+  saltNonce: bigint;
+}): Promise<Capability<Address>> {
+  let ownerAddress: Address;
+  try {
+    ownerAddress = getAddress(params.ownerAddress);
+  } catch {
+    return unavailable(`"${params.ownerAddress}" is not an address`);
+  }
+
+  const cacheKey = `${ownerAddress}:${params.saltNonce.toString()}`;
+  const cached = derivedAddressCache.get(cacheKey);
+  if (cached) return real(cached);
+
+  try {
+    const account = await toSafeSmartAccount({
+      client: derivationClient(),
+      // Address-only owner: enough to predict the address, unable to authorise anything.
+      owners: [{ address: ownerAddress, type: "json-rpc" } as const],
+      version: "1.4.1",
+      entryPoint: { address: ENTRY_POINT_07_ADDRESS, version: "0.7" },
+      saltNonce: params.saltNonce,
+    });
+
+    const derived = getAddress(account.address);
+    derivedAddressCache.set(cacheKey, derived);
+    return real(derived);
+  } catch (err) {
+    return unavailable(
+      `The Rock Account address could not be derived: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
