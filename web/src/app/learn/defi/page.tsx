@@ -40,11 +40,8 @@ export default function DefiPage() {
         {/* Section 2: Architecture Setup (Infographic 2 Placeholder) */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 items-center">
           <div className="order-1 flex justify-center">
-            <div className="w-full max-w-md aspect-square rounded-3xl relative overflow-hidden bg-ink-4/10 border border-black/5 flex items-center justify-center">
-              <span className="text-ink-3 font-mono font-medium tracking-widest uppercase text-center px-4">
-                [ Infographic 2 Placeholder ]<br/>
-                <span className="text-xs mt-2 block">How Aqua works inside Bank Rock</span>
-              </span>
+            <div className="w-full max-w-md aspect-square rounded-3xl relative overflow-hidden shadow-xl bg-white border border-black/5">
+              <Image src="/infographics/aqua_architecture.jpg" alt="Aqua Architecture" fill className="object-cover" />
             </div>
           </div>
           <div className="flex flex-col gap-6 order-2">
