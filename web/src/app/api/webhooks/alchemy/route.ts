@@ -1,6 +1,9 @@
 import * as crypto from "crypto";
 import { NextResponse } from 'next/server';
 import { logger } from "@/lib/telemetry";
+import { getRequestContext } from "@cloudflare/next-on-pages";
+import { getDb } from "@/lib/db";
+import { rockEvents } from "@/lib/db/schema";
 
 export async function POST(req: Request) {
   try {
@@ -29,9 +32,22 @@ export async function POST(req: Request) {
     // Extract event data
     const { event } = body;
     
-    // TODO: Insert into D1
-    // const db = getRequestContext().env.DB;
-    // await db.prepare('INSERT INTO events (data) VALUES (?)').bind(JSON.stringify(event)).run();
+    // Insert into D1 via Drizzle
+    const env = getRequestContext().env as any;
+    if (env && env.DB) {
+      const db = getDb(env);
+      const network = event?.network || "UNKNOWN";
+      
+      await db.insert(rockEvents).values({
+        id: crypto.randomUUID(),
+        rockId: event?.activity?.[0]?.to || "unknown", // Using 'to' address as rockId mapping for now
+        eventType: 'ALCHEMY_WEBHOOK',
+        txHash: event?.activity?.[0]?.hash || "unknown",
+        amountUsdc: 0, // Would parse from activity
+        amountWeth: 0,
+        timestamp: Date.now()
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

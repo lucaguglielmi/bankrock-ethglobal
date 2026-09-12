@@ -21,5 +21,13 @@
   },
   "observability": {
     "enabled": true
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bankrock-db",
+      "database_id": "f0a28d6f-0a36-46aa-b711-8b5297913d2e",
+      "migrations_dir": "drizzle"
+    }
+  ]
 }

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/telemetry";
+import { getRequestContext } from "@cloudflare/next-on-pages";
+import { getDb } from "@/lib/db";
+import { subscribers } from "@/lib/db/schema";
 
 // Email validation regex (RFC 5322 standard compliance)
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
@@ -52,15 +55,39 @@ export async function POST(req: Request) {
     }
 
     const normalizedEmail = rawEmail.toLowerCase();
-    const isNew = !subscribersMap.has(normalizedEmail);
-
-    const record: SubscriberRecord = {
-      email: normalizedEmail,
-      subscribedAt: new Date().toISOString(),
-      source: body.source || "landing_genesis_batch",
-    };
-
-    subscribersMap.set(normalizedEmail, record);
+    
+    // Save to D1 Database
+    let isNew = true;
+    try {
+      const env = getRequestContext().env as any;
+      if (env && env.DB) {
+        const db = getDb(env);
+        
+        // Attempt to insert, on conflict do nothing (or update if desired)
+        await db.insert(subscribers).values({
+          email: normalizedEmail,
+          topics: body.source ? [body.source] : ["landing_genesis_batch"],
+          createdAt: Date.now(),
+        }).onConflictDoNothing();
+      } else {
+        // Fallback for development if D1 not bound properly
+        isNew = !subscribersMap.has(normalizedEmail);
+        subscribersMap.set(normalizedEmail, {
+          email: normalizedEmail,
+          subscribedAt: new Date().toISOString(),
+          source: body.source || "landing_genesis_batch",
+        });
+      }
+    } catch (dbErr) {
+      logger.error("Failed to insert subscriber to D1", dbErr);
+      // fallback
+      isNew = !subscribersMap.has(normalizedEmail);
+      subscribersMap.set(normalizedEmail, {
+        email: normalizedEmail,
+        subscribedAt: new Date().toISOString(),
+        source: body.source || "landing_genesis_batch",
+      });
+    }
 
     const latencyMs = Date.now() - start;
     logger.info("Newsletter subscriber recorded successfully", {

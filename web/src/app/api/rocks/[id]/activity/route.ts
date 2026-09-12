@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getRequestContext } from "@cloudflare/next-on-pages";
 import { logger } from "@/lib/telemetry";
+import { getDb } from "@/lib/db";
+import { rockEvents } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 
 export const runtime = "edge";
 
@@ -32,19 +35,27 @@ export async function GET(
       });
     }
 
-    // Real D1 SQL query
-    const stmt = db.prepare(`
-      SELECT id, type, title, timestamp, txHash 
-      FROM Events 
-      WHERE rockId = ? 
-      ORDER BY timestamp DESC 
-      LIMIT 50
-    `);
+    const drizzleDb = getDb(getRequestContext().env as any);
     
-    const { results } = await stmt.bind(id).all();
+    // Real D1 SQL query via Drizzle
+    const results = await drizzleDb
+      .select()
+      .from(rockEvents)
+      .where(eq(rockEvents.rockId, id))
+      .orderBy(desc(rockEvents.timestamp))
+      .limit(50);
+
+    // Map to expected UI format
+    const events = results.map(row => ({
+      id: row.id,
+      type: row.eventType.toLowerCase(),
+      title: row.eventType === "ALCHEMY_WEBHOOK" ? "On-chain Event Recorded" : row.eventType,
+      timestamp: new Date(row.timestamp).toISOString(),
+      txHash: row.txHash,
+    }));
 
     return NextResponse.json({
-      events: results
+      events
     });
   } catch (error) {
     logger.error('Error fetching activity data', error as Error);
