@@ -77,6 +77,20 @@ import { logger } from "@/lib/telemetry";
 const CLAIMS_PER_ROCK = 3;
 const CLAIM_WINDOW_MS = 60 * 60 * 1000;
 
+/**
+ * How much life an attestation must have left before this route will start (review N-6).
+ *
+ * The first half of the sequence is irreversible: once the Safe owner swap lands, the account is
+ * the claimant's whether or not the registry claim follows. A claimant who posts at
+ * deadline-minus-seconds passes every pre-check, the swap lands during up to fifteen seconds of
+ * receipt polling, and `claimHandover` is then mined past `att.deadline` and reverts
+ * `AttestationExpired` — leaving the giver owning the rock and the recipient owning the Safe that
+ * holds its money. Ninety seconds covers the poll window and a block or two of inclusion delay.
+ *
+ * Refusing costs the claimant one more tap. The failure it prevents costs someone their rock.
+ */
+const MIN_ATTESTATION_LIFETIME_MS = 90 * 1000;
+
 /** Reports whether a claim could be relayed at all, without disclosing anything about the key. */
 export async function GET() {
   const relayer = relayerAccount();
@@ -119,6 +133,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       reason: verified.reason,
     });
     return NextResponse.json({ state: "UNAVAILABLE", reason: verified.reason }, { status: 401 });
+  }
+
+  // Enough lifetime left to finish both halves (review N-6). Checked before the reservation and
+  // long before the swap, so a refusal here changes nothing at all.
+  const remainingMs = attestation.message.deadline * 1000 - Date.now();
+  if (remainingMs < MIN_ATTESTATION_LIFETIME_MS) {
+    logger.warn("Refused a claim whose attestation was about to expire", {
+      action: "HANDOVER_CLAIM_TOO_CLOSE_TO_EXPIRY",
+      rockId: id,
+      remainingMs,
+    });
+    return NextResponse.json(
+      { state: "UNAVAILABLE", reason: "attestation too close to expiry; tap again" },
+      { status: 409 },
+    );
   }
 
   // The registry decides whether this claim can succeed — ask it before paying for the attempt.

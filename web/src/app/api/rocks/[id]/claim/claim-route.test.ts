@@ -268,6 +268,50 @@ describe("refusals before any gas is spent (P-1)", () => {
     expect(submitClaimHandover).not.toHaveBeenCalled();
   });
 
+  it("does not claim when the owner swap was included but reverted (review N-6)", async () => {
+    // ERC-4337 reports a reverted UserOperation with `success: false` and a good transaction hash.
+    // Treating that as landed is N-1 reached through the check meant to prevent it.
+    submitSignedUserOp.mockResolvedValue({
+      state: "UNAVAILABLE",
+      reason: `account handover reverted on-chain (0x${"ef".repeat(32)})`,
+    });
+
+    const { status, body } = await post();
+    expect(status).toBe(503);
+    expect(submitClaimHandover).not.toHaveBeenCalled();
+    expect(releaseRelayerSpend).toHaveBeenCalledTimes(1);
+    expect(body.rockAccountHandover.reason).toMatch(/reverted on-chain/);
+  });
+
+  it("refuses when the attestation is about to expire (review N-6)", async () => {
+    const { POST } = await import("./route");
+    const expiring = {
+      ...attestation,
+      message: { ...attestation.message, deadline: Math.floor(Date.now() / 1000) + 30 },
+    };
+    const response = await POST(
+      new Request("https://bank-rock.com/api/rocks/1/claim", {
+        method: "POST",
+        body: JSON.stringify({ attestation: expiring }),
+        headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.7" },
+      }),
+      { params: Promise.resolve({ id: "1" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.reason).toBe("attestation too close to expiry; tap again");
+    // Nothing irreversible ran: no swap, no claim, and no cap consumed.
+    expect(submitSignedUserOp).not.toHaveBeenCalled();
+    expect(submitClaimHandover).not.toHaveBeenCalled();
+    expect(reserveRelayerSpend).not.toHaveBeenCalled();
+  });
+
+  it("accepts an attestation with comfortable lifetime left", async () => {
+    const { status } = await post();
+    expect(status).toBe(200);
+  });
+
   it("does not claim when the owner swap fails to land, and releases the reservation", async () => {
     submitSignedUserOp.mockResolvedValue({
       state: "UNAVAILABLE",

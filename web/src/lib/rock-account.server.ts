@@ -436,8 +436,23 @@ export async function submitSignedUserOp(
         userOpHash,
       ])) as { receipt?: { transactionHash?: Hex }; success?: boolean } | null;
 
-      if (receipt?.receipt?.transactionHash) {
-        return real({ txHash: receipt.receipt.transactionHash, userOpHash });
+      const txHash = receipt?.receipt?.transactionHash;
+      if (txHash) {
+        // Included is not succeeded (review N-6). ERC-4337 reports a UserOperation that reverted
+        // inside its own execution with `success: false` and a perfectly good transaction hash —
+        // a stale `prevOwner`, a spent nonce or a Safe guard all look like this. Reading only the
+        // hash would report a Safe owner swap that never happened as landed, and the claim route
+        // would then hand over a rock whose account is still the giver's: N-1, reached through
+        // the check added to prevent it.
+        if (receipt?.success !== true) {
+          logger.warn("A stored UserOperation was included but reverted", {
+            action: "USEROP_REVERTED",
+            txHash,
+            userOpHash,
+          });
+          return unavailable(`account handover reverted on-chain (${txHash})`);
+        }
+        return real({ txHash, userOpHash });
       }
     } catch {
       // Keep polling: a not-yet-known operation is reported as an error by some bundlers.
