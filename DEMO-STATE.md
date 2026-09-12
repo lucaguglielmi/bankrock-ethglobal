@@ -46,24 +46,17 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 
 ## 3. Unavailable until something is deployed
 
-**The contracts are deployed and their addresses are now committed** (D-034): `web/wrangler.jsonc`
-`vars` carries the registry, the XYCSwap app, the taker and both deploy blocks, copied from
-`contracts/deployments/sepolia.json` and `contracts/deployments/sepolia-aqua-app.json` and compared
-against them by `scripts/spec-checks.sh`. What is *not* yet true is that a deployed build is reading
-them — production last shipped before they were committed, and `NEXT_PUBLIC_*` values are inlined at
-build time, so only a new deploy carries them.
+**Nothing is left in this state.** The contracts are deployed and verified, their addresses are
+committed (D-034), and the build of `c142a4b` was observed serving them on `https://bank-rock.com`
+at 16:48 UTC on 2026-09-12: `bash scripts/check-live.sh` reported code at all six addresses and
+both deploy blocks, and `/api/rocks/next-id` and `/api/rocks/1/activity` answered `REAL` from the
+registry. D-1 (rock lifecycle, owner, Rock Account, provenance, archive) is therefore deleted.
 
-**These five rows are deleted when the next successful deploy has been observed serving real
-data** — deployed *and* observed on `https://bank-rock.com`, not merely committed. Until then each
-surface still renders `UNAVAILABLE` naming the variable, because that is what the live build does.
-
-| # | What | Spec | Becomes real when |
-| --- | --- | --- | --- |
-| D-1 | Rock lifecycle, owner, Rock Account address, provenance, archive | 15 P2 | Committed: `NEXT_PUBLIC_REGISTRY_ADDRESS` = `0x2A3101Fc…F757`, `REGISTRY_DEPLOY_BLOCK` = `11689716`. Delete when a deploy carrying them serves a real rock page. Provenance additionally needs K-7. |
-| D-2 | Ship and dock a liquidity stream | 15 P3, 04 | Committed: `NEXT_PUBLIC_AQUA_APP_ADDRESS` = `0x8a293F43…316B`. Delete when a deployed build ships a strategy on chain. |
-| D-3 | Visitor swap | 15 P3, 02 Flow D | Committed: `NEXT_PUBLIC_AQUA_TAKER_ADDRESS` = `0xCd7899E3…0016`. A taker must be a contract (D-030). Delete when a deployed build takes a real swap. |
-| D-4 | Cumulative earned fees | 04, 09 D-030 | Committed: `AQUA_APP_DEPLOY_BLOCK` = `11689724`. Still needs a provider RPC that serves the log range (K-7). The fee *rate* needs only the strategy. |
-| D-5 | Quotes | 04 | Committed with D-2. `XYCSwap.quoteExactIn` is the source; there is no price feed and no external API. Delete when a deployed build quotes from it. |
+The four Aqua rows that used to sit here (ship and dock, visitor swap, cumulative fees, quotes)
+are not "unavailable" any more — every surface is configured and reads the deployed app — but
+none has been *exercised* on chain yet. They are the same fact as **P-3** in §5 and live there
+now, not here: a shipped strategy, a swap through the taker and a quote from `quoteExactIn` are
+what the WP-2 live run proves, and that is the line that gets deleted when it does.
 
 ## 4. Unavailable until a secret is set
 
