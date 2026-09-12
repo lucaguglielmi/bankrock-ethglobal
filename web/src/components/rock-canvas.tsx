@@ -171,7 +171,7 @@ function RockMesh({ isHovered }: { isHovered: boolean }) {
             speed={0.5}
           />
           <Html position={[-0.8, -0.2, 0.5]}>
-            <div className={`transition-all duration-1000 flex flex-row-reverse items-center font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#001144] whitespace-nowrap -translate-x-full ${isHovered ? 'opacity-100 translate-y-0 pointer-events-auto delay-300' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+            <div className={`transition-all duration-1000 flex flex-row-reverse items-center font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#001144] whitespace-nowrap -translate-x-full ${isHovered ? 'opacity-100 translate-y-0 pointer-events-none delay-300' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
               <div className="w-1.5 h-1.5 rounded-full bg-[#001144]" />
               <div className="w-24 h-[1px] bg-[#001144]/80 ml-4" />
               a normal rock
@@ -204,7 +204,7 @@ function RockMesh({ isHovered }: { isHovered: boolean }) {
                 <meshStandardMaterial color="#222222" metalness={0.6} roughness={0.4} />
              </mesh>
              <Html position={[0.1, -0.1, 0]}>
-              <div className={`transition-all duration-1000 flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#001144] whitespace-nowrap ${isHovered ? 'opacity-100 translate-y-0 pointer-events-auto delay-500' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+              <div className={`transition-all duration-1000 flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#001144] whitespace-nowrap ${isHovered ? 'opacity-100 translate-y-0 pointer-events-none delay-500' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#001144]" />
                 <div className="w-32 h-[1px] bg-[#001144]/80 mr-4" />
                 a tiny NFC sensor
@@ -231,7 +231,7 @@ function RockMesh({ isHovered }: { isHovered: boolean }) {
             <Sparkles count={20} scale={1.2} size={3.5} speed={0.8} opacity={0.8} color="#aaddff" />
             
             <Html position={[0.2, 0.2, 0]}>
-              <div className={`transition-all duration-1000 flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#001144] whitespace-nowrap ${isHovered ? 'opacity-100 translate-y-0 pointer-events-auto delay-700' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+              <div className={`transition-all duration-1000 flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#001144] whitespace-nowrap ${isHovered ? 'opacity-100 translate-y-0 pointer-events-none delay-700' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#001144]" />
                 <div className="w-40 h-[1px] bg-[#001144]/80 mr-4" />
                 a sparkly silicon protective layer
@@ -283,17 +283,21 @@ function SmallRock({ position, scale, speed, rotationIntensity, color = "#f8f8f8
 export function RockCanvas() {
   const [isHovered, setIsHovered] = useState(false);
 
+  const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
+
   const handleMouseEnter = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
     if (!isHovered) {
       setIsHovered(true);
       playFuturisticSweep();
     }
   };
   const handleMouseLeave = () => {
-    if (isHovered) {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    hoverTimeout.current = setTimeout(() => {
       setIsHovered(false);
       playClick();
-    }
+    }, 200); // 200ms tolerance to prevent flickering
   };
   
   const handleToggle = () => {
@@ -305,7 +309,7 @@ export function RockCanvas() {
     <div className="absolute inset-0 pointer-events-none z-0 flex items-center justify-center">
       {/* Invisible DOM hit area for the rock */}
       <div 
-        className="w-[300px] h-[300px] md:w-[450px] md:h-[450px] rounded-full pointer-events-auto cursor-pointer absolute z-10"
+        className="w-[80vw] max-w-[600px] aspect-square rounded-full pointer-events-auto cursor-pointer absolute z-10"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleToggle}
