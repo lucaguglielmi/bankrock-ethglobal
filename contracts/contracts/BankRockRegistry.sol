@@ -68,14 +68,14 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  *  Physical possession is never sufficient financial authorization. An attestation gates
  *  claiming the object; it authorizes no spending of any kind.
  *
- *  Known gap, recorded rather than silently accepted: `awakenRock` takes `smartAccount` as a
- *  plain argument, and the attestation does not cover it. An observer who sees a pending
- *  awakening can therefore re-submit the same attestation with a different `smartAccount`,
- *  which would leave the rock owned by the right person but pointing at a Rock Account the
- *  observer controls. Closing it needs either `smartAccount` added to the signed payload, or
- *  `msg.sender == smartAccount` required on awaken (which keeps 4337 sponsorship working, but
- *  rules out a plain operator relayer). The type string is fixed by agreement with the
- *  attestation signer, so the choice is deferred rather than made here.
+ *  Because neither call reads `msg.sender`, an attestation is relayable but not malleable: the
+ *  signature covers every consequence the call can have. `awakenRock` binds a Rock Account, so
+ *  `smartAccount` is part of the signed payload and must equal the argument; without that, an
+ *  observer could take a captured attestation and re-submit it naming a Rock Account of their
+ *  own, leaving the rock owned by the right person but custodied at an address the attacker
+ *  controls — which is precisely the address the interface would then invite the owner to fund.
+ *  `claimHandover` changes no smart account, so it ignores the field; the signer sets it to zero
+ *  for claim attestations, and the registry does not care what it holds.
  */
 contract BankRockRegistry is Ownable, Pausable, EIP712 {
     // ---------------------------------------------------------------------
@@ -125,7 +125,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
      * @notice A server-signed statement that a genuine tap of the tag bound to `rockId` was
      *         verified, and which wallet that tap authorises.
      * @dev EIP-712 type string, exactly:
-     *      `Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)`
+     *      `Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)`
      * @param rockId   The public rock id the attestation is for.
      * @param uidHash  `keccak256(rawUid7Bytes)` — the raw 7-byte NTAG UID, hashed.
      * @param counter  The tag's `SDMReadCtr` for this read. Must strictly exceed the highest
@@ -137,6 +137,11 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
      *                 the transaction can be submitted by anyone — a sponsored UserOp from the
      *                 rock's Safe, or an operator relayer — without the tapping user needing gas.
      *                 Must not be the zero address.
+     * @param smartAccount The Rock Account this attestation authorises `awakenRock` to bind.
+     *                 Covering it in the signature is what stops a front-runner re-submitting a
+     *                 captured attestation with a Rock Account of their own. `claimHandover`
+     *                 ignores this field entirely — it changes no smart account — and the signer
+     *                 sets it to the zero address for claim attestations.
      */
     struct Attestation {
         uint256 rockId;
@@ -144,11 +149,12 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         uint32 counter;
         uint256 deadline;
         address subject;
+        address smartAccount;
     }
 
-    /// @notice `keccak256("Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)")`
+    /// @notice `keccak256("Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)")`
     bytes32 public constant ATTESTATION_TYPEHASH = keccak256(
-        "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)"
+        "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)"
     );
 
     // ---------------------------------------------------------------------
@@ -176,6 +182,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     error AttesterNotSet();
     error AttestationRockMismatch(uint256 expected, uint256 provided);
     error AttestationUidMismatch(bytes32 expected, bytes32 provided);
+    error AttestationSmartAccountMismatch(address expected, address provided);
     error AttestationExpired(uint256 deadline);
     error StaleAttestationCounter(uint32 provided, uint32 lastSeen);
     error InvalidAttestationSignature();
@@ -283,15 +290,17 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
      * @dev Requires a valid, unexpired, non-replayed attestation signed by `attester`. A rock can
      *      be awakened exactly once, and a UID can be bound to exactly one rock.
      *
-     *      `msg.sender` is deliberately irrelevant. Ownership is taken from the signed payload,
-     *      so the transaction can be relayed by anyone: a gas-sponsored UserOp from the rock's
-     *      Safe, or an operator relayer. The tapping user never needs a funded wallet, which is
-     *      the whole point of the sponsored-onboarding decision.
+     *      `msg.sender` is deliberately irrelevant. Both consequences of this call — who ends up
+     *      owning the rock, and which Rock Account it is bound to — come from the signed payload,
+     *      so the transaction can be submitted by anyone: a gas-sponsored UserOp from the rock's
+     *      Safe, or an operator relayer. The tapping user never needs a funded wallet, and a
+     *      third party who captures the attestation can do nothing with it except carry out the
+     *      awakening the attester already authorised.
      * @param rockId The public rock id. Must be non-zero.
      * @param smartAccount The Rock Account (ERC-4337 smart account) that custodies this rock's
-     *        assets. Recorded here; this registry never calls it.
-     * @param att The attestation. `att.rockId` must equal `rockId` and `att.subject` must be
-     *        non-zero; `att.subject` becomes the owner.
+     *        assets. Must equal `att.smartAccount`. Recorded here; this registry never calls it.
+     * @param att The attestation. `att.rockId` must equal `rockId`, `att.subject` must be
+     *        non-zero and becomes the owner, and `att.smartAccount` must equal `smartAccount`.
      * @param sig The attester's EIP-712 signature over `att`.
      */
     function awakenRock(uint256 rockId, address smartAccount, Attestation calldata att, bytes calldata sig)
@@ -300,6 +309,10 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     {
         if (rockId == 0) revert InvalidRockId();
         if (smartAccount == address(0)) revert InvalidSmartAccount();
+        // The attester authorised this Rock Account and no other. See the contract-level note.
+        if (att.smartAccount != smartAccount) {
+            revert AttestationSmartAccountMismatch(att.smartAccount, smartAccount);
+        }
         if (att.uidHash == bytes32(0)) revert InvalidUidHash();
 
         Rock storage r = _rocks[rockId];
@@ -417,7 +430,8 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
      * @param rockId The rock being claimed.
      * @param att The attestation. `att.rockId` must equal `rockId`, `att.uidHash` must equal the
      *        UID hash bound to the rock, and `att.subject` must be the named recipient when the
-     *        handover named one.
+     *        handover named one. `att.smartAccount` is ignored — this call binds no Rock Account
+     *        — and is neither required to be zero nor required to match anything.
      * @param sig The attester's EIP-712 signature over `att`.
      */
     function claimHandover(uint256 rockId, Attestation calldata att, bytes calldata sig)
@@ -580,7 +594,13 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     function _structHash(Attestation calldata att) private pure returns (bytes32) {
         return keccak256(
             abi.encode(
-                ATTESTATION_TYPEHASH, att.rockId, att.uidHash, att.counter, att.deadline, att.subject
+                ATTESTATION_TYPEHASH,
+                att.rockId,
+                att.uidHash,
+                att.counter,
+                att.deadline,
+                att.subject,
+                att.smartAccount
             )
         );
     }

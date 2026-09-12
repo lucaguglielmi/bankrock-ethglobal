@@ -51,6 +51,22 @@ export const BANK_ROCK_REGISTRY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "expected",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "provided",
+        "type": "address"
+      }
+    ],
+    "name": "AttestationSmartAccountMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes32",
         "name": "expected",
         "type": "bytes32"
@@ -615,6 +631,11 @@ export const BANK_ROCK_REGISTRY_ABI = [
             "internalType": "address",
             "name": "subject",
             "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "smartAccount",
+            "type": "address"
           }
         ],
         "internalType": "struct BankRockRegistry.Attestation",
@@ -677,6 +698,11 @@ export const BANK_ROCK_REGISTRY_ABI = [
           {
             "internalType": "address",
             "name": "subject",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "smartAccount",
             "type": "address"
           }
         ],
@@ -862,6 +888,11 @@ export const BANK_ROCK_REGISTRY_ABI = [
           {
             "internalType": "address",
             "name": "subject",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "smartAccount",
             "type": "address"
           }
         ],

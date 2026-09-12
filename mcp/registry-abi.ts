@@ -47,6 +47,22 @@ export const registryAbi = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "expected",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "provided",
+        "type": "address"
+      }
+    ],
+    "name": "AttestationSmartAccountMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes32",
         "name": "expected",
         "type": "bytes32"
@@ -611,6 +627,11 @@ export const registryAbi = [
             "internalType": "address",
             "name": "subject",
             "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "smartAccount",
+            "type": "address"
           }
         ],
         "internalType": "struct BankRockRegistry.Attestation",
@@ -673,6 +694,11 @@ export const registryAbi = [
           {
             "internalType": "address",
             "name": "subject",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "smartAccount",
             "type": "address"
           }
         ],
@@ -858,6 +884,11 @@ export const registryAbi = [
           {
             "internalType": "address",
             "name": "subject",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "smartAccount",
             "type": "address"
           }
         ],
