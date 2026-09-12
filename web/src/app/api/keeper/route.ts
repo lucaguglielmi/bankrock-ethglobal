@@ -1,81 +1,74 @@
-import { NextRequest, NextResponse } from "next/server";
+/**
+ * /api/keeper (SA-6, S-3, N-1, D-014)
+ *
+ *  - POST triggered a "rebalance" with no authentication at all. It now requires
+ *    `x-cron-secret: <CRON_SECRET>`, and an unset secret is a 503, not a bypass (D-017);
+ *  - the rebalance mutated an in-memory Map and returned a random 64-hex string as a transaction
+ *    hash with `success: true`. No keeper exists, so POST answers UNAVAILABLE and produces no
+ *    hash (D-014);
+ *  - GET returned a fabricated position — 1,250 USDC, 0.45 WETH, ETH at 2,850, fees accruing from
+ *    wall-clock time. It now returns the real position or UNAVAILABLE.
+ *
+ * Keeper rebalancing remains a DEMO capability in the UI (spec 15 Part 3 / Part 8). The badge is
+ * the UI's; this endpoint's job is to never supply a fabricated number to badge.
+ */
 
+import { NextResponse } from "next/server";
 import { evaluateAquaPosition, executeAquaRebalance } from "@/lib/aqua-keeper";
+import { requireCronSecret } from "@/lib/secure";
 import { logger } from "@/lib/telemetry";
 
-
-/**
- * GET /api/keeper?rockId=1&threshold=3.0
- * Evaluates the Aqua position and returns whether rebalancing is advised.
- */
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const rawRockId = searchParams.get("rockId") || "1";
-    const rawThreshold = searchParams.get("threshold") || "3.0";
-
-    const rockId = parseInt(rawRockId, 10);
-    const threshold = parseFloat(rawThreshold);
-
-    if (isNaN(rockId) || rockId <= 0) {
-      return NextResponse.json(
-        { error: "Invalid rockId. Must be a positive integer." },
-        { status: 400 }
-      );
-    }
-
-    const state = await evaluateAquaPosition(rockId, isNaN(threshold) ? 3.0 : threshold);
-
-    return NextResponse.json(
-      { success: true, ...state },
-      {
-        status: 200,
-        headers: {
-          "Cache-Control": "public, s-maxage=5, stale-while-revalidate=15",
-          "X-Content-Type-Options": "nosniff",
-        },
-      }
-    );
-  } catch (error: unknown) {
-    logger.error("Error in GET /api/keeper", error);
-    return NextResponse.json(
-      { error: "Failed to evaluate Aqua position" },
-      { status: 500 }
-    );
-  }
+function parseRockId(raw: unknown): string | null {
+  const value = String(raw ?? "").trim();
+  return /^\d+$/.test(value) && value !== "0" ? value : null;
 }
 
-/**
- * POST /api/keeper
- * Body: { rockId: 1 }
- * Executes an automated keeper rebalance.
- */
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json().catch(() => ({})) as { rockId?: number | string };
-    const rawRockId = body.rockId || 1;
-    const rockId = parseInt(String(rawRockId), 10);
+export async function GET(request: Request) {
+  const rockId = parseRockId(new URL(request.url).searchParams.get("rockId") ?? "1");
+  if (!rockId) {
+    return NextResponse.json({ error: "rockId must be a positive integer" }, { status: 400 });
+  }
 
-    if (isNaN(rockId) || rockId <= 0) {
-      return NextResponse.json(
-        { error: "Invalid rockId. Must be a positive integer." },
-        { status: 400 }
-      );
-    }
-
-    const result = await executeAquaRebalance(rockId);
-
-    return NextResponse.json(result, {
-      status: 200,
-      headers: {
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
-  } catch (error: unknown) {
-    logger.error("Error in POST /api/keeper", error);
+  const result = await evaluateAquaPosition(rockId);
+  if (result.state === "UNAVAILABLE") {
     return NextResponse.json(
-      { error: "Failed to execute keeper rebalance" },
-      { status: 500 }
+      { state: "UNAVAILABLE", reason: result.reason, rockId },
+      { headers: { "X-Content-Type-Options": "nosniff" } },
     );
   }
+
+  return NextResponse.json(
+    { state: result.state, rockId, position: result.value },
+    { headers: { "X-Content-Type-Options": "nosniff" } },
+  );
+}
+
+export async function POST(request: Request) {
+  const guard = requireCronSecret(request);
+  if (!guard.ok) return guard.response;
+
+  const body = (await request.json().catch(() => ({}))) as { rockId?: number | string };
+  const rockId = parseRockId(body.rockId ?? "1");
+  if (!rockId) {
+    return NextResponse.json({ error: "rockId must be a positive integer" }, { status: 400 });
+  }
+
+  const result = await executeAquaRebalance(rockId);
+
+  if (result.state === "UNAVAILABLE") {
+    logger.warn("Keeper rebalance refused", {
+      action: "KEEPER_REBALANCE_UNAVAILABLE",
+      rockId,
+      reason: result.reason,
+    });
+    return NextResponse.json(
+      { state: "UNAVAILABLE", reason: result.reason, rockId },
+      { status: 503, headers: { "X-Content-Type-Options": "nosniff" } },
+    );
+  }
+
+  return NextResponse.json(
+    { state: result.state, rockId, result: result.value },
+    { headers: { "X-Content-Type-Options": "nosniff" } },
+  );
 }

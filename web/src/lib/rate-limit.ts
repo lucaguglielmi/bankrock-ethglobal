@@ -1,0 +1,107 @@
+/**
+ * Durable rate limiting (SA-11).
+ *
+ * The previous limiter was a `Map` in middleware. On Workers each isolate has its own memory and
+ * isolates are created and discarded constantly, so that limiter counted a few requests per
+ * isolate and limited nothing. Buckets now live in D1, where every isolate sees the same counter.
+ *
+ * When there is no D1 binding the limiter reports UNAVAILABLE. The caller decides: a public read
+ * route serves the request and says so in telemetry, a spending route (the faucet) refuses.
+ */
+
+import { sql } from "drizzle-orm";
+import { getDb, NO_DATABASE_REASON } from "@/lib/db";
+import { logger } from "@/lib/telemetry";
+
+export interface RateLimitDecision {
+  /** false only when the limiter positively established that the caller is over the limit. */
+  allowed: boolean;
+  /** true when no durable store was reachable, so no limit could be enforced. */
+  enforced: boolean;
+  remaining: number;
+  reason?: string;
+}
+
+/** SHA-256 of an arbitrary key. Client IPs are stored hashed; they are keys, not user records. */
+export async function hashKey(value: string): Promise<string> {
+  const data = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** The client IP as seen behind Cloudflare, or null when no header is present. */
+export function clientIp(req: Request): string | null {
+  return (
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    null
+  );
+}
+
+/**
+ * Consumes one unit from a fixed window bucket.
+ *
+ * The whole decision is a single upsert: the window is reset when it has expired and the count is
+ * incremented otherwise, so concurrent isolates cannot both read a stale count.
+ */
+export async function consumeRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+): Promise<RateLimitDecision> {
+  const db = getDb();
+  if (!db) {
+    return { allowed: true, enforced: false, remaining: limit, reason: NO_DATABASE_REASON };
+  }
+
+  const now = Date.now();
+  const windowStart = now - (now % windowMs);
+
+  try {
+    const rows = await db.all<{ count: number }>(sql`
+      INSERT INTO rate_limits (key, window_start, count)
+      VALUES (${key}, ${windowStart}, 1)
+      ON CONFLICT(key) DO UPDATE SET
+        count = CASE WHEN rate_limits.window_start < ${windowStart} THEN 1 ELSE rate_limits.count + 1 END,
+        window_start = CASE WHEN rate_limits.window_start < ${windowStart} THEN ${windowStart} ELSE rate_limits.window_start END
+      RETURNING count
+    `);
+
+    const count = rows?.[0]?.count ?? 1;
+    return {
+      allowed: count <= limit,
+      enforced: true,
+      remaining: Math.max(0, limit - count),
+    };
+  } catch (err) {
+    logger.error("Rate limit store unavailable", err, { action: "RATE_LIMIT_STORE_ERROR" });
+    return {
+      allowed: true,
+      enforced: false,
+      remaining: limit,
+      reason: "Rate limit store unavailable",
+    };
+  }
+}
+
+/** Convenience: limits by client IP under a named scope. */
+export async function consumeIpRateLimit(
+  req: Request,
+  scope: string,
+  limit: number,
+  windowMs: number,
+): Promise<RateLimitDecision> {
+  const ip = clientIp(req);
+  if (!ip) {
+    return {
+      allowed: true,
+      enforced: false,
+      remaining: limit,
+      reason: "No client IP header present",
+    };
+  }
+  return consumeRateLimit(`${scope}:${await hashKey(ip)}`, limit, windowMs);
+}

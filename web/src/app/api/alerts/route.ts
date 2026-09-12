@@ -1,53 +1,109 @@
+/**
+ * GET|POST /api/alerts — a rock's alert preferences (SA-5, N-9).
+ *
+ * Both verbs were anonymous: anyone could read back the owner's stored email address for any
+ * rockId, or overwrite it. Both now require a verified Privy access token
+ * (`Authorization: Bearer …`) and only ever touch the preferences owned by that DID.
+ *
+ * Preferences persist; delivery does not exist. Spec 15 Part 6 cuts the delivery pipeline, so the
+ * response states plainly that no alert can currently be dispatched.
+ */
+
 import { NextResponse } from "next/server";
-import { getAlertPreferences, saveAlertPreferences, AlertTopicsConfig } from "@/lib/alerts";
+import { requirePrivyIdentity } from "@/lib/auth/privy";
+import {
+  DEFAULT_ALERT_TOPICS,
+  getAlertPreferences,
+  saveAlertPreferences,
+  type AlertTopicsConfig,
+} from "@/lib/alerts";
 import { logger } from "@/lib/telemetry";
 
+const DELIVERY_NOTE =
+  "Alert delivery is not implemented: preferences are stored, but nothing dispatches them yet.";
+
+function rockIdFrom(value: unknown): string | null {
+  const raw = String(value ?? "").trim();
+  return /^\d+$/.test(raw) ? raw : null;
+}
+
 export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const rockId = searchParams.get("rockId") || "1";
+  const auth = await requirePrivyIdentity(req);
+  if (!auth.ok) return auth.response;
 
-    const preferences = getAlertPreferences(rockId);
+  const rockId = rockIdFrom(new URL(req.url).searchParams.get("rockId"));
+  if (!rockId) {
+    return NextResponse.json({ error: "rockId must be an unsigned integer" }, { status: 400 });
+  }
 
-    return NextResponse.json({
-      success: true,
-      preferences,
-    });
-  } catch (error: unknown) {
-    logger.error("Error in GET /api/alerts", error);
+  const result = await getAlertPreferences(rockId, auth.identity.did);
+  if (result.state === "UNAVAILABLE") {
     return NextResponse.json(
-      { error: "Failed to retrieve alert preferences" },
-      { status: 500 }
+      { state: "UNAVAILABLE", reason: result.reason },
+      { status: 503 },
     );
   }
+
+  return NextResponse.json({
+    state: "REAL",
+    delivery: { state: "UNAVAILABLE", reason: DELIVERY_NOTE },
+    preferences:
+      result.value ??
+      {
+        rockId,
+        email: "",
+        pushEnabled: false,
+        topics: DEFAULT_ALERT_TOPICS,
+        updatedAt: null,
+      },
+  });
 }
 
 export async function POST(req: Request) {
-  try {
-    const body = await req.json().catch(() => ({})) as {
-      rockId?: string | number;
-      email?: string;
-      pushEnabled?: boolean;
-      topics?: Partial<AlertTopicsConfig>;
-    };
+  const auth = await requirePrivyIdentity(req);
+  if (!auth.ok) return auth.response;
 
-    const rockId = body.rockId || 1;
-    const email = typeof body.email === "string" ? body.email : "";
-    const pushEnabled = Boolean(body.pushEnabled);
-    const topics = body.topics || {};
+  const body = (await req.json().catch(() => ({}))) as {
+    rockId?: string | number;
+    email?: string;
+    pushEnabled?: boolean;
+    topics?: Partial<AlertTopicsConfig>;
+  };
 
-    const updated = saveAlertPreferences(rockId, email, pushEnabled, topics);
+  const rockId = rockIdFrom(body.rockId);
+  if (!rockId) {
+    return NextResponse.json({ error: "rockId must be an unsigned integer" }, { status: 400 });
+  }
 
-    return NextResponse.json({
-      success: true,
-      message: "Alert preferences updated successfully.",
-      preferences: updated,
+  const email = typeof body.email === "string" ? body.email.slice(0, 254) : "";
+  if (email !== "" && !email.includes("@")) {
+    return NextResponse.json({ error: "email must be an address or empty" }, { status: 400 });
+  }
+
+  const result = await saveAlertPreferences(
+    rockId,
+    auth.identity.did,
+    email,
+    Boolean(body.pushEnabled),
+    body.topics ?? {},
+  );
+
+  if (result.state === "UNAVAILABLE") {
+    logger.warn("Alert preferences not saved", {
+      action: "ALERT_PREFERENCES_UNAVAILABLE",
+      rockId,
+      reason: result.reason,
     });
-  } catch (error: unknown) {
-    logger.error("Error in POST /api/alerts", error);
     return NextResponse.json(
-      { error: "Failed to save alert preferences" },
-      { status: 500 }
+      { state: "UNAVAILABLE", reason: result.reason },
+      { status: 503 },
     );
   }
+
+  return NextResponse.json({
+    state: "REAL",
+    persisted: true,
+    delivery: { state: "UNAVAILABLE", reason: DELIVERY_NOTE },
+    preferences: result.value,
+  });
 }

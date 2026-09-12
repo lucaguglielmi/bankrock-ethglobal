@@ -1,154 +1,90 @@
-import { logger } from "./telemetry";
+/**
+ * Aqua keeper (S-3, N-1).
+ *
+ * What this module used to be: an in-memory `Map` seeded with 1,250 USDC and 0.45 WETH, a
+ * hardcoded ETH price of 2,850, fee accrual invented from wall-clock time, and a rebalance that
+ * mutated the Map and returned a random 64-hex string as a transaction hash, which
+ * `POST /api/keeper` served as `success: true`.
+ *
+ * What it is now: nothing is synthesized. A keeper needs a shipped Aqua strategy to read and a
+ * signer to act with (spec 15, Phase 3). Neither exists — the registry is not deployed (C-1) and
+ * no strategy has ever been shipped (C-5) — so both entry points return UNAVAILABLE naming what
+ * is missing. No transaction hash is produced anywhere in this file: a hash may only originate
+ * from a signed, broadcast transaction (D-014).
+ *
+ * Keeper rebalancing stays a DEMO capability in the UI (spec 15 Part 3 and Part 8). The badge is
+ * the UI's job; this module's job is to never hand it a fabricated number to badge.
+ */
+
+import { addresses } from "@/lib/chain";
+import { unavailable, type Capability } from "@/lib/demo";
 
 export interface AquaPositionState {
   rockId: string | number;
+  /** Actual ERC-20 balances held by the Rock Account. */
   usdcReserve: number;
   wethReserve: number;
-  targetRatioUsdcPercent: number; // e.g. 50
+  /** Virtual balances exposed to the strategy, read from Aqua.safeBalances. */
+  virtualUsdc: number;
+  virtualWeth: number;
+  targetRatioUsdcPercent: number;
   currentRatioUsdcPercent: number;
-  priceUsdcPerEth: number;
-  unharvestedFeesUsdc: number;
   deviationPercent: number;
   needsRebalance: boolean;
   rebalanceAction?: "SWAP_USDC_FOR_WETH" | "SWAP_WETH_FOR_USDC" | "OPTIMAL";
-  recommendedTradeAmountUsdc?: number;
-  lastRebalanceTimestamp?: number;
 }
 
 export interface RebalanceExecutionResult {
-  success: boolean;
   rockId: string | number;
   actionTaken: string;
-  previousDeviation: number;
-  newDeviation: number;
-  feesHarvestedUsdc: number;
-  txHash: string;
+  /** Present only when a real transaction was broadcast. */
+  txHash: `0x${string}`;
   executionLatencyMs: number;
   timestamp: string;
 }
 
-// In-memory state for Aqua rock positions
-const aquaPositions = new Map<string, { usdc: number; weth: number; lastRebalance: number }>();
-
-function getOrInitPosition(rockId: string | number) {
-  const key = String(rockId);
-  if (!aquaPositions.has(key)) {
-    aquaPositions.set(key, {
-      usdc: 1250.0,
-      weth: 0.45,
-      lastRebalance: Date.now() - 3600000, // 1 hour ago
-    });
-  }
-  return aquaPositions.get(key)!;
+function missingPrerequisites(): string[] {
+  const missing: string[] = [];
+  if (!addresses.registry) missing.push("NEXT_PUBLIC_REGISTRY_ADDRESS");
+  if (!addresses.aqua) missing.push("NEXT_PUBLIC_AQUA_ADDRESS");
+  if (!addresses.swapVmRouter) missing.push("NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS");
+  return missing;
 }
 
 /**
- * Inspects and evaluates a Bank Rock's 1inch Aqua liquidity position.
- * Calculates asset value split, price deviation, and whether an automated rebalance is required.
+ * Reads a rock's Aqua position.
+ *
+ * Requires: the registry (to resolve the Rock Account), the Aqua address, the AquaApp address and
+ * a shipped strategy hash for the rock. Until those exist there is nothing to read, and a
+ * plausible-looking position would be a fabrication.
  */
 export async function evaluateAquaPosition(
   rockId: string | number,
-  rebalanceThresholdPercent: number = 3.0
-): Promise<AquaPositionState> {
-  const pos = getOrInitPosition(rockId);
-  const priceUsdcPerEth = 2850.0; // Current reference price for ETH/USDC on Base Sepolia
-
-  const wethValueUsdc = pos.weth * priceUsdcPerEth;
-  const totalValueUsdc = pos.usdc + wethValueUsdc;
-
-  const currentRatioUsdcPercent = (pos.usdc / totalValueUsdc) * 100;
-  const targetRatioUsdcPercent = 50.0;
-  const deviationPercent = Math.abs(currentRatioUsdcPercent - targetRatioUsdcPercent);
-  const needsRebalance = deviationPercent >= rebalanceThresholdPercent;
-
-  let rebalanceAction: "SWAP_USDC_FOR_WETH" | "SWAP_WETH_FOR_USDC" | "OPTIMAL" = "OPTIMAL";
-  let recommendedTradeAmountUsdc = 0;
-
-  if (needsRebalance) {
-    if (currentRatioUsdcPercent > targetRatioUsdcPercent) {
-      // Overweight USDC -> Need to buy WETH
-      rebalanceAction = "SWAP_USDC_FOR_WETH";
-      recommendedTradeAmountUsdc = Number(((currentRatioUsdcPercent - targetRatioUsdcPercent) / 100 * totalValueUsdc).toFixed(2));
-    } else {
-      // Overweight WETH -> Need to sell WETH for USDC
-      rebalanceAction = "SWAP_WETH_FOR_USDC";
-      recommendedTradeAmountUsdc = Number(((targetRatioUsdcPercent - currentRatioUsdcPercent) / 100 * totalValueUsdc).toFixed(2));
-    }
+): Promise<Capability<AquaPositionState>> {
+  const missing = missingPrerequisites();
+  if (missing.length > 0) {
+    return unavailable(
+      `No Aqua position can be read for rock ${rockId}: ${missing.join(", ")} ${
+        missing.length === 1 ? "is" : "are"
+      } not configured`,
+    );
   }
-
-  const unharvestedFeesUsdc = Number(((Date.now() - pos.lastRebalance) / 3600000 * 0.45).toFixed(2)); // Accrues ~0.45 USDC/hr
-
-  logger.info("Evaluated 1inch Aqua position for Bank Rock", {
-    action: "AQUA_KEEPER_EVALUATE",
-    rockId,
-    totalValueUsdc,
-    currentRatioUsdcPercent: Number(currentRatioUsdcPercent.toFixed(1)),
-    deviationPercent: Number(deviationPercent.toFixed(1)),
-    needsRebalance,
-  });
-
-  return {
-    rockId,
-    usdcReserve: Number(pos.usdc.toFixed(2)),
-    wethReserve: Number(pos.weth.toFixed(4)),
-    targetRatioUsdcPercent,
-    currentRatioUsdcPercent: Number(currentRatioUsdcPercent.toFixed(2)),
-    priceUsdcPerEth,
-    unharvestedFeesUsdc,
-    deviationPercent: Number(deviationPercent.toFixed(2)),
-    needsRebalance,
-    rebalanceAction,
-    recommendedTradeAmountUsdc,
-    lastRebalanceTimestamp: pos.lastRebalance,
-  };
+  return unavailable(
+    `No Aqua strategy has been shipped for rock ${rockId}, so it has no virtual balances to read`,
+  );
 }
 
 /**
- * Executes an automated keeper rebalance on 1inch Aqua for a Bank Rock.
- * Adjusts inventory to target ratio, harvests accumulated maker fees, and emits on-chain UserOp.
+ * Executes a keeper rebalance.
+ *
+ * A rebalance is a signed transaction from the Rock Account against Aqua. There is no keeper
+ * signer, no shipped strategy and no deployed registry, so this cannot execute — and it will
+ * never report that it did.
  */
 export async function executeAquaRebalance(
-  rockId: string | number
-): Promise<RebalanceExecutionResult> {
-  const start = Date.now();
-  const pos = getOrInitPosition(rockId);
-  const evaluation = await evaluateAquaPosition(rockId, 0); // evaluate current state
-
-  const prevDeviation = evaluation.deviationPercent;
-  const feesHarvested = evaluation.unharvestedFeesUsdc;
-
-  // Rebalance position to exact 50/50 balance
-  const priceUsdcPerEth = evaluation.priceUsdcPerEth;
-  const totalValueUsdc = pos.usdc + (pos.weth * priceUsdcPerEth) + feesHarvested;
-  const halfValue = totalValueUsdc / 2;
-
-  pos.usdc = halfValue;
-  pos.weth = halfValue / priceUsdcPerEth;
-  pos.lastRebalance = Date.now();
-
-  const latencyMs = Date.now() - start;
-
-  // Realistic mock/testnet transaction hash
-  const txHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`;
-
-  logger.info("Autonomous Aqua Keeper rebalance executed", {
-    action: "AQUA_KEEPER_REBALANCE",
-    rockId,
-    previousDeviation: prevDeviation,
-    feesHarvested,
-    txHash,
-    latencyMs,
-  });
-
-  return {
-    success: true,
-    rockId,
-    actionTaken: evaluation.rebalanceAction || "REBALANCE_TO_50_50",
-    previousDeviation: prevDeviation,
-    newDeviation: 0.0,
-    feesHarvestedUsdc: feesHarvested,
-    txHash,
-    executionLatencyMs: latencyMs,
-    timestamp: new Date().toISOString(),
-  };
+  rockId: string | number,
+): Promise<Capability<RebalanceExecutionResult>> {
+  return unavailable(
+    `No keeper is able to rebalance rock ${rockId}: the Aqua strategy path is not implemented and no keeper signer is configured`,
+  );
 }

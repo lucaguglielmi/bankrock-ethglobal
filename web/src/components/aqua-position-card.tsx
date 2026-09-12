@@ -3,7 +3,9 @@ import { AnalyticsDashboard, YieldDataPoint } from "./analytics-dashboard";
 
 import { useState } from "react";
 import { ExternalLink, Sparkles, SlidersHorizontal, ArrowUpRight, Check, RefreshCw, Info } from "lucide-react";
-import { AQUA_ADDRESSES } from "@/lib/contracts";
+import { addresses, explorer } from "@/lib/chain";
+// Interim shim until this card is rebuilt on the chain module (spec 17 Part 5).
+const AQUA_ADDRESSES = { aquaContract: addresses.aqua ?? "", swapVmContract: addresses.swapVmRouter ?? "" };
 import { useRockReserves } from "@/hooks/useBankRock";
 
 interface AquaPositionCardProps {
@@ -155,7 +157,7 @@ export function AquaPositionCard({
         <div>
           <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Shared Safe Custody</div>
           <a
-            href={`https://sepolia.basescan.org/address/${smartAccountAddress}`}
+            href={`${explorer.baseUrl}/address/${smartAccountAddress}`}
             target="_blank"
             rel="noreferrer"
             className="text-sm font-bold font-mono text-neutral-800 hover:text-black hover:underline flex items-center gap-1"
@@ -183,7 +185,7 @@ export function AquaPositionCard({
           <span className="flex items-center gap-1">
             <span>Aqua Core:</span>
             <a
-              href={`https://sepolia.basescan.org/address/${AQUA_ADDRESSES.aquaContract}`}
+              href={`${explorer.baseUrl}/address/${AQUA_ADDRESSES.aquaContract}`}
               target="_blank"
               rel="noreferrer"
               className="text-neutral-700 hover:text-black underline decoration-neutral-300"
@@ -194,7 +196,7 @@ export function AquaPositionCard({
           <span className="flex items-center gap-1">
             <span>SwapVM:</span>
             <a
-              href={`https://sepolia.basescan.org/address/${AQUA_ADDRESSES.swapVmContract}`}
+              href={`${explorer.baseUrl}/address/${AQUA_ADDRESSES.swapVmContract}`}
               target="_blank"
               rel="noreferrer"
               className="text-neutral-700 hover:text-black underline decoration-neutral-300"

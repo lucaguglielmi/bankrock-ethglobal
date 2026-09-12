@@ -90,11 +90,12 @@ const TOOLS = [
   {
     name: "get_rock_status",
     description:
-      "Reads the Bank Rock registry on Ethereum Sepolia for one rock: lifecycle state, current " +
-      "owner, Rock Account (smart account) address, bound NFC tag UID hash, the owner's lost " +
-      "flag, any pending gift handover, and the USDC and WETH balances actually held by the " +
-      "Rock Account. Returns status 'unavailable' when the registry address or RPC endpoint is " +
-      "not configured. Never returns a placeholder balance.",
+      "Reads the Bank Rock registry on Ethereum Sepolia for one rock: lifecycle state (dormant, " +
+      "awake, handover_pending, or archived), current owner, Rock Account (smart account) " +
+      "address, bound NFC tag UID hash, the owner's lost flag, any pending gift handover, and " +
+      "the USDC and WETH balances actually held by the Rock Account. Returns status " +
+      "'unavailable' when the registry address or RPC endpoint is not configured. Never returns " +
+      "a placeholder balance.",
     inputSchema: {
       type: "object",
       properties: {
@@ -305,6 +306,20 @@ async function getRockStatus(args: Record<string, unknown> | undefined): Promise
       "Balances are ERC-20 balanceOf calls against the Rock Account, read at the time above.",
       "Physical NFC verification is performed off-chain by the web app; this tool reports only " +
         "the UID hash the registry has bound to the rock, which is not proof of a recent tap.",
+      ...(rock.state === "archived"
+        ? [
+            "This rock is archived: its owner retired it and released its NFC tag, which may " +
+              "since have been used to awaken a different rock id. The owner, Rock Account and " +
+              "UID hash above are history, not the tag's current binding. Balances, if any, are " +
+              "still whatever the Rock Account holds today.",
+          ]
+        : []),
+      ...(rock.state === "unknown"
+        ? [
+            "The registry reported a lifecycle state this server's ABI does not know. It is " +
+              "probably running against a newer registry than it was built for.",
+          ]
+        : []),
     ],
   });
 }

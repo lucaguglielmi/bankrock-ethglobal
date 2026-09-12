@@ -228,7 +228,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
 
       setAwakeningStage("Awakening rock on Base Sepolia (awakenOnchain)...");
       try {
-        await awakenOnchain(rockId, smartAccountAddress as `0x${string}`, rawNfcPubKey);
+        await awakenOnchain(rockId, smartAccountAddress as `0x${string}`);
       } catch (err) {
         console.warn("Real on-chain awaken failed, proceeding with UI sequence for demo purposes:", err);
       }

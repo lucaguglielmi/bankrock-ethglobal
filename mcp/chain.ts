@@ -48,12 +48,18 @@ export function publicClient(): PublicClient | undefined {
   return client;
 }
 
-/** Lifecycle states, in the order the registry's `RockState` enum declares them. */
-const ROCK_STATES = ["dormant", "awake", "handover_pending"] as const;
+/**
+ * Lifecycle states, in the order the registry's `RockState` enum declares them.
+ *
+ * `archived` is terminal: the rock was retired by its owner and its NFC tag released, so the
+ * same physical tag may now back a different rock id. The archived record keeps its owner,
+ * smart account and UID hash as history.
+ */
+const ROCK_STATES = ["dormant", "awake", "handover_pending", "archived"] as const;
 
 export type RockRecord = {
   rockId: string;
-  state: (typeof ROCK_STATES)[number];
+  state: (typeof ROCK_STATES)[number] | "unknown";
   owner: `0x${string}` | null;
   smartAccount: `0x${string}` | null;
   uidHash: `0x${string}` | null;
@@ -87,12 +93,14 @@ export async function readRock(
     args: [rockId],
   });
 
-  const stateName = ROCK_STATES[state] ?? "unknown";
+  // An out-of-range value means this server is reading a registry newer than its ABI. Say so
+  // rather than guessing at a state name.
+  const stateName: RockRecord["state"] = ROCK_STATES[state] ?? "unknown";
   const pending = stateName === "handover_pending";
 
   return {
     rockId: rockId.toString(),
-    state: stateName as RockRecord["state"],
+    state: stateName,
     owner: orNull(owner, ZERO_ADDRESS),
     smartAccount: orNull(smartAccount, ZERO_ADDRESS),
     uidHash: orNull(uidHash, ZERO_BYTES32),

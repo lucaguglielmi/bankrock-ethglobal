@@ -40,6 +40,14 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  *  Note that `transferOwnership(address)` inherited from `Ownable` is unrelated: it moves
  *  administration of this contract (pausing and the attester address), never a rock.
  *
+ * @dev Archiving.
+ *
+ *  `archiveRock` is the one-way exit. It retires a rock and releases its tag so the same
+ *  physical object can awaken a fresh rock id — the operator rehearsing the awakening beat with
+ *  a single tag, without reprogramming it. The archived record stays readable, and the tag's
+ *  read counter keeps climbing across the boundary, so nothing about reuse weakens replay
+ *  resistance. See `archiveRock` and `lastCounter`.
+ *
  * @dev Attestation.
  *
  *  Awakening a rock and claiming a handover both require an EIP-712 attestation signed by
@@ -64,7 +72,10 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         /// @dev Awakened and owned. No handover outstanding.
         Awake,
         /// @dev Awakened, owned, and a handover is outstanding and not yet expired.
-        HandoverPending
+        HandoverPending,
+        /// @dev Retired by its owner. Terminal: it can never be awakened, given, or revived.
+        ///      Its owner, smart account and UID binding stay readable as history.
+        Archived
     }
 
     /// @notice An outstanding gift handover (Flow E).
@@ -129,6 +140,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
 
     error RockAlreadyAwakened(uint256 rockId);
     error RockNotAwakened(uint256 rockId);
+    error RockIsArchived(uint256 rockId);
     error UidBoundToDifferentRock(bytes32 uidHash, uint256 boundRockId);
 
     error NotRockOwner(address caller, address rockOwner);
@@ -173,6 +185,8 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     );
 
     event HandoverCancelled(uint256 indexed rockId, address indexed by);
+
+    event RockArchived(uint256 indexed rockId, address indexed by, bytes32 indexed uidHash);
 
     event RockMarkedLost(uint256 indexed rockId, address indexed by);
     event RockLostCleared(uint256 indexed rockId, address indexed by);
@@ -258,6 +272,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         if (att.uidHash == bytes32(0)) revert InvalidUidHash();
 
         Rock storage r = _rocks[rockId];
+        if (r.state == RockState.Archived) revert RockIsArchived(rockId);
         if (r.state != RockState.Dormant) revert RockAlreadyAwakened(rockId);
 
         uint256 boundRockId = _uidToRockId[att.uidHash];
@@ -274,6 +289,50 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         r.state = RockState.Awake;
 
         emit RockAwakened(rockId, msg.sender, att.uidHash, smartAccount, att.counter);
+    }
+
+    /**
+     * @notice Retires a rock and releases its tag, so the same physical tag can awaken a new
+     *         rock id. Only the current owner.
+     *
+     * @dev Terminal and one-way. An archived rock can never be awakened, given, claimed,
+     *      flagged lost, or un-archived; there is deliberately no `unarchive`. Its owner, smart
+     *      account and UID binding stay readable through `getRock`, so the object's history does
+     *      not disappear when the tag is reused — the record becomes a closed chapter rather
+     *      than a blank.
+     *
+     *      What archiving actually releases is the tag: `rockIdForUid(uidHash)` returns to zero,
+     *      which is what lets the next `awakenRock` bind that UID to a *different* rock id. The
+     *      practical use is rehearsal — awakening the demo beat repeatedly with one physical tag
+     *      without reprogramming it between runs.
+     *
+     *      `lastCounter(uidHash)` is deliberately NOT reset. Replay protection follows the tag,
+     *      not the rock: the tag's read counter only ever goes up, so an attestation captured
+     *      before archiving cannot be replayed against the rock that comes after it.
+     *
+     *      An outstanding handover is cancelled as part of archiving, and emits
+     *      `HandoverCancelled` before `RockArchived`, so a reader of the event log sees the
+     *      claim path close explicitly rather than inferring it from the archive.
+     *
+     *      Not gated by `whenNotPaused`. Like `cancelHandover`, archiving only removes ways to
+     *      act on a rock; an emergency stop should not be able to trap a tag.
+     */
+    function archiveRock(uint256 rockId) external {
+        Rock storage r = _rocks[rockId];
+        if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
+        if (r.state == RockState.Archived) revert RockIsArchived(rockId);
+        if (msg.sender != r.currentOwner) revert NotRockOwner(msg.sender, r.currentOwner);
+
+        if (r.state == RockState.HandoverPending) {
+            delete r.handover;
+            emit HandoverCancelled(rockId, msg.sender);
+        }
+
+        bytes32 uidHash = r.uidHash;
+        delete _uidToRockId[uidHash];
+        r.state = RockState.Archived;
+
+        emit RockArchived(rockId, msg.sender, uidHash);
     }
 
     // ---------------------------------------------------------------------
@@ -297,6 +356,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     {
         Rock storage r = _rocks[rockId];
         if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
+        if (r.state == RockState.Archived) revert RockIsArchived(rockId);
         if (msg.sender != r.currentOwner) revert NotRockOwner(msg.sender, r.currentOwner);
         if (expiresAt <= block.timestamp) revert InvalidHandoverExpiry();
         if (recipient == r.currentOwner) revert InvalidRecipient();
@@ -375,6 +435,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     function markLost(uint256 rockId) external {
         Rock storage r = _rocks[rockId];
         if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
+        if (r.state == RockState.Archived) revert RockIsArchived(rockId);
         if (msg.sender != r.currentOwner) revert NotRockOwner(msg.sender, r.currentOwner);
 
         r.lost = true;
@@ -385,6 +446,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     function clearLost(uint256 rockId) external {
         Rock storage r = _rocks[rockId];
         if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
+        if (r.state == RockState.Archived) revert RockIsArchived(rockId);
         if (msg.sender != r.currentOwner) revert NotRockOwner(msg.sender, r.currentOwner);
 
         r.lost = false;
@@ -400,8 +462,13 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
      * @dev `state` is the *effective* state: a rock whose stored state is `HandoverPending` but
      *      whose handover deadline has passed is reported as `Awake`, because an expired handover
      *      is claimable by nobody. The `handover` struct is returned as stored, so a caller can
-     *      still see the expired attempt.
-     * @return rockOwner The current owner of the object.
+     *      still see the expired attempt. `Archived` is terminal and is reported as stored.
+     *
+     *      An archived rock keeps its owner, smart account and UID hash here as history, even
+     *      though its tag may since have awakened a different rock. To ask which rock a tag is
+     *      bound to *now*, use `rockIdForUid`.
+     * @return rockOwner The owner at the time of the last state change. For an archived rock,
+     *         the owner who archived it.
      * @return smartAccount The Rock Account holding this rock's assets.
      * @return uidHash `keccak256(rawUid7Bytes)` of the bound tag, or zero if never awakened.
      * @return state Effective lifecycle state.
@@ -429,11 +496,16 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     }
 
     /// @notice The highest tag read counter this registry has accepted for a UID hash.
+    /// @dev Monotonic for the life of the tag, across archiving and across rocks: it is never
+    ///      reset, so an attestation captured before a rock was archived cannot be replayed
+    ///      against whatever rock that tag awakens next.
     function lastCounter(bytes32 uidHash) external view returns (uint32) {
         return _lastCounter[uidHash];
     }
 
-    /// @notice The rock id a UID hash is bound to, or 0 if the tag has never awakened a rock.
+    /// @notice The rock id a UID hash is currently bound to, or 0 if the tag has never awakened a
+    ///         rock or its rock has since been archived. Archiving releases the tag; it does not
+    ///         erase the archived rock, which still reports the UID hash through `getRock`.
     function rockIdForUid(bytes32 uidHash) external view returns (uint256) {
         return _uidToRockId[uidHash];
     }

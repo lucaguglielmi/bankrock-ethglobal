@@ -1,73 +1,63 @@
+/**
+ * GET /api/events?rockId=N — indexed registry provenance (X-5).
+ *
+ * Returns real events, or an empty list carrying `state: "UNAVAILABLE"` and the reason when the
+ * registry address is unset, the deploy block is unknown, or the RPC could not be read. An empty
+ * `REAL` list means the chain really holds no events for that rock; the two cases are never
+ * conflated.
+ */
+
 import { NextResponse } from "next/server";
 import { getRockOnchainEvents, sanitizeRockId } from "@/lib/indexer";
 import { logger } from "@/lib/telemetry";
 
 export async function GET(req: Request) {
   const start = Date.now();
+  const { searchParams } = new URL(req.url);
+  const rawRockId = searchParams.get("rockId");
 
-  try {
-    const { searchParams } = new URL(req.url);
-    const rawRockId = searchParams.get("rockId");
-
-    if (!rawRockId) {
-      logger.warn("Events API request missing rockId parameter", {
-        action: "EVENTS_API_BAD_REQUEST",
-        statusCode: 400,
-      });
-      return NextResponse.json(
-        { error: "rockId parameter is required and must be a valid positive integer" },
-        { status: 400 }
-      );
-    }
-
-    const rockId = sanitizeRockId(rawRockId);
-    if (rockId === null) {
-      logger.warn("Events API rejected malformed rockId", {
-        action: "EVENTS_API_INVALID_INPUT",
-        rawRockId: rawRockId.slice(0, 50),
-        statusCode: 400,
-      });
-      return NextResponse.json(
-        { error: "Invalid rockId format. Must be an unsigned integer." },
-        { status: 400 }
-      );
-    }
-
-    const events = await getRockOnchainEvents(rockId);
-
-    const latencyMs = Date.now() - start;
-    logger.info("Events API served on-chain logs", {
-      action: "EVENTS_API_SUCCESS",
-      rockId: rockId.toString(),
-      count: events.length,
-      latencyMs,
-    });
-
+  if (!rawRockId || sanitizeRockId(rawRockId) === null) {
     return NextResponse.json(
-      {
-        success: true,
-        rockId: rockId.toString(),
-        count: events.length,
-        events,
-      },
-      {
-        headers: {
-          "Cache-Control": "public, s-maxage=15, stale-while-revalidate=45",
-          "X-Content-Type-Options": "nosniff",
-        },
-      }
-    );
-  } catch (error) {
-    const latencyMs = Date.now() - start;
-    logger.error("Events API internal error", error, {
-      action: "EVENTS_API_ERROR",
-      latencyMs,
-    });
-
-    // Do not leak stack traces to client
-    return NextResponse.json(
-      { error: "Internal server error while indexing on-chain events." },
-      { status: 500 }
+      { error: "rockId is required and must be an unsigned integer" },
+      { status: 400 },
     );
   }
+
+  const rockId = sanitizeRockId(rawRockId)!;
+  const result = await getRockOnchainEvents(rockId);
+
+  const headers = {
+    "Cache-Control": "public, s-maxage=15, stale-while-revalidate=45",
+    "X-Content-Type-Options": "nosniff",
+  };
+
+  if (result.state === "UNAVAILABLE") {
+    return NextResponse.json(
+      {
+        state: "UNAVAILABLE",
+        reason: result.reason,
+        rockId: rockId.toString(),
+        count: 0,
+        events: [],
+      },
+      { headers },
+    );
+  }
+
+  logger.info("Events API served indexed logs", {
+    action: "EVENTS_API_SUCCESS",
+    rockId: rockId.toString(),
+    count: result.value.length,
+    latencyMs: Date.now() - start,
+  });
+
+  return NextResponse.json(
+    {
+      state: "REAL",
+      rockId: rockId.toString(),
+      count: result.value.length,
+      events: result.value,
+    },
+    { headers },
+  );
 }

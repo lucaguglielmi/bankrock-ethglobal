@@ -1,14 +1,34 @@
-import { logger } from "./telemetry";
+/**
+ * Alert preferences (N-9, SA-5, privacy).
+ *
+ *  - preferences live in D1, not in a per-isolate `Map`. The old store lost every preference on
+ *    the next isolate while telling the user it had saved them (R-4);
+ *  - a rock's preferences belong to the Privy DID that first wrote them. Anyone else reading or
+ *    writing them gets a refusal — the previous route let any anonymous caller read back the
+ *    owner's stored email address for any rockId (SA-5);
+ *  - with no database, saving is UNAVAILABLE. A success state is never shown for something that
+ *    was not persisted.
+ *
+ * Delivery remains UNAVAILABLE by decision (spec 15, Part 6): preferences persist, nothing
+ * dispatches. There is no event-to-delivery pipeline and this module does not pretend otherwise.
+ */
 
-export interface AlertTopicsConfig {
-  loss_warning: boolean;       // Extreme Impermanent Loss & Volatility Warning
-  dangerous_trade: boolean;    // Large Whale Swap & Liquidity Drain (> 20% pool)
-  profit_milestone: boolean;   // Fee Distribution & Profit Spike (> 10/50 USDC)
-  keeper_rebalance: boolean;   // Autonomous Aqua Keeper Action Report
-  custody_transfer: boolean;   // NFC Physical Tap & Ownership Change
-  gas_depletion: boolean;      // Safe Gas & Paymaster Health
-  genesis_drop: boolean;       // Physical Genesis Drop Coordinates
-}
+import { eq } from "drizzle-orm";
+import { getDb, NO_DATABASE_REASON } from "@/lib/db";
+import { alertPreferences } from "@/lib/db/schema";
+import { real, unavailable, type Capability } from "@/lib/demo";
+import { logger } from "@/lib/telemetry";
+
+/** A plain object type, not an interface: Drizzle's json column needs the implicit index signature. */
+export type AlertTopicsConfig = {
+  loss_warning: boolean;
+  dangerous_trade: boolean;
+  profit_milestone: boolean;
+  keeper_rebalance: boolean;
+  custody_transfer: boolean;
+  gas_depletion: boolean;
+  genesis_drop: boolean;
+};
 
 export const DEFAULT_ALERT_TOPICS: AlertTopicsConfig = {
   loss_warning: true,
@@ -21,59 +41,100 @@ export const DEFAULT_ALERT_TOPICS: AlertTopicsConfig = {
 };
 
 export interface UserAlertPreferences {
-  rockId: string | number;
+  rockId: string;
   email: string;
   pushEnabled: boolean;
   topics: AlertTopicsConfig;
   updatedAt: string;
 }
 
-// In-memory persistent alert preferences map (keyed by rockId)
-const alertPreferencesMap = new Map<string, UserAlertPreferences>();
-
-export function getAlertPreferences(rockId: string | number): UserAlertPreferences {
-  const key = String(rockId);
-  if (!alertPreferencesMap.has(key)) {
-    return {
-      rockId,
-      email: "",
-      pushEnabled: false,
-      topics: { ...DEFAULT_ALERT_TOPICS },
-      updatedAt: new Date().toISOString(),
-    };
-  }
-  return alertPreferencesMap.get(key)!;
+function coerceTopics(stored: Record<string, boolean> | null | undefined): AlertTopicsConfig {
+  return { ...DEFAULT_ALERT_TOPICS, ...(stored ?? {}) };
 }
 
-export function saveAlertPreferences(
+/** Reads the preferences owned by `ownerDid`. Returns REAL with `null` when none are stored. */
+export async function getAlertPreferences(
   rockId: string | number,
+  ownerDid: string,
+): Promise<Capability<UserAlertPreferences | null>> {
+  const db = getDb();
+  if (!db) return unavailable(NO_DATABASE_REASON);
+
+  const key = String(rockId);
+  const row = await db
+    .select()
+    .from(alertPreferences)
+    .where(eq(alertPreferences.rockId, key))
+    .get();
+
+  if (!row) return real(null);
+  if (row.ownerDid !== ownerDid) {
+    return unavailable(`Alert preferences for rock ${key} belong to another account`);
+  }
+
+  return real({
+    rockId: row.rockId,
+    email: row.email ?? "",
+    pushEnabled: row.pushEnabled,
+    topics: coerceTopics(row.topics),
+    updatedAt: new Date(row.updatedAt).toISOString(),
+  });
+}
+
+/** Writes preferences. The first writer claims the rock; later writes must be the same DID. */
+export async function saveAlertPreferences(
+  rockId: string | number,
+  ownerDid: string,
   email: string,
   pushEnabled: boolean,
-  topics: Partial<AlertTopicsConfig>
-): UserAlertPreferences {
+  topics: Partial<AlertTopicsConfig>,
+): Promise<Capability<UserAlertPreferences>> {
+  const db = getDb();
+  if (!db) return unavailable(NO_DATABASE_REASON);
+
   const key = String(rockId);
-  const existing = getAlertPreferences(rockId);
+  const existing = await db
+    .select()
+    .from(alertPreferences)
+    .where(eq(alertPreferences.rockId, key))
+    .get();
 
-  const updated: UserAlertPreferences = {
-    rockId,
-    email: email.trim().toLowerCase(),
-    pushEnabled,
-    topics: {
-      ...existing.topics,
-      ...topics,
-    },
-    updatedAt: new Date().toISOString(),
-  };
+  if (existing && existing.ownerDid !== ownerDid) {
+    return unavailable(`Alert preferences for rock ${key} belong to another account`);
+  }
 
-  alertPreferencesMap.set(key, updated);
+  const merged: AlertTopicsConfig = { ...coerceTopics(existing?.topics), ...topics };
+  const updatedAt = Date.now();
+  const normalisedEmail = email.trim().toLowerCase();
 
-  logger.info("Saved alert preferences for rock", {
+  await db
+    .insert(alertPreferences)
+    .values({
+      rockId: key,
+      ownerDid,
+      email: normalisedEmail || null,
+      pushEnabled,
+      topics: merged,
+      updatedAt,
+    })
+    .onConflictDoUpdate({
+      target: alertPreferences.rockId,
+      set: { email: normalisedEmail || null, pushEnabled, topics: merged, updatedAt },
+    });
+
+  logger.info("Saved alert preferences", {
     action: "ALERT_PREFERENCES_SAVED",
-    rockId,
-    email: updated.email ? updated.email.slice(0, 3) + "***" : "none",
+    rockId: key,
+    email: normalisedEmail || "none",
     pushEnabled,
-    activeTopicsCount: Object.values(updated.topics).filter(Boolean).length,
+    activeTopicsCount: Object.values(merged).filter(Boolean).length,
   });
 
-  return updated;
+  return real({
+    rockId: key,
+    email: normalisedEmail,
+    pushEnabled,
+    topics: merged,
+    updatedAt: new Date(updatedAt).toISOString(),
+  });
 }

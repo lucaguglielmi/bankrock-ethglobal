@@ -1,82 +1,64 @@
-import { NextResponse } from 'next/server';
-import { getRequestContext } from "@cloudflare/next-on-pages";
-import { logger } from "@/lib/telemetry";
-import { getDb } from "@/lib/db";
+/**
+ * GET /api/rocks/[id]/yield (N-2, D-004, D-016)
+ *
+ *  - 200 with an empty series when D1 is absent or has no rows for this rock. It returned a
+ *    hardcoded three-point history and `currentAPY: 18.5` in both cases, and 500 in production
+ *    because it used the wrong Cloudflare adapter (R-2, R-3);
+ *  - `currentAPY` is gone entirely. Decision D-004 forbids the claim regardless of data quality,
+ *    so APY is removed rather than staged (spec 15, Part 3);
+ *  - `state` tells the client which of the three capability states the data is in. "no data" is
+ *    never an error.
+ */
+
+import { NextResponse } from "next/server";
+import { asc, eq } from "drizzle-orm";
+import { getDb, NO_DATABASE_REASON } from "@/lib/db";
 import { yieldSnapshots } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { logger } from "@/lib/telemetry";
 
-export const runtime = "edge";
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
 
-export async function GET(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
   try {
-    // In local dev without wrangler running, env will be empty. Fallback to mock data.
-    const { id } = await params;
-    let db;
-    try {
-      db = (getRequestContext().env as any).DB;
-    } catch {
-      db = null;
-    }
-
+    const db = getDb();
     if (!db) {
-      // Mock Data for development or if D1 is not bound
       return NextResponse.json({
+        state: "UNAVAILABLE",
+        reason: NO_DATABASE_REASON,
         rockId: id,
-        currentAPY: 18.5,
-        tvl: 45000.0,
-        historicalData: [
-          { date: "2023-01-01", tvl: 1200, fees: 5, apy: 10 },
-          { date: "2023-02-01", tvl: 1250, fees: 8, apy: 12 },
-          { date: "2023-03-01", tvl: 1300, fees: 12.4, apy: 18.5 },
-        ]
+        tvl: null,
+        historicalData: [],
       });
     }
 
-    const drizzleDb = getDb(getRequestContext().env as any);
-    
-    // Fetch historical snapshots from D1 via Drizzle
-    const results = await drizzleDb
+    const rows = await db
       .select()
       .from(yieldSnapshots)
       .where(eq(yieldSnapshots.rockId, id))
       .orderBy(asc(yieldSnapshots.timestamp))
       .limit(30);
 
-    // Map to expected UI format
-    const historicalData = results.map(row => ({
-      date: new Date(row.timestamp).toISOString().split('T')[0], // YYYY-MM-DD
+    const historicalData = rows.map((row) => ({
+      date: new Date(row.timestamp).toISOString().split("T")[0],
+      timestamp: row.timestamp,
       tvl: row.tvlUsdc,
       fees: row.feesEarnedUsdc,
-      apy: 18.5 // In a real scenario, this would be computed dynamically based on fee growth
     }));
 
-    // If D1 is empty for this rock, fall back to mock data so the UI doesn't look broken during the hackathon
-    if (historicalData.length === 0) {
-      return NextResponse.json({
-        rockId: id,
-        currentAPY: 18.5,
-        tvl: 1250.0,
-        historicalData: [
-          { date: "2023-01-01", tvl: 1200, fees: 5, apy: 10 },
-          { date: "2023-02-01", tvl: 1250, fees: 8, apy: 12 },
-          { date: "2023-03-01", tvl: 1300, fees: 12.4, apy: 18.5 },
-        ]
-      });
-    }
-
-    const latest = historicalData[historicalData.length - 1];
-
     return NextResponse.json({
+      state: "REAL",
       rockId: id,
-      currentAPY: latest.apy,
-      tvl: latest.tvl,
-      historicalData
+      tvl: historicalData.length > 0 ? historicalData[historicalData.length - 1].tvl : null,
+      historicalData,
     });
   } catch (error) {
-    logger.error('Error fetching yield data', error as Error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    logger.error("Error reading yield snapshots", error, { rockId: id });
+    return NextResponse.json({
+      state: "UNAVAILABLE",
+      reason: "The yield history could not be read from the application database",
+      rockId: id,
+      tvl: null,
+      historicalData: [],
+    });
   }
 }

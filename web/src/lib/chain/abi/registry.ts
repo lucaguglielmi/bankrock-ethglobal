@@ -1,4 +1,16 @@
-export const BANK_ROCK_REGISTRY_ADDRESS = "0x89f735f4c74f878d3aac6e60b134d115e5e29631";
+/**
+ * BankRockRegistry ABI.
+ *
+ * Derived from contracts/BankRockRegistry.sol, with the arbitrary-call primitive removed per
+ * D-020: `executeTrade`, `setRouterWhitelist`, `whitelistedRouters`, the
+ * `RouterWhitelisted` and `TradeExecuted` events are gone. The registry is an identity
+ * and lifecycle registry only — it never holds funds, never receives approvals and never
+ * performs a call with caller-supplied calldata. Swaps execute from the Rock Account against
+ * Aqua (spec 03).
+ *
+ * The registry is not deployed yet (C-1). Its address comes from NEXT_PUBLIC_REGISTRY_ADDRESS
+ * via lib/chain; there is no literal here.
+ */
 
 export const BANK_ROCK_REGISTRY_ABI = [
   {
@@ -119,56 +131,6 @@ export const BANK_ROCK_REGISTRY_ABI = [
     "type": "event"
   },
   {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "router",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "status",
-        "type": "bool"
-      }
-    ],
-    "name": "RouterWhitelisted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "rockId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "tokenIn",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "tokenOut",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amountIn",
-        "type": "uint256"
-      }
-    ],
-    "name": "TradeExecuted",
-    "type": "event"
-  },
-  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -200,49 +162,6 @@ export const BANK_ROCK_REGISTRY_ABI = [
       }
     ],
     "name": "bindNFC",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "rockId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "router",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "tokenIn",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "tokenOut",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "amountIn",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "minAmountOut",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bytes",
-        "name": "routerPayload",
-        "type": "bytes"
-      }
-    ],
-    "name": "executeTrade",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -395,24 +314,6 @@ export const BANK_ROCK_REGISTRY_ABI = [
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "router",
-        "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "status",
-        "type": "bool"
-      }
-    ],
-    "name": "setRouterWhitelist",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "uint256",
         "name": "rockId",
         "type": "uint256"
@@ -427,31 +328,5 @@ export const BANK_ROCK_REGISTRY_ABI = [
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "whitelistedRouters",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
   }
 ] as const;
-
-export const AQUA_ADDRESSES = {
-  aquaContract: '0x111111125421cA6dc452d289314280a0f8842A65' as `0x${string}`,
-  swapVmContract: '0x222222225421ca6dc452d289314280a0f8842a65' as `0x${string}`,
-  testUSDC: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as `0x${string}`,
-  testWETH: '0x4200000000000000000000000000000000000006' as `0x${string}`,
-};

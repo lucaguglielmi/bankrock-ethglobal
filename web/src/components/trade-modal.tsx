@@ -48,7 +48,7 @@ function TradeModalInner({
 }: Omit<TradeModalProps, "isOpen">) {
   const { hapticError, hapticLight } = useHaptics();
   const { playTap, playSuccess, playError, playSwipe } = useAudio();
-  const { tradeOnchain, contractAddresses } = useRockActions();
+  const { tradingUnavailableReason } = useRockActions();
   const [fromToken, setFromToken] = useState<TokenType>("USDC");
   const [toToken, setToToken] = useState<TokenType>("WETH");
   const [amountIn, setAmountIn] = useState<string>("");
@@ -192,15 +192,12 @@ function TradeModalInner({
       // Step 1: UserOp Signing (Approval + Swap)
       setStatus("signing");
 
-      const decimalsIn = fromToken === "USDC" ? 6 : 18;
-      const decimalsOut = toToken === "USDC" ? 6 : 18;
-      const amountInWei = BigInt(Math.floor(inputNumber * (10 ** decimalsIn)));
-      const amountOutMinWei = BigInt(Math.floor(outputAmount * 0.95 * (10 ** decimalsOut))); 
-      const tokenInAddr = fromToken === "USDC" ? contractAddresses.testUSDC : contractAddresses.testWETH;
-
-      // Step 2: Pimlico Bundler & Execution
+      // Trading is UNAVAILABLE until the Aqua swap path exists (spec 15 Phase 3, D-020).
+      // This modal is rebuilt as a Sheet in the UI migration; until then it fails honestly.
+      void inputNumber;
+      void outputAmount;
       setStatus("bundling");
-      const generatedTxHash = await tradeOnchain(rockId, amountInWei, amountOutMinWei, tokenInAddr, "0x") as string;
+      const generatedTxHash: string = await Promise.reject(new Error(tradingUnavailableReason));
 
       // Step 3: Aqua Settlement
       setStatus("settling");

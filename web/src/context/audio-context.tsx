@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useSyncExternalStore } from "react";
 // In a real production app we would host these as actual .mp3 or .wav files in the /public/sounds/ folder.
 // For the sake of this implementation, we use synthetic beeps/boops or placeholder URLs that will fail gracefully if missing.
 import useSound from "use-sound";
@@ -16,24 +16,68 @@ export interface AudioContextType {
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
-export function AudioProvider({ children }: { children: React.ReactNode }) {
-  const [isMuted, setIsMuted] = useState(false);
-  const [mounted, setMounted] = useState(false);
+/**
+ * The mute preference is an external store (localStorage) read through useSyncExternalStore,
+ * not state hydrated inside an effect: the server snapshot is "not muted", the client snapshot is
+ * whatever the visitor last chose, and there is no hydration flicker to paper over with a
+ * `mounted` flag.
+ */
+const MUTE_KEY = "bankrock_muted";
+const muteListeners = new Set<() => void>();
+let muteCache: boolean | undefined;
 
-  useEffect(() => {
-    setMounted(true);
-    const saved = localStorage.getItem("bankrock_muted");
-    if (saved === "true") {
-      setIsMuted(true);
+function readMuted(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(MUTE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function getMutedSnapshot(): boolean {
+  if (muteCache === undefined) {
+    muteCache = readMuted();
+  }
+  return muteCache;
+}
+
+function getServerMutedSnapshot(): boolean {
+  return false;
+}
+
+function subscribeMuted(callback: () => void): () => void {
+  muteListeners.add(callback);
+  const onStorage = () => {
+    muteCache = readMuted();
+    callback();
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", onStorage);
+  }
+  return () => {
+    muteListeners.delete(callback);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("storage", onStorage);
     }
-  }, []);
+  };
+}
+
+function writeMuted(next: boolean): void {
+  try {
+    localStorage.setItem(MUTE_KEY, String(next));
+  } catch {
+    // Storage restricted: the preference simply does not persist across visits.
+  }
+  muteCache = next;
+  muteListeners.forEach((listener) => listener());
+}
+
+export function AudioProvider({ children }: { children: React.ReactNode }) {
+  const isMuted = useSyncExternalStore(subscribeMuted, getMutedSnapshot, getServerMutedSnapshot);
 
   const toggleMute = () => {
-    setIsMuted((prev) => {
-      const next = !prev;
-      localStorage.setItem("bankrock_muted", String(next));
-      return next;
-    });
+    writeMuted(!isMuted);
   };
 
   // Replace these with your actual sound file paths in /public
@@ -48,8 +92,8 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (!isMuted && typeof window !== "undefined" && window.navigator && window.navigator.vibrate) {
       try {
         window.navigator.vibrate(pattern);
-      } catch (e) {
-        // Ignore haptics error
+      } catch {
+        // Haptics are optional; a browser that blocks them changes nothing else.
       }
     }
   };
@@ -77,7 +121,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   return (
     <AudioContext.Provider
       value={{
-        isMuted: !mounted ? false : isMuted,
+        isMuted,
         toggleMute,
         playTap,
         playSuccess,

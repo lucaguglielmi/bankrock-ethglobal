@@ -5,8 +5,8 @@ export function useHaptics() {
     if (typeof window !== "undefined" && "vibrate" in navigator) {
       try {
         navigator.vibrate(pattern);
-      } catch (e) {
-        // Ignore, some browsers might block this without user interaction
+      } catch {
+        // Some browsers block vibration without a user gesture; that is not an error here.
       }
     }
   }, []);

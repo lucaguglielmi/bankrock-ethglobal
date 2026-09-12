@@ -374,6 +374,221 @@ contract BankRockRegistryTest {
     }
 
     // -----------------------------------------------------------------
+    // Archiving — reuse one physical tag for a new rock
+    // -----------------------------------------------------------------
+
+    function testArchiveFromAwake() public {
+        _awaken();
+
+        registry.archiveRock(ROCK);
+
+        (
+            address rockOwner,
+            address smartAccount,
+            bytes32 uidHash,
+            BankRockRegistry.RockState state,
+            ,
+        ) = registry.getRock(ROCK);
+
+        require(state == BankRockRegistry.RockState.Archived, "state should be Archived");
+        // History survives archiving.
+        require(rockOwner == address(this), "archived rock keeps its owner");
+        require(smartAccount == SAFE, "archived rock keeps its smart account");
+        require(uidHash == UID, "archived rock keeps its UID binding");
+        // The tag, however, is released.
+        require(registry.rockIdForUid(UID) == 0, "tag should no longer be bound to a rock");
+        // Replay protection is not rewound.
+        require(registry.lastCounter(UID) == 1, "counter must survive archiving");
+    }
+
+    function testArchiveCancelsPendingHandover() public {
+        _awaken();
+        registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), keccak256("gift"));
+
+        registry.archiveRock(ROCK);
+
+        (,,, BankRockRegistry.RockState state,, BankRockRegistry.Handover memory h) = registry.getRock(ROCK);
+        require(state == BankRockRegistry.RockState.Archived, "state should be Archived");
+        require(h.recipient == address(0) && h.expiresAt == 0, "handover should be cleared");
+
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300);
+        bytes memory sig = _sign(ATTESTER_PK, att);
+
+        bytes4 sel;
+        vm.prank(BOB);
+        try registry.claimHandover(ROCK, att, sig) {
+            require(false, "a cancelled handover must not be claimable");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.HandoverNotPending.selector, "wrong error");
+    }
+
+    function testOnlyRockOwnerCanArchive() public {
+        _awaken();
+
+        bytes4 sel;
+        vm.prank(BOB);
+        try registry.archiveRock(ROCK) {
+            require(false, "non-owner must not archive");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.NotRockOwner.selector, "wrong error");
+
+        (,,, BankRockRegistry.RockState state,,) = registry.getRock(ROCK);
+        require(state == BankRockRegistry.RockState.Awake, "rock must still be Awake");
+    }
+
+    function testArchivedRockCannotBeAwakenedAgain() public {
+        _awaken();
+        registry.archiveRock(ROCK);
+
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300);
+        bytes memory sig = _sign(ATTESTER_PK, att);
+
+        bytes4 sel;
+        vm.prank(BOB);
+        try registry.awakenRock(ROCK, SAFE, att, sig) {
+            require(false, "an archived rock must not be awakened again");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.RockIsArchived.selector, "wrong error");
+    }
+
+    function testArchivedRockCannotInitiateHandover() public {
+        _awaken();
+        registry.archiveRock(ROCK);
+
+        bytes4 sel;
+        try registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0)) {
+            require(false, "an archived rock must not be given away");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.RockIsArchived.selector, "wrong error");
+    }
+
+    function testArchivedRockCannotBeArchivedAgain() public {
+        _awaken();
+        registry.archiveRock(ROCK);
+
+        bytes4 sel;
+        try registry.archiveRock(ROCK) {
+            require(false, "archiving is one-way and idempotent calls must revert");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.RockIsArchived.selector, "wrong error");
+    }
+
+    function testArchivedRockCannotBeMarkedLost() public {
+        _awaken();
+        registry.archiveRock(ROCK);
+
+        bytes4 sel;
+        try registry.markLost(ROCK) {
+            require(false, "an archived rock must not change state");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.RockIsArchived.selector, "wrong error");
+    }
+
+    function testSameUidAwakensANewRockAfterArchive() public {
+        _awaken();
+        registry.archiveRock(ROCK);
+
+        uint256 freshRock = ROCK + 1;
+        BankRockRegistry.Attestation memory att = _att(freshRock, UID, 2, block.timestamp + 300);
+        bytes memory sig = _sign(ATTESTER_PK, att);
+
+        vm.prank(BOB);
+        registry.awakenRock(freshRock, SAFE, att, sig);
+
+        (address rockOwner,, bytes32 uidHash, BankRockRegistry.RockState state,,) = registry.getRock(freshRock);
+        require(rockOwner == BOB, "the new rock belongs to whoever awakened it");
+        require(uidHash == UID, "the same tag now backs the new rock");
+        require(state == BankRockRegistry.RockState.Awake, "new rock should be Awake");
+        require(registry.rockIdForUid(UID) == freshRock, "tag should be rebound to the new rock");
+
+        // And the old rock is untouched by any of it.
+        (,,, BankRockRegistry.RockState oldState,,) = registry.getRock(ROCK);
+        require(oldState == BankRockRegistry.RockState.Archived, "old rock stays archived");
+    }
+
+    function testLiveUidStillCannotAwakenASecondRockAfterAnUnrelatedArchive() public {
+        // ROCK is archived and its tag released; OTHER_UID awakens a live rock that must keep
+        // its exclusive claim on that tag.
+        _awaken();
+        registry.archiveRock(ROCK);
+
+        uint256 liveRock = ROCK + 1;
+        BankRockRegistry.Attestation memory first = _att(liveRock, OTHER_UID, 1, block.timestamp + 300);
+        registry.awakenRock(liveRock, SAFE, first, _sign(ATTESTER_PK, first));
+
+        uint256 thirdRock = ROCK + 2;
+        BankRockRegistry.Attestation memory second = _att(thirdRock, OTHER_UID, 2, block.timestamp + 300);
+        bytes memory sig = _sign(ATTESTER_PK, second);
+
+        bytes4 sel;
+        try registry.awakenRock(thirdRock, SAFE, second, sig) {
+            require(false, "a tag bound to a live rock must not awaken another");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.UidBoundToDifferentRock.selector, "wrong error");
+    }
+
+    function testCounterStaysMonotonicAcrossTheArchiveBoundary() public {
+        // Burn counters 1 and 2 on the original rock: awaken, then hand over.
+        _awaken();
+        registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
+        BankRockRegistry.Attestation memory claim = _att(ROCK, UID, 2, block.timestamp + 300);
+        // Sign before pranking: hashAttestation is itself a call, and would consume the prank.
+        bytes memory claimSig = _sign(ATTESTER_PK, claim);
+        vm.prank(BOB);
+        registry.claimHandover(ROCK, claim, claimSig);
+        require(registry.lastCounter(UID) == 2, "counter should be 2 before archiving");
+
+        vm.prank(BOB);
+        registry.archiveRock(ROCK);
+        require(registry.lastCounter(UID) == 2, "archiving must not reset the counter");
+
+        // A tap captured before the archive — counter 2 — must not work on the new rock.
+        uint256 freshRock = ROCK + 1;
+        BankRockRegistry.Attestation memory replay = _att(freshRock, UID, 2, block.timestamp + 300);
+        bytes memory replaySig = _sign(ATTESTER_PK, replay);
+
+        bytes4 sel;
+        try registry.awakenRock(freshRock, SAFE, replay, replaySig) {
+            require(false, "a pre-archive counter must not be reusable on the new rock");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.StaleAttestationCounter.selector, "wrong error");
+
+        // A genuinely newer tap does work.
+        BankRockRegistry.Attestation memory fresh = _att(freshRock, UID, 3, block.timestamp + 300);
+        registry.awakenRock(freshRock, SAFE, fresh, _sign(ATTESTER_PK, fresh));
+        require(registry.lastCounter(UID) == 3, "counter should advance to 3");
+    }
+
+    function testArchiveIsNotPauseGated() public {
+        _awaken();
+        registry.pause();
+
+        // Like cancelHandover, archiving only removes ways to act on a rock, so the emergency
+        // stop must not be able to trap a tag.
+        registry.archiveRock(ROCK);
+
+        (,,, BankRockRegistry.RockState state,,) = registry.getRock(ROCK);
+        require(state == BankRockRegistry.RockState.Archived, "archive should work while paused");
+        require(registry.rockIdForUid(UID) == 0, "tag should be released while paused");
+    }
+
+    // -----------------------------------------------------------------
     // Lost flag — Flow F
     // -----------------------------------------------------------------
 

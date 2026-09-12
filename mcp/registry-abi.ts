@@ -215,6 +215,17 @@ export const registryAbi = [
         "type": "uint256"
       }
     ],
+    "name": "RockIsArchived",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
     "name": "RockNotAwakened",
     "type": "error"
   },
@@ -417,6 +428,31 @@ export const registryAbi = [
       {
         "indexed": true,
         "internalType": "address",
+        "name": "by",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "uidHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RockArchived",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "rockOwner",
         "type": "address"
       },
@@ -504,6 +540,19 @@ export const registryAbi = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
+    "name": "archiveRock",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
