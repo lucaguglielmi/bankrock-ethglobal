@@ -14,7 +14,6 @@ import { cn } from "@/lib/ui/cn";
 
 const NAV_LINKS = [
   { href: "/shop", label: "Shop" },
-  { href: "/mcp", label: "AI Oracle" },
 ] as const;
 
 /**

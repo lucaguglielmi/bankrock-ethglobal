@@ -42,6 +42,46 @@ export default function Home() {
       {/* How It Works Section */}
       <HowItWorksDynamic />
 
+      <section className="mx-auto w-full max-w-7xl px-[var(--gutter)] py-24 flex flex-col gap-32">
+        {/* The 3 Learn Pages */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-16">
+          <div className="flex flex-col gap-4">
+            <h2 className="text-2xl font-bold tracking-tight">The physical object</h2>
+            <p className="text-ink-2 leading-relaxed">How it&apos;s made, the NFC activation flow, and true ownership mechanics.</p>
+            <Link href="/learn/rock" className="inline-flex items-center gap-1.5 font-semibold hover:opacity-70 transition-opacity">Learn more <ArrowRight className="size-4" /></Link>
+          </div>
+          <div className="flex flex-col gap-4">
+            <h2 className="text-2xl font-bold tracking-tight">DeFi & Aqua</h2>
+            <p className="text-ink-2 leading-relaxed">The smart account architecture and shared liquidity powering Bank Rock.</p>
+            <Link href="/learn/defi" className="inline-flex items-center gap-1.5 font-semibold hover:opacity-70 transition-opacity">Learn more <ArrowRight className="size-4" /></Link>
+          </div>
+          <div className="flex flex-col gap-4">
+            <h2 className="text-2xl font-bold tracking-tight">Security & Privacy</h2>
+            <p className="text-ink-2 leading-relaxed">Self-custody, telemetry, and keeping the physical-to-digital bridge safe.</p>
+            <Link href="/learn/security" className="inline-flex items-center gap-1.5 font-semibold hover:opacity-70 transition-opacity">Learn more <ArrowRight className="size-4" /></Link>
+          </div>
+        </div>
+
+        {/* MCP Terminal Section */}
+        <div className="w-full flex flex-col items-center py-20 border-y border-black/5">
+          <div className="flex items-center gap-2 text-ink-3 mb-4 font-mono text-xs font-medium uppercase tracking-widest">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            <span>MCP Endpoint</span>
+          </div>
+          <div className="bg-black text-white px-6 py-4 rounded-xl shadow-2xl flex items-center justify-between gap-6 w-full max-w-2xl font-mono">
+            <code className="text-sm truncate opacity-90">npx -y @bankrock/mcp-server</code>
+            <div className="flex items-center gap-4 shrink-0">
+              <button className="hover:text-white/70 transition-colors" title="Copy prompt">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+              <Link href="/mcp" className="text-sm border border-white/20 hover:bg-white/10 px-4 py-2 rounded-lg transition-colors font-sans font-medium">
+                Docs
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Newsletter Signup */}
       <NewsletterSignup />
 
