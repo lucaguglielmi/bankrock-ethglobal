@@ -5,6 +5,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { privateKeyToAccount } from "viem/accounts";
+import type { Hex } from "viem";
 
 import { GET, POST } from "@/app/api/nfc/verify/route";
 import { verifyNtagSignature } from "@/actions/verify-ntag";
@@ -15,6 +17,9 @@ import { computeSdmMac, deriveSessionKeys } from "./sdm";
 const MASTER_KEY_HEX = "00112233445566778899AABBCCDDEEFF";
 const MASTER_KEY = Buffer.from(MASTER_KEY_HEX, "hex");
 const UID = Buffer.from("04AABBCCDDEE80", "hex");
+const SIGNER_KEY = ("0x" + "11".repeat(32)) as Hex;
+const REGISTRY_KEY = ("0x" + "22".repeat(32)) as Hex;
+const SUBJECT_KEY = ("0x" + "33".repeat(32)) as Hex;
 
 /** SELF-GENERATED, test-only: the (e, c) a provisioned tag would emit. */
 function tap(counter: number): { e: string; c: string } {
@@ -110,6 +115,40 @@ describe("GET /api/nfc/verify", () => {
     });
   });
 
+  it("400s on a subject that is not an address", async () => {
+    const { e, c } = tap(7);
+    const response = await GET(new Request(url({ rockId: "1", e, c, subject: "0xnope" })));
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      verified: false,
+      reason: "malformed_request",
+    });
+  });
+
+  it("signs an attestation bound to the subject when one is supplied", async () => {
+    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
+    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+    const subject = privateKeyToAccount(SUBJECT_KEY).address;
+
+    const { e, c } = tap(7);
+    const response = await GET(new Request(url({ rockId: "42", e, c, subject })));
+    const body = await response.json();
+    expect(body.verified).toBe(true);
+    expect(body.attestation).toMatchObject({
+      state: "SIGNED",
+      typeString:
+        "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)",
+      message: { rockId: "42", counter: 7, subject },
+    });
+    expect(Object.keys(body.attestation.message)).toEqual([
+      "rockId",
+      "uidHash",
+      "counter",
+      "deadline",
+      "subject",
+    ]);
+  });
+
   it("fails closed when NXP_MASTER_KEY is unset", async () => {
     delete process.env.NXP_MASTER_KEY;
     const { e, c } = tap(7);
@@ -129,6 +168,25 @@ describe("POST /api/nfc/verify", () => {
       }),
     );
     await expect(response.json()).resolves.toMatchObject({ verified: true, counter: 7 });
+  });
+
+  it("reads subject from the JSON body", async () => {
+    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
+    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+    const subject = privateKeyToAccount(SUBJECT_KEY).address;
+
+    const { e, c } = tap(7);
+    const response = await POST(
+      new Request("https://bank-rock.com/api/nfc/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rockId: "42", e, c, subject }),
+      }),
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      verified: true,
+      attestation: { state: "SIGNED", message: { subject } },
+    });
   });
 
   it("400s on an empty body", async () => {
@@ -155,6 +213,27 @@ describe("verifyNtagSignature (server action)", () => {
       state: "UNAVAILABLE",
       reason: "signer_unconfigured",
     });
+  });
+
+  it("passes subject through to the attestation", async () => {
+    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
+    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+    const subject = privateKeyToAccount(SUBJECT_KEY).address;
+
+    const { e, c } = tap(7);
+    const result = await verifyNtagSignature({ rockId: "42", e, c, subject });
+    expect(result.verified).toBe(true);
+    expect(result.attestation).toMatchObject({
+      state: "SIGNED",
+      message: { rockId: "42", counter: 7, subject },
+    });
+  });
+
+  it("rejects an invalid subject as malformed_request", async () => {
+    const { e, c } = tap(7);
+    const result = await verifyNtagSignature({ rockId: "42", e, c, subject: "0xnope" });
+    expect(result.verified).toBe(false);
+    expect(result.reason).toBe("malformed_request");
   });
 
   it("is never authentic for an arbitrary c — the F-1 regression", async () => {

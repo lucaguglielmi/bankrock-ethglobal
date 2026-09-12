@@ -9,6 +9,8 @@
  * strictly-monotonic counter advance in durable storage. Nothing else sets it.
  */
 
+import { isAddress } from "viem";
+
 import { isHex, loadSdmKeyConfig } from "./config";
 import { resolveCounterStore, type CounterStoreKind } from "./counter-store";
 import { signAttestation, type AttestationResult } from "./attestation";
@@ -39,6 +41,21 @@ export interface VerifyTapInput {
   c?: string;
   /** SDMENCFileData: the optional `enc` parameter. */
   enc?: string;
+  /**
+   * The wallet this tap authorises, bound into the EIP-712 attestation so the
+   * transaction can be relayed or sent from a sponsored Safe without the
+   * relayer being able to redirect the rock.
+   *
+   * Client-supplied, and that is acceptable: the physical tap is the
+   * authorisation. `subject` only names who the person holding the rock is
+   * giving it to, which is a choice that person already has. It is never a
+   * substitute for the tap — an invalid CMAC or a stale counter produces no
+   * attestation no matter what `subject` says.
+   *
+   * Absent: verification runs and the attestation is `UNAVAILABLE`.
+   * Present but not an address: the whole request is `malformed_request`.
+   */
+  subject?: string;
 }
 
 export interface VerifyTapResponse {
@@ -90,11 +107,15 @@ export async function verifyTap(input: VerifyTapInput): Promise<VerifyTapOutcome
   const e = normaliseHexParam(input.e);
   const c = normaliseHexParam(input.c);
   const enc = normaliseHexParam(input.enc);
+  const subject = normaliseHexParam(input.subject);
 
   if (!e || !c || !isHex(e, PICC_DATA_LENGTH) || !isHex(c, SDM_MAC_LENGTH)) {
     return { status: 400, body: { verified: false, reason: "malformed_request" } };
   }
   if (enc !== undefined && !isHex(enc)) {
+    return { status: 400, body: { verified: false, reason: "malformed_request" } };
+  }
+  if (subject !== undefined && !isAddress(subject, { strict: false })) {
     return { status: 400, body: { verified: false, reason: "malformed_request" } };
   }
 
@@ -144,6 +165,7 @@ export async function verifyTap(input: VerifyTapInput): Promise<VerifyTapOutcome
     rockId: input.rockId ?? "",
     uid: sdm.uid,
     counter: sdm.readCounter,
+    subject,
   });
 
   return {

@@ -12,6 +12,7 @@ const MASTER_KEY = Buffer.from(MASTER_KEY_HEX, "hex");
 const UID = Buffer.from("04AABBCCDDEE80", "hex");
 const SIGNER_KEY = ("0x" + "11".repeat(32)) as Hex;
 const REGISTRY_KEY = ("0x" + "22".repeat(32)) as Hex;
+const SUBJECT_KEY = ("0x" + "33".repeat(32)) as Hex;
 
 /** Forge the (e, c) a provisioned tag would emit. SELF-GENERATED, test-only. */
 function tap(counter: number, key: Buffer = MASTER_KEY): { e: string; c: string } {
@@ -101,7 +102,7 @@ describe("fail closed", () => {
 describe("malformed input", () => {
   beforeEach(configureVerifier);
 
-  const cases: Array<[string, { e?: string; c?: string; enc?: string }]> = [
+  const cases: Array<[string, { e?: string; c?: string; enc?: string; subject?: string }]> = [
     ["no parameters", {}],
     ["e only", { e: tap(1).e }],
     ["c only", { c: tap(1).c }],
@@ -111,6 +112,9 @@ describe("malformed input", () => {
     ["c too short", { e: tap(1).e, c: "0011" }],
     ["c not hex", { e: tap(1).e, c: "z".repeat(16) }],
     ["enc not hex", { e: tap(1).e, c: tap(1).c, enc: "zzzz" }],
+    ["subject not an address", { e: tap(1).e, c: tap(1).c, subject: "0xnope" }],
+    ["subject too short", { e: tap(1).e, c: tap(1).c, subject: "0x1234" }],
+    ["subject not hex at all", { e: tap(1).e, c: tap(1).c, subject: "vitalik.eth" }],
     ["empty strings", { e: "", c: "" }],
   ];
 
@@ -221,7 +225,12 @@ describe("attestation", () => {
 
   it("reports UNAVAILABLE when the signer key is unset, but still verifies", async () => {
     const { e, c } = tap(7);
-    const outcome = await verifyTap({ rockId: "1", e, c });
+    const outcome = await verifyTap({
+      rockId: "1",
+      e,
+      c,
+      subject: privateKeyToAccount(SUBJECT_KEY).address,
+    });
     expect(outcome.body.verified).toBe(true);
     expect(outcome.body.attestation).toEqual({
       state: "UNAVAILABLE",
@@ -232,7 +241,12 @@ describe("attestation", () => {
   it("reports UNAVAILABLE when the registry address is unset, but still verifies", async () => {
     process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
     const { e, c } = tap(7);
-    const outcome = await verifyTap({ rockId: "1", e, c });
+    const outcome = await verifyTap({
+      rockId: "1",
+      e,
+      c,
+      subject: privateKeyToAccount(SUBJECT_KEY).address,
+    });
     expect(outcome.body.verified).toBe(true);
     expect(outcome.body.attestation).toEqual({
       state: "UNAVAILABLE",
@@ -240,19 +254,61 @@ describe("attestation", () => {
     });
   });
 
-  it("signs when both are configured, binding rockId, uid and counter", async () => {
+  it("signs when everything is configured, binding rockId, uid, counter and subject", async () => {
+    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
+    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+    const subject = privateKeyToAccount(SUBJECT_KEY).address;
+
+    const { e, c } = tap(7);
+    const outcome = await verifyTap({ rockId: "42", e, c, subject });
+    expect(outcome.body.verified).toBe(true);
+    expect(outcome.body.attestation).toMatchObject({
+      state: "SIGNED",
+      signer: privateKeyToAccount(SIGNER_KEY).address,
+      primaryType: "Attestation",
+      typeString:
+        "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)",
+      message: { rockId: "42", counter: 7, subject },
+    });
+  });
+
+  it("verifies without a subject, but the attestation is UNAVAILABLE", async () => {
     process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
     process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
 
     const { e, c } = tap(7);
     const outcome = await verifyTap({ rockId: "42", e, c });
     expect(outcome.body.verified).toBe(true);
-    expect(outcome.body.attestation).toMatchObject({
-      state: "SIGNED",
-      signer: privateKeyToAccount(SIGNER_KEY).address,
-      primaryType: "Attestation",
-      message: { rockId: "42", counter: 7 },
+    expect(outcome.body.attestation).toEqual({
+      state: "UNAVAILABLE",
+      reason: "missing_subject",
     });
+  });
+
+  it("never signs for a subject when the CMAC is wrong, however valid the subject", async () => {
+    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
+    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+
+    const outcome = await verifyTap({
+      rockId: "42",
+      e: tap(7).e,
+      c: "DEADBEEFDEADBEEF",
+      subject: privateKeyToAccount(SUBJECT_KEY).address,
+    });
+    expect(outcome.body.verified).toBe(false);
+    expect(outcome.body.attestation).toBeUndefined();
+  });
+
+  it("never signs for a subject on a replay", async () => {
+    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
+    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+    const subject = privateKeyToAccount(SUBJECT_KEY).address;
+
+    const { e, c } = tap(7);
+    await verifyTap({ rockId: "42", e, c, subject });
+    const replay = await verifyTap({ rockId: "42", e, c, subject });
+    expect(replay.body.reason).toBe("stale_counter");
+    expect(replay.body.attestation).toBeUndefined();
   });
 
   it("is never present on a rejected tap", async () => {

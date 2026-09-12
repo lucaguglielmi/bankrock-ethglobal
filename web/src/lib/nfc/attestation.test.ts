@@ -18,6 +18,7 @@ import {
 // (Part 7 of spec 15 greps for address literals outside the chain module).
 const SIGNER_KEY = ("0x" + "11".repeat(32)) as Hex;
 const OTHER_KEY = ("0x" + "22".repeat(32)) as Hex;
+const SUBJECT_KEY = ("0x" + "33".repeat(32)) as Hex;
 
 const UID = Buffer.from("04DE5F1EACC040", "hex");
 
@@ -44,18 +45,18 @@ afterEach(() => {
   }
 });
 
-function configure(): { signer: string; registry: string } {
+function configure(): { signer: string; registry: string; subject: `0x${string}` } {
   const signer = privateKeyToAccount(SIGNER_KEY).address;
   const registry = privateKeyToAccount(OTHER_KEY).address;
   process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
   process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = registry;
-  return { signer, registry };
+  return { signer, registry, subject: privateKeyToAccount(SUBJECT_KEY).address };
 }
 
 describe("the EIP-712 definition the registry must match", () => {
   it("pins the type string", () => {
     expect(ATTESTATION_TYPE_STRING).toBe(
-      "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline)",
+      "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)",
     );
   });
 
@@ -65,6 +66,7 @@ describe("the EIP-712 definition the registry must match", () => {
       "bytes32 uidHash",
       "uint32 counter",
       "uint256 deadline",
+      "address subject",
     ]);
   });
 
@@ -85,56 +87,76 @@ describe("hashUid", () => {
 describe("signAttestation", () => {
   it("is UNAVAILABLE with no signer key", async () => {
     process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(OTHER_KEY).address;
-    await expect(signAttestation({ rockId: "1", uid: UID, counter: 61 })).resolves.toEqual({
-      state: "UNAVAILABLE",
-      reason: "signer_unconfigured",
-    });
+    const subject = privateKeyToAccount(SUBJECT_KEY).address;
+    await expect(
+      signAttestation({ rockId: "1", uid: UID, counter: 61, subject }),
+    ).resolves.toEqual({ state: "UNAVAILABLE", reason: "signer_unconfigured" });
   });
 
   it("is UNAVAILABLE with a malformed signer key", async () => {
-    configure();
+    const { subject } = configure();
     process.env.ATTESTATION_SIGNER_PRIVATE_KEY = "not-a-key";
-    await expect(signAttestation({ rockId: "1", uid: UID, counter: 61 })).resolves.toEqual({
-      state: "UNAVAILABLE",
-      reason: "signer_key_invalid",
-    });
+    await expect(
+      signAttestation({ rockId: "1", uid: UID, counter: 61, subject }),
+    ).resolves.toEqual({ state: "UNAVAILABLE", reason: "signer_key_invalid" });
   });
 
   it("is UNAVAILABLE with no registry address", async () => {
     process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
-    await expect(signAttestation({ rockId: "1", uid: UID, counter: 61 })).resolves.toEqual({
-      state: "UNAVAILABLE",
-      reason: "registry_unconfigured",
-    });
+    const subject = privateKeyToAccount(SUBJECT_KEY).address;
+    await expect(
+      signAttestation({ rockId: "1", uid: UID, counter: 61, subject }),
+    ).resolves.toEqual({ state: "UNAVAILABLE", reason: "registry_unconfigured" });
   });
 
   it("is UNAVAILABLE with a malformed registry address", async () => {
-    configure();
+    const { subject } = configure();
     process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = "0xnope";
-    await expect(signAttestation({ rockId: "1", uid: UID, counter: 61 })).resolves.toMatchObject({
-      state: "UNAVAILABLE",
-      reason: "registry_unconfigured",
-    });
+    await expect(
+      signAttestation({ rockId: "1", uid: UID, counter: 61, subject }),
+    ).resolves.toMatchObject({ state: "UNAVAILABLE", reason: "registry_unconfigured" });
   });
 
   it("is UNAVAILABLE for a rockId that is not a uint256", async () => {
-    configure();
+    const { subject } = configure();
     for (const rockId of ["", "new", "-1", "1.5", "0x01"]) {
-      await expect(signAttestation({ rockId, uid: UID, counter: 61 })).resolves.toEqual({
-        state: "UNAVAILABLE",
-        reason: "invalid_rock_id",
-      });
+      await expect(
+        signAttestation({ rockId, uid: UID, counter: 61, subject }),
+      ).resolves.toEqual({ state: "UNAVAILABLE", reason: "invalid_rock_id" });
     }
   });
 
+  it("is UNAVAILABLE with no subject, or a subject that is not an address", async () => {
+    configure();
+    for (const subject of [undefined, "", "0xnope", "not-an-address", "0x1234"]) {
+      await expect(
+        signAttestation({ rockId: "1", uid: UID, counter: 61, subject }),
+      ).resolves.toEqual({ state: "UNAVAILABLE", reason: "missing_subject" });
+    }
+  });
+
+  it("checksums a lowercase subject", async () => {
+    const { subject } = configure();
+    const result = await signAttestation({
+      rockId: "1",
+      uid: UID,
+      counter: 61,
+      subject: subject.toLowerCase(),
+    });
+    expect(result.state).toBe("SIGNED");
+    if (result.state !== "SIGNED") return;
+    expect(result.message.subject).toBe(subject);
+  });
+
   it("signs a recoverable EIP-712 attestation", async () => {
-    const { signer, registry } = configure();
+    const { signer, registry, subject } = configure();
     const now = 1_800_000_000;
 
     const result = await signAttestation({
       rockId: "42",
       uid: UID,
       counter: 61,
+      subject,
       nowSeconds: now,
     });
 
@@ -154,7 +176,16 @@ describe("signAttestation", () => {
       uidHash: hashUid(UID),
       counter: 61,
       deadline: now + ATTESTATION_TTL_SECONDS,
+      subject,
     });
+    // The signed struct field order must match ATTESTATION_TYPE_STRING.
+    expect(Object.keys(result.message)).toEqual([
+      "rockId",
+      "uidHash",
+      "counter",
+      "deadline",
+      "subject",
+    ]);
 
     const recovered = await recoverTypedDataAddress({
       domain: result.domain,
@@ -165,6 +196,7 @@ describe("signAttestation", () => {
         uidHash: result.message.uidHash,
         counter: result.message.counter,
         deadline: BigInt(result.message.deadline),
+        subject: result.message.subject,
       },
       signature: result.signature,
     });
@@ -172,18 +204,18 @@ describe("signAttestation", () => {
   });
 
   it("expires ten minutes after signing", async () => {
-    configure();
+    const { subject } = configure();
     const now = Math.floor(Date.now() / 1000);
-    const result = await signAttestation({ rockId: "1", uid: UID, counter: 1 });
+    const result = await signAttestation({ rockId: "1", uid: UID, counter: 1, subject });
     expect(result.state).toBe("SIGNED");
     if (result.state !== "SIGNED") return;
     expect(result.message.deadline - now).toBeGreaterThanOrEqual(ATTESTATION_TTL_SECONDS - 2);
     expect(result.message.deadline - now).toBeLessThanOrEqual(ATTESTATION_TTL_SECONDS + 2);
   });
 
-  it("binds rockId, uid and counter — changing any one changes the signature", async () => {
-    configure();
-    const base = { rockId: "42", uid: UID, counter: 61, nowSeconds: 1_800_000_000 };
+  it("binds rockId, uid, counter and subject — changing any one changes the signature", async () => {
+    const { subject } = configure();
+    const base = { rockId: "42", uid: UID, counter: 61, subject, nowSeconds: 1_800_000_000 };
     const signature = async (input: Parameters<typeof signAttestation>[0]) => {
       const r = await signAttestation(input);
       return r.state === "SIGNED" ? r.signature : null;
@@ -197,5 +229,8 @@ describe("signAttestation", () => {
       await signature({ ...base, uid: Buffer.from("04AABBCCDDEE80", "hex") }),
     ).not.toBe(original);
     expect(await signature({ ...base, nowSeconds: base.nowSeconds + 1 })).not.toBe(original);
+    expect(
+      await signature({ ...base, subject: privateKeyToAccount(OTHER_KEY).address }),
+    ).not.toBe(original);
   });
 });

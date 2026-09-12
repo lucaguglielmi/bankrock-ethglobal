@@ -24,6 +24,16 @@ export interface VerifyNtagParams {
   e?: string;
   /** Optional SDMENCFileData. */
   enc?: string;
+  /**
+   * The wallet this tap authorises, bound into the EIP-712 attestation so the
+   * awaken/claim transaction can be relayed or sent from a sponsored Safe.
+   *
+   * Client-supplied, and that is fine: the physical tap is the authorisation
+   * and `subject` only names who the tapper is giving the rock to. Without a
+   * valid CMAC there is no attestation to relay, whatever `subject` says.
+   * Absent: verification still runs, the attestation is `UNAVAILABLE`.
+   */
+  subject?: string;
   rockId?: string | number;
 }
 
@@ -75,6 +85,7 @@ export async function verifyNtagSignature(params: VerifyNtagParams): Promise<Ver
       e: params.e,
       c: params.c,
       enc: params.enc,
+      subject: params.subject,
     });
 
     const { body } = outcome;

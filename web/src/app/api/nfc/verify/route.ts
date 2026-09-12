@@ -1,12 +1,19 @@
 /**
  * The single NFC verifier endpoint (D-018, Phase 4 step 1).
  *
- * GET  /api/nfc/verify?rockId=…&e=…&c=…[&enc=…]
- * POST /api/nfc/verify   { rockId, e, c, enc? }
+ * GET  /api/nfc/verify?rockId=…&e=…&c=…[&enc=…][&subject=0x…]
+ * POST /api/nfc/verify   { rockId, e, c, enc?, subject? }
  *
  * `e` / `picc_data` is the 16-byte encrypted PICCData and `c` / `cmac` the
  * 8-byte truncated SDM CMAC, both hex, exactly as the NTAG 424 DNA mirrors them
  * into the tag URL.
+ *
+ * `subject` is the wallet the tap authorises. It is client-supplied on purpose:
+ * the tap is the authorisation, and `subject` only names who the tapper is
+ * giving the rock to. It never substitutes for the tap — no CMAC match, no
+ * attestation. Binding it into the signed struct is what lets the transaction
+ * be relayed or sent from a sponsored Safe without the relayer redirecting the
+ * rock to itself.
  *
  * No `export const runtime`: OpenNext runs route handlers on the Worker and the
  * declaration only confuses the adapter (D-016).
@@ -33,6 +40,7 @@ function readParams(url: URL): VerifyTapInput {
     e: q.get("e") ?? q.get("picc_data") ?? undefined,
     c: q.get("c") ?? q.get("cmac") ?? undefined,
     enc: q.get("enc") ?? undefined,
+    subject: q.get("subject") ?? undefined,
   };
 }
 
@@ -101,5 +109,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     e: pick("e", pick("picc_data", fromQuery.e)),
     c: pick("c", pick("cmac", fromQuery.c)),
     enc: pick("enc", fromQuery.enc),
+    subject: pick("subject", fromQuery.subject),
   });
 }

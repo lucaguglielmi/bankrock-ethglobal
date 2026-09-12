@@ -2,7 +2,7 @@
  * Server-signed EIP-712 attestation for a verified physical tap.
  *
  * D-018: `awakenRock` and the claim path require an attestation bound to
- * `(rockId, uid, counter)` with an expiry. F-5 replaces the previous
+ * `(rockId, uid, counter, subject)` with an expiry. F-5 replaces the previous
  * `verifiedPubKey = "0x" + e + c` string, which was neither a key nor a
  * signature. The struct definition below must match the registry contract
  * exactly.
@@ -11,14 +11,14 @@
  * struct. Attestation gates *claiming*, never *spending* (spec 06).
  */
 
-import { isAddress, keccak256, type Address, type Hex } from "viem";
+import { getAddress, isAddress, keccak256, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 export const ATTESTATION_PRIMARY_TYPE = "Attestation" as const;
 
 /** The EIP-712 type string the registry must hash into its type hash. */
 export const ATTESTATION_TYPE_STRING =
-  "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline)";
+  "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)";
 
 export const ATTESTATION_TYPES = {
   Attestation: [
@@ -26,6 +26,7 @@ export const ATTESTATION_TYPES = {
     { name: "uidHash", type: "bytes32" },
     { name: "counter", type: "uint32" },
     { name: "deadline", type: "uint256" },
+    { name: "subject", type: "address" },
   ],
 } as const;
 
@@ -51,6 +52,23 @@ export interface AttestationMessage {
   counter: number;
   /** Unix seconds. */
   deadline: number;
+  /**
+   * The wallet this tap authorises, checksummed.
+   *
+   * Naming the subject in the signed struct is what lets the transaction be
+   * relayed or sent from a sponsored Safe: whoever submits it, the registry
+   * credits `subject`, so a bundler, paymaster or relayer cannot redirect the
+   * rock to itself.
+   *
+   * `subject` is supplied by the client. That is deliberate and safe: the
+   * physical tap is the authorisation, and `subject` only says who the person
+   * holding the rock is giving it to. A caller who can choose `subject` is a
+   * caller who already tapped the rock, and could equally have tapped it while
+   * signed in as anyone. It grants nothing that possession did not already
+   * grant. What it must never become is a substitute for the tap, which is why
+   * a `subject` alone produces no signature.
+   */
+  subject: Address;
 }
 
 export type AttestationUnavailableReason =
@@ -58,6 +76,7 @@ export type AttestationUnavailableReason =
   | "signer_key_invalid"
   | "registry_unconfigured"
   | "invalid_rock_id"
+  | "missing_subject"
   | "signing_failed";
 
 export type AttestationResult =
@@ -79,6 +98,12 @@ export interface SignAttestationInput {
   uid: Buffer;
   /** SDMReadCtr accepted by the counter store. */
   counter: number;
+  /**
+   * The wallet the tap authorises. Client-supplied (see `AttestationMessage`).
+   * Required for signing: without a valid address the attestation is
+   * `UNAVAILABLE`, while verification itself still succeeds.
+   */
+  subject?: string;
   /** Override the clock, for tests. Unix seconds. */
   nowSeconds?: number;
 }
@@ -137,6 +162,11 @@ export async function signAttestation(input: SignAttestationInput): Promise<Atte
     return { state: "UNAVAILABLE", reason: "invalid_rock_id" };
   }
 
+  if (!input.subject || !isAddress(input.subject, { strict: false })) {
+    return { state: "UNAVAILABLE", reason: "missing_subject" };
+  }
+  const subject = getAddress(input.subject);
+
   const counter = Math.trunc(input.counter);
   if (!Number.isFinite(counter) || counter < 0 || counter > UINT32_MAX) {
     return { state: "UNAVAILABLE", reason: "invalid_rock_id" };
@@ -165,6 +195,7 @@ export async function signAttestation(input: SignAttestationInput): Promise<Atte
         uidHash,
         counter,
         deadline: BigInt(deadline),
+        subject,
       },
     });
 
@@ -180,6 +211,7 @@ export async function signAttestation(input: SignAttestationInput): Promise<Atte
         uidHash,
         counter,
         deadline,
+        subject,
       },
     };
   } catch {
