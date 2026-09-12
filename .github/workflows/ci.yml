@@ -88,18 +88,19 @@ jobs:
             exit 1
           fi
 
-      # `postcompile` also regenerates the web app's copy of the ABI, so the same run that
-      # produced contracts/abi has already refreshed it. A dirty file here means the committed
-      # copy the web app compiles against no longer matches the contract.
-      - name: Check the web ABI module is committed and up to date
+      # `postcompile` also regenerates the web app's copies of the ABIs, so the same run that
+      # produced contracts/abi has already refreshed them. A dirty file here means a committed
+      # copy the web app compiles against no longer matches the contract — which does not fail
+      # loudly at runtime, it just encodes the wrong calldata.
+      - name: Check the web ABI modules are committed and up to date
         working-directory: .
         run: |
-          TARGET=web/src/lib/chain/abi/registry.ts
-          if [ -n "$(git status --porcelain -- "$TARGET")" ]; then
-            echo "$TARGET does not match the compiled contracts."
+          TARGETS="web/src/lib/chain/abi/registry.ts web/src/lib/chain/abi/aqua-app.ts"
+          if [ -n "$(git status --porcelain -- $TARGETS)" ]; then
+            echo "A generated web ABI module does not match the compiled contracts."
             echo "Run 'node scripts/sync-web-abi.mjs' from the repository root and commit the result."
-            git status --porcelain -- "$TARGET"
-            git diff -- "$TARGET"
+            git status --porcelain -- $TARGETS
+            git diff -- $TARGETS
             exit 1
           fi
 

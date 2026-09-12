@@ -210,14 +210,16 @@ describe("buildSwapCall", () => {
 
     expect(swap.value.call.to).toBe(TAKER);
     expect(swap.value.calls[1]).toEqual(swap.value.call);
+    // The audit of 2026-09-12 removed the caller-supplied `app` argument (finding F-6: the
+    // periphery is bound to one app at deployment now) and added a `deadline` (finding F-8).
     const decoded = decodeFunctionData({ abi: XYC_SWAP_TAKER_ABI, data: swap.value.call.data });
     expect(decoded.functionName).toBe("swapExactIn");
-    expect(decoded.args?.[0]).toBe(APP);
-    expect(decoded.args?.[1]).toMatchObject({ maker: MAKER, token0: USDC, token1: WETH });
-    expect(decoded.args?.[2]).toBe(true); // zeroForOne: selling token0 (USDC)
-    expect(decoded.args?.[3]).toBe(BigInt(100_000_000));
-    expect(decoded.args?.[4]).toBe(BigInt(1));
-    expect(decoded.args?.[5]).toBe(VISITOR);
+    expect(decoded.args?.[0]).toMatchObject({ maker: MAKER, token0: USDC, token1: WETH });
+    expect(decoded.args?.[1]).toBe(true); // zeroForOne: selling token0 (USDC)
+    expect(decoded.args?.[2]).toBe(BigInt(100_000_000));
+    expect(decoded.args?.[3]).toBe(BigInt(1));
+    expect(decoded.args?.[4]).toBe(VISITOR);
+    expect(decoded.args?.[5]).toBe(swap.value.deadline);
   });
 
   it("reads the direction from the token being sold", async () => {

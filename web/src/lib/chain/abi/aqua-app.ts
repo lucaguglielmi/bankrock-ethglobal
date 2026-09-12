@@ -1,23 +1,20 @@
-/**
- * The Aqua app path: `XYCSwap` and the taker periphery that reaches it.
- *
- * Copied from `contracts/abi/XYCSwap.json` and `contracts/abi/XYCSwapTaker.json`, which
- * `contracts/scripts/export-abi.js` writes on every `npm run compile` in `contracts/`. If either
- * contract changes, recompile and paste the arrays below — the compiler output is the only
- * authority for these, exactly as for the registry ABI next door.
- *
- * XYCSwap is the reference constant-product AquaApp, vendored unmodified from
- * github.com/1inch/aqua at commit 9c5c42e5 (contracts/aqua/UPSTREAM.md) and deployed by us: 1inch
- * publishes no XYCSwap deployment on any network. It is the spec 04 fallback the D-023 amendment
- * allows, and it carries no strategy logic of ours.
- *
- * XYCSwapTaker exists because XYCSwap settles a swap by calling `xycSwapCallback` back into its
- * caller: an EOA or a plain Safe cannot trade against it directly (contracts/aqua/NOTES.md §5).
- * A visitor's transaction is `approve(taker, amountIn)` then `taker.swapExactIn(...)`.
- *
- * No address appears here. Both come from the environment — NEXT_PUBLIC_AQUA_APP_ADDRESS and
- * NEXT_PUBLIC_AQUA_TAKER_ADDRESS — through `lib/aqua/config.ts` (D-015).
- */
+// Generated from contracts/abi/XYCSwap.json, contracts/abi/XYCSwapTaker.json by scripts/sync-web-abi.mjs.
+// Do not edit by hand. Regenerate with "npm run compile" in contracts/, or by running
+// "node scripts/sync-web-abi.mjs" from the repository root.
+//
+// The Aqua app path: `XYCSwap` and the taker periphery that reaches it.
+//
+// XYCSwap is the reference constant-product AquaApp, vendored unmodified from
+// github.com/1inch/aqua at commit 9c5c42e5 (contracts/aqua/UPSTREAM.md) and deployed by us:
+// 1inch publishes no XYCSwap deployment on any network. It is the spec 04 fallback the D-023
+// amendment allows, and it carries no strategy logic of ours.
+//
+// XYCSwapTaker exists because XYCSwap settles a swap by calling `xycSwapCallback` back into
+// its caller: an EOA or a plain Safe cannot trade against it directly (contracts/aqua/NOTES.md
+// §5). A visitor's transaction is `approve(taker, amountIn)` then `taker.swapExactIn(...)`.
+//
+// No address appears here. Both come from the environment — NEXT_PUBLIC_AQUA_APP_ADDRESS and
+// NEXT_PUBLIC_AQUA_TAKER_ADDRESS — through `lib/aqua/config.ts` (D-015).
 export const XYC_SWAP_ABI = [
   {
     "inputs": [
@@ -400,10 +397,20 @@ export const XYC_SWAP_TAKER_ABI = [
         "internalType": "contract IAqua",
         "name": "aqua_",
         "type": "address"
+      },
+      {
+        "internalType": "contract XYCSwap",
+        "name": "app_",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
     "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "CallbackNeverHappened",
+    "type": "error"
   },
   {
     "inputs": [
@@ -414,6 +421,27 @@ export const XYC_SWAP_TAKER_ABI = [
       }
     ],
     "name": "SafeERC20FailedOperation",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "SwapAlreadyInProgress",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "nowTimestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "SwapExpired",
     "type": "error"
   },
   {
@@ -433,6 +461,110 @@ export const XYC_SWAP_TAKER_ABI = [
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "provided",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "expected",
+        "type": "uint256"
+      }
+    ],
+    "name": "UnexpectedCallbackAmount",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "provided",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      }
+    ],
+    "name": "UnexpectedCallbackStrategy",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "provided",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "expected",
+        "type": "address"
+      }
+    ],
+    "name": "UnexpectedCallbackToken",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "taker",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "tokenIn",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "tokenOut",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amountIn",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amountOut",
+        "type": "uint256"
+      }
+    ],
+    "name": "Swapped",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "APP",
+    "outputs": [
+      {
+        "internalType": "contract XYCSwap",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "AQUA",
     "outputs": [
@@ -447,11 +579,6 @@ export const XYC_SWAP_TAKER_ABI = [
   },
   {
     "inputs": [
-      {
-        "internalType": "contract XYCSwap",
-        "name": "app",
-        "type": "address"
-      },
       {
         "components": [
           {
@@ -503,6 +630,11 @@ export const XYC_SWAP_TAKER_ABI = [
         "internalType": "address",
         "name": "to",
         "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
       }
     ],
     "name": "swapExactIn",
@@ -514,6 +646,19 @@ export const XYC_SWAP_TAKER_ABI = [
       }
     ],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "version",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "semver",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "pure",
     "type": "function"
   },
   {

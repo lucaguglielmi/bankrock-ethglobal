@@ -98,11 +98,16 @@ describe("the batch a visitor submits", () => {
     const swap = decodeFunctionData({ abi: XYC_SWAP_TAKER_ABI, data: batch[1].data });
     expect(swap.functionName).toBe("swapExactIn");
     const args = swap.args as readonly unknown[];
-    expect(String(args[0]).toLowerCase()).toBe(APP);
-    expect(args[2]).toBe(true); // zeroForOne: selling token0 (USDC)
-    expect(args[3]).toBe(BigInt(100_000_000));
-    expect(args[4]).toBe(BigInt(1));
-    expect(String(args[5])).toBe(zeroAddress); // "pay the caller"
+    // The 2026-09-12 audit removed the caller-supplied `app` argument — the periphery is bound to
+    // one app at deployment now, so nobody can point it at a contract of their own (finding F-6) —
+    // and added a trailing `deadline` (finding F-8). Every argument shifted down one.
+    expect(args[0]).toMatchObject({ token0: USDC, token1: WETH });
+    expect(args[1]).toBe(true); // zeroForOne: selling token0 (USDC)
+    expect(args[2]).toBe(BigInt(100_000_000));
+    expect(args[3]).toBe(BigInt(1));
+    expect(String(args[4])).toBe(zeroAddress); // "pay the caller"
+    expect(args[5]).toBe(plan.value.deadline);
+    expect(args[5]).toBeGreaterThan(BigInt(Math.floor(Date.now() / 1000)));
   });
 
   it("prefixes three calls when a stale USDC allowance has to be reset first", async () => {

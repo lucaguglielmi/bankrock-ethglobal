@@ -20,6 +20,16 @@ import { encodeFunctionData, getAddress, maxUint256, zeroAddress, type Address, 
 import { AQUA_ABI } from "@/lib/chain/abi/aqua";
 import { ERC20_ABI } from "@/lib/chain/abi/erc20";
 import { XYC_SWAP_TAKER_ABI } from "@/lib/chain/abi/aqua-app";
+
+/**
+ * How long a swap stays valid, in seconds, when the caller does not say.
+ *
+ * A signed transaction that does not get mined stays valid indefinitely, and a swap that executes
+ * twenty minutes late executes against reserves that have moved (audit finding F-8). Five minutes
+ * is long enough for a sponsored UserOp to clear a bundler and short enough that the price the
+ * visitor was shown is still roughly the price they get.
+ */
+export const DEFAULT_SWAP_DEADLINE_SECONDS = 300;
 import { real, unavailable, type Capability } from "@/lib/demo";
 import { getAquaAddresses, getAquaTakerAddress, type AquaAddresses } from "./config";
 import {
@@ -192,6 +202,13 @@ export interface SwapParams {
   taker?: Address;
   /** Override the app address. Defaults to the strategy's configured app. */
   app?: Address;
+  /**
+   * Absolute unix seconds after which the periphery refuses the swap. Defaults to
+   * `DEFAULT_SWAP_DEADLINE_SECONDS` from now, so existing callers need no change.
+   */
+  deadline?: bigint;
+  /** Relative alternative to `deadline`: seconds from now. Ignored when `deadline` is given. */
+  deadlineSeconds?: number;
 }
 
 export interface SwapPlan {
@@ -207,6 +224,8 @@ export interface SwapPlan {
   tokenOut: Address;
   /** True when selling token0 (USDC) for token1 (WETH). */
   zeroForOne: boolean;
+  /** The absolute unix-seconds deadline encoded into the call. */
+  deadline: bigint;
 }
 
 /**
@@ -242,13 +261,16 @@ export function buildSwapCall(params: SwapParams): Capability<SwapPlan> {
   }
   const tokenOut = zeroForOne ? fields.token1 : fields.token0;
 
+  const deadline =
+    params.deadline ??
+    BigInt(Math.floor(Date.now() / 1000) + (params.deadlineSeconds ?? DEFAULT_SWAP_DEADLINE_SECONDS));
+
   const call: Call = {
     to: taker,
     data: encodeFunctionData({
       abi: XYC_SWAP_TAKER_ABI,
       functionName: "swapExactIn",
       args: [
-        app,
         {
           maker: fields.maker,
           token0: fields.token0,
@@ -261,6 +283,7 @@ export function buildSwapCall(params: SwapParams): Capability<SwapPlan> {
         params.minAmountOut,
         // The periphery reads `to == 0` as "pay the caller".
         params.to ? getAddress(params.to) : zeroAddress,
+        deadline,
       ],
     }),
     value: BigInt(0),
@@ -274,5 +297,6 @@ export function buildSwapCall(params: SwapParams): Capability<SwapPlan> {
     tokenIn,
     tokenOut,
     zeroForOne,
+    deadline,
   });
 }
