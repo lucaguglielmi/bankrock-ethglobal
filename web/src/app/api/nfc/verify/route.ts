@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import * as crypto from 'crypto';
 import { logger } from "@/lib/telemetry";
+import { getRequestContext } from "@cloudflare/next-on-pages";
+import { getDb } from "@/lib/db";
+import { nfcTags } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export const runtime = "nodejs";
 
@@ -40,13 +44,42 @@ export async function POST(req: Request) {
     const uid = decryptedPayload.subarray(0, 7).toString('hex');
     const counter = decryptedPayload.readUInt32LE(7); // Next 3 bytes usually
 
-    // Replay Attack Prevention
-    const lastCounter = readCounters.get(uid) || 0;
-    if (counter <= lastCounter) {
-      logger.warn('NFC Replay Attack prevented', { uid, counter, lastCounter });
-      return NextResponse.json({ error: 'Replay Attack Detected' }, { status: 403 });
+    // Replay Attack Prevention using D1
+    let env;
+    try {
+      env = (getRequestContext() as any)?.env;
+    } catch {
+      // Fallback for non-cloudflare env if needed
     }
-    readCounters.set(uid, counter);
+
+    if (env && env.DB) {
+      const db = getDb(env);
+      const tagRecord = await db.select().from(nfcTags).where(eq(nfcTags.uid, uid)).get();
+      const lastCounter = tagRecord?.lastCounter || 0;
+      
+      if (counter <= lastCounter) {
+        logger.warn('NFC Replay Attack prevented via D1', { uid, counter, lastCounter });
+        return NextResponse.json({ error: 'Replay Attack Detected' }, { status: 403 });
+      }
+      
+      // Update the counter
+      await db.insert(nfcTags).values({
+        uid,
+        rockId: 'unassigned', // Set upon activation
+        lastCounter: counter,
+      }).onConflictDoUpdate({
+        target: nfcTags.uid,
+        set: { lastCounter: counter }
+      });
+    } else {
+      // Fallback in-memory
+      const lastCounter = readCounters.get(uid) || 0;
+      if (counter <= lastCounter) {
+        logger.warn('NFC Replay Attack prevented (in-memory)', { uid, counter, lastCounter });
+        return NextResponse.json({ error: 'Replay Attack Detected' }, { status: 403 });
+      }
+      readCounters.set(uid, counter);
+    }
 
     // CMAC Verification
     // Structurally: we would AES-CMAC the UID+Counter and compare with 'c'.

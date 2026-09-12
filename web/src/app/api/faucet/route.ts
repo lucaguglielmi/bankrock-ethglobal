@@ -19,24 +19,16 @@ const walletClient = createWalletClient({
 });
 
 import { logger } from "@/lib/telemetry";
+import { getRequestContext } from "@cloudflare/next-on-pages";
+import { getDb } from "@/lib/db";
+import { faucetClaims } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
-const rateLimitMap = new Map<string, number>();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const MAX_REQUESTS = 3;
+const RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function POST(req: Request) {
   const start = Date.now();
   
-  const ip = req.headers.get("x-forwarded-for") || "unknown";
-  const userRequests = rateLimitMap.get(ip) || 0;
-  
-  if (userRequests >= MAX_REQUESTS) {
-    logger.warn("Rate limit exceeded for IP", { ip });
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-  }
-  rateLimitMap.set(ip, userRequests + 1);
-  setTimeout(() => rateLimitMap.set(ip, (rateLimitMap.get(ip) || 1) - 1), RATE_LIMIT_WINDOW_MS);
-
   try {
     const { address } = await req.json();
 
@@ -47,6 +39,18 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({ error: "Address is required" }, { status: 400 });
     }
+
+    const env = getRequestContext().env as any;
+    if (env && env.DB) {
+      const db = getDb(env);
+      const existingClaim = await db.select().from(faucetClaims).where(eq(faucetClaims.walletAddress, address)).get();
+      
+      if (existingClaim && (start - existingClaim.lastClaimTimestamp) < RATE_LIMIT_WINDOW_MS) {
+        logger.warn("Sybil rate limit exceeded for address", { address });
+        return NextResponse.json({ error: "Rate limit exceeded. You can only request testnet funds once every 24 hours." }, { status: 429 });
+      }
+    }
+
 
     logger.info("Processing faucet funding request", {
       action: "FAUCET_REQUEST_START",
@@ -65,6 +69,17 @@ export async function POST(req: Request) {
       to: address as `0x${string}`,
       value: parseEther("0.01"),
     });
+
+    if (env && env.DB) {
+      const db = getDb(env);
+      await db.insert(faucetClaims).values({
+        walletAddress: address,
+        lastClaimTimestamp: start,
+      }).onConflictDoUpdate({
+        target: faucetClaims.walletAddress,
+        set: { lastClaimTimestamp: start }
+      });
+    }
 
     const latencyMs = Date.now() - start;
     logger.info("Faucet funding broadcasted successfully", {

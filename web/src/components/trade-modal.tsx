@@ -1,3 +1,4 @@
+import { useHaptics } from "@/hooks/useHaptics";
 "use client";
 
 import { useState, useEffect } from "react";
@@ -254,7 +255,7 @@ function TradeModalInner({
       });
     } catch (err: any) {
       console.error("Swap execution failed:", err);
-      setStatus("idle");
+      setStatus("idle"); hapticError();
       // Gotcha Fix: Graceful paymaster error handling
       if (err.message === "Paymaster sponsorship failed") {
         setError("Gas sponsorship temporarily unavailable from Pimlico. Please try again later.");
@@ -379,7 +380,7 @@ function TradeModalInner({
             <div className="flex gap-3 w-full">
               <button
                 onClick={() => {
-                  setStatus("idle");
+                  setStatus("idle"); hapticError();
                   setAmountIn("");
                   setTxHash(null);
                 }}
@@ -648,7 +649,7 @@ function TradeModalInner({
                       dragConstraints={{ left: 0, right: 300 }}
                       dragElastic={0.05}
                       dragSnapToOrigin
-                      onDragEnd={(e, info) => {
+                      onDragEnd={(e, info) => { hapticLight();
                         if (info.offset.x > 200) {
                           handleExecuteSwap();
                         }

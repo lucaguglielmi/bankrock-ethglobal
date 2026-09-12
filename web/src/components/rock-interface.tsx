@@ -1,3 +1,5 @@
+import { SocialBridge } from "@/components/social-bridge";
+import { useHaptics } from "@/hooks/useHaptics";
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -62,6 +64,7 @@ const INITIAL_EVENTS: ActivityEvent[] = [
 export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
   const { authenticated, user, address } = useAuth();
   const { playTap, playSuccess, playError } = useAudio();
+  const { hapticSuccess, hapticHeavy, hapticError, hapticLight } = useHaptics();
   const { awakenOnchain } = useRockActions();
   
   const [step, setStep] = useState<"scanning" | "unactivated" | "authenticating" | "awakening" | "active">("scanning");
@@ -179,11 +182,11 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
     verify();
   }, [rockId, urlParams]);
 
-  const { createWallet } = usePrivy();
+  const { createWallet, linkEmail, linkTwitter, linkGoogle } = usePrivy();
 
   const startAwakening = useCallback(async () => {
     setStep("awakening");
-    playTap();
+    playTap(); hapticHeavy();
 
     // Gotcha Fix: If user logged in via email/passkey but hasn't created a wallet,
     // proactively generate the embedded wallet here so AA flows don't crash.
@@ -260,7 +263,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
 
       setFaucetTxHash(tx);
       setIsSimulatedFaucet(simulated);
-      playTap();
+      playTap(); hapticHeavy();
       await new Promise((r) => setTimeout(r, 800));
 
       // Stage 3: Aqua Strategy Deployment
@@ -274,11 +277,11 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
       // Complete
       setCustomOwnerAddress(targetAddress);
       setStep("active");
-      playSuccess();
+      playSuccess(); hapticSuccess();
     } catch (err) {
       console.error("Awakening failed:", err);
       setStep("active");
-      playError();
+      playError(); hapticError();
     }
   }, [user, authenticated, address, rockId, awakenOnchain, playTap, playSuccess, playError, smartAccountAddress, createWallet]);
 
@@ -688,6 +691,8 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
         <RockAlerts rockId={rockId} />
 
         {/* Provenance & On-Chain Activity Timeline */}
+        <SocialBridge rockId={rockId} />
+        
         <RockActivity rockId={rockId} events={displayEvents} isSyncing={isSyncingEvents} />
 
         {/* Modals */}

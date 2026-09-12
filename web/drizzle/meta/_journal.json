@@ -8,6 +8,20 @@
       "when": 1789193863408,
       "tag": "0000_parched_beyonder",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789195164033,
+      "tag": "0001_dry_peter_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789195289825,
+      "tag": "0002_high_blizzard",
+      "breakpoints": true
     }
   ]
 }

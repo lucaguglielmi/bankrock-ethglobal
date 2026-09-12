@@ -46,7 +46,7 @@ export async function POST(req: Request) {
         amountUsdc: 0, // Would parse from activity
         amountWeth: 0,
         timestamp: Date.now()
-      });
+      }).onConflictDoNothing({ target: rockEvents.txHash });
     }
 
     return NextResponse.json({ success: true });

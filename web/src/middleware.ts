@@ -1,12 +1,38 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 
 const rateLimitMap = new Map<string, { count: number, timestamp: number }>();
 const RATE_LIMIT_WINDOW_MS = 60000;
 const MAX_REQUESTS_PER_WINDOW = 100;
 
-export function middleware(request: NextRequest) {
+const SECRET_KEY = new TextEncoder().encode(
+  process.env.ADMIN_JWT_SECRET || 'fallback-secret-do-not-use-in-prod'
+);
+
+export async function middleware(request: NextRequest) {
   const url = request.nextUrl.pathname;
+  
+  // Protect /admin routes (except /admin/login)
+  if (url.startsWith('/admin') && url !== '/admin/login') {
+    const token = request.cookies.get('bankrock_sentinel_session')?.value;
+    
+    if (!token) {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
+    }
+    
+    try {
+      const { payload } = await jwtVerify(token, SECRET_KEY);
+      if (payload.role !== 'admin') {
+        throw new Error('Invalid role');
+      }
+    } catch (err) {
+      // Token is invalid or expired
+      const response = NextResponse.redirect(new URL('/admin/login', request.url));
+      response.cookies.delete('bankrock_sentinel_session');
+      return response;
+    }
+  }
   
   if (url.startsWith('/api/rocks')) {
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
@@ -42,5 +68,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/api/:path*',
+  matcher: ['/api/:path*', '/admin/:path*'],
 };
