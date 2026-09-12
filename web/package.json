@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "node scripts/build-sw.mjs",
     "build": "next build",
     "dev": "next dev",
     "start": "next start",
@@ -63,6 +64,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
     "@playwright/test": "1.56.1",
+    "@serwist/build": "^9.5.12",
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/typography": "^0.5.16",
     "@types/canvas-confetti": "^1.9.0",
@@ -71,8 +73,10 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "drizzle-kit": "^0.31.10",
+    "esbuild": "^0.28.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "serwist": "^9.5.12",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.4",

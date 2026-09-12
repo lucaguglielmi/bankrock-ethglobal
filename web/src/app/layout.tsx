@@ -7,6 +7,7 @@ import { Header } from "@/components/header";
 import { DemoBanner } from "@/components/ui/demo-banner";
 import { BottomDock } from "@/components/ui/bottom-dock";
 import { VersionCheck } from "@/components/version-check";
+import { RegisterServiceWorker } from "@/components/chrome/register-sw";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -67,6 +68,7 @@ export default function RootLayout({
         <BottomDock />
         <Toaster position="bottom-center" offset="var(--dock-h)" />
         <VersionCheck />
+        <RegisterServiceWorker />
       </body>
     </html>
   );

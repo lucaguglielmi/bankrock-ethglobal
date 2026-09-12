@@ -138,7 +138,6 @@ interface NotificationClickEventLike {
  * file header for why the real type is unavailable).
  */
 interface ServiceWorkerSelfLike {
-  __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
   registration: { showNotification(title: string, options?: NotificationOptions): Promise<void> };
   clients: { openWindow(url: string): Promise<unknown> };
   addEventListener(type: "push", listener: (event: PushEventLike) => void): void;
@@ -150,8 +149,23 @@ interface ServiceWorkerSelfLike {
 
 const swSelf = self as unknown as ServiceWorkerSelfLike;
 
+/**
+ * `@serwist/build`'s `injectManifest` looks for the literal text `self.__SW_MANIFEST` in the
+ * bundled output by default (see `scripts/build-sw.mjs`) and replaces it with the precache list —
+ * empty, on purpose, since the runtime-caching rules above already cover every asset this app
+ * needs cached. That means the property access below has to be spelled out as `self.__SW_MANIFEST`
+ * verbatim rather than routed through the `swSelf` alias used everywhere else in this file. Typing
+ * it needs only this one addition to the ambient (already-present) `Window` interface — not the
+ * full `lib.webworker.d.ts` this file otherwise avoids (see the file header).
+ */
+declare global {
+  interface Window {
+    __SW_MANIFEST?: (PrecacheEntry | string)[];
+  }
+}
+
 const serwist = new Serwist({
-  precacheEntries: swSelf.__SW_MANIFEST,
+  precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
