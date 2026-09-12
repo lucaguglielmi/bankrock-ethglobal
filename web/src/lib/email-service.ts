@@ -1,4 +1,5 @@
 import { logger } from "./telemetry";
+import { Resend } from "resend";
 
 export interface AlertEmailPayload {
   to: string;
@@ -124,38 +125,30 @@ export async function sendAlertEmail(payload: AlertEmailPayload): Promise<EmailD
   const apiKey = process.env.RESEND_API_KEY;
   const html = generateAlertEmailHtml(payload);
 
-  // 1. If RESEND_API_KEY is configured, dispatch via Resend REST API
+  // 1. If RESEND_API_KEY is configured, dispatch via Resend SDK
   if (apiKey && apiKey.startsWith("re_")) {
     try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: "Bank Rock Sentinel <alerts@resend.dev>", // default Resend test domain
-          to: payload.to,
-          subject: `[Bank Rock #${payload.rockId}] ${payload.topicTitle}`,
-          html: html,
-        }),
+      const resend = new Resend(apiKey);
+      const data = await resend.emails.send({
+        from: "Bank Rock Sentinel <alerts@resend.dev>", // default Resend test domain
+        to: payload.to,
+        subject: `[Bank Rock #${payload.rockId}] ${payload.topicTitle}`,
+        html: html,
       });
 
-      const data = await response.json() as { id?: string; error?: { message: string } };
-
-      if (response.ok && data.id) {
+      if (data.data?.id) {
         logger.info("Resend alert email sent successfully", {
           action: "EMAIL_ALERT_SENT",
           rockId: payload.rockId,
           recipient: payload.to.slice(0, 3) + "***@" + payload.to.split("@")[1],
           topic: payload.topic,
-          resendId: data.id,
+          resendId: data.data.id,
           latencyMs: Date.now() - start,
         });
 
         return {
           success: true,
-          id: data.id,
+          id: data.data.id,
           mode: "resend",
           message: `Live alert dispatched via Resend to ${payload.to}`,
           previewHtml: html,

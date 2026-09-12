@@ -8,12 +8,6 @@ export default function SentinelDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.info(
-      "%c[Security Note]%c We are fingerprinting (with our middle finger 🖕) against session hijacking by binding your session to your User-Agent. After the hackathon, we will have a revoke session functionality directly in this dashboard.",
-      "color: #ef4444; font-weight: bold;",
-      "color: inherit;"
-    );
-
     // In a real app we would fetch from /api/admin/stats which reads from D1 rock_events
     setTimeout(() => {
       setData({

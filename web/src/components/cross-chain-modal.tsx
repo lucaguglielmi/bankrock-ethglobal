@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/auth-context";
 import { useWallets } from "@privy-io/react-auth";
+import { useBalance, useReadContract } from "wagmi";
+import { erc20Abi, formatUnits } from "viem";
 import { 
   X, 
   ExternalLink, 
@@ -122,10 +124,41 @@ function CrossChainModalInner({
 
   const selectedChain = SOURCE_CHAINS[selectedChainId];
 
-  // User simulated source balances for demo feel
-  const mockBalances: Record<DepositTokenType, number> = {
-    USDC: 850.0,
-    ETH: 1.25,
+  const { data: ethBalanceData } = useBalance({
+    address: address as `0x${string}`,
+    chainId: selectedChainId,
+  });
+
+  const USDC_ADDRESSES: Record<number, `0x${string}`> = {
+    1: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", // Mainnet
+    10: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", // OP
+    137: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", // Polygon
+    8453: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // Base
+    42161: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // Arbitrum
+  };
+
+  const { data: usdcBalanceRaw } = useReadContract({
+    address: USDC_ADDRESSES[selectedChainId],
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: address ? [address as `0x${string}`] : undefined,
+    chainId: selectedChainId,
+    query: {
+      enabled: !!address,
+    },
+  });
+
+  const ethBalance = ethBalanceData 
+    ? Number(formatUnits(ethBalanceData.value, ethBalanceData.decimals)) 
+    : 0;
+    
+  const usdcBalance = usdcBalanceRaw !== undefined
+    ? Number(formatUnits(usdcBalanceRaw as bigint, 6))
+    : 0;
+
+  const realBalances: Record<DepositTokenType, number> = {
+    USDC: authenticated ? usdcBalance : 0,
+    ETH: authenticated ? ethBalance : 0,
   };
 
   const parsedAmount = parseFloat(amount) || 0;
@@ -410,7 +443,7 @@ function CrossChainModalInner({
 
               {/* Quick Amount Presets */}
               <div className="flex justify-between items-center mt-2 text-xs text-neutral-500">
-                <span>Available: {mockBalances[token]} {token}</span>
+                <span>Available: {realBalances[token]} {token}</span>
                 <div className="flex gap-1.5">
                   {token === "USDC" ? (
                     <>
