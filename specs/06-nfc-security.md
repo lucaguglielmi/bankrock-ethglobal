@@ -79,7 +79,9 @@ It must not reveal:
 - activation secret;
 - authentication material;
 - personal email or social identity;
-- private gift message before acceptance;
+- private gift message — a public scan never carries it. Only its `keccak256` is on chain, and
+  reading the text needs a Privy token; the rock page asks for it only for the **named recipient**,
+  who is shown it on the screen they claim from (spec 02 Flow E step 2);
 - server authorization tokens.
 
 ## Ownership and possession

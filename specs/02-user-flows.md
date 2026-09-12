@@ -113,14 +113,31 @@ otherwise. **A recipient must be named** — the app issues no open gifts.
    have an owner swap pre-signed for them.*
 2. `initiateHandover(rockId, recipient, expiresAt, messageHash)` goes out as a sponsored
    UserOperation from the Rock Account. Only the message *hash* is on chain; the text is stored
-   off-chain and shown after the claim.
+   off-chain and is shown **to the named recipient, on the rock page, from the moment they are
+   signed in** — the screen they are standing in front of when they decide whether to claim.
 3. **In the same interaction, the giver pre-signs the Safe owner swap.** They are online and are
    still the Safe's only owner, which is the one moment that signature can be produced:
    `Safe.swapOwner(SENTINEL, giver, recipient)`. The signed UserOperation is stored server-side
    until the claim. It is one-shot, and cancelling the handover discards it — a cancelled gift
    whose owner-swap operation survived would be a live path to hand the account away.
+
+   Two things make this half real rather than hoped for:
+
+   - **the store is part of the gift's success condition.** The giver's sheet awaits it and then
+     confirms it with `GET /api/rocks/[id]/pending-userop` before it says the gift is waiting. A
+     gift whose key was not stored is one the claim route refuses forever, and the giver is the
+     only person who can sign another — so the sheet says so instead, and offers **"Sign the
+     handover key again"**, which re-prepares and re-stores the swap and never re-opens the
+     handover on chain;
+   - **the stored operation is validated by the bundler before it is kept.** Everything the store
+     route can check by itself is public, so `eth_estimateUserOperationGas` is asked whether the
+     operation really validates — a signature is the one thing a stranger cannot forge. A refusal,
+     or a bundler that cannot be reached, stores nothing.
 4. Recipient physically receives and taps the rock.
-5. Recipient signs in through Privy (email, passkey or social).
+5. Recipient signs in through Privy (email, passkey or social). **The tap is held, not spent,
+   until they do.** Verifying a tap consumes its counter, and an attestation with no `subject`
+   claims nothing, so on a rock waiting to be claimed a signed-out visitor's tap is verified only
+   after sign-in — one tap, in the order this flow states.
 6. The verifier checks the SDM CMAC, advances the counter, and signs an attestation naming the
    recipient as `subject`. `smartAccount` is the account the registry already holds for this rock,
    and **the claim binds it** — `claimHandover` writes `rock.smartAccount = att.smartAccount`
@@ -140,6 +157,15 @@ otherwise. **A recipient must be named** — the app issues no open gifts.
    already answers to `att.subject`, and reverts `AccountDoesNotAnswerToOwner` otherwise — which
    is what makes step 7's ordering an invariant for every caller, not a convention of this route.
    **Gas is sponsored end to end**: the recipient pays nothing and needs no native tokens.
+
+   **The claim is judged by its receipt, like the swap before it.** A node accepting the
+   transaction is not a claim: `claimHandover` can still revert — a slow mempool past
+   `att.deadline`, an account that stopped answering — and the recipient reads this answer as
+   "This rock is yours". So the route waits for the receipt and only `status: success` counts; a
+   revert, or a transaction that never mines, is reported UNAVAILABLE and names the transaction.
+   The relayed transaction is also **priced inside the amount reserved against
+   `RELAYER_DAILY_CAP_WEI`** (`gas * maxFeePerGas <=` the reservation), and a base fee that does
+   not fit under that ceiling refuses the attempt rather than overspending the cap.
 9. The account address, its assets and its Aqua maker identity remain completely stable. The
    strategies stay shipped; nothing is docked and re-shipped. **The recipient's owner actions —
    give, retire, ship, cash in, mark lost — work from the app straight away and stay sponsored,

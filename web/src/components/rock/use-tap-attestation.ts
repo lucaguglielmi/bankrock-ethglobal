@@ -10,12 +10,14 @@
  * Verifying a tap *consumes its counter*, so the call may happen only once and it must happen at
  * the moment its result is most useful:
  *
- *  - on a dormant rock opened by a signed-out visitor the call is **held**. Awakening needs an
- *    attestation bound to the visitor's wallet, and only the same single verification can produce
- *    one — so the page says "tap detected, sign in to awaken" and runs the one verification after
- *    sign-in, with `subject` known;
- *  - everywhere else (an awake rock, a handover, a signed-in visitor) it runs as soon as the
+ *  - on a **dormant** rock or a rock **waiting to be claimed**, opened by a signed-out visitor,
+ *    the call is **held**. Awakening and claiming both need an attestation bound to the visitor's
+ *    wallet, and only the same single verification can produce one — so the page says "tap
+ *    detected, sign in first" and runs the one verification after sign-in, with `subject` known;
+ *  - everywhere else (an awake rock, an archived one, a signed-in visitor) it runs as soon as the
  *    rock's state and the signed-in wallet are known.
+ *
+ * `tap-gate.ts` decides which of those it is, and says why.
  *
  * The verifier also says which rock the tag really belongs to (`effectiveRockId`) and how it
  * decided (`resolution`). When that differs from the URL the page navigates there, and the answer
@@ -27,6 +29,7 @@ import { verifyNtagSignature } from "@/actions/verify-ntag";
 import type { AttestationResult } from "@/lib/nfc/attestation";
 import { sameAddress } from "@/components/rock/util";
 import { recallTap, rememberTap } from "@/components/rock/tap-store";
+import type { TapGate } from "@/components/rock/tap-gate";
 
 export interface TapParams {
   e?: string;
@@ -42,12 +45,9 @@ export interface TapParams {
  */
 export type TapResolution = "bound" | "url" | "next_free" | "registry_unavailable";
 
-/**
- * `wait`   — not enough is known yet to spend the tap.
- * `hold`   — deliberately not verified: sign-in must come first (dormant rock, signed-out visitor).
- * `verify` — run the single verification now.
- */
-export type TapGate = "wait" | "hold" | "verify";
+/** The gate itself lives in `tap-gate.ts`, which is pure and unit-tested. */
+export type { TapGate, TapGateInput } from "@/components/rock/tap-gate";
+export { tapGateFor, tapNeedsSubject } from "@/components/rock/tap-gate";
 
 export type TapAttestation =
   /** The page was opened without tap parameters — a link, a bookmark, a share. */

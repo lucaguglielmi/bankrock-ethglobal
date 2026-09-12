@@ -62,6 +62,12 @@ import {
 } from "@/lib/rock-account";
 import { useAuth } from "@/context/auth-context";
 import { publicReasonWith } from "@/lib/errors";
+import {
+  handoverKeyFromPendingResponse,
+  OPEN_GIFT_HAS_NO_KEY_REASON,
+  UNCONFIRMED_HANDOVER_KEY_REASON,
+  type HandoverKeyResult,
+} from "@/lib/handover-key";
 
 export type { SignedAttestation } from "@/lib/rock-account";
 
@@ -76,12 +82,28 @@ export interface UseRockActions {
     rockId: string,
     attestation: SignedAttestation,
   ): Promise<Capability<{ txHash: Hex; smartAccount: Address }>>;
+  /**
+   * Flow E steps 1-3. One interaction, two things: the handover on chain, and the pre-signed Safe
+   * owner swap the recipient cannot produce for themselves.
+   *
+   * `handoverKey` is the second one, confirmed against the server rather than assumed — a gift
+   * whose key was not stored is refused by the claim route forever, so it is part of the success
+   * condition and never a silent side effect.
+   */
   initiateHandover(
     rockId: string,
     recipient: Address | null,
     expiresAt: number,
     message?: string,
-  ): Promise<Capability<{ txHash: Hex }>>;
+  ): Promise<Capability<{ txHash: Hex; handoverKey: HandoverKeyResult }>>;
+  /**
+   * Signs and stores the hand-over key again for a gift that is **already on chain**.
+   *
+   * The repair path for `initiateHandover` returning a REAL receipt with an UNAVAILABLE
+   * `handoverKey`. It never touches the registry: the handover is open, and opening it twice would
+   * be a second transaction for an event that has already happened.
+   */
+  storeHandoverKey(rockId: string, recipient: Address): Promise<HandoverKeyResult>;
   claimHandover(rockId: string, attestation: SignedAttestation): Promise<Capability<{ txHash: Hex }>>;
   cancelHandover(rockId: string): Promise<Capability<{ txHash: Hex }>>;
   archiveRock(rockId: string): Promise<Capability<{ txHash: Hex }>>;
@@ -451,50 +473,97 @@ export function useRockActions(): UseRockActions {
 
   const initiateHandover = useCallback(
     (rockId: string, recipient: Address | null, expiresAt: number, message?: string) =>
-      withPending(async () => {
-        const id = parseRockId(rockId);
-        if (id === null) return unavailable(`"${rockId}" is not a rock id`);
-        if (!Number.isInteger(expiresAt) || expiresAt * 1000 <= Date.now()) {
-          return unavailable("The handover expiry must be in the future");
-        }
+      withPending(
+        async (): Promise<Capability<{ txHash: Hex; handoverKey: HandoverKeyResult }>> => {
+          const id = parseRockId(rockId);
+          if (id === null) return unavailable(`"${rockId}" is not a rock id`);
+          if (!Number.isInteger(expiresAt) || expiresAt * 1000 <= Date.now()) {
+            return unavailable("The handover expiry must be in the future");
+          }
+          if (registry.state === "UNAVAILABLE") return unavailable(registry.reason);
+          if (!authenticated || !activeWallet) return unavailable(SIGNED_OUT_REASON);
 
-        const messageHash = messageHashFor(message);
-        const result = await sendFromRockAccount(
+          // One client for both halves of the gift. It is the account the registry names, checked
+          // against this wallet (D-037) — and re-reading it between the two halves would ask the
+          // registry about a rock whose state the first half has just changed.
+          const owner = await ownerClientFor(rockId);
+          if (owner.state === "UNAVAILABLE") return unavailable(owner.reason);
+          const { client, smartAccount } = owner.value;
+
+          const messageHash = messageHashFor(message);
+          let txHash: Hex;
+          try {
+            txHash = await client.sendTransaction({
+              to: registry.value,
+              data: encodeInitiateHandover(id, recipient, expiresAt, messageHash),
+              value: BigInt(0),
+            });
+          } catch (err) {
+            return unavailable(publicReasonWith("The gift was not created", err));
+          }
+
+          const token = await getAccessToken();
+
+          // The gift message itself never goes on chain — only its hash does. Store the plaintext
+          // so the recipient can read it. Bookkeeping: the gift is already on chain, and a failed
+          // note must not be reported as a failed gift.
+          if (message && message.trim() !== "") {
+            void storeHandoverMessage(rockId, messageHash, message.trim(), token);
+          }
+
+          // Flow E step 3: pre-sign the Safe owner swap now, while the giver is online and still
+          // owns the Safe. This is the one moment that signature can exist, and a gift without it
+          // is refused by the claim route forever — so it is awaited, confirmed, and reported.
+          const handoverKey = recipient
+            ? await storeAndConfirmHandoverKey({
+                rockId,
+                recipient,
+                currentOwner: getAddress(activeWallet.address),
+                smartAccount,
+                client,
+                token,
+              })
+            : unavailable<{ confirmed: true }>(OPEN_GIFT_HAS_NO_KEY_REASON);
+
+          return real({ txHash, handoverKey });
+        },
+      ),
+    [
+      withPending,
+      registry,
+      authenticated,
+      activeWallet,
+      ownerClientFor,
+      getAccessToken,
+    ],
+  );
+
+  /**
+   * Repairs a gift whose hand-over key was never stored, without touching the registry.
+   *
+   * The handover itself is on chain and must not be opened twice — `initiateHandover` again would
+   * be a second transaction for an event that has already happened, and on a rock that is already
+   * `handover_pending` the registry would refuse it anyway. This re-prepares, re-signs and
+   * re-stores only the Safe owner swap, and confirms it the same way.
+   */
+  const storeHandoverKey = useCallback(
+    (rockId: string, recipient: Address) =>
+      withPending(async (): Promise<HandoverKeyResult> => {
+        if (!authenticated || !activeWallet) return unavailable(SIGNED_OUT_REASON);
+
+        const owner = await ownerClientFor(rockId);
+        if (owner.state === "UNAVAILABLE") return unavailable(owner.reason);
+
+        return storeAndConfirmHandoverKey({
           rockId,
-          encodeInitiateHandover(id, recipient, expiresAt, messageHash),
-        );
-        if (result.state === "UNAVAILABLE") return unavailable(result.reason);
-
-        const token = await getAccessToken();
-
-        // The gift message itself never goes on chain — only its hash does. Store the plaintext
-        // so the recipient can read it after claiming.
-        if (message && message.trim() !== "") {
-          void storeHandoverMessage(rockId, messageHash, message.trim(), token);
-        }
-
-        // Flow E step 7: pre-sign the Safe owner swap now, while the giver is online and still
-        // owns the Safe. Only possible for a named recipient; an open handover has no address to
-        // sign for, and the registry claim still works without it.
-        if (recipient && activeWallet) {
-          void storeOwnerSwapUserOp({
-            rockId,
-            recipient,
-            currentOwner: getAddress(activeWallet.address),
-            smartAccount: result.value.smartAccount,
-            build: async () => {
-              const owner = await ownerClientFor(rockId);
-              return owner.state === "UNAVAILABLE"
-                ? unavailable(owner.reason)
-                : real(owner.value.client);
-            },
-            token,
-          });
-        }
-
-        return real({ txHash: result.value.txHash });
+          recipient,
+          currentOwner: getAddress(activeWallet.address),
+          smartAccount: owner.value.smartAccount,
+          client: owner.value.client,
+          token: await getAccessToken(),
+        });
       }),
-    [withPending, sendFromRockAccount, getAccessToken, activeWallet, ownerClientFor],
+    [withPending, authenticated, activeWallet, ownerClientFor, getAccessToken],
   );
 
   const claimHandover = useCallback(
@@ -706,6 +775,7 @@ export function useRockActions(): UseRockActions {
   return {
     awaken,
     initiateHandover,
+    storeHandoverKey,
     claimHandover,
     cancelHandover,
     archiveRock,
@@ -791,12 +861,20 @@ async function findShippedStream(params: {
 /* -------------------------------------------------------------------------- */
 /* Side-channel writes                                                         */
 /*                                                                             */
-/* None of these can fail the on-chain action that preceded it: the rock has    */
-/* already changed state on chain, and a failed bookkeeping write must not be   */
-/* reported to the user as a failed transaction. They log and move on.          */
+/* Bookkeeping — the tag binding, the gift note — cannot fail the on-chain      */
+/* action that preceded it: the rock has already changed state on chain, and a  */
+/* failed bookkeeping write must not be reported as a failed transaction.       */
+/*                                                                             */
+/* The hand-over key below is **not** bookkeeping, and treating it as such is   */
+/* defect A2. It is the second half of the gift: without it the claim route     */
+/* refuses the gift forever, so it is awaited, confirmed, and reported.         */
 /* -------------------------------------------------------------------------- */
 
-async function post(path: string, body: unknown, token: string | null): Promise<boolean> {
+async function post(
+  path: string,
+  body: unknown,
+  token: string | null,
+): Promise<{ ok: boolean; reason?: string }> {
   try {
     const res = await fetch(path, {
       method: "POST",
@@ -806,9 +884,19 @@ async function post(path: string, body: unknown, token: string | null): Promise<
       },
       body: JSON.stringify(body),
     });
-    return res.ok;
+    if (res.ok) return { ok: true };
+    // The route's own reason, when it wrote one. Every reason these routes emit is chosen from a
+    // fixed set server-side (`lib/errors.ts`), so it is safe to show and it is the useful thing.
+    const answer = (await res.json().catch(() => ({}))) as { reason?: unknown; error?: unknown };
+    const reason =
+      typeof answer.reason === "string"
+        ? answer.reason
+        : typeof answer.error === "string"
+          ? answer.error
+          : undefined;
+    return { ok: false, reason };
   } catch {
-    return false;
+    return { ok: false };
   }
 }
 
@@ -838,27 +926,32 @@ async function discardOwnerSwapUserOp(rockId: string, token: string | null) {
 }
 
 /**
- * Prepares and signs the Safe owner swap, then stores it for the claim route.
+ * Prepares and signs the Safe owner swap, stores it, and confirms the server really has it
+ * (Flow E step 3, defect A2).
  *
- * UNTESTED against a live bundler: it needs a Pimlico key and a deployed registry, neither of
- * which exists in this environment. The failure mode is contained — the gift itself is already on
- * chain, and a missing owner swap leaves the Safe with its old owner, which the recipient sees as
- * "the rock is yours, its account is still being handed over" rather than as a lost asset.
+ * This used to be `void`-ed and to swallow every failure in a bare `catch {}`. Everything it can
+ * fail at — no Pimlico key, a paymaster that will not sponsor, a wallet that will not sign, a 503
+ * from the store — ended with the giver reading "The gift is waiting" and the claim route
+ * refusing that gift forever, with the one person who could re-sign it already gone.
+ *
+ * So it is awaited, and "stored" is not taken on trust: the POST's 200 says the row was written,
+ * and the GET says the row is there and is **mine**. Only the second answer is allowed to read as
+ * a gift that can be claimed.
+ *
+ * It never re-sends `initiateHandover`. The handover is on chain by the time this runs, and this
+ * is the half that is missing.
  */
-async function storeOwnerSwapUserOp(params: {
+async function storeAndConfirmHandoverKey(params: {
   rockId: string;
   recipient: Address;
   currentOwner: Address;
   smartAccount: Address;
-  build: () => Promise<Capability<SmartAccountClient>>;
+  client: SmartAccountClient;
   token: string | null;
-}) {
+}): Promise<HandoverKeyResult> {
+  let userOp: Record<string, string>;
   try {
-    const clientCapability = await params.build();
-    if (clientCapability.state === "UNAVAILABLE") return;
-    const client = clientCapability.value;
-
-    const prepared = await client.prepareUserOperation({
+    const prepared = await params.client.prepareUserOperation({
       calls: [
         {
           to: params.smartAccount,
@@ -867,22 +960,93 @@ async function storeOwnerSwapUserOp(params: {
         },
       ],
     });
-
-    const signature = await client.account.signUserOperation(prepared as never);
-
-    await post(
-      `/api/rocks/${encodeURIComponent(params.rockId)}/pending-userop`,
-      {
-        kind: "swap_owner",
-        recipient: params.recipient,
-        userOp: serialiseUserOp(prepared, signature),
-      },
-      params.token,
-    );
-  } catch {
-    // Reported through the claim route, which says the owner swap is unavailable rather than
-    // pretending it happened.
+    const signature = await params.client.account.signUserOperation(prepared as never);
+    userOp = serialiseUserOp(prepared, signature);
+  } catch (err) {
+    return unavailable(publicReasonWith("The hand-over key was not signed", err));
   }
+
+  const stored = await post(
+    `/api/rocks/${encodeURIComponent(params.rockId)}/pending-userop`,
+    { kind: "swap_owner", recipient: params.recipient, userOp },
+    params.token,
+  );
+  if (!stored.ok) {
+    return unavailable(
+      stored.reason ?? "The hand-over key could not be stored, so it was not saved",
+    );
+  }
+
+  return confirmHandoverKey(params.rockId, params.token);
+}
+
+/** Asks the server whether it holds this giver's hand-over key. The pure rule is `lib/handover-key`. */
+async function confirmHandoverKey(
+  rockId: string,
+  token: string | null,
+): Promise<HandoverKeyResult> {
+  try {
+    const res = await fetch(`/api/rocks/${encodeURIComponent(rockId)}/pending-userop`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const body = (await res.json().catch(() => ({}))) as Parameters<
+      typeof handoverKeyFromPendingResponse
+    >[1];
+    return handoverKeyFromPendingResponse(res.ok, body);
+  } catch {
+    return unavailable(UNCONFIRMED_HANDOVER_KEY_REASON);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* The gift message                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The note the giver left with a gift (Flow E step 2, defect B2).
+ *
+ * Only `keccak256(message)` is on chain; the text is stored off chain against that hash. It was
+ * stored and then shown nowhere — the only component that rendered it was a sheet that is mounted
+ * on no page — so every gift message written in this app has so far been invisible to the person
+ * it was written for.
+ *
+ * Reading it needs a Privy token, so this asks only when someone is signed in. An empty answer
+ * with no reason means the gift carried no note; a reason means the note could not be read. The
+ * two are never conflated (D-013).
+ */
+export function useHandoverMessage(rockId: string | undefined, enabled: boolean) {
+  const { authenticated, getAccessToken } = useAuth();
+  const active = Boolean(rockId) && rockId !== "new" && enabled && authenticated;
+
+  const query = useQuery({
+    queryKey: ["handover-message", String(rockId ?? "")],
+    enabled: active,
+    staleTime: 60_000,
+    retry: false,
+    queryFn: async (): Promise<{ message: string | null; reason: string | null }> => {
+      const token = await getAccessToken();
+      const res = await fetch(
+        `/api/rocks/${encodeURIComponent(String(rockId))}/handover-message`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      );
+      const body = (await res.json().catch(() => ({}))) as {
+        state?: string;
+        message?: string | null;
+        reason?: string;
+      };
+      if (res.ok && body.state === "REAL") {
+        return { message: body.message ?? null, reason: null };
+      }
+      return { message: null, reason: body.reason ?? "The gift message could not be read" };
+    },
+  });
+
+  return {
+    message: query.data?.message ?? null,
+    isLoading: active && query.isPending,
+    unavailableReason:
+      query.data?.reason ?? (query.error ? "The gift message could not be read" : null),
+  };
 }
 
 /* -------------------------------------------------------------------------- */

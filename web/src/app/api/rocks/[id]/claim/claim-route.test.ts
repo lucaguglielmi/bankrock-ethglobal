@@ -410,6 +410,7 @@ describe("when the broadcast itself fails", () => {
     submitClaimHandover.mockResolvedValue({
       state: "UNAVAILABLE",
       reason: "The claim was not broadcast: the network could not be reached",
+      broadcast: null,
     });
 
     const { status, body } = await post();
@@ -419,5 +420,46 @@ describe("when the broadcast itself fails", () => {
     expect(body.reason).not.toMatch(/http/i);
     // The swap did land, and the response says so rather than implying nothing happened.
     expect(body.rockAccountHandover).toEqual({ state: "REAL", txHash: `0x${"ef".repeat(32)}` });
+  });
+});
+
+/**
+ * B4: acceptance by a node is not a claim.
+ *
+ * `submitClaimHandover` now waits for the receipt, so a revert and a transaction that never mined
+ * both reach the route as failures — and both have already spent the relayer's gas, which the
+ * ledger must keep recording.
+ */
+describe("when the claim was broadcast but did not land", () => {
+  const CLAIM_TX = `0x${"cd".repeat(32)}`;
+
+  it("reports the revert, claims nothing, and keeps the spend on the ledger", async () => {
+    submitClaimHandover.mockResolvedValue({
+      state: "UNAVAILABLE",
+      reason: `the claim transaction reverted on chain (${CLAIM_TX}), so nothing was claimed`,
+      broadcast: { txHash: CLAIM_TX },
+    });
+
+    const { status, body } = await post();
+    expect(status).toBe(503);
+    expect(body.state).toBe("UNAVAILABLE");
+    expect(body.reason).toMatch(/reverted on chain/);
+    // The gas was spent, so releasing the reservation would let the day's cap be exceeded.
+    expect(releaseRelayerSpend).not.toHaveBeenCalled();
+    // And the transaction is named, because it is in a block and anyone can read it.
+    expect(body.claimTxHash).toBe(CLAIM_TX);
+  });
+
+  it("does not report a rock as claimed when the transaction has not been mined", async () => {
+    submitClaimHandover.mockResolvedValue({
+      state: "UNAVAILABLE",
+      reason: `the claim transaction ${CLAIM_TX} was broadcast but has not been mined yet`,
+      broadcast: { txHash: CLAIM_TX },
+    });
+
+    const { status, body } = await post();
+    expect(status).toBe(503);
+    expect(body.txHash).toBeUndefined();
+    expect(releaseRelayerSpend).not.toHaveBeenCalled();
   });
 });

@@ -21,15 +21,50 @@
  * with the registry claim and no Rock Account. The DID that stored the row is kept with it, and
  * only that DID may replace or delete it. The claim route reads it without a DID, because by then
  * the attestation has already proved the claim.
+ *
+ * ## Why the operation is simulated before it is stored
+ *
+ * First-writer-wins plus "the sender is the rock's account" is not enough on its own, and the two
+ * combine into a denial of service on the gift itself. Everything the route could check about a
+ * submitted operation was public — the rock id is in the URL and the Rock Account is in the
+ * registry — so any signed-in Privy account could store a row of nonsense against any rock, take
+ * the row's creator DID, and lock the real giver out with the 403 above. The recipient would then
+ * be handed a gift the claim route submits and fails on, with the one person who could repair it
+ * refused every time they tried.
+ *
+ * So two things are checked before a row is written, and both are stated with their limits:
+ *
+ *   1. **the operation must be the hand-over it claims to be.** Its `callData` has to contain
+ *      exactly `swapOwner(SENTINEL, <the rock's registered owner>, <the named recipient>)`, both
+ *      addresses taken from the registry and the body the route already validates. A row that does
+ *      not carry that call cannot become one by being stored;
+ *   2. **the bundler must accept it.** `eth_estimateUserOperationGas` runs the operation's
+ *      validation and execution without submitting or spending anything, so a malformed operation,
+ *      a spent nonce, an account with no code and a paymaster that will not sponsor are all caught
+ *      here rather than at the claim. Both ways of not getting an answer refuse (D-017): "the
+ *      bundler said no" and "the bundler could not be asked" are reported with different words,
+ *      and neither stores a row.
+ *
+ * **What this does not close:** ERC-4337 bundlers deliberately *skip signature validation* during
+ * estimation, so a well-formed squatted operation carrying a forged signature still passes step 2.
+ * It can no longer be an arbitrary operation — step 1 forces it to be this exact owner swap — but
+ * the giver can still be locked out of their own row by a stranger who gets there first. Closing
+ * that needs the caller's *wallet*, and a Privy token carries a DID, not an address. Recorded so
+ * it is a known residual rather than an assumed fix.
  */
 
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
+import { getAddress, isAddress } from "viem";
 import { requirePrivyIdentity } from "@/lib/auth/privy";
 import { getDb, NO_DATABASE_REASON } from "@/lib/db";
 import { pendingUserOps } from "@/lib/db/schema";
 import { consumeIpRateLimit } from "@/lib/rate-limit";
-import { parseRockId, readRock } from "@/lib/rock-account";
+import { encodeSwapOwner, parseRockId, readRock } from "@/lib/rock-account";
+import {
+  simulateSignedUserOp,
+  type SerializedUserOperation,
+} from "@/lib/rock-account.server";
 import { logger } from "@/lib/telemetry";
 
 const KINDS = new Set(["swap_owner"]);
@@ -123,6 +158,50 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       {
         state: "UNAVAILABLE",
         reason: "The operation's sender is not this rock's Rock Account",
+      },
+      { status: 409 },
+    );
+  }
+
+  // The operation must carry the one call this row is for. Both addresses come from the registry
+  // and from the body already checked above, never from the operation itself.
+  if (!isAddress(rock.value.owner, { strict: false })) {
+    return NextResponse.json(
+      { state: "UNAVAILABLE", reason: "This rock has no readable owner to hand over from" },
+      { status: 409 },
+    );
+  }
+  const expectedSwap = encodeSwapOwner(getAddress(rock.value.owner), getAddress(recipient))
+    .slice(2)
+    .toLowerCase();
+  const callData = typeof userOp.callData === "string" ? userOp.callData.toLowerCase() : "";
+  if (!callData.includes(expectedSwap)) {
+    logger.warn("Refused a pre-signed hand-over that is not this rock's owner swap", {
+      action: "PENDING_USEROP_WRONG_CALL",
+      rockId: id,
+    });
+    return NextResponse.json(
+      {
+        state: "UNAVAILABLE",
+        reason:
+          "The operation does not hand this rock's account to the named recipient, so it was not stored",
+      },
+      { status: 409 },
+    );
+  }
+
+  // The bundler is asked next: it is the only party that can run the operation.
+  const validated = await simulateSignedUserOp(userOp as unknown as SerializedUserOperation);
+  if (validated.state === "UNAVAILABLE") {
+    logger.warn("Refused a pre-signed hand-over the bundler would not accept", {
+      action: "PENDING_USEROP_REFUSED",
+      rockId: id,
+      reason: validated.reason,
+    });
+    return NextResponse.json(
+      {
+        state: "UNAVAILABLE",
+        reason: `The pre-signed Rock Account hand-over was not stored: ${validated.reason}`,
       },
       { status: 409 },
     );

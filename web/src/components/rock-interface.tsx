@@ -42,7 +42,8 @@ import { HandoverRock } from "@/components/rock/rock-handover";
 import { ArchivedRock } from "@/components/rock/rock-archived";
 import { RockSample } from "@/components/rock/rock-sample";
 import { OwnerMenu } from "@/components/rock/owner-menu";
-import { useTapAttestation, type TapGate } from "@/components/rock/use-tap-attestation";
+import { useTapAttestation } from "@/components/rock/use-tap-attestation";
+import { tapGateFor } from "@/components/rock/tap-gate";
 import { sameAddress } from "@/components/rock/util";
 
 export interface RockPageParams {
@@ -96,15 +97,17 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
 
   /*
    * Verifying a tap consumes its counter, so it happens once, at the moment its answer is worth
-   * the most. On a dormant rock that is after sign-in, when `subject` can be bound into the
-   * attestation that awakening needs; everywhere else it is as soon as the rock's state is known.
+   * the most: after sign-in wherever the attestation has to name a subject — a dormant rock, and a
+   * rock waiting to be claimed — and as soon as the rock's state is known everywhere else. The
+   * rule is `tap-gate.ts`, so the irreversible decision is stated in one tested place.
    */
   const rockResolved = record !== null || !isLoading;
-  const gate: TapGate = !ready || !rockResolved
-    ? "wait"
-    : record?.state === "dormant" && !authenticated
-      ? "hold"
-      : "verify";
+  const gate = tapGateFor({
+    ready,
+    rockResolved,
+    state: record?.state,
+    authenticated,
+  });
 
   const tap = useTapAttestation({
     rockId,
