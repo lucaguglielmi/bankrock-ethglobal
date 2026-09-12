@@ -6,7 +6,7 @@ export default function RockPage() {
     <main className="flex min-h-dvh flex-col bg-white text-ink pt-[var(--header-h)] pb-24">
       <Header />
       
-      <article className="mx-auto w-full max-w-4xl px-[var(--gutter)] pt-12 flex flex-col gap-16">
+      <article className="mx-auto w-full max-w-6xl px-[var(--gutter)] pt-12 flex flex-col gap-24">
         
         {/* Header */}
         <header className="flex flex-col gap-6 text-center items-center">
@@ -16,56 +16,63 @@ export default function RockPage() {
           </p>
         </header>
 
-        {/* Infographic Placeholder */}
-        <section className="w-full aspect-[4/3] bg-ink-4/10 rounded-3xl flex items-center justify-center border border-black/5 overflow-hidden relative">
-          <div className="text-ink-3 font-mono font-medium tracking-widest uppercase">
-            [ Infographic 1 Placeholder ]
-          </div>
-        </section>
-
         {/* Anatomy of the Rock */}
-        <section className="flex flex-col gap-8">
-          <h2 className="text-2xl font-bold">Anatomy of the Rock</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-ink-4/20 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 items-center">
+          <div className="flex flex-col gap-6 order-2 md:order-1">
+            <h2 className="text-3xl font-bold">Anatomy of the Rock</h2>
+            <div className="prose prose-lg text-ink-2">
+              <p>
+                Each Bank Rock is cast by hand, embedding a tiny passive NFC tag deep within the core. The tag carries a unique encrypted payload that links the physical object to its corresponding smart contract.
+              </p>
+              <p>
+                Because the tag contains no private keys, the rock cannot be &quot;hacked&quot; if stolen. It acts purely as a physical intent to awaken the digital account. We use <TooltipLink term="Privy" description="A toolkit for progressive authentication and embedded wallets." href="https://docs.privy.io/" /> to authenticate you seamlessly when you tap the rock with your phone.
+              </p>
+            </div>
+            
+            <div className="bg-ink-4/20 p-6 rounded-2xl border border-black/5 mt-4">
+              <p className="text-ink text-sm font-medium leading-relaxed">
+                <strong>Note on the Hackathon Demo:</strong> For the practicality of testing, there is currently only a single physical rock (affectionately named <em>Rock 420</em>) able to generate infinite virtual rock instances from its link. 
+                <br/><br/>
+                On mainnet, each rock link will be entirely unique, utilizing the more secure AWS KMS architecture.
+              </p>
+            </div>
+          </div>
+
+          <div className="order-1 md:order-2 flex flex-col gap-6">
+            <div className="w-full max-w-md aspect-[4/3] mx-auto bg-ink-4/10 rounded-3xl flex items-center justify-center relative overflow-hidden border border-black/5">
               <span className="text-ink-3 font-mono text-sm">[ Photo: Rock with Silicon & NFC tag ]</span>
             </div>
-            <div className="bg-ink-4/20 rounded-2xl aspect-square flex items-center justify-center relative overflow-hidden">
+            <div className="w-full max-w-md aspect-[4/3] mx-auto bg-ink-4/10 rounded-3xl flex items-center justify-center relative overflow-hidden border border-black/5">
               <span className="text-ink-3 font-mono text-sm">[ Photo: Finger with tag for size reference ]</span>
             </div>
           </div>
-          
-          <div className="prose prose-lg text-ink-2 max-w-none">
-            <p>
-              Each Bank Rock is cast by hand, embedding a tiny passive NFC tag deep within the core. The tag carries a unique encrypted payload that links the physical object to its corresponding smart contract.
-            </p>
-            <p>
-              Because the tag contains no private keys, the rock cannot be &quot;hacked&quot; if stolen. It acts purely as a physical intent to awaken the digital account. We use <TooltipLink term="Privy" description="A toolkit for progressive authentication and embedded wallets." href="https://docs.privy.io/" /> to authenticate you seamlessly when you tap the rock with your phone.
-            </p>
-          </div>
         </section>
 
-        {/* The Activation Flow (D2 Diagram Placeholder) */}
-        <section className="flex flex-col gap-8">
-          <h2 className="text-2xl font-bold">The Activation Flow</h2>
-          
-          <div className="w-full p-8 bg-ink-4/10 rounded-2xl border border-black/5 flex flex-col items-center justify-center min-h-[300px]">
-             {/* We can place the compiled D2 SVG here. Using animated dashed lines in D2 (e.g. d2 --animate) */}
-            <span className="text-ink-3 font-mono text-sm mb-4">[ D2 Animated Flow Diagram Placeholder ]</span>
-            <div className="text-sm text-ink-2 max-w-xl text-center">
-              Tap Rock &rarr; Resolve NFC Payload &rarr; Privy Auth &rarr; <TooltipLink term="Pimlico" description="An infrastructure provider for ERC-4337 smart accounts and paymasters." href="https://docs.pimlico.io/" /> Paymaster sponsors gas &rarr; Smart Account Ownership Transferred &rarr; Aqua Liquidity Initialized.
+        {/* The Activation Flow */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 items-center">
+          <div className="order-1 flex justify-center">
+            <div className="w-full max-w-md aspect-square rounded-3xl relative overflow-hidden bg-ink-4/10 border border-black/5 flex flex-col items-center justify-center p-8">
+              <span className="text-ink-3 font-mono text-sm mb-6 text-center">[ D2 Animated Flow Diagram Placeholder ]</span>
+              <div className="text-sm text-ink-2 text-center max-w-xs">
+                Tap Rock &rarr; Resolve NFC Payload &rarr; Privy Auth &rarr; Paymaster sponsors gas &rarr; Account Transferred.
+              </div>
             </div>
           </div>
-        </section>
 
-        {/* Practicality Note */}
-        <section className="bg-ink-4/20 p-8 rounded-2xl border border-black/5 mt-8">
-          <p className="text-ink text-sm font-medium leading-relaxed">
-            <strong>Note on the Hackathon Demo:</strong> For the practicality of testing and demoing, there is currently only a single physical rock (affectionately named <em>Rock 420</em>) able to generate infinite virtual rock instances from its link. 
-            <br/><br/>
-            On mainnet, each rock link will be entirely unique, utilizing the more secure AWS KMS architecture already documented for our post-hackathon plans.
-          </p>
+          <div className="flex flex-col gap-6 order-2">
+            <h2 className="text-3xl font-bold">The Activation Flow</h2>
+            <div className="prose prose-lg text-ink-2">
+              <p>
+                Tapping the rock initiates a secure handshake between the physical world and the blockchain. The NFC payload is resolved via our backend, and you are prompted to log in with <TooltipLink term="Privy" description="Embedded wallet infrastructure." href="https://docs.privy.io/" />.
+              </p>
+              <p>
+                Once authenticated, a <TooltipLink term="Pimlico" description="An infrastructure provider for ERC-4337 smart accounts and paymasters." href="https://docs.pimlico.io/" /> paymaster sponsors the transaction fees, transferring ownership of the Rock&apos;s smart account to your new wallet address.
+              </p>
+              <p>
+                The entire process takes seconds and requires absolutely no ETH for gas.
+              </p>
+            </div>
+          </div>
         </section>
 
       </article>

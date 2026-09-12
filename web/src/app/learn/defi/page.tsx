@@ -1,12 +1,13 @@
 import { TooltipLink } from "@/components/ui/tooltip-link";
 import { Header } from "@/components/header";
+import Image from "next/image";
 
 export default function DefiPage() {
   return (
     <main className="flex min-h-dvh flex-col bg-white text-ink pt-[var(--header-h)] pb-24">
       <Header />
       
-      <article className="mx-auto w-full max-w-4xl px-[var(--gutter)] pt-12 flex flex-col gap-16">
+      <article className="mx-auto w-full max-w-6xl px-[var(--gutter)] pt-12 flex flex-col gap-24">
         
         {/* Header */}
         <header className="flex flex-col gap-6 text-center items-center">
@@ -16,53 +17,69 @@ export default function DefiPage() {
           </p>
         </header>
 
-        {/* Infographic Placeholder */}
-        <section className="w-full aspect-[4/3] bg-ink-4/10 rounded-3xl flex items-center justify-center border border-black/5 overflow-hidden relative">
-          <div className="text-ink-3 font-mono font-medium tracking-widest uppercase">
-            [ Infographic 2 Placeholder ]
+        {/* Section 1: Aqua / Shared Liquidity (Infographic 1) */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 items-center">
+          <div className="flex flex-col gap-6 order-2 md:order-1">
+            <h2 className="text-3xl font-bold">Liquid Intelligence</h2>
+            <div className="prose prose-lg text-ink-2">
+              <p>
+                Bank Rock runs entirely on the <TooltipLink term="1inch Aqua Protocol" description="A shared liquidity layer allowing a single token balance to supply multiple strategies simultaneously." href="https://1inch.com/aqua/" />. Instead of depositing funds into isolated pools, the Rock Account retains full custody of its tokens. 
+              </p>
+              <p>
+                Aqua tracks virtual allowances, executing trades peer-to-peer. A single central asset is shared across multiple strategies without being fragmented, maximizing capital efficiency.
+              </p>
+            </div>
+          </div>
+          <div className="order-1 md:order-2 flex justify-center">
+            <div className="w-full max-w-md aspect-square rounded-3xl relative overflow-hidden shadow-xl bg-white border border-black/5">
+              <Image src="/infographics/why_aqua.jpg" alt="Shared Liquidity Schema" fill className="object-cover" />
+            </div>
           </div>
         </section>
 
-        {/* The Setup */}
-        <section className="flex flex-col gap-8">
-          <h2 className="text-2xl font-bold">Smart Account Architecture</h2>
-          
-          <div className="prose prose-lg text-ink-2 max-w-none">
-            <p>
-              When a rock is awakened, a <TooltipLink term="Privy Wallet" description="An embedded, self-custodial wallet tied to your social login or email." href="https://docs.privy.io/" /> is generated. This wallet acts as the controlling signer for the physical object. 
-            </p>
-            <p>
-              The rock itself is represented by an <TooltipLink term="ERC-4337 Smart Account" description="A smart contract that acts as a user's wallet, enabling advanced features like gas sponsorship and session keys." href="https://eips.ethereum.org/EIPS/eip-4337" />. This ensures the rock&apos;s identity and asset address remain stable even if the human owner (the Privy signer) changes. We use a <TooltipLink term="Paymaster" description="A service that pays for transaction gas fees on behalf of users." href="https://docs.pimlico.io/paymaster" /> to make the entire awakening process gasless.
-            </p>
+        {/* Section 2: Architecture Setup (Infographic 2 Placeholder) */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 items-center">
+          <div className="order-1 flex justify-center">
+            <div className="w-full max-w-md aspect-square rounded-3xl relative overflow-hidden bg-ink-4/10 border border-black/5 flex items-center justify-center">
+              <span className="text-ink-3 font-mono font-medium tracking-widest uppercase text-center px-4">
+                [ Infographic 2 Placeholder ]<br/>
+                <span className="text-xs mt-2 block">How Aqua works inside Bank Rock</span>
+              </span>
+            </div>
           </div>
-
-          <div className="w-full p-8 bg-ink-4/10 rounded-2xl border border-black/5 flex flex-col items-center justify-center min-h-[250px]">
-             {/* D2 Placeholder */}
-            <span className="text-ink-3 font-mono text-sm mb-4">[ D2 Diagram: Architecture Setup Placeholder ]</span>
-          </div>
-        </section>
-
-        {/* Infographic 3 Placeholder */}
-        <section className="w-full aspect-[4/3] bg-ink-4/10 rounded-3xl flex items-center justify-center border border-black/5 overflow-hidden relative mt-8">
-          <div className="text-ink-3 font-mono font-medium tracking-widest uppercase">
-            [ Infographic 3 Placeholder - The Stack ]
+          <div className="flex flex-col gap-6 order-2">
+            <h2 className="text-3xl font-bold">Smart Account Architecture</h2>
+            <div className="prose prose-lg text-ink-2">
+              <p>
+                When a rock is awakened, a <TooltipLink term="Privy Wallet" description="An embedded, self-custodial wallet tied to your social login or email." href="https://docs.privy.io/" /> is generated to act as the controlling signer. 
+              </p>
+              <p>
+                The rock itself is an <TooltipLink term="ERC-4337 Smart Account" description="A smart contract acting as a wallet, enabling gas sponsorship and session keys." href="https://eips.ethereum.org/EIPS/eip-4337" />. We use a <TooltipLink term="Paymaster" description="A service that pays for transaction gas fees on behalf of users." href="https://docs.pimlico.io/paymaster" /> to make the entire awakening process completely gasless for the user.
+              </p>
+            </div>
           </div>
         </section>
 
-        {/* Aqua & Automation */}
-        <section className="flex flex-col gap-8">
-          <h2 className="text-2xl font-bold">Liquid Intelligence</h2>
-          
-          <div className="prose prose-lg text-ink-2 max-w-none">
-            <p>
-              Bank Rock runs entirely on the <TooltipLink term="1inch Aqua Protocol" description="A shared liquidity layer allowing a single token balance to supply multiple strategies simultaneously." href="https://1inch.com/aqua/" />. Instead of depositing funds into isolated pools, the Rock Account retains full custody of its tokens. Aqua merely tracks virtual allowances, executing trades peer-to-peer when a visitor taps the rock.
-            </p>
-            <p>
-              Because capital remains in the rock, we automatically deploy idle stablecoins into yield protocols like <TooltipLink term="Aave v3" description="A decentralized non-custodial liquidity protocol for earning interest on deposits." href="https://aave.com/" /> to earn passive yield.
-            </p>
-            <p>
-              To manage this complexity without bothering the user, we leverage <TooltipLink term="Gelato" description="A web3 automation network that executes smart contract functions reliably." href="https://www.gelato.network/" /> combined with <TooltipLink term="ERC-7579 Session Keys" description="A standard for modular smart accounts, allowing scoped permissions for automated agents." href="https://erc7579.com/" />. This allows the AI Oracle to automatically rebalance strategies and harvest yield securely, transforming the rock into an autonomous economic object.
-            </p>
+        {/* Section 3: The Stack (Infographic 3 Placeholder) */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 items-center">
+          <div className="flex flex-col gap-6 order-2 md:order-1">
+            <h2 className="text-3xl font-bold">Autonomous Agents</h2>
+            <div className="prose prose-lg text-ink-2">
+              <p>
+                Because capital remains in the rock, idle stablecoins are automatically deployed into yield protocols like <TooltipLink term="Aave v3" description="A decentralized non-custodial liquidity protocol." href="https://aave.com/" /> to earn passive yield.
+              </p>
+              <p>
+                To manage this complexity without bothering the user, we leverage <TooltipLink term="Gelato" description="A web3 automation network." href="https://www.gelato.network/" /> combined with <TooltipLink term="ERC-7579 Session Keys" description="A standard for modular smart accounts, allowing scoped permissions." href="https://erc7579.com/" />. This allows our AI Oracle to autonomously rebalance strategies and harvest yield securely.
+              </p>
+            </div>
+          </div>
+          <div className="order-1 md:order-2 flex justify-center">
+            <div className="w-full max-w-md aspect-square rounded-3xl relative overflow-hidden bg-ink-4/10 border border-black/5 flex items-center justify-center">
+              <span className="text-ink-3 font-mono font-medium tracking-widest uppercase text-center px-4">
+                [ Infographic 3 Placeholder ]<br/>
+                <span className="text-xs mt-2 block">The Automation Stack</span>
+              </span>
+            </div>
           </div>
         </section>
 
