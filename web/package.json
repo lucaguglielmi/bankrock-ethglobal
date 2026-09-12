@@ -21,6 +21,7 @@
     "@privy-io/wagmi": "^4.0.17",
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
+    "@stripe/stripe-js": "^9.16.0",
     "@tanstack/react-query": "^5.102.8",
     "@turf/turf": "^7.4.0",
     "@types/three": "^0.186.0",
