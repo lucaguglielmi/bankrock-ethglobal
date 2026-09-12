@@ -65,7 +65,7 @@ what the WP-2 live run proves, and that is the line that gets deleted when it do
 | K-1 | Sign-in and any wallet address on screen | 16 #1 | `NEXT_PUBLIC_PRIVY_APP_ID` is set and the origin and chain are configured in the Privy dashboard. |
 | K-2 | The "Verified Physical" badge | 16 #18, 06 | `NXP_MASTER_KEY` matches the key written to the tags. |
 | K-3 | An attestation for a verified tap | 16 #17, 09 D-026 | `ATTESTATION_SIGNER_PRIVATE_KEY` is set and its address is the registry's attester. A tap can verify without it; only the on-chain step is blocked. |
-| K-4 | Gift claims | 16 #30, #34, 09 D-027, D-032 | `RELAYER_PRIVATE_KEY` is set **and funded**, **and** `RELAYER_DAILY_CAP_WEI` is set to a non-zero whole number of wei. Either unset means claims are unavailable, never free and never uncapped. |
+| K-4 | Gift claims | 16 #30, #34, 09 D-027, D-032 | `RELAYER_PRIVATE_KEY` is set on the Worker (its address `0x767D…5430` is funded with 0.045 ETH since 2026-09-12), **and** `RELAYER_DAILY_CAP_WEI` is non-zero (committed as 0.05 ETH/day in `wrangler.jsonc`, D-034). Either unset means claims are unavailable, never free and never uncapped. |
 | K-5 | Any gas-sponsored operation | 16 #15 | A Pimlico key **and** a sponsorship policy for chain 11155111. Without the policy every UserOp is rejected. |
 | K-6 | The ETH faucet | 16 #16 | `FAUCET_PRIVATE_KEY` is set and funded. There is no default key. |
 | K-7 | Provenance, the fee log scan, Rock Account derivation | 16 #4, 09 D-036 | `SEPOLIA_RPC_URL` is set on the Worker. `https://ethereum-sepolia-rpc.publicnode.com` is a measured, working value (D-036); a keyed provider is the recommendation for demo day, not a condition. |
