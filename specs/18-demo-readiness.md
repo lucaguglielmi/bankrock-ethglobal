@@ -9,7 +9,7 @@ This document says **what is still missing, right now, to run the three-minute d
 
 State of the tree: branch `exit-from-demo-mode`, HEAD `11d6817` ("XYCSwap strategy encoding,
 taker periphery, tests and deploy script"), with an uncommitted working set. Uncommitted files are
-treated as real. `bash scripts/spec-checks.sh` runs 20 checks and is blocking in CI; run it before
+treated as real. `bash scripts/spec-checks.sh` runs 21 checks and is blocking in CI; run it before
 reading anything below as done, because an in-flight edit can turn one red.
 
 *(Sections 1, 3 and 6 were refreshed against that tree. Sections 2, 4 and 5 — operator blockers,
@@ -288,7 +288,7 @@ Per spec 15 Part 8, plus what Part 1 above adds:
 | # | Step | Done when |
 | --- | --- | --- |
 | 1 | `npm ci && npm run lint && npm run typecheck && npm test && npm run build` in `web/`; `npm test` in `contracts/`; `npm run build` in `mcp/` | all exit 0 from a clean checkout |
-| 2 | `bash scripts/spec-checks.sh`, and the CI run itself | all 20 checks pass. The job is blocking, as is the Playwright `e2e-responsive` matrix. `D-014*` and `D-015` are the two a judge can see |
+| 2 | `bash scripts/spec-checks.sh`, and the CI run itself | all 21 checks pass. The job is blocking, as is the Playwright `e2e-responsive` matrix. `D-014*` and `D-015` are the two a judge can see |
 | 3 | ~~Registry deployed and verified; `contracts/deployments/sepolia.json` committed~~ **done 2026-09-12** | `bash scripts/check-live.sh` shows code at the registry address |
 | 4 | ~~XYCSwap + XYCSwapTaker deployed~~ **done 2026-09-12**; one strategy shipped on a throwaway rock; one swap executed against it from a second account (the rehearsal script does both) | `Shipped` and `Pushed` events on Sepolia Etherscan, and `safeBalances` answering for the recomputed `strategyHash` |
 | 5 | Every Part 2 secret set **on the Worker `web`**; `NEXT_PUBLIC_DEMO_MODE=false` | deploy job green **and** `NEXT_PUBLIC_APP_VERSION` on `https://bank-rock.com` has changed — a green deploy to a surface no domain points at is the failure this catches (spec 12) |

@@ -721,7 +721,7 @@ working Aqua transaction or security model."* Phases 2, 3 and 4 are precisely th
 Mechanically checkable. **The static checks below are implemented in
 [`../scripts/spec-checks.sh`](../scripts/spec-checks.sh)**, which runs both this section and spec
 17 Part 7, prints the spec ID and PASS/FAIL for each, shows the offending lines on a failure, and
-exits non-zero if any check fails. There are **20 checks**, and they are expected to pass on
+exits non-zero if any check fails. There are **21 checks** (20 at the time of writing; D-034 was added on 2026-09-12), and they are expected to pass on
 every pull request.
 
 Three deviations from the literal greps here are implemented in the script and documented in its
