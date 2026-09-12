@@ -95,7 +95,7 @@ most dangerous category on this page, because it looks finished.
 
 | # | What | Spec | Fixed when |
 | --- | --- | --- | --- |
-| W-1 | `https://www.bank-rock.com` returns 308 to a literal `:path*` placeholder | 15 R-1, D-022, 12 §1 | The old Cloudflare redirect rule is **deleted**. The app now ships the redirect itself (`web/next.config.ts` matches the `www` host and 308s with the path substituted), but a dashboard rule is evaluated before the Worker, so the broken one still wins. **No tag may be programmed before `curl -sIL https://www.bank-rock.com` ends 200.** |
+| W-1 | `https://www.bank-rock.com/` (the bare root only) returns 308 to a literal `:path*` | 15 R-1, D-022, 12 §1 | **Diagnosed 2026-09-12 with the zone API: there is no dashboard redirect rule** (the zone has no dynamic-redirect ruleset). The 308 is the app's own `next.config.ts` redirect: the OpenNext adapter leaves `:path*` unsubstituted for the empty path, while `/rock/1` redirects correctly. Fixed by a dedicated root rule plus `/:path+`; deleted when `curl -sIL https://www.bank-rock.com/` ends 200 on the live site. |
 | W-2 | The CI responsive job configures no chain, so the two spec 17 Part 7 checks that need a live rock (items 7, 8) skip rather than run; the Lighthouse budget (item 10) is not run at all | 17 U4, 09 D-031 | That job's environment points at a deployed registry, and the Lighthouse budget is measured by hand against the public deployment. The static checks and the rest of the matrix are blocking today. |
 
 ---

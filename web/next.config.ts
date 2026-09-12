@@ -18,14 +18,16 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: Date.now().toString(),
   },
+  // www → apex (D-022). Two rules on purpose: with a single optional catch-all (`/:path*`) the
+  // OpenNext Cloudflare adapter substitutes nothing for the EMPTY path and answers the bare
+  // `https://www.bank-rock.com/` with the literal string `:path*` (observed live on 2026-09-12;
+  // `/rock/1` was substituted correctly). The root gets its own rule; the rest use `+`, which
+  // never matches empty.
   async redirects() {
+    const www = [{ type: 'host' as const, value: 'www.bank-rock.com' }];
     return [
-      {
-        source: '/:path*',
-        has: [{ type: 'host', value: 'www.bank-rock.com' }],
-        destination: 'https://bank-rock.com/:path*',
-        permanent: true,
-      },
+      { source: '/', has: www, destination: 'https://bank-rock.com/', permanent: true },
+      { source: '/:path+', has: www, destination: 'https://bank-rock.com/:path+', permanent: true },
     ]
   },
 };

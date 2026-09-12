@@ -350,8 +350,8 @@ These are dashboard or DNS actions, not env vars:
    The app id itself goes in the GitHub repository *variable* (§2.3.1), not the dashboard.
 2. **Pimlico dashboard** — create the API key; create a sponsorship policy for chain 11155111;
    restrict the public key by origin.
-3. **Cloudflare dashboard** — remove or fix the `www` redirect rule with the unsubstituted
-   `:path*` (R-1); the app now ships the redirect itself in `web/next.config.ts`, but a dashboard
+3. ~~**Cloudflare dashboard** — remove or fix the `www` redirect rule~~ — there was no such rule; the
+   literal `:path*` was the app's own redirect on the empty path, fixed in `web/next.config.ts` (2026-09-12).
    rule is evaluated first, so the broken one must go. Create the API token (§2.3.1) and set the
    Worker's secrets (§2.3.2). **Do not add anything to the Worker's *Variables* pane** — a deploy
    deletes it.
