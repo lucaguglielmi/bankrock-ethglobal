@@ -88,6 +88,11 @@ contract BankRockRegistry {
      * @notice Binds an NFC public key to a rock.
      */
     function bindNFC(uint256 rockId, bytes32 nfcPubKey) external {
+        Rock storage r = rocks[rockId];
+        if (!r.isAwake) revert RockNotAwakened(rockId);
+        if (msg.sender != r.currentOwner && msg.sender != r.smartAccount) {
+            revert UnauthorizedTapper(msg.sender, r.currentOwner);
+        }
         rockToNfcPubKey[rockId] = nfcPubKey;
     }
 
@@ -95,6 +100,11 @@ contract BankRockRegistry {
      * @notice Executes a trade.
      */
     function executeTrade(uint256 rockId, address tokenIn, address tokenOut, uint256 amountIn, bytes calldata routerPayload) external {
+        Rock storage r = rocks[rockId];
+        if (!r.isAwake) revert RockNotAwakened(rockId);
+        if (msg.sender != r.currentOwner && msg.sender != r.smartAccount) {
+            revert UnauthorizedTapper(msg.sender, r.currentOwner);
+        }
         emit TradeExecuted(rockId, tokenIn, tokenOut, amountIn);
     }
 

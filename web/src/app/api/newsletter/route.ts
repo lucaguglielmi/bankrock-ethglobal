@@ -97,32 +97,49 @@ export async function POST(req: Request) {
 
 /**
  * GET /api/newsletter
- * Retrieves subscriber statistics and list (used by MCP agent and internal dashboards).
+ * Retrieves aggregated subscriber statistics (used by MCP agent and internal dashboards).
+ * Zero PII is returned unless authenticated with an operator ADMIN_API_KEY.
  */
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const showFull = searchParams.get("admin") === "true";
+    const subscribers = Array.from(subscribersMap.values());
+    const count = subscribers.length;
 
-    const subscribersList = Array.from(subscribersMap.values()).map((sub) => {
-      if (showFull) {
-        return sub;
-      }
-      // Mask email for privacy when queried publicly
-      const [user, domain] = sub.email.split("@");
-      const maskedUser = user.length > 2 ? `${user.slice(0, 2)}***${user.slice(-1)}` : `${user.slice(0, 1)}***`;
-      return {
-        email: `${maskedUser}@${domain}`,
-        subscribedAt: sub.subscribedAt,
-        source: sub.source,
-      };
-    });
+    // Check for authorized operator token in Authorization header
+    const authHeader = req.headers.get("Authorization") || "";
+    const adminKey = process.env.ADMIN_API_KEY;
+    const isAuthorizedAdmin = Boolean(adminKey && authHeader === `Bearer ${adminKey}`);
 
+    const now = Date.now();
+    const recent24hCount = subscribers.filter(
+      (s) => now - new Date(s.subscribedAt).getTime() < 24 * 60 * 60 * 1000
+    ).length;
+
+    const sourceBreakdown: Record<string, number> = {};
+    for (const sub of subscribers) {
+      const src = sub.source || "landing_genesis_batch";
+      sourceBreakdown[src] = (sourceBreakdown[src] || 0) + 1;
+    }
+
+    // Operator view: Only if explicit ADMIN_API_KEY bearer token matches
+    if (isAuthorizedAdmin) {
+      return NextResponse.json({
+        success: true,
+        count,
+        recent24hCount,
+        sourceBreakdown,
+        subscribers,
+        lastUpdated: new Date().toISOString(),
+      });
+    }
+
+    // Public / MCP view: PII-free aggregated metrics only
     return NextResponse.json(
       {
         success: true,
-        count: subscribersMap.size,
-        subscribers: subscribersList,
+        count,
+        recent24hCount,
+        sourceBreakdown,
         lastUpdated: new Date().toISOString(),
       },
       {

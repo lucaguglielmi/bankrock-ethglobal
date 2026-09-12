@@ -143,13 +143,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "get_newsletter_subscribers",
-        description: "Queries subscriber counts and waitlist details for the Genesis Batch OG Bank Rock release.",
+        name: "get_waitlist_stats",
+        description: "Returns aggregate subscriber counts and demand metrics for the Genesis Batch OG Bank Rock release (privacy-preserving, zero PII).",
         inputSchema: {
           type: "object",
-          properties: {
-            admin: { type: "boolean", description: "Whether to return unmasked email addresses (for authorized operators)" },
-          },
+          properties: {},
           required: [],
         },
       },
@@ -452,9 +450,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
 
-    if (name === "get_newsletter_subscribers") {
-      const isAdmin = Boolean(args?.admin);
-      const res = await fetch(`${LIVE_API_URL}/api/newsletter?admin=${isAdmin}`);
+    if (name === "get_waitlist_stats") {
+      const res = await fetch(`${LIVE_API_URL}/api/newsletter`);
       const data = await res.json();
       return {
         content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
