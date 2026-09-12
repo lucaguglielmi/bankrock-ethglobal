@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { privateKeyToAccount } from "viem/accounts";
-import type { Hex } from "viem";
+import { zeroAddress, type Hex } from "viem";
 
 import { resetSharedMemoryCounterStore } from "./counter-store";
 import { aesCbcEncrypt } from "./crypto";
@@ -13,6 +13,7 @@ const UID = Buffer.from("04AABBCCDDEE80", "hex");
 const SIGNER_KEY = ("0x" + "11".repeat(32)) as Hex;
 const REGISTRY_KEY = ("0x" + "22".repeat(32)) as Hex;
 const SUBJECT_KEY = ("0x" + "33".repeat(32)) as Hex;
+const SMART_ACCOUNT_KEY = ("0x" + "44".repeat(32)) as Hex;
 
 /** Forge the (e, c) a provisioned tag would emit. SELF-GENERATED, test-only. */
 function tap(counter: number, key: Buffer = MASTER_KEY): { e: string; c: string } {
@@ -102,7 +103,9 @@ describe("fail closed", () => {
 describe("malformed input", () => {
   beforeEach(configureVerifier);
 
-  const cases: Array<[string, { e?: string; c?: string; enc?: string; subject?: string }]> = [
+  const cases: Array<
+    [string, { e?: string; c?: string; enc?: string; subject?: string; smartAccount?: string }]
+  > = [
     ["no parameters", {}],
     ["e only", { e: tap(1).e }],
     ["c only", { c: tap(1).c }],
@@ -115,6 +118,8 @@ describe("malformed input", () => {
     ["subject not an address", { e: tap(1).e, c: tap(1).c, subject: "0xnope" }],
     ["subject too short", { e: tap(1).e, c: tap(1).c, subject: "0x1234" }],
     ["subject not hex at all", { e: tap(1).e, c: tap(1).c, subject: "vitalik.eth" }],
+    ["smartAccount not an address", { e: tap(1).e, c: tap(1).c, smartAccount: "0xnope" }],
+    ["smartAccount too short", { e: tap(1).e, c: tap(1).c, smartAccount: "0x1234" }],
     ["empty strings", { e: "", c: "" }],
   ];
 
@@ -254,21 +259,44 @@ describe("attestation", () => {
     });
   });
 
-  it("signs when everything is configured, binding rockId, uid, counter and subject", async () => {
+  it("signs when everything is configured, binding every field", async () => {
     process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
     process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
     const subject = privateKeyToAccount(SUBJECT_KEY).address;
+    const smartAccount = privateKeyToAccount(SMART_ACCOUNT_KEY).address;
 
     const { e, c } = tap(7);
-    const outcome = await verifyTap({ rockId: "42", e, c, subject });
+    const outcome = await verifyTap({ rockId: "42", e, c, subject, smartAccount });
     expect(outcome.body.verified).toBe(true);
     expect(outcome.body.attestation).toMatchObject({
       state: "SIGNED",
       signer: privateKeyToAccount(SIGNER_KEY).address,
       primaryType: "Attestation",
       typeString:
-        "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)",
-      message: { rockId: "42", counter: 7, subject },
+        "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)",
+      message: { rockId: "42", counter: 7, subject, smartAccount },
+    });
+    const attestation = outcome.body.attestation;
+    expect(attestation?.state === "SIGNED" && Object.keys(attestation.message)).toEqual([
+      "rockId",
+      "uidHash",
+      "counter",
+      "deadline",
+      "subject",
+      "smartAccount",
+    ]);
+  });
+
+  it("signs the zero smartAccount for a claim that does not name one", async () => {
+    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
+    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+    const subject = privateKeyToAccount(SUBJECT_KEY).address;
+
+    const { e, c } = tap(7);
+    const outcome = await verifyTap({ rockId: "42", e, c, subject });
+    expect(outcome.body.attestation).toMatchObject({
+      state: "SIGNED",
+      message: { smartAccount: zeroAddress },
     });
   });
 

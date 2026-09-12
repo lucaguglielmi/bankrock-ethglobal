@@ -34,6 +34,12 @@ export interface VerifyNtagParams {
    * Absent: verification still runs, the attestation is `UNAVAILABLE`.
    */
   subject?: string;
+  /**
+   * The Rock Account this tap authorises, bound into the attestation so a
+   * front-runner cannot substitute a Safe they deployed. Optional: absent signs
+   * the zero address, which is right for a claim. An awakening must supply it.
+   */
+  smartAccount?: string;
   rockId?: string | number;
 }
 
@@ -86,6 +92,7 @@ export async function verifyNtagSignature(params: VerifyNtagParams): Promise<Ver
       c: params.c,
       enc: params.enc,
       subject: params.subject,
+      smartAccount: params.smartAccount,
     });
 
     const { body } = outcome;

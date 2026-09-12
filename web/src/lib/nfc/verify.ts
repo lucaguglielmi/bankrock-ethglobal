@@ -56,6 +56,15 @@ export interface VerifyTapInput {
    * Present but not an address: the whole request is `malformed_request`.
    */
   subject?: string;
+  /**
+   * The Rock Account this tap authorises, bound into the attestation so a
+   * front-runner cannot swap in a Safe they deployed.
+   *
+   * Optional. Absent signs the zero address, which is what a claim wants; an
+   * awakening must supply a real address. Present but not an address makes the
+   * whole request `malformed_request`.
+   */
+  smartAccount?: string;
 }
 
 export interface VerifyTapResponse {
@@ -108,6 +117,7 @@ export async function verifyTap(input: VerifyTapInput): Promise<VerifyTapOutcome
   const c = normaliseHexParam(input.c);
   const enc = normaliseHexParam(input.enc);
   const subject = normaliseHexParam(input.subject);
+  const smartAccount = normaliseHexParam(input.smartAccount);
 
   if (!e || !c || !isHex(e, PICC_DATA_LENGTH) || !isHex(c, SDM_MAC_LENGTH)) {
     return { status: 400, body: { verified: false, reason: "malformed_request" } };
@@ -116,6 +126,9 @@ export async function verifyTap(input: VerifyTapInput): Promise<VerifyTapOutcome
     return { status: 400, body: { verified: false, reason: "malformed_request" } };
   }
   if (subject !== undefined && !isAddress(subject, { strict: false })) {
+    return { status: 400, body: { verified: false, reason: "malformed_request" } };
+  }
+  if (smartAccount !== undefined && !isAddress(smartAccount, { strict: false })) {
     return { status: 400, body: { verified: false, reason: "malformed_request" } };
   }
 
@@ -166,6 +179,7 @@ export async function verifyTap(input: VerifyTapInput): Promise<VerifyTapOutcome
     uid: sdm.uid,
     counter: sdm.readCounter,
     subject,
+    smartAccount,
   });
 
   return {

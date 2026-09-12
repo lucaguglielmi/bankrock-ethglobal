@@ -2,7 +2,7 @@
  * Server-signed EIP-712 attestation for a verified physical tap.
  *
  * D-018: `awakenRock` and the claim path require an attestation bound to
- * `(rockId, uid, counter, subject)` with an expiry. F-5 replaces the previous
+ * `(rockId, uid, counter, subject, smartAccount)` with an expiry. F-5 replaces the previous
  * `verifiedPubKey = "0x" + e + c` string, which was neither a key nor a
  * signature. The struct definition below must match the registry contract
  * exactly.
@@ -11,14 +11,14 @@
  * struct. Attestation gates *claiming*, never *spending* (spec 06).
  */
 
-import { getAddress, isAddress, keccak256, type Address, type Hex } from "viem";
+import { getAddress, isAddress, keccak256, zeroAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 export const ATTESTATION_PRIMARY_TYPE = "Attestation" as const;
 
 /** The EIP-712 type string the registry must hash into its type hash. */
 export const ATTESTATION_TYPE_STRING =
-  "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)";
+  "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)";
 
 export const ATTESTATION_TYPES = {
   Attestation: [
@@ -27,6 +27,7 @@ export const ATTESTATION_TYPES = {
     { name: "counter", type: "uint32" },
     { name: "deadline", type: "uint256" },
     { name: "subject", type: "address" },
+    { name: "smartAccount", type: "address" },
   ],
 } as const;
 
@@ -69,6 +70,20 @@ export interface AttestationMessage {
    * a `subject` alone produces no signature.
    */
   subject: Address;
+  /**
+   * The Rock Account the tap authorises, checksummed, or the zero address.
+   *
+   * Without this field a front-runner who watches an attestation reach the
+   * mempool can bind the rock to a Safe they deployed: `subject` alone says who
+   * is credited, not which account the registry writes. Naming the smart
+   * account in the signed struct closes that.
+   *
+   * The zero address means "this attestation does not name one". Claims do not
+   * need a smart account and sign the zero address; an **awakening must supply
+   * a real one**, and the registry must reject a zero `smartAccount` on that
+   * path rather than treat it as a wildcard.
+   */
+  smartAccount: Address;
 }
 
 export type AttestationUnavailableReason =
@@ -77,6 +92,7 @@ export type AttestationUnavailableReason =
   | "registry_unconfigured"
   | "invalid_rock_id"
   | "missing_subject"
+  | "invalid_smart_account"
   | "signing_failed";
 
 export type AttestationResult =
@@ -104,6 +120,12 @@ export interface SignAttestationInput {
    * `UNAVAILABLE`, while verification itself still succeeds.
    */
   subject?: string;
+  /**
+   * The Rock Account this tap authorises. Optional: absent signs the zero
+   * address, which is correct for a claim. An awakening must pass a real
+   * address or a front-runner can substitute their own Safe.
+   */
+  smartAccount?: string;
   /** Override the clock, for tests. Unix seconds. */
   nowSeconds?: number;
 }
@@ -167,6 +189,15 @@ export async function signAttestation(input: SignAttestationInput): Promise<Atte
   }
   const subject = getAddress(input.subject);
 
+  // Defence in depth: `verifyTap` already 400s on a malformed value, so this
+  // only fires for a direct caller. Absent is legitimate and means "no account
+  // named" — the zero address, never a wildcard.
+  if (input.smartAccount !== undefined && !isAddress(input.smartAccount, { strict: false })) {
+    return { state: "UNAVAILABLE", reason: "invalid_smart_account" };
+  }
+  const smartAccount: Address =
+    input.smartAccount === undefined ? zeroAddress : getAddress(input.smartAccount);
+
   const counter = Math.trunc(input.counter);
   if (!Number.isFinite(counter) || counter < 0 || counter > UINT32_MAX) {
     return { state: "UNAVAILABLE", reason: "invalid_rock_id" };
@@ -196,6 +227,7 @@ export async function signAttestation(input: SignAttestationInput): Promise<Atte
         counter,
         deadline: BigInt(deadline),
         subject,
+        smartAccount,
       },
     });
 
@@ -212,6 +244,7 @@ export async function signAttestation(input: SignAttestationInput): Promise<Atte
         counter,
         deadline,
         subject,
+        smartAccount,
       },
     };
   } catch {

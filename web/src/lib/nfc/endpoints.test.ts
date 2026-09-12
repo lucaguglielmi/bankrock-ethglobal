@@ -6,7 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { privateKeyToAccount } from "viem/accounts";
-import type { Hex } from "viem";
+import { zeroAddress, type Hex } from "viem";
 
 import { GET, POST } from "@/app/api/nfc/verify/route";
 import { verifyNtagSignature } from "@/actions/verify-ntag";
@@ -20,6 +20,7 @@ const UID = Buffer.from("04AABBCCDDEE80", "hex");
 const SIGNER_KEY = ("0x" + "11".repeat(32)) as Hex;
 const REGISTRY_KEY = ("0x" + "22".repeat(32)) as Hex;
 const SUBJECT_KEY = ("0x" + "33".repeat(32)) as Hex;
+const SMART_ACCOUNT_KEY = ("0x" + "44".repeat(32)) as Hex;
 
 /** SELF-GENERATED, test-only: the (e, c) a provisioned tag would emit. */
 function tap(counter: number): { e: string; c: string } {
@@ -125,20 +126,35 @@ describe("GET /api/nfc/verify", () => {
     });
   });
 
-  it("signs an attestation bound to the subject when one is supplied", async () => {
+  it("400s on a smartAccount that is not an address", async () => {
+    const { e, c } = tap(7);
+    const response = await GET(
+      new Request(url({ rockId: "1", e, c, smartAccount: "0xnope" })),
+    );
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      verified: false,
+      reason: "malformed_request",
+    });
+  });
+
+  it("signs an attestation bound to the subject and smart account", async () => {
     process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
     process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
     const subject = privateKeyToAccount(SUBJECT_KEY).address;
+    const smartAccount = privateKeyToAccount(SMART_ACCOUNT_KEY).address;
 
     const { e, c } = tap(7);
-    const response = await GET(new Request(url({ rockId: "42", e, c, subject })));
+    const response = await GET(
+      new Request(url({ rockId: "42", e, c, subject, smartAccount })),
+    );
     const body = await response.json();
     expect(body.verified).toBe(true);
     expect(body.attestation).toMatchObject({
       state: "SIGNED",
       typeString:
-        "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)",
-      message: { rockId: "42", counter: 7, subject },
+        "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)",
+      message: { rockId: "42", counter: 7, subject, smartAccount },
     });
     expect(Object.keys(body.attestation.message)).toEqual([
       "rockId",
@@ -146,7 +162,19 @@ describe("GET /api/nfc/verify", () => {
       "counter",
       "deadline",
       "subject",
+      "smartAccount",
     ]);
+  });
+
+  it("signs the zero smart account when none is supplied", async () => {
+    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
+    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+    const subject = privateKeyToAccount(SUBJECT_KEY).address;
+
+    const { e, c } = tap(7);
+    const response = await GET(new Request(url({ rockId: "42", e, c, subject })));
+    const body = await response.json();
+    expect(body.attestation.message.smartAccount).toBe(zeroAddress);
   });
 
   it("fails closed when NXP_MASTER_KEY is unset", async () => {
@@ -215,18 +243,41 @@ describe("verifyNtagSignature (server action)", () => {
     });
   });
 
-  it("passes subject through to the attestation", async () => {
+  it("passes subject and smartAccount through to the attestation", async () => {
     process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
     process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
     const subject = privateKeyToAccount(SUBJECT_KEY).address;
 
     const { e, c } = tap(7);
-    const result = await verifyNtagSignature({ rockId: "42", e, c, subject });
+    const smartAccount = privateKeyToAccount(SMART_ACCOUNT_KEY).address;
+    const result = await verifyNtagSignature({ rockId: "42", e, c, subject, smartAccount });
     expect(result.verified).toBe(true);
     expect(result.attestation).toMatchObject({
       state: "SIGNED",
-      message: { rockId: "42", counter: 7, subject },
+      message: { rockId: "42", counter: 7, subject, smartAccount },
     });
+    const attestation = result.attestation;
+    expect(attestation?.state === "SIGNED" && Object.keys(attestation.message)).toEqual([
+      "rockId",
+      "uidHash",
+      "counter",
+      "deadline",
+      "subject",
+      "smartAccount",
+    ]);
+  });
+
+  it("rejects an invalid smartAccount as malformed_request", async () => {
+    const { e, c } = tap(7);
+    const result = await verifyNtagSignature({
+      rockId: "42",
+      e,
+      c,
+      subject: privateKeyToAccount(SUBJECT_KEY).address,
+      smartAccount: "0xnope",
+    });
+    expect(result.verified).toBe(false);
+    expect(result.reason).toBe("malformed_request");
   });
 
   it("rejects an invalid subject as malformed_request", async () => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { keccak256, recoverTypedDataAddress, type Hex } from "viem";
+import { keccak256, recoverTypedDataAddress, zeroAddress, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 import {
@@ -19,6 +19,7 @@ import {
 const SIGNER_KEY = ("0x" + "11".repeat(32)) as Hex;
 const OTHER_KEY = ("0x" + "22".repeat(32)) as Hex;
 const SUBJECT_KEY = ("0x" + "33".repeat(32)) as Hex;
+const SMART_ACCOUNT_KEY = ("0x" + "44".repeat(32)) as Hex;
 
 const UID = Buffer.from("04DE5F1EACC040", "hex");
 
@@ -56,7 +57,7 @@ function configure(): { signer: string; registry: string; subject: `0x${string}`
 describe("the EIP-712 definition the registry must match", () => {
   it("pins the type string", () => {
     expect(ATTESTATION_TYPE_STRING).toBe(
-      "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)",
+      "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)",
     );
   });
 
@@ -67,6 +68,7 @@ describe("the EIP-712 definition the registry must match", () => {
       "uint32 counter",
       "uint256 deadline",
       "address subject",
+      "address smartAccount",
     ]);
   });
 
@@ -135,6 +137,38 @@ describe("signAttestation", () => {
     }
   });
 
+  it("is UNAVAILABLE for a smartAccount that is not an address", async () => {
+    const { subject } = configure();
+    for (const smartAccount of ["0xnope", "not-an-address", "0x1234"]) {
+      await expect(
+        signAttestation({ rockId: "1", uid: UID, counter: 61, subject, smartAccount }),
+      ).resolves.toEqual({ state: "UNAVAILABLE", reason: "invalid_smart_account" });
+    }
+  });
+
+  it("signs the zero address when smartAccount is absent", async () => {
+    const { subject } = configure();
+    const result = await signAttestation({ rockId: "1", uid: UID, counter: 61, subject });
+    expect(result.state).toBe("SIGNED");
+    if (result.state !== "SIGNED") return;
+    expect(result.message.smartAccount).toBe(zeroAddress);
+  });
+
+  it("checksums a lowercase smartAccount", async () => {
+    const { subject } = configure();
+    const smartAccount = privateKeyToAccount(SMART_ACCOUNT_KEY).address;
+    const result = await signAttestation({
+      rockId: "1",
+      uid: UID,
+      counter: 61,
+      subject,
+      smartAccount: smartAccount.toLowerCase(),
+    });
+    expect(result.state).toBe("SIGNED");
+    if (result.state !== "SIGNED") return;
+    expect(result.message.smartAccount).toBe(smartAccount);
+  });
+
   it("checksums a lowercase subject", async () => {
     const { subject } = configure();
     const result = await signAttestation({
@@ -152,11 +186,14 @@ describe("signAttestation", () => {
     const { signer, registry, subject } = configure();
     const now = 1_800_000_000;
 
+    const smartAccount = privateKeyToAccount(SMART_ACCOUNT_KEY).address;
+
     const result = await signAttestation({
       rockId: "42",
       uid: UID,
       counter: 61,
       subject,
+      smartAccount,
       nowSeconds: now,
     });
 
@@ -177,6 +214,7 @@ describe("signAttestation", () => {
       counter: 61,
       deadline: now + ATTESTATION_TTL_SECONDS,
       subject,
+      smartAccount,
     });
     // The signed struct field order must match ATTESTATION_TYPE_STRING.
     expect(Object.keys(result.message)).toEqual([
@@ -185,6 +223,7 @@ describe("signAttestation", () => {
       "counter",
       "deadline",
       "subject",
+      "smartAccount",
     ]);
 
     const recovered = await recoverTypedDataAddress({
@@ -197,6 +236,7 @@ describe("signAttestation", () => {
         counter: result.message.counter,
         deadline: BigInt(result.message.deadline),
         subject: result.message.subject,
+        smartAccount: result.message.smartAccount,
       },
       signature: result.signature,
     });
@@ -213,9 +253,16 @@ describe("signAttestation", () => {
     expect(result.message.deadline - now).toBeLessThanOrEqual(ATTESTATION_TTL_SECONDS + 2);
   });
 
-  it("binds rockId, uid, counter and subject — changing any one changes the signature", async () => {
+  it("binds every field — changing any one changes the signature", async () => {
     const { subject } = configure();
-    const base = { rockId: "42", uid: UID, counter: 61, subject, nowSeconds: 1_800_000_000 };
+    const base = {
+      rockId: "42",
+      uid: UID,
+      counter: 61,
+      subject,
+      smartAccount: privateKeyToAccount(SMART_ACCOUNT_KEY).address,
+      nowSeconds: 1_800_000_000,
+    };
     const signature = async (input: Parameters<typeof signAttestation>[0]) => {
       const r = await signAttestation(input);
       return r.state === "SIGNED" ? r.signature : null;
@@ -232,5 +279,10 @@ describe("signAttestation", () => {
     expect(
       await signature({ ...base, subject: privateKeyToAccount(OTHER_KEY).address }),
     ).not.toBe(original);
+    // Without this field a front-runner could bind the rock to their own Safe.
+    expect(
+      await signature({ ...base, smartAccount: privateKeyToAccount(OTHER_KEY).address }),
+    ).not.toBe(original);
+    expect(await signature({ ...base, smartAccount: undefined })).not.toBe(original);
   });
 });
