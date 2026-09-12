@@ -62,7 +62,7 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
 
   const messageLabel = variant === "light" 
     ? "How would you like to sponsor?" 
-    : "Why do you deserve an OG Rock?";
+    : "What are you bartering, or why should you get one?";
 
   const modalContent = (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 md:p-12 text-black text-left cursor-default">
@@ -127,12 +127,12 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
               <input 
                 required 
                 type="text" 
-                id="skill"
+                id="link"
                 className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all placeholder-transparent" 
-                placeholder="What's something you can do very well?" 
+                placeholder="Link to your portfolio, Twitter, or Website" 
               />
               <label 
-                htmlFor="skill" 
+                htmlFor="link" 
                 className="absolute left-4 top-2 text-xs font-bold uppercase tracking-wider text-neutral-400 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-focus:top-2 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase"
               >
                 What's something you can do very well?

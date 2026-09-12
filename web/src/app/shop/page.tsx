@@ -9,7 +9,7 @@ export default function Shop() {
         </h1>
         <p className="text-lg md:text-xl text-neutral-500 font-medium mb-12 text-center max-w-2xl leading-relaxed">
           Bank Rocks are not for sale. They are a physical interface to an experimental agentic DeFi layer. 
-          The first OG rocks will be granted exclusively to those who can convince us they deserve one. 
+          The first OG rocks will be granted exclusively to those who barter for one, or can convince us they deserve it. 
           Initially, your Bank Rock will operate on testnet. After a feedback round, we will launch and you will be able to activate your rock on mainnet.
         </p>
 
@@ -17,9 +17,15 @@ export default function Shop() {
           
           {/* Option 1: OG Rock */}
           <div className="border border-neutral-200 rounded-3xl p-8 hover:border-black/20 hover:shadow-xl transition-all group bg-white/50 backdrop-blur-md relative overflow-hidden flex flex-col">
-            <h2 className="text-2xl font-bold mb-2">Claim an OG Rock</h2>
-            <p className="text-neutral-500 mb-8 flex-1">Tell us why you are the perfect candidate to test the physical agentic DeFi experience.</p>
-            <ContactModal triggerText="Convince Us" title="Claim an OG Rock" variant="dark" />
+            <h2 className="text-2xl font-bold mb-2">Get a Testnet Rock</h2>
+            <div className="text-neutral-500 mb-8 flex-1 space-y-3">
+              <p>You can get a physical testnet Bank Rock in two ways:</p>
+              <ul className="list-disc pl-5 space-y-1 text-sm">
+                <li>Barter something for it (value not important)</li>
+                <li>Convince us you should have one</li>
+              </ul>
+            </div>
+            <ContactModal triggerText="Convince Us / Barter" title="Claim a Testnet Rock" variant="dark" />
           </div>
 
           {/* Option 2: Sponsor */}
