@@ -4,4 +4,4 @@ compatibility_date = "2024-03-20"
 [[d1_databases]]
 binding = "DB"
 database_name = "bankrock-db"
-database_id = "your-d1-id"
+database_id = "f0a28d6f-0a36-46aa-b711-8b5297913d2e"
