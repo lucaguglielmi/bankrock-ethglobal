@@ -665,9 +665,12 @@ Required by the spec rules for security-sensitive behaviour.
 | Attestation replayed against the chain | EIP-712 payload binds `(rockId, uidHash, counter, deadline, subject, smartAccount)`; the registry requires a strictly higher counter for that UID | Requires the attestation signer key to stay secret. |
 | Attestation re-submitted by an observer naming their own Safe | `awakenRock` requires `att.smartAccount == smartAccount`, and the field is inside the signature (D-026) | None. A relayer can only carry out the awakening the attester already authorised. |
 | Attestation replayed across an archive boundary | `lastCounter(uidHash)` is never reset — replay protection follows the tag, not the rock (D-028) | None. |
+| **Attester chooses which account a rock binds to** (audit `N-7`, D-032) | Since D-032 `claimHandover` writes `rock.smartAccount = att.smartAccount`, so the signer decides, at claim time, which account the rock's money is recorded against and which address the owner-action gate will admit. Mitigated on chain: the registry asks that account, through `ISafeOwnerManager.isOwner`, whether it already answers to `att.subject`, and refuses the claim otherwise — so the attester can only name an account the new owner already controls. `claimHandover` is `whenNotPaused`, so the pause switch stops this path too | **Attester key compromise is a transfer of title.** A compromised signer cannot choose *who* receives a named gift — `att.subject` must equal the recipient the owner named — but it can bind the rock to any contract that answers `isOwner(newOwner)`, installing itself as a permanent co-controller able to `archiveRock`, `initiateHandover` and `markLost`. It also redirects `describeRock().rockAccount`, which is where the app says the rock's money lives, and therefore where the next deposit goes. Rotation is `setAttester`, `onlyOwner`, and the zero address is rejected. The key is a Cloudflare secret and nothing else — never a file, never the deployer key (spec 16 #17) — and it is unfunded, so it never transacts. `bytes32 action` (spec 19 `PM-1`) narrows what one signature can authorise and is mandatory before a value-bearing network |
 
 **Non-goal, restated from spec 06:** physical possession is never sufficient financial
-authorization. Attestation gates *claiming*, never *spending*.
+authorization. Attestation gates *claiming*, never *spending*. **Refined by D-032:** it also gates
+*which account is recorded as holding the rock's money*, which is a different power from claiming
+and is why the row above exists. It still never authorises a transfer out of that account.
 
 ## Registry (D-020)
 
@@ -678,6 +681,9 @@ authorization. Attestation gates *claiming*, never *spending*.
 | Ownership seized mid-handover (SC-5) | Pending handover with expiry; a named recipient is matched against `att.subject`, not against the sender. |
 | A cancelled gift's pre-signed Safe owner swap surviving | The claim route deletes the stored operation after submitting, and cancelling the handover discards it (D-027). |
 | The claim relayer redirecting a gift to itself | It cannot: ownership comes from `att.subject`, inside the signature. `msg.sender` is not an input (D-026). |
+| The giver's Safe keeping controller rights over a rock it no longer owns (audit `F-1` / `N-1`) | D-032: the claim rebinds `rock.smartAccount`, **and** the registry requires that account to already report the new owner as a signing owner. Asking the old account `isOwner` was not enough on its own — a Safe's owner set is writable by the Safe, so the giver could answer `true` for one batched transaction, `archiveRock` the recipient's rock, and remove the signer again. |
+| A claim landing while the Rock Account is still the giver's | The pre-signed owner swap runs first and only a UserOperation receipt with `success === true` counts as landed; the route refuses an attestation with under 90 s of life, so the irreversible half cannot run against a claim that will then expire (audit `N-6`). |
+| An **open** gift claimed with no account hand-over | The app issues none: the transfer sheet requires a named recipient and the claim route refuses to relay `recipient == address(0)` (D-032). The contract still accepts open handovers, so a hand-built one is possible — and the on-chain `isOwner` check means it can only bind an account the claimant already controls. |
 | Registry holding value | It never holds tokens and never receives approvals. Assets live in the Rock Account. |
 
 ## Demo mode itself

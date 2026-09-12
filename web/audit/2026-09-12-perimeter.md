@@ -353,3 +353,56 @@ cannot redirect the rock to itself, and no client-side path can set the verified
 at the start of it and closed before the end; `hooks/useNotifications.ts` was fixed at 12:15 UTC to
 send the Privy bearer token, which closed half of P-7 and left the env-name half open. Anyone re-checking should re-confirm those four and
 should not treat their absence as evidence that the perimeter was always in this shape.
+
+---
+
+## 7. Appended note — 2026-09-12, after the contract re-review (docs pass)
+
+*Append-only. Nothing above this line was edited; the audit stands as it was written at 12:16 UTC.
+This note records what the tree does now, for anyone re-checking it later.*
+
+**Two of this document's findings are closed in the tree, with tests.** Both were "open" at 12:12
+UTC and are not open now:
+
+- **`P-1` — the relayer perimeter.** `web/src/app/api/rocks/[id]/claim/route.ts` reads the
+  registry before it spends anything (`isClaimable`), enforces three claims per rock per hour
+  alongside the per-IP limit, both limiters failing **closed**, and reserves `RELAYER_DAILY_CAP_WEI`
+  in one atomic D1 statement before broadcasting, releasing the reservation on either failure path.
+  **Unset or zero disables relaying** — the closed branch, not the permissive one. Recorded as
+  spec 16 §2.2 #34. Evidence: `rock-account.server.perimeter.test.ts`, `describe("P-1: …")`.
+- **`P-2` — the RPC URL in an unauthenticated error path.** Reasons now come from a fixed set and
+  are never built from an exception. Evidence: the same file, `describe("P-2: …")`.
+
+**`P-7` is closed too.** The browser and the server now read one name,
+`NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY`, and all four push variables
+(`NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY`, `WEB_PUSH_VAPID_PRIVATE_KEY`, `WEB_PUSH_SUBJECT`, plus
+`RELAYER_DAILY_CAP_WEI`) are in `web/.env.example` and in the spec 16 inventory as #34–#37, which
+`.env.example` is authoritative for.
+
+**Two findings from the contract re-review land on this perimeter, and both are closed.** They are
+`N-1` and `N-6` in `contracts/audit/2026-09-12-signoff.md`, and the decision that records them is
+D-032:
+
+1. **Ordering.** The claim route submits the pre-signed `Safe.swapOwner` UserOperation **before**
+   `claimHandover`, and refuses open gifts outright — the app has no path that issues one. The
+   registry now enforces the same ordering for every caller: `claimHandover` reverts
+   `AccountDoesNotAnswerToOwner` unless the account the attestation names already reports the new
+   owner as a signing owner.
+2. **`success` is read.** `submitSignedUserOp` returns `REAL` only for a receipt with
+   `success === true`. ERC-4337 reports an included-but-reverted operation with a perfectly good
+   transaction hash, and the route's whole ordering argument rested on not being fooled by one.
+   The route also refuses an attestation with under 90 seconds of life left, because the first half
+   of the sequence is irreversible and the second must still be mined before `att.deadline`.
+
+**Four more look closed on a reading of the tree, and are recorded here as *claimed closed, not
+re-audited* — a cold pass should confirm each rather than take this note's word for it:**
+
+| # | What the tree shows now |
+| --- | --- |
+| `P-3` | `web/src/sw.ts` states `/api/**` is `NetworkOnly`, unconditionally, with the cookie-auth reasoning written out — the header check this finding said was insufficient is gone |
+| `P-4` | `/api/nfc/verify` calls `consumeIpRateLimit` on both entry points. Note the limiter still fails **open** there, which is `P-11`, and the route's own comment says so |
+| `P-5` | `POST /api/rocks/[id]/pending-userop` stores a creator, requires a named recipient, and reads the rock's account from the registry rather than the client. A row with no creator is treated as unowned, by design, so the first writer can still claim a pre-existing row |
+| `P-6` | `handleUnsubscribe` matches on endpoint **and** owner DID, so the comment and the code now agree |
+
+**Unchanged, with the dispositions this document gives them:** `P-8` through `P-17`. `P-9`, `P-11`,
+`P-12`, `P-16` and `P-17` remain accepted; `P-8`, `P-10`, `P-13`, `P-14` and `P-15` remain open.

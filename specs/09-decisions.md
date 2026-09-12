@@ -210,7 +210,7 @@ The user tests the result on devices; CI catches regressions.
 
 ## Implementation decisions (exit-from-demo-mode branch)
 
-D-026 through D-031 were taken while the exit plan was implemented. Each is verified against the
+D-026 through D-032 were taken while the exit plan was implemented. Each is verified against the
 code it lives in; the file is named so the claim can be rechecked.
 
 ### D-026 — The attestation names the subject and the Rock Account
@@ -225,7 +225,9 @@ signed under the domain `BankRockRegistry` / version `1` / chain 11155111 / `ver
 the registry (`EIP712("BankRockRegistry", "1")` in `BankRockRegistry.sol`). Ownership comes from
 `att.subject`; `msg.sender` is not an input to any attested decision. `awakenRock(rockId,
 smartAccount, att, sig)` requires `att.smartAccount == smartAccount`. `claimHandover(rockId, att,
-sig)` ignores the field — it changes no smart account — and the signer sets it to zero there.
+sig)` **binds** the field: **superseded by D-032**, which makes the claim write
+`rock.smartAccount = att.smartAccount` and require that account to already answer to `att.subject`.
+The signer populates the field on both paths; it is never zero.
 Owner-gated actions (`initiateHandover`, `cancelHandover`, `archiveRock`, `markLost`,
 `clearLost`) accept either the owner's wallet or the rock's own Safe as `msg.sender`.
 
@@ -253,16 +255,18 @@ never trusts the client's copy).
 ownership goes through `initiateHandover` → `claimHandover`, including the case where the giver
 already knows the recipient's address. Control of the Rock Account moves separately: the giver
 pre-signs a `Safe.swapOwner(SENTINEL, giver, recipient)` UserOperation at initiate time; it is
-stored server-side and submitted immediately after the registry claim succeeds.
+stored server-side and submitted **before** the registry claim (**order reversed by D-032**, which
+makes the claim refuse an account that does not yet answer to the new owner).
 
 **Consequence:** provenance is uniform — a rock changes hands exactly when someone holding the
 physical object presents a fresh attestation — and a compromised owner key cannot hand the object
 to an attacker who never held it. The claim is relayed from `RELAYER_PRIVATE_KEY`, because the
 recipient has no gas and the Safe is still the giver's at that moment. Two consequences are
 stated rather than hidden: an **open** handover (`recipient == address(0)`) cannot be pre-signed,
-so its registry claim succeeds while the Safe owner swap is reported `UNAVAILABLE`; and the stored
-operation is one-shot and revocable — the claim route deletes it after submitting, and cancelling
-the handover discards it.
+which is why **D-032 removed open gifts from the app entirely** — the transfer sheet requires a
+named recipient and the claim route refuses to relay an open gift, though the contract still accepts
+one; and the stored operation is one-shot and revocable — the claim route deletes it after
+submitting, and cancelling the handover discards it.
 
 **Rationale:** two on-chain shapes for one real-world event would make the history unreadable:
 some transfers proven by a tap, some not, distinguishable only by which function was called.
@@ -405,6 +409,66 @@ deployment, and stays manual, as does device testing.
 `web/e2e/helpers.ts`; `web/src/components/ui/` (`sheet`, `button`, `icon-button`, `bottom-dock`,
 `amount`, `address`, `tx-hash`, `code-block`, `simulated-badge`, `demo-banner`,
 `unavailable-state`).
+
+### D-032 — A claim binds the Rock Account, and the registry verifies the binding
+
+**Decision:** `claimHandover(rockId, att, sig)` no longer ignores `att.smartAccount`. It writes
+`rock.smartAccount = att.smartAccount` and then requires that account to **already** report the new
+owner as one of its signing owners, through the same `ISafeOwnerManager.isOwner` staticcall the
+owner-action gate uses. A claim that names an account which does not answer to `att.subject` reverts
+`AccountDoesNotAnswerToOwner(account, owner)`; a claim that names the zero address reverts
+`InvalidSmartAccount(0)`. This supersedes the last sentence of D-026 — *"`claimHandover`
+ignores the field […] and the signer sets it to zero there"* — which is no longer true of
+either the contract or the signer.
+
+**Consequence:**
+
+1. **A counterfactual Rock Account cannot be bound.** An ERC-4337 account that has never executed
+   has no code, so it cannot answer `isOwner` and the claim reverts until it exists. That is
+   intended: an address that has never executed anything cannot be shown to answer to anybody.
+   The sponsored path deploys the account as a side effect of the owner-swap UserOperation, so the
+   ordinary flow never meets this.
+2. **The Rock Account owner swap must land before the claim, not after.** D-027 had the claim route
+   submit the pre-signed `Safe.swapOwner` *after* the registry claim; the order is now reversed, and
+   it is an invariant of the contract rather than a convention of one caller.
+3. **The relayed claim route enforces four more things** before it spends gas
+   (`web/src/app/api/rocks/[id]/claim/route.ts`): it executes the stored owner swap first and treats
+   only a UserOperation receipt with `success === true` as landed; it **refuses open gifts**
+   outright; it refuses an attestation with less than **90 seconds** of life left, because the first
+   half of the sequence is irreversible and the second half must still be mined before
+   `att.deadline`; and it reserves against `RELAYER_DAILY_CAP_WEI` before broadcasting, releasing
+   the reservation on either failure path.
+4. **The app requires a named recipient for every gift.** The transfer sheet has no "leave it
+   open" affordance. Open handovers (`recipient == address(0)`) remain a contract capability — the
+   registry still accepts them and `initiateHandover` still documents the zero address — but **no
+   app path issues one**, and the claim route refuses to relay one. Spec 02 Flow E and spec 05's
+   ownership-transfer section are updated accordingly.
+
+**Rationale:** the cold re-review (spec 19 Part 3, finding `N-1` in
+[`../contracts/audit/2026-09-12-signoff.md`](../contracts/audit/2026-09-12-signoff.md))
+showed that leaving `smartAccount` alone across a change of owner left the
+*giver's* Safe recorded as the rock's account, and therefore as one of the two addresses the
+owner-action gate admits. A Safe's owner set is writable by the Safe, so the giver could add the
+recipient as a signer for one batched transaction, `archiveRock` the recipient's rock — which
+is terminal — and remove the signer again. Rebinding on claim fixes that only if the attester
+names the right account; the on-chain `isOwner` check makes it true for every caller, including a
+self-relayed claim and a hand-built Etherscan call.
+
+**Threat model (the new power this gives the attester):** see
+[`15-exit-demo-mode.md`](./15-exit-demo-mode.md) Part 5, row *"Attester chooses which account a rock
+binds to"*. In short: the attestation signer now decides, at claim time, which account a rock binds
+to. The on-chain `isOwner` check is the mitigation; the residual is attester key compromise, which
+is a transfer of title, rotatable through `setAttester`.
+
+**Files:** `contracts/contracts/BankRockRegistry.sol` (`claimHandover`, `_accountAnswersTo`,
+`AccountDoesNotAnswerToOwner`, the `HandoverClaimed` event's new `smartAccount` argument);
+`contracts/test/BankRockRegistry.t.sol`
+(`testAClaimRebindsTheRockAccountToTheOneTheAttestationNames`,
+`testAClaimIsRefusedWhenTheBoundAccountDoesNotAnswerToTheNewOwner`,
+`testAClaimCannotBindACounterfactualAccount`); `contracts/test/audit/BankRockRegistryReview.t.sol`
+(both `testReview_N1_*` proofs-of-concept); `web/src/app/api/rocks/[id]/claim/route.ts`;
+`web/src/lib/rock-account.server.ts` (`submitSignedUserOp`'s receipt check, `reserveRelayerSpend`);
+`web/src/lib/nfc/rock-resolution.ts` (`resolveSmartAccount`).
 
 ## Open product questions
 

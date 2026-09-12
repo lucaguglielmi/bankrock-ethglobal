@@ -19,16 +19,30 @@ The user wallet should control the Rock Account. The rock's funds should not be 
 on EntryPoint 0.7 owned by the same Privy embedded wallet, and what distinguishes them is the
 CREATE2 salt:
 
-| Account | `saltNonce` | Belongs to | Used for |
-| --- | --- | --- | --- |
-| Rock Account | `uint256(keccak256(rawUid))` — the tag | one rock, one owner | Holding the reserve, shipping and docking |
-| Personal account | `0` | the person | Trading against *any* rock, as a visitor |
+| Account | `saltNonce` | Belongs to | Used for | Recorded on chain |
+| --- | --- | --- | --- | --- |
+| Rock Account | `uint256(keccak256(rawUid))` — the tag | one rock, one owner | Holding the reserve, shipping and docking | `rock.smartAccount`, written at awakening and **rewritten at every claim** (D-032) |
+| Personal account | `0` | the person | Trading against *any* rock, as a visitor | never — it is not a rock's account |
 
 So one owner's two rocks have two accounts that never pool, and one visitor has one account no
 matter how many rocks they trade with. The Rock Account's address is counterfactual and derived
 **server-side by the NFC verifier**, which signs it into the attestation; the client cannot choose
 it (D-026). The personal account exists so a visitor's swap can be one sponsored batch and so the
 taker periphery has a contract to call back into (D-030) — not because it belongs to a rock.
+
+**What the registry records, and when (D-032).** `rock.smartAccount` is the address the registry
+will admit as an actor for that rock, alongside the owner's wallet. It is set by `awakenRock` and
+**rebound by `claimHandover` to the account the attestation names**, which is why a gift does not
+leave the giver's Safe recorded against a rock the giver no longer owns. Two consequences follow
+from the way the registry verifies that binding:
+
+- **the named account must already report the new owner as one of its signing owners.** The
+  registry asks it through `ISafeOwnerManager.isOwner` and reverts `AccountDoesNotAnswerToOwner`
+  otherwise, so the `Safe.swapOwner` below has to land *before* the claim, for every caller;
+- **a counterfactual account cannot be bound on claim.** An account that has never executed has no
+  code and cannot answer, so it must be deployed first. The sponsored owner-swap UserOperation
+  carries the `initCode` and deploys it as a side effect, so the ordinary flow never meets this.
+  At *awakening* the address is still purely counterfactual and no such check applies.
 
 ## Supported login methods
 
@@ -117,17 +131,22 @@ This avoids the complexity of the "dock, transfer, reship" fallback entirely.
 swap with a signature from its current owner — the giver — and the giver is by definition not
 present when the recipient taps. So the giver signs
 `Safe.swapOwner(SENTINEL, giver, recipient)` as a UserOperation **at the moment the gift is
-created**, and it is stored until the claim. The claim route submits it immediately after the
-registry claim succeeds. Two consequences are stated rather than hidden: an **open** handover has
-no recipient address to sign for, so its owner swap cannot be pre-signed and is reported
-`UNAVAILABLE` while the registry claim still succeeds; and the stored operation is one-shot and
-revocable — cancelling the handover deletes it.
+created**, and it is stored until the claim. The claim route submits it **before** the registry
+claim and treats only a UserOperation receipt reporting `success === true` as landed
+(**order reversed by D-032**; it used to run after). Two consequences are stated rather than hidden:
+an **open** handover has no recipient address to sign for, which is why the app no longer issues
+one — the transfer sheet requires a named recipient and the claim route refuses to relay an open
+gift, though the contract still accepts them; and the stored operation is one-shot and revocable —
+cancelling the handover deletes it.
 
 **Two different keys pay for this, and neither can redirect it.** The *attestation signer* never
 transacts and holds no funds; it only states that a genuine tap happened, for a named `subject`
-and `smartAccount`. The *relayer* pays gas for `claimHandover`, because the recipient has none and
-the Safe is still the giver's. Neither can send the rock elsewhere: ownership comes from
-`att.subject` inside the signature, never from `msg.sender` (D-026).
+and `smartAccount`. The *relayer* pays gas for `claimHandover`, because the recipient has none, and
+spends within `RELAYER_DAILY_CAP_WEI`. Neither can send the rock elsewhere: ownership comes from
+`att.subject` inside the signature, never from `msg.sender` (D-026). The attestation signer does,
+since D-032, decide *which account* the rock binds to — a power the registry bounds by asking that
+account whether it already answers to the new owner. The threat model for it is in
+[`15-exit-demo-mode.md`](./15-exit-demo-mode.md) Part 5.
 
 ## Failure states
 

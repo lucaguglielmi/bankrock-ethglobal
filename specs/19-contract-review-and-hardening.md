@@ -12,6 +12,91 @@ It is the contract for the review, not the review itself. Findings and sign-off 
 `contracts/audit/`. Status vocabulary is the one in
 [`15-exit-demo-mode.md`](./15-exit-demo-mode.md).
 
+---
+
+## Status (Fact, 2026-09-12)
+
+All four steps of [Part 3](#part-3--process-and-evidence) have run, and both rounds of
+remediation have landed. This section is the summary; the evidence is in the four audit files.
+
+| Step | Artefact | Outcome |
+| --- | --- | --- |
+| 1 — independent audit | [`contracts/audit/2026-09-12-findings.md`](../contracts/audit/2026-09-12-findings.md) | 25 findings: 1 High, 7 Medium, 11 Low, 6 Informational |
+| 2 — hardening and readability | [`contracts/audit/2026-09-12-changes.md`](../contracts/audit/2026-09-12-changes.md) | every High and Medium fixed with a regression test; the Part 2 standard applied to both contracts |
+| 3 — cold re-review and sign-off | [`contracts/audit/2026-09-12-signoff.md`](../contracts/audit/2026-09-12-signoff.md) | 23 of 25 re-checked as genuinely closed; 8 new findings `N-1`…`N-8`; two further rounds of fixes followed |
+| 4 — application perimeter | [`../web/audit/2026-09-12-perimeter.md`](../web/audit/2026-09-12-perimeter.md) | 21 findings `P-1`…`P-21`, no Critical; `P-1` and `P-2` closed after it was written |
+
+### Per-finding table summary
+
+| Origin | Critical | High | Medium | Low | Informational | Total |
+| --- | --- | --- | --- | --- | --- | --- |
+| Audit, `F-1`…`F-25` | 0 | 1 | 7 | 11 | 6 | 25 |
+| Re-review, `N-1`…`N-8` | 0 | 0 | 2 | 2 | 4 | 8 |
+| Perimeter, `P-1`…`P-21` | 0 | 3 | 8 | 8 | 2 | 21 |
+
+`F-1` and `N-1` are one defect carrying two ids, so the on-chain count is 33 ids over 32 defects.
+
+**Open against the tree at `9c5bc1a`: 0 Critical, 0 High, 0 Medium.** Three dispositions are not
+"closed" and are deliberate:
+
+| Id | Severity | Disposition |
+| --- | --- | --- |
+| `F-19` | Low | **Accepted.** The plain-English renames (`giveRock`, `claimRock`, …) were not made; the `@notice` first words carry the plain English instead. Three consumers depend on the current names |
+| `F-21` | Informational | **Deferred, and mandatory before a value-bearing network.** See [Part 4](#part-4--pre-mainnet) |
+| `N-7` | Low | **Closed by this document's companion edit** — the attester's new power is now a row in the [`15-exit-demo-mode.md`](./15-exit-demo-mode.md) Part 5 threat model |
+
+### Verdict (quoted from the sign-off, §6)
+
+> **Sepolia, now: yes** — the relayer path is now genuinely safe (open gifts refused, the Safe
+> moved and its receipt awaited before the rock, the attestation's account checked against the
+> registry), the registry moves no value on any network […]
+>
+> **A value-bearing network, later: no, not yet** — not until the registry stops taking the
+> attester's word for it […], `N-6` is fixed and re-reviewed by the perimeter owner, the
+> `bytes32 action` field of `F-21` is added in that same ABI change, `N-7` is written into
+> spec 15 Part 5, and one reviewer re-checks that change alone.
+
+Four of those five conditions have since been met: the registry check landed (`8a93e21`, D-032),
+`N-6` landed (`42f2190`), `N-7` is written into spec 15 Part 5, and the tooling below re-ran clean.
+What is left is `F-21` and a single reviewer pass over the combined change — both in
+[Part 4](#part-4--pre-mainnet).
+
+### Tooling results (Fact — re-run 2026-09-12 against `9c5bc1a`)
+
+```
+cd contracts && npm test                     # 108 passing, 0 failing (was 105 passing / 1 failing
+                                             # at the sign-off, the failure being the N-1 PoC)
+npx solhint --config solhint:recommended \
+  contracts/BankRockRegistry.sol contracts/aqua/XYCSwapTaker.sol
+                                             # 0 errors, 8 warnings, 0 use-natspec
+node scripts/export-abi.js                   # the three ABI copies reproduce with no diff
+slither contracts/BankRockRegistry.sol       # 6 results, 0 high, 0 medium
+slither contracts/aqua/XYCSwapTaker.sol      # 14 results, 1 medium-impact (N-5), triaged in writing
+```
+
+The eight solhint warnings are the same eight the sign-off triaged: one `gas-struct-packing` on the
+EIP-712 `Attestation`, two `gas-small-strings` on the type string, three `gas-strict-inequalities`
+on the deliberately inclusive boundaries, and two `func-visibility` false positives on constructors.
+The slither figures are quoted from the sign-off; they were not re-run here.
+
+### Where the audit files and the code now disagree (Fact)
+
+The sign-off was written at 13:29 UTC and two fixes landed after it. Read the code, not the file:
+
+- **`F-1` / `N-1`.** The sign-off says `N-1` is "open (reduced)" and that
+  `testReview_N1_aClaimNamingTheGiversAccountMustNotLeaveItInControl` fails. It no longer does.
+  `claimHandover` now calls `_accountAnswersTo(att.smartAccount, att.subject)` and reverts
+  `AccountDoesNotAnswerToOwner` otherwise (`BankRockRegistry.sol` L563-565). The whole suite is
+  green. `2026-09-12-changes.md` §1 second-pass table records `N-1` as fixed, and it is right.
+- **`N-6`.** The sign-off says `submitSignedUserOp` never reads the receipt's `success` flag. It
+  does now (`rock-account.server.ts` L447), and the claim route refuses an attestation with less
+  than 90 s of life left (`MIN_ATTESTATION_LIFETIME_MS`). Both halves of `N-6` are closed.
+- **`N-8`.** The sign-off says `claimHandover`'s `@dev` describes a verifier branch nobody wrote,
+  and that `2026-09-12-changes.md` §3 carries a stale `InvalidSmartAccount` warning. Both texts
+  were rewritten in `8a93e21`; the prose now matches the code.
+- **Perimeter `P-1` and `P-2`.** Recorded "open" at 12:12 UTC. Both are closed in the tree, with
+  tests, in `web/src/lib/rock-account.server.perimeter.test.ts`.
+
 ## Scope
 
 | Contract | Path | Written by us | Deployed by us |
@@ -195,3 +280,39 @@ test -f contracts/audit/2026-09-12-signoff.md && ! grep -E "^\| (Critical|High|M
 
 Manual: open the verified source on Etherscan, read `describeRock(1)`, and confirm every
 Write-tab field is self-explanatory without the README.
+
+---
+
+# Part 4 — Pre-mainnet
+
+**Decision.** Everything below is acceptable on Ethereum Sepolia and is **not** acceptable on a
+network where a rock id or a Rock Account balance is worth something. None is a defect today; each
+is a property that only becomes load-bearing once value is involved. The list is the sign-off's and
+`2026-09-12-changes.md` §5's, restated here so that deferring is a decision with an owner rather
+than an omission. It is mirrored in [`../DEMO-STATE.md`](../DEMO-STATE.md) under the same heading.
+
+## 4.1 Mandatory before a value-bearing deployment
+
+| # | Item | Why it can wait on Sepolia | What the change is |
+| --- | --- | --- | --- |
+| PM-1 | **`bytes32 action` in the attestation (`F-21`)** | the signed struct says *what* (rock, tag, counter) and *who* (subject, account) but never *which call*, so one signature satisfies both attested functions wherever its field checks happen to pass. Today `subject` is the same person on both paths and the counter is consumed either way, so the impact is nil | add `bytes32 action` to `ATTESTATION_TYPEHASH` with `keccak256("AWAKEN")` and `keccak256("CLAIM")`, and check it in `awakenRock` and `claimHandover`. It is a type-hash change: the three ABI copies, the signer, and every attestation in flight at the moment of the switch |
+| PM-2 | **A second, independent verifier for the attester key** | the registry trusts exactly one address, rotatable by one administrator, and that key lives on a web server. Since D-032 it signs what amounts to a transfer of title *and* the choice of controlling account | a threshold scheme, or an attester contract implementing `isValidSignature`. `setAttester` can already point at a contract; `_consumeAttestation` would move from `ECDSA.tryRecover` to `SignatureChecker` |
+| PM-3 | **One reviewer pass over the combined change** | the sign-off's last condition. `N-1`'s on-chain half and `N-6` landed after it was written, so no cold reader has yet re-checked them together | one agent, cold, re-checks `8a93e21` and `42f2190` against Part 1.2 and updates the sign-off in place |
+
+## 4.2 Strongly recommended
+
+| # | Item | Note |
+| --- | --- | --- |
+| PM-4 | **An external audit of the vendored Aqua sources** | this review covered *integration* risk only — how our contracts call Aqua and what it calls back — which is what the Scope section asks for. `Aqua` and `XYCSwap` themselves were not reviewed, and a value-bearing deployment rests on both |
+| PM-5 | **The relayer perimeter as an operator-cost control (`F-10`, `P-1`)** | the claimable pre-check, the per-rock bucket, the fail-closed limiter and `RELAYER_DAILY_CAP_WEI` have all landed. It becomes *mandatory* rather than recommended the moment the relayer key holds a real balance |
+| PM-6 | **Restate `archiveRock`'s terminality in the interface** | a retired rock cannot be revived. The tag can awaken a new rock id and the old record stays readable, but where a rock id carries value the owner must be told this in the UI, not only in the NatSpec |
+
+## 4.3 Explicitly accepted at any value
+
+- **Mis-sent tokens are lost** (`F-5`). A rescue function is an admin key on the trade path, which
+  is a larger risk than the mistake it recovers from. Written on `XYCSwapTaker.sol` itself.
+- **`Handover` will not gain fields** (`F-23`). Pinned in the source; a future field goes in a new
+  view, not in the struct.
+- **Function names stay as they are** (`F-19`). The plain English lives in the `@notice`.
+- **A counterfactual Rock Account cannot be bound on claim** (D-032). Intended: an address that has
+  never executed anything cannot be shown to answer to anybody.

@@ -101,11 +101,16 @@ The application must never imply that a swap is risk-free.
 
 ## Flow E — Gift an active rock
 
-There is exactly one path (D-027). There is no immediate `transferOwnership`: a rock changes
-hands when someone holding the physical object presents a fresh attestation, and never otherwise.
+There is exactly one path (D-027, refined by D-032). There is no immediate `transferOwnership`: a
+rock changes hands when someone holding the physical object presents a fresh attestation, and never
+otherwise. **A recipient must be named** — the app issues no open gifts.
 
-1. Current owner selects **Give this rock**, names a recipient or leaves it open, chooses an
-   expiry and optionally adds a message.
+1. Current owner selects **Give this rock**, **names a recipient** (required — the transfer sheet
+   has no "leave it open" affordance, D-032), chooses an expiry and optionally adds a message.
+   *Open handovers remain a capability of the contract: `initiateHandover` still accepts
+   `recipient == address(0)` and still documents it. **No app path issues one**, and the claim
+   route refuses to relay one, because a recipient who is unknown when the gift is opened cannot
+   have an owner swap pre-signed for them.*
 2. `initiateHandover(rockId, recipient, expiresAt, messageHash)` goes out as a sponsored
    UserOperation from the Rock Account. Only the message *hash* is on chain; the text is stored
    off-chain and shown after the claim.
@@ -114,23 +119,27 @@ hands when someone holding the physical object presents a fresh attestation, and
    `Safe.swapOwner(SENTINEL, giver, recipient)`. The signed UserOperation is stored server-side
    until the claim. It is one-shot, and cancelling the handover discards it — a cancelled gift
    whose owner-swap operation survived would be a live path to hand the account away.
-   *An open handover (no named recipient) cannot be pre-signed, because there is no address to
-   sign for. That case is stated plainly in the UI rather than papered over: the registry claim
-   still works; the account hand-over does not.*
 4. Recipient physically receives and taps the rock.
 5. Recipient signs in through Privy (email, passkey or social).
 6. The verifier checks the SDM CMAC, advances the counter, and signs an attestation naming the
-   recipient as `subject`. `smartAccount` is the account the registry already holds for this rock
-   — a claim changes no account, and the registry ignores the field there anyway (D-026).
-7. `claimHandover(rockId, att, sig)` is **relayed by the server** from `RELAYER_PRIVATE_KEY`. It
-   has to be: the recipient has no gas, and the Rock Account's Safe is still the giver's, so it
-   cannot sponsor the claim either. This is not an open relay — the registry credits
-   `att.subject`, which is inside the signature, so the relayer cannot redirect the rock to
-   itself, and the route refuses any attestation not signed by this deployment's attester.
-8. The claim route then submits the stored owner-swap operation, so control of the Rock Account
-   follows the object. **Gas is sponsored end to end**: the recipient pays nothing and needs no
-   native tokens. If the swap cannot be submitted, the response says so instead of implying the
-   account moved.
+   recipient as `subject`. `smartAccount` is the account the registry already holds for this rock,
+   and **the claim binds it** — `claimHandover` writes `rock.smartAccount = att.smartAccount`
+   (D-032). The route checks that the attestation names the same account the registry holds before
+   it does anything at all.
+7. **The Rock Account moves first.** The claim route submits the stored owner-swap operation and
+   waits for its receipt. Only a UserOperation receipt reporting `success === true` counts as
+   landed; an included-but-reverted operation is a failure, and the route reports it and claims
+   nothing. It also refuses to start when the attestation has **less than 90 seconds** of life
+   left, because this half is irreversible and the next one must still be mined before
+   `att.deadline` (D-032). If the swap does not land, the recipient is exactly where they started.
+8. `claimHandover(rockId, att, sig)` is **relayed by the server** from `RELAYER_PRIVATE_KEY`,
+   within `RELAYER_DAILY_CAP_WEI`. It has to be relayed: the recipient has no gas. This is not an
+   open relay — the registry credits `att.subject`, which is inside the signature, so the relayer
+   cannot redirect the rock to itself, and the route refuses any attestation not signed by this
+   deployment's attester. The registry then asks the named account, through `isOwner`, whether it
+   already answers to `att.subject`, and reverts `AccountDoesNotAnswerToOwner` otherwise — which
+   is what makes step 7's ordering an invariant for every caller, not a convention of this route.
+   **Gas is sponsored end to end**: the recipient pays nothing and needs no native tokens.
 9. The account address, its assets and its Aqua maker identity remain completely stable. The
    strategies stay shipped; nothing is docked and re-shipped.
 10. Both parties receive a receipt. Provenance shows `HandoverInitiated` then `HandoverClaimed`,

@@ -25,13 +25,14 @@ Working line: **Liquidity you can hold.**
 | [09-decisions.md](./09-decisions.md) | Open questions and architectural decisions | Active |
 | [10-telemetry-and-observability.md](./10-telemetry-and-observability.md) | Structured logging, metrics, and agent-ready telemetry | Active |
 | [11-mcp-and-connectors.md](./11-mcp-and-connectors.md) | Model Context Protocol servers and agent tools | Active |
-| [12-deployment.md](./12-deployment.md) | Cloudflare Pages, Workers, D1 database and CI/CD | Active |
+| [12-deployment.md](./12-deployment.md) | The Cloudflare Worker that serves production, D1, the contract deploy order, CI and the deploy pipeline's history | Active |
 | [13-after-the-hackathon-ideas.md](./13-after-the-hackathon-ideas.md) | Post-hackathon hardware security & social recovery roadmap | Roadmap |
 | [14-progressive-web-app.md](./14-progressive-web-app.md) | PWA conversion, mobile standalone UX, and contextual notification policy | Active |
 | [15-exit-demo-mode.md](./15-exit-demo-mode.md) | Audit baseline, simulation ledger, and the phased plan to replace simulated behaviour with real behaviour | Active |
 | [16-environment-and-secrets.md](./16-environment-and-secrets.md) | Verified external dependencies on Ethereum Sepolia, every secret the code reads, who provides it, funding budget | Active |
 | [17-mobile-ui-and-typography.md](./17-mobile-ui-and-typography.md) | Phone-first layout contract, typeface and type scale, contrast tokens, sheet primitive, and the CI checks that enforce them | Active |
 | [18-demo-readiness.md](./18-demo-readiness.md) | What is still missing to run the three-minute demo end to end on a physical rock: the beat-by-beat state, the operator blockers, the tag's exact SDM settings, and the day-before checklist | Active |
+| [19-contract-review-and-hardening.md](./19-contract-review-and-hardening.md) | The security review and Etherscan-readability standard every contract must pass before deployment, the process and evidence that sign it off, the status of the completed audit, and the pre-mainnet list | Active |
 
 ## Spec rules
 

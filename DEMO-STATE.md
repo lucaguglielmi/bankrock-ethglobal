@@ -63,7 +63,7 @@ The code is complete; the address is not. Each renders `UNAVAILABLE` naming the 
 | K-1 | Sign-in and any wallet address on screen | 16 #1 | `NEXT_PUBLIC_PRIVY_APP_ID` is set and the origin and chain are configured in the Privy dashboard. |
 | K-2 | The "Verified Physical" badge | 16 #18, 06 | `NXP_MASTER_KEY` matches the key written to the tags. |
 | K-3 | An attestation for a verified tap | 16 #17, 09 D-026 | `ATTESTATION_SIGNER_PRIVATE_KEY` is set and its address is the registry's attester. A tap can verify without it; only the on-chain step is blocked. |
-| K-4 | Gift claims | 16 #30, 09 D-027 | `RELAYER_PRIVATE_KEY` is set **and funded**. Unset means claims are unavailable, never free. |
+| K-4 | Gift claims | 16 #30, #34, 09 D-027, D-032 | `RELAYER_PRIVATE_KEY` is set **and funded**, **and** `RELAYER_DAILY_CAP_WEI` is set to a non-zero whole number of wei. Either unset means claims are unavailable, never free and never uncapped. |
 | K-5 | Any gas-sponsored operation | 16 #15 | A Pimlico key **and** a sponsorship policy for chain 11155111. Without the policy every UserOp is rejected. |
 | K-6 | The ETH faucet | 16 #16 | `FAUCET_PRIVATE_KEY` is set and funded. There is no default key. |
 | K-7 | Provenance, the fee log scan, Rock Account derivation | 16 #4 | `SEPOLIA_RPC_URL` points at a real provider. Public RPCs reject the log ranges the indexer needs. |
@@ -80,16 +80,57 @@ most dangerous category on this page, because it looks finished.
 | P-1 | **NTAG 424 DNA SDM verification** | 06, 15 P4, 18 §4.2 | A physical tag is programmed and tapped, and the copied-URL test shows `unverified` in a second browser. This is the acceptance test for D-002 and cannot be waived. |
 | P-2 | The registry, end to end | 15 P2 | A rock is awakened on Sepolia from a fresh Privy account and two browsers show the same state. |
 | P-3 | The Aqua path, end to end | 04, 15 P3 | A strategy is shipped and a second account swaps against it; actual and virtual balances both move on chain. |
-| P-4 | The gift handover, end to end | 02 Flow E, 09 D-027 | A recipient with no ETH claims a rock and the Rock Account's Safe owner has changed. An **open** handover cannot pre-sign the owner swap and reports it unavailable — by design, and it must be said out loud. |
+| P-4 | The gift handover, end to end | 02 Flow E, 09 D-027, D-032 | A recipient with no ETH claims a rock and the Rock Account's Safe owner has changed. The app issues **no open handovers** — the transfer sheet requires a named recipient and the claim route refuses to relay one — so the "open gift reports the swap unavailable" caveat is gone: there is no app path to it. |
 | P-5 | Archive and start over | 02 Flow K, 09 D-028 | One physical tag awakens a second rock id after an archive, and the Rock Account address is unchanged. |
+| P-6 | **Relayed claim ordering** | 09 D-032, 19 Status | The claim route submits the pre-signed `Safe.swapOwner` **before** `claimHandover`. Every test of this is a unit test against a mocked bundler; no real UserOperation has ever been submitted in this order. Proven when one claim lands on Sepolia and the Safe's owner is the recipient *before* the registry transaction is mined. |
+| P-7 | **The UserOperation receipt check** | 09 D-032, audit `N-6` | `submitSignedUserOp` now treats only `receipt.success === true` as landed, because ERC-4337 reports an included-but-reverted operation with a perfectly good transaction hash. Proven when a *deliberately* reverting owner swap is seen to be reported `UNAVAILABLE` with nothing claimed — the honest failure, not the silent one. |
+| P-8 | **The on-chain `isOwner` check on claim** | 09 D-032, audit `N-1` | `claimHandover` reverts `AccountDoesNotAnswerToOwner` unless the named account already reports the new owner as a signing owner. Proven against a real Safe 1.4.1 on Sepolia, not the mock the Solidity tests use — including the counterfactual case, where an undeployed account has no code to answer and the claim must revert until the owner-swap UserOperation deploys it. |
+| P-9 | **The taker's deadline and recipient rules** | 04, 19 `F-8`, `N-2` | `swapExactIn` now takes a `deadline` and refuses `to == address(0)` (the old "pay the caller" sentinel) and `to == address(this)`. The hooks pass the caller's own account explicitly. Proven when a visitor swap lands on Sepolia with a real deadline and the output arrives at the named recipient. |
+| P-10 | **The relayer's daily spend cap** | 16 #34, audit `F-10` / `P-1` | `RELAYER_DAILY_CAP_WEI` is reserved in D1 before each broadcast and released on either failure path, and unset means relaying is **off**. Proven when a claim is refused because the day's cap is exhausted, and the next UTC day allows one again. |
 
 ## 6. Known-wrong, outside the app
 
 | # | What | Spec | Fixed when |
 | --- | --- | --- | --- |
-| W-1 | `https://www.bank-rock.com` returns 308 to a literal `:path*` placeholder | 15 R-1, D-022 | The Cloudflare redirect rule is corrected. **No tag may be programmed before this.** |
+| W-1 | `https://www.bank-rock.com` returns 308 to a literal `:path*` placeholder | 15 R-1, D-022, 12 §1 | The old Cloudflare redirect rule is **deleted**. The app now ships the redirect itself (`web/next.config.ts` matches the `www` host and 308s with the path substituted), but a dashboard rule is evaluated before the Worker, so the broken one still wins. **No tag may be programmed before `curl -sIL https://www.bank-rock.com` ends 200.** |
+| W-4 | The production domain has never served a build from this branch | 12 *Deploy pipeline history* | A deploy run publishes the **Worker** `web` — not the Pages project, which no domain points at — and `NEXT_PUBLIC_APP_VERSION` on `https://bank-rock.com` changes. Every run before 2026-09-12 13:29 UTC died at `npm ci` (spec 15 B-2); the next died on the two missing GitHub secrets; the first green one published to a surface nobody visits. |
 | W-2 | The CI responsive job configures no chain, so the two spec 17 Part 7 checks that need a live rock (items 7, 8) skip rather than run; the Lighthouse budget (item 10) is not run at all | 17 U4, 09 D-031 | That job's environment points at a deployed registry, and the Lighthouse budget is measured by hand against the public deployment. The static checks and the rest of the matrix are blocking today. |
 | W-3 | The Gelato keeper function targets a contract interface that does not exist | 15 X-7 | It is rewritten against the current registry and Aqua, or deleted. It is `DEMO` either way. |
+
+---
+
+## 7. Pre-mainnet — true on Sepolia, not true where value is
+
+Not simulated, not unavailable, not unproven: **deliberately deferred.** Each item is safe on a
+testnet and unsafe on a network where a rock id or a Rock Account balance is worth something. The
+full reasoning is in [spec 19](./specs/19-contract-review-and-hardening.md) Part 4 and
+`contracts/audit/2026-09-12-changes.md` §5. This section exists so that "we decided to
+wait" and "we forgot" never look the same.
+
+**Mandatory before a value-bearing deployment**
+
+| # | What | Why it can wait on Sepolia |
+| --- | --- | --- |
+| M-1 | **`bytes32 action` in the attestation** (audit `F-21`) | The signed struct names the rock, tag, counter, subject and account — but not *which call*. One signature therefore satisfies both attested functions wherever the field checks pass. Today `subject` is the same person on both paths and the counter is spent either way, so the impact is nil. It stops being nil the moment a third attested action exists, or the verifier signs anything that is not a claim, or a second verifier implementation appears. It is a type-hash change: three ABI copies, the signer, and every attestation in flight. |
+| M-2 | **A second, independent verifier for the attester key** | One address, rotatable by one administrator, living on a web server — and since D-032 it signs what amounts to a transfer of title *and* the choice of controlling account. A threshold scheme or an attester contract implementing `isValidSignature` removes the single point of compromise; `_consumeAttestation` would move to `SignatureChecker`. |
+| M-3 | **One cold reviewer over the combined change** | The sign-off's last open condition. The on-chain `isOwner` check and the receipt check both landed *after* the sign-off was written, so no cold reader has re-checked them together. |
+
+**Strongly recommended**
+
+| # | What | Note |
+| --- | --- | --- |
+| M-4 | An external audit of the vendored Aqua sources | The review covered *integration* risk only — how our contracts call Aqua and what it calls back. `Aqua` and `XYCSwap` themselves were not reviewed, and a value-bearing deployment rests on both. |
+| M-5 | Treat the relayer perimeter as mandatory, not recommended | The claimable pre-check, per-rock bucket, fail-closed limiter and `RELAYER_DAILY_CAP_WEI` have all landed. They become mandatory the moment the relayer key holds a real balance. |
+| M-6 | Say out loud in the UI that `archiveRock` is terminal | A retired rock cannot be revived. The tag can awaken a new id and the old record stays readable, but where a rock id carries value the owner must be told before pressing it, not afterwards. |
+
+**Accepted at any value, and written down so that accepting is a decision**
+
+- Tokens mis-sent to `XYCSwapTaker` are **lost**. A rescue function is an admin key on the trade
+  path, which is a larger risk than the mistake it recovers from.
+- The `Handover` struct will not gain fields; a future field goes in a new view.
+- The registry's function names stay as they are; the plain English lives in the `@notice`.
+- A counterfactual Rock Account cannot be bound on claim — an address that has never executed
+  cannot be shown to answer to anybody.
 
 ---
 
