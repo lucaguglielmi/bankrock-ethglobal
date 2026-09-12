@@ -12,11 +12,20 @@
  * "Trade with this rock" is disabled while no strategy is live: with nothing shipped there is
  * nothing to trade against, and a button that opens a sheet only to explain that would be worse
  * than one that says so where it stands.
+ *
+ * **Funding** is "Fund this rock", which opens a REAL surface: the Rock Account, its balances, the
+ * two token contracts and the explorer link. It used to be "Add funds from another chain", which
+ * opened the bridge sheet — and with demo mode off that sheet says only that no bridge exists, so
+ * the one fund-shaped control on an awake rock was a dead end. The bridge sheet is now offered
+ * only under `NEXT_PUBLIC_DEMO_MODE=true`, where it is a badged DEMO beat (DEMO-STATE S-1).
  */
 
-import { Globe } from "lucide-react";
+import { useState } from "react";
+import { Globe, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SimulatedBadge } from "@/components/ui/simulated-badge";
+import { FundRockSheet } from "@/components/rock/fund-rock-sheet";
+import { isDemoMode } from "@/lib/demo";
 import { AquaPositionCard } from "@/components/aqua-position-card";
 import { RockAlerts } from "@/components/rock-alerts";
 import { RockActivity } from "@/components/rock-activity";
@@ -41,6 +50,7 @@ export interface AwakeRockProps {
   ownerActions?: Capability<string>;
   onTrade: () => void;
   onGive: () => void;
+  /** Opens the simulated bridge sheet. Only reachable under `NEXT_PUBLIC_DEMO_MODE=true`. */
   onCrossChain: () => void;
   onRefresh: () => void;
   isRefreshing?: boolean;
@@ -60,6 +70,7 @@ export function AwakeRock({
   onRefresh,
   isRefreshing = false,
 }: AwakeRockProps) {
+  const [isFundOpen, setFundOpen] = useState(false);
   const isTrading = strategy.state !== "UNAVAILABLE" && strategy.value.streams.length > 0;
   const canTrade = isTrading || isStrategyLoading;
   const ownerBlockedReason =
@@ -99,14 +110,36 @@ export function AwakeRock({
       <Button
         variant="outline"
         className="h-auto w-full flex-wrap justify-between gap-3 py-3 text-left"
-        onClick={onCrossChain}
+        onClick={() => setFundOpen(true)}
       >
         <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-          <Globe aria-hidden />
-          Add funds from another chain
+          <Wallet aria-hidden />
+          Fund this rock
         </span>
-        <SimulatedBadge />
+        <span className="text-sm text-ink-3">Send USDC or WETH</span>
       </Button>
+
+      {isDemoMode() ? (
+        <Button
+          variant="outline"
+          className="h-auto w-full flex-wrap justify-between gap-3 py-3 text-left"
+          onClick={onCrossChain}
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <Globe aria-hidden />
+            Add funds from another chain
+          </span>
+          <SimulatedBadge />
+        </Button>
+      ) : null}
+
+      <FundRockSheet
+        open={isFundOpen}
+        onOpenChange={setFundOpen}
+        rockId={rockId}
+        smartAccount={smartAccount}
+        reserves={reserves}
+      />
 
       <AquaPositionCard
         rockId={rockId}

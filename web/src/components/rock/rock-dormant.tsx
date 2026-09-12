@@ -5,10 +5,23 @@
  *
  * Awakening needs two things and says which one is missing: a signed-in wallet, and a tap this
  * server verified and signed for that wallet. Neither can be faked from the client (D-018).
+ *
+ * It also shows **the account this rock would open** — the counterfactual Rock Account derived
+ * from the verified tag and the signed-in wallet (D-029), which the page could not show at all
+ * until `uidHash` was passed down from the tap. Flow B step 9 funds that address, and funding it
+ * before awakening is legitimate: the Safe is deployed by the first sponsored UserOperation, and
+ * tokens sent to the address beforehand are already the rock's when it wakes up. The one condition
+ * is the wallet: the address is derived from `(subject, uidHash)`, so awakening with a different
+ * wallet opens a different account, and the page says so next to the address rather than letting
+ * an operator discover it after a transfer.
  */
 
 import { useState } from "react";
+import { Address } from "@/components/ui/address";
 import { Button } from "@/components/ui/button";
+import { UnavailableState } from "@/components/ui/unavailable-state";
+import { explorer } from "@/lib/chain";
+import type { Capability } from "@/lib/demo";
 import { useAudio } from "@/context/audio-context";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useRockActions } from "@/hooks/useBankRock";
@@ -24,6 +37,12 @@ export interface DormantRockProps {
   tap: TapAttestation;
   authenticated: boolean;
   address?: string;
+  /**
+   * The account this rock would open, from `useRockAccount` — derived from the verified tag and
+   * the signed-in wallet (D-029). UNAVAILABLE carries the reason there is no address yet: signed
+   * out, no tap, or the derivation could not be run.
+   */
+  rockAccount: Capability<string>;
   /** Opens the onboarding sheet — a dormant rock cannot be awakened by a visitor without a wallet. */
   onSignIn: () => void;
   onAwakened: () => void;
@@ -51,6 +70,7 @@ export function DormantRock({
   tap,
   authenticated,
   address,
+  rockAccount,
   onSignIn,
   onAwakened,
 }: DormantRockProps) {
@@ -62,7 +82,17 @@ export function DormantRock({
   const attestation = signedAttestation(tap, address);
   const registryReason =
     availability.registry.state === "UNAVAILABLE" ? availability.registry.reason : null;
-  const reason = registryReason ?? (authenticated ? blockedReason(tap, address) : null);
+  const tapBlocked = authenticated ? blockedReason(tap, address) : null;
+  const reason = registryReason ?? tapBlocked;
+
+  /*
+   * Why there is no address yet. The tap is the more specific answer whenever it is the thing
+   * that is missing: the derivation needs `uidHash` from a signed attestation, so "tap the rock
+   * first" would otherwise be shown to somebody who has tapped it and whose tap could not be
+   * signed.
+   */
+  const accountReason =
+    rockAccount.state === "UNAVAILABLE" ? (tapBlocked ?? rockAccount.reason) : null;
 
   const handleAwaken = async () => {
     if (!authenticated) {
@@ -107,6 +137,29 @@ export function DormantRock({
       ) : !authenticated ? (
         <p className="text-sm text-ink-3">You will be asked to sign in first.</p>
       ) : null}
+
+      <div className="flex flex-col gap-2 rounded-2xl border border-border p-4">
+        <h3 className="text-label text-ink-3">The account this rock would open</h3>
+        {rockAccount.state === "UNAVAILABLE" ? (
+          <UnavailableState reason={accountReason ?? rockAccount.reason} />
+        ) : (
+          <>
+            <Address
+              value={rockAccount.value}
+              explorerHref={explorer.address(rockAccount.value)}
+            />
+            <p className="max-w-prose text-sm text-ink-2">
+              Funds sent here before awakening belong to this rock once you awaken it with this
+              wallet.
+            </p>
+            <p className="max-w-prose text-sm text-ink-3">
+              The address comes from this tag and the wallet you are signed in with. Awaken with a
+              different wallet and the rock opens a different account, and anything already sent
+              here stays with this one.
+            </p>
+          </>
+        )}
+      </div>
 
       <ActionOutcomeNotice outcome={outcome} successLabel="This rock is awake" />
     </section>

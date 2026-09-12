@@ -65,17 +65,6 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
 
   const record = rock.state === "UNAVAILABLE" ? null : rock.value;
 
-  /*
-   * Who may act from this rock's account, asked of the account itself (D-037).
-   *
-   * `isOwner` below is object ownership — what the registry says about the rock. This is the other
-   * half: whether the Rock Account the registry names still answers to the signed-in wallet. After
-   * a gift the two move together, and they are the two conditions the registry's own owner gate
-   * applies, so asking both here means the owner's buttons are never offered when the transaction
-   * behind them would revert.
-   */
-  const { authority } = useRockAccount({ record });
-
   // One strategy read for the whole page: the reserve caption, the trade button, the position
   // card and the owner's Cash in all describe the same streams and must not disagree.
   const {
@@ -111,6 +100,33 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
     params: { e: searchParams.e, c: searchParams.c, enc: searchParams.enc },
     subject: address,
     gate,
+  });
+
+  /*
+   * The tag, as the server hashed it. It comes only from a signed attestation, so it cannot be
+   * supplied by a URL, and it is the missing half of the Rock Account derivation on a rock that
+   * has not been awakened yet (D-029): without it `useRockAccount` had nothing to derive from and
+   * a dormant rock never showed the account it would open.
+   */
+  const tapUidHash =
+    tap.status === "checked" && tap.verified && tap.attestation?.state === "SIGNED"
+      ? tap.attestation.message.uidHash
+      : undefined;
+
+  /*
+   * Two answers about this rock's account (`useRockAccount`):
+   *
+   *  - `rockAccount` — which account holds the money. For an awakened rock that is the registry's,
+   *    read and never re-derived (D-037); before the awakening it is the counterfactual address
+   *    this wallet and this tag derive, which is what a dormant rock now shows so it can be funded
+   *    before it is awakened;
+   *  - `authority` — whether that account still answers to the signed-in wallet. `isOwner` below is
+   *    the other half, object ownership as the registry records it. Asking both means the owner's
+   *    buttons are never offered when the transaction behind them would revert.
+   */
+  const { address: rockAccount, authority } = useRockAccount({
+    record,
+    uidHash: tapUidHash,
   });
 
   const [scenario, setScenario] = useState<DemoScenario>("awake");
@@ -183,6 +199,7 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         tap={tap}
         authenticated={authenticated}
         address={address}
+        rockAccount={rockAccount}
         onSignIn={() => requireSignIn(null)}
         onAwakened={refreshAll}
       />

@@ -20,6 +20,13 @@
  * Deleted with the rewrite: the `Math.random()` deposit hash and its BaseScan link (S-2), the
  * estimated-return figure (N-3), the fabricated second strategy, and the SIMULATED spread selector —
  * the real fee tier is chosen once, in the ship sheet, because it is the strategy's identity.
+ *
+ * Deleted after it: the **History** charts. They rendered `history ?? []`, no caller ever passed
+ * `history`, and the route that could have filled it — `GET /api/rocks/[id]/yield` — was called by
+ * nobody and is gone with them. The fee figures above are the real history this card has: they are
+ * summed from Aqua's own `Pushed` events, per stream, with the block range they were read over. An
+ * empty chart under the heading "History" reads as "nothing happened", which is a claim, not an
+ * absence.
  */
 
 import { useState } from "react";
@@ -29,7 +36,6 @@ import { Amount } from "@/components/ui/amount";
 import { Button } from "@/components/ui/button";
 import { SimulatedBadge } from "@/components/ui/simulated-badge";
 import { UnavailableState } from "@/components/ui/unavailable-state";
-import { AnalyticsDashboard, type YieldDataPoint } from "@/components/analytics-dashboard";
 import { ShipStrategySheet } from "@/components/rock/ship-strategy-sheet";
 import { formatFeeRate } from "@/components/rock/util";
 import type { ParsedStream, StrategyView } from "@/hooks/useAquaStrategy";
@@ -52,8 +58,6 @@ export interface AquaPositionCardProps {
    * is a batch from that account, so an UNAVAILABLE answer replaces the button with its reason.
    */
   ownerActions?: Capability<string>;
-  /** Recorded history, when there is any. */
-  history?: YieldDataPoint[];
   /** Re-reads the chain. Wired to the page's `refresh()`. */
   onSync: () => void;
   isSyncing?: boolean;
@@ -67,7 +71,6 @@ export function AquaPositionCard({
   isStrategyLoading = false,
   isOwner = false,
   ownerActions,
-  history,
   onSync,
   isSyncing = false,
 }: AquaPositionCardProps) {
@@ -147,12 +150,6 @@ export function AquaPositionCard({
             This rock is not trading yet. Only its owner can start it.
           </p>
         )}
-      </div>
-
-      {/* History ------------------------------------------------------------- */}
-      <div className="flex flex-col gap-2">
-        <h4 className="text-label text-ink-3">History</h4>
-        <AnalyticsDashboard data={history ?? []} />
       </div>
 
       {/* Contracts ----------------------------------------------------------- */}

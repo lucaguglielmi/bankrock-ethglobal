@@ -46,8 +46,17 @@ Registration does not create or fund a wallet.
    the transaction may equally be relayed — the tapping user never needs ETH. The client refuses
    to send an attestation that names a different wallet, rock or account than the one on screen.
 9. The user funds the Rock Account with the supported testnet token pair **(0.01 ETH from the
-   built-in faucet; USDC and WETH from the public faucets — spec 16 Part 3)**.
-10. The owner selects a fee rate and the amounts to expose.
+   built-in faucet; USDC and WETH from the public faucets — spec 16 Part 3)**. An awake rock's
+   **Fund this rock** sheet is the surface for it: the Rock Account address with a copy button,
+   what the account holds right now, the USDC and WETH contract addresses from `lib/chain`, and
+   the Sepolia Etherscan link — no bridge, no quote and no amount field, because the transfer is
+   made in the sender's own wallet. A **dormant** rock shows the same address before it is
+   awakened — the account it *would* open, derived from the tag and the signed-in wallet (D-029) —
+   with the one condition stated beside it: funds sent there belong to the rock only if it is
+   awakened with that same wallet.
+10. The owner selects which stream to open and the amounts to expose. The choices are exactly the
+    streams every reader probes — stream 0 at 30 bps ("Wide") and stream 1 at 5 bps ("Tight") —
+    because a fee the readers do not probe hashes to a strategy nothing in the app can find.
 11. **Atomic UserOperation Batching (1-Click Launch):** the user approves once via Privy. The Rock
     Account executes one batched UserOperation bundling `USDC.approve(Aqua, a)`,
     `WETH.approve(Aqua, b)` and
@@ -80,7 +89,10 @@ No login should be required for public inspection.
    swap is a public action against a public strategy, and the tap proves nothing a swap needs.
 2. If necessary, Privy creates or restores the visitor wallet. The account that transacts is the
    visitor's **personal Safe** — `saltNonce = 0`, not tied to any tag, one per visitor no matter
-   how many rocks they trade with (D-029).
+   how many rocks they trade with (D-029). The trade sheet **shows that account**: its address
+   with a copy button and its live USDC and WETH balances. Gas is sponsored but the input token is
+   not, so an account holding none of it says "This account holds no USDC — send some to the
+   address above" and the confirm button stays disabled, rather than failing in estimation.
 3. The interface shows input, expected output, price impact, fee rate and network. The quote
    comes from `XYCSwap.quoteExactIn` — the identical code path the swap runs — with the mirrored
    client-side maths only as a preview while the user types. Price impact is computed from the

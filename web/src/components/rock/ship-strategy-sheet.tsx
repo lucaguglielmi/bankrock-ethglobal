@@ -3,7 +3,7 @@
 /**
  * Start earning — shipping a strategy to Aqua (spec 04, Flow B steps 8–10).
  *
- * Two things this sheet is careful about:
+ * Three things this sheet is careful about:
  *
  *  - the consequence sentence is literal. `ship` moves no tokens: the rock keeps them in its own
  *    account and Aqua records how much of that reserve this strategy may trade
@@ -11,7 +11,12 @@
  *    wrong in a way the user would only discover later;
  *  - the fee tier is the strategy's identity, not a setting. A strategy whose `feeBps` differs by
  *    one basis point hashes differently and has no balances, so it is chosen here, once, and
- *    never presented as an adjustable slider afterwards (NOTES §6).
+ *    never presented as an adjustable slider afterwards (NOTES §6);
+ *  - **the choices are the streams the readers probe**, taken from `SHIP_OPTIONS`, which is
+ *    derived from `DEFAULT_STREAMS`. The free 5 / 30 / 100 bps tiers this sheet used to offer on
+ *    stream 0 could ship a strategy that `findShippedStream` never looks for: the position card,
+ *    the Trade button, the quote route and Cash in would all report "not trading" over a live
+ *    allowance, with no way back short of shipping again at the fee a reader knows.
  *
  * Nothing is annualised anywhere in this flow (D-004).
  */
@@ -32,12 +37,7 @@ import {
   type ActionOutcome,
 } from "@/components/rock/action-result";
 import { formatFeeRate } from "@/components/rock/util";
-
-const FEE_TIERS = [
-  { bps: 5, hint: "Tight — trades often, earns least per trade" },
-  { bps: 30, hint: "Standard" },
-  { bps: 100, hint: "Wide — trades rarely, earns most per trade" },
-] as const;
+import { SHIP_OPTIONS, shipOptionFor, type ShipOption } from "@/components/rock/ship-options";
 
 const DECIMAL_PATTERN = /^\d*(\.\d*)?$/;
 
@@ -57,6 +57,7 @@ export interface ShipStrategySheetProps {
   onOpenChange: (open: boolean) => void;
   rockId: string;
   reserves: Capability<{ usdc: bigint; weth: bigint }>;
+  /** Which stream the sheet opens on. It must be one the readers probe; see `ship-options.ts`. */
   streamIndex?: number;
   onShipped: () => void;
 }
@@ -75,7 +76,7 @@ export function ShipStrategySheet({
   const [step, setStep] = useState<"amounts" | "review">("amounts");
   const [usdcInput, setUsdcInput] = useState("");
   const [wethInput, setWethInput] = useState("");
-  const [feeBps, setFeeBps] = useState<number>(30);
+  const [option, setOption] = useState<ShipOption>(() => shipOptionFor(streamIndex));
   const [outcome, setOutcome] = useState<ActionOutcome | null>(null);
 
   const held = reserves.state === "UNAVAILABLE" ? null : reserves.value;
@@ -92,7 +93,12 @@ export function ShipStrategySheet({
     if (!canReview || usdcAmount === null || wethAmount === null) return;
     playTap();
     const result = outcomeFrom(
-      await shipStrategy(rockId, { usdcAmount, wethAmount, feeBps, streamIndex }),
+      await shipStrategy(rockId, {
+        usdcAmount,
+        wethAmount,
+        feeBps: option.feeBps,
+        streamIndex: option.streamIndex,
+      }),
     );
     setOutcome(result);
     if (result.kind === "error") {
@@ -169,15 +175,20 @@ export function ShipStrategySheet({
 
             <fieldset className="flex flex-col gap-2">
               <legend className="text-label text-ink-3">What each trade pays this rock</legend>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {FEE_TIERS.map((tier) => {
-                  const isActive = tier.bps === feeBps;
+              <div
+                className={cn(
+                  "grid grid-cols-1 gap-2",
+                  SHIP_OPTIONS.length > 1 ? "sm:grid-cols-2" : null,
+                )}
+              >
+                {SHIP_OPTIONS.map((candidate) => {
+                  const isActive = candidate.streamIndex === option.streamIndex;
                   return (
                     <button
-                      key={tier.bps}
+                      key={candidate.streamIndex}
                       type="button"
                       aria-pressed={isActive}
-                      onClick={() => setFeeBps(tier.bps)}
+                      onClick={() => setOption(candidate)}
                       className={cn(
                         "flex min-h-12 flex-col justify-center rounded-2xl border px-4 py-2 text-left motion-safe:transition-colors",
                         isActive
@@ -185,14 +196,16 @@ export function ShipStrategySheet({
                           : "border-border bg-background text-ink-2 hover:bg-muted",
                       )}
                     >
-                      <span className="text-sm font-semibold">{formatFeeRate(tier.bps)}</span>
+                      <span className="text-sm font-semibold">
+                        {candidate.label} — {formatFeeRate(candidate.feeBps)}
+                      </span>
                       <span
                         className={cn(
                           "text-caption",
                           isActive ? "text-background/80" : "text-ink-3",
                         )}
                       >
-                        {tier.hint}
+                        {candidate.hint}
                       </span>
                     </button>
                   );
@@ -222,7 +235,7 @@ export function ShipStrategySheet({
                 </span>
               </div>
               <p className="text-sm text-ink-2">
-                Earns {formatFeeRate(feeBps)} of every trade.
+                {option.label} — earns {formatFeeRate(option.feeBps)} of every trade.
               </p>
             </div>
 
