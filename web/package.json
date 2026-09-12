@@ -9,7 +9,7 @@
     "lint": "eslint",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "deploy:pages": "opennextjs-cloudflare build && rm -rf .dist-pages && mkdir -p .dist-pages && cp -r .open-next/assets/* .dist-pages/ && cp -r .open-next/cloudflare .open-next/middleware .open-next/server-functions .open-next/.build .dist-pages/ && cp .open-next/worker.js .dist-pages/_worker.js && wrangler pages deploy .dist-pages --project-name bankrock-ethglobal --branch main --commit-dirty=true && rm -rf .dist-pages",
+    "deploy:pages": "opennextjs-cloudflare build && rm -rf .dist-pages && mkdir -p .dist-pages && cp -r .open-next/assets/* .dist-pages/ && cp -r .open-next/cloudflare .open-next/middleware .open-next/server-functions .open-next/.build .dist-pages/ && cp .open-next/worker.js .dist-pages/_worker.js && echo '{\"version\":1,\"include\":[\"/*\"],\"exclude\":[\"/_next/static/*\",\"/favicon.ico\",\"/icon.svg\",\"/manifest.webmanifest\"]}' > .dist-pages/_routes.json && wrangler pages deploy .dist-pages --project-name bankrock-ethglobal --branch main --commit-dirty=true && rm -rf .dist-pages",
     "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
