@@ -77,23 +77,12 @@ function TransferModalInner({
     try {
       // Step 1: EIP-712 Safe UserOp Encoding
       setSubmissionStep(1);
-      await new Promise((resolve) => setTimeout(resolve, 300)); // Minimal delay for UI
 
       // Step 2: Paymaster Gas Sponsorship & Execution
       setSubmissionStep(2);
       
-      let generatedTx = "";
-      try {
-        const isPaymasterEmpty = Math.random() < 0.1;
-        if (isPaymasterEmpty) throw new Error("Paymaster sponsorship failed");
-        
-        const txRes = await transferOnchain(rockId, trimmedRecipient as `0x${string}`);
-        generatedTx = txRes as string;
-      } catch (err: any) {
-        if (err.message === "Paymaster sponsorship failed") throw err;
-        console.warn("Real on-chain transfer failed, proceeding with UI sequence for demo:", err);
-        generatedTx = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`;
-      }
+      const txRes = await transferOnchain(rockId, trimmedRecipient as `0x${string}`);
+      const generatedTx = txRes as string;
       
       setSubmissionStep(3);
       setTxHash(generatedTx);

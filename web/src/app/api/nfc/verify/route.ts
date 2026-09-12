@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import * as crypto from 'crypto';
+import { Buffer } from 'buffer';
+// @ts-ignore
+import { aesCmac } from 'node-aes-cmac';
 import { logger } from "@/lib/telemetry";
 import { getRequestContext } from "@cloudflare/next-on-pages";
 import { getDb } from "@/lib/db";
@@ -82,8 +85,18 @@ export async function POST(req: Request) {
     }
 
     // CMAC Verification
-    // Structurally: we would AES-CMAC the UID+Counter and compare with 'c'.
-    // We will simulate verification logic here.
+    // Structurally: we AES-CMAC the UID+Counter and compare with 'c'.
+    const macInput = Buffer.alloc(11);
+    Buffer.from(uid, 'hex').copy(macInput, 0);
+    macInput.writeUInt32LE(counter, 7);
+    
+    const calculatedCmac = aesCmac(key, macInput);
+    
+    // SDM MAC is typically truncated to 8 bytes (16 hex chars). We compare up to the length of 'c' provided.
+    if (c.length > 0 && !calculatedCmac.toLowerCase().startsWith(c.toLowerCase())) {
+      logger.warn('NFC CMAC Verification failed', { expected: calculatedCmac, received: c });
+      return NextResponse.json({ error: 'Invalid SDM MAC' }, { status: 401 });
+    }
     
     // Generate a cryptographic signature to pass to the smart contract (or JWT for session)
     const signatureKey = process.env.SIGNER_PRIVATE_KEY || '0000000000000000000000000000000000000000000000000000000000000001';

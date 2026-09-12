@@ -3,12 +3,23 @@ import { getRequestContext } from "@cloudflare/next-on-pages";
 import { getDb } from "@/lib/db";
 import { yieldSnapshots } from "@/lib/db/schema";
 import { logger } from "@/lib/telemetry";
-import * as crypto from 'crypto';
+import { createPublicClient, http, formatUnits } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { BANK_ROCK_REGISTRY_ADDRESS, BANK_ROCK_REGISTRY_ABI, AQUA_ADDRESSES } from "@/lib/contracts";
 
 export const runtime = "edge";
 
+const ERC20_BALANCE_ABI = [
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
 export async function GET(req: Request) {
-  // In production, require a secure chron token matching an env var
   const url = new URL(req.url);
   const token = url.searchParams.get("token");
   
@@ -25,30 +36,64 @@ export async function GET(req: Request) {
     const db = getDb(env);
     const now = Date.now();
 
-    // Since this is a hackathon MVP, we don't have a robust directory of all active rocks yet.
-    // In a full implementation, we would query the `rocks` table, then fetch each Rock's Safe TVL.
-    // For now, we will simulate the chron indexer executing a TVL capture for Rock "1" and "2".
-    
-    const mockRocksToSnapshot = [
-      { id: "1", currentTvl: 1250.00, currentFees: 12.40 },
-      { id: "2", currentTvl: 450.00, currentFees: 1.20 }
-    ];
+    const publicClient = createPublicClient({
+      chain: baseSepolia,
+      transport: http(process.env.RPC_URL || "https://sepolia.base.org")
+    });
 
-    for (const rock of mockRocksToSnapshot) {
-      // Simulate real-world drift slightly for the chart to move up
-      const tvlDrift = rock.currentTvl + (Math.random() * 10 - 2); 
-      const feesDrift = rock.currentFees + (Math.random() * 1);
+    // Default to Rock #1 and #2
+    const rocksToSnapshot = ["1", "2"];
+
+    for (const rockId of rocksToSnapshot) {
+      let tvlUsdc = 0;
+      let feesEarnedUsdc = 0; // Mock for now
+
+      try {
+        const rockData = await publicClient.readContract({
+          address: BANK_ROCK_REGISTRY_ADDRESS as `0x${string}`,
+          abi: BANK_ROCK_REGISTRY_ABI,
+          functionName: 'rocks',
+          args: [BigInt(rockId)]
+        }) as [string, string, bigint, boolean];
+
+        const smartAccount = rockData[0] as `0x${string}`;
+
+        if (smartAccount && smartAccount !== "0x0000000000000000000000000000000000000000") {
+          const usdcBalance = await publicClient.readContract({
+            address: AQUA_ADDRESSES.testUSDC as `0x${string}`,
+            abi: ERC20_BALANCE_ABI,
+            functionName: 'balanceOf',
+            args: [smartAccount]
+          }) as bigint;
+
+          const wethBalance = await publicClient.readContract({
+            address: AQUA_ADDRESSES.testWETH as `0x${string}`,
+            abi: ERC20_BALANCE_ABI,
+            functionName: 'balanceOf',
+            args: [smartAccount]
+          }) as bigint;
+
+          const usdcNum = parseFloat(formatUnits(usdcBalance, 6));
+          const wethNum = parseFloat(formatUnits(wethBalance, 18));
+          
+          // Assuming 1 WETH = 2500 USDC
+          tvlUsdc = parseFloat((usdcNum + wethNum * 2500).toFixed(2));
+          feesEarnedUsdc = parseFloat((tvlUsdc * 0.01).toFixed(2)); // Mocking some earned fees based on TVL
+        }
+      } catch (err) {
+        logger.error(`Failed to fetch balances for rock ${rockId}`, { error: String(err) });
+      }
 
       await db.insert(yieldSnapshots).values({
         id: crypto.randomUUID(),
-        rockId: rock.id,
+        rockId: rockId,
         timestamp: now,
-        tvlUsdc: parseFloat(tvlDrift.toFixed(2)),
-        feesEarnedUsdc: parseFloat(feesDrift.toFixed(2)),
+        tvlUsdc: tvlUsdc,
+        feesEarnedUsdc: feesEarnedUsdc,
       });
     }
 
-    logger.info('Yield Snapshot Cron executed successfully', { rocksSnapshotted: mockRocksToSnapshot.length });
+    logger.info('Yield Snapshot Cron executed successfully', { rocksSnapshotted: rocksToSnapshot.length });
 
     return NextResponse.json({ success: true, message: "Yield snapshots captured." });
   } catch (error) {

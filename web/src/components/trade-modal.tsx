@@ -17,6 +17,7 @@ import {
   Zap
 } from "lucide-react";
 import { useAudio } from "@/context/audio-context";
+import { useRockActions } from "@/hooks/useBankRock";
 
 type TokenType = "USDC" | "WETH";
 
@@ -47,6 +48,7 @@ function TradeModalInner({
 }: Omit<TradeModalProps, "isOpen">) {
   const { hapticError, hapticLight } = useHaptics();
   const { playTap, playSuccess, playError, playSwipe } = useAudio();
+  const { tradeOnchain, contractAddresses } = useRockActions();
   const [fromToken, setFromToken] = useState<TokenType>("USDC");
   const [toToken, setToToken] = useState<TokenType>("WETH");
   const [amountIn, setAmountIn] = useState<string>("");
@@ -189,31 +191,19 @@ function TradeModalInner({
       playSwipe();
       // Step 1: UserOp Signing (Approval + Swap)
       setStatus("signing");
-      await new Promise((resolve) => setTimeout(resolve, 800));
 
-      // Step 2: Pimlico Bundler
+      const decimalsIn = fromToken === "USDC" ? 6 : 18;
+      const decimalsOut = toToken === "USDC" ? 6 : 18;
+      const amountInWei = BigInt(Math.floor(inputNumber * (10 ** decimalsIn)));
+      const amountOutMinWei = BigInt(Math.floor(outputAmount * 0.95 * (10 ** decimalsOut))); 
+      const tokenInAddr = fromToken === "USDC" ? contractAddresses.testUSDC : contractAddresses.testWETH;
+
+      // Step 2: Pimlico Bundler & Execution
       setStatus("bundling");
-      await new Promise((resolve, reject) => {
-        // Mock 10% chance of paymaster failure for realism/gotcha demonstration
-        const isPaymasterEmpty = Math.random() < 0.1;
-        setTimeout(() => {
-          if (isPaymasterEmpty) {
-            reject(new Error("Paymaster sponsorship failed"));
-          } else {
-            resolve(true);
-          }
-        }, 1000);
-      });
+      const generatedTxHash = await tradeOnchain(rockId, amountInWei, amountOutMinWei, tokenInAddr, "0x") as string;
 
       // Step 3: Aqua Settlement
       setStatus("settling");
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      // Generate realistic Base Sepolia UserOp / Tx Hash
-      const randomHex = Array.from({ length: 64 }, () =>
-        Math.floor(Math.random() * 16).toString(16)
-      ).join("");
-      const generatedTxHash = `0x${randomHex}`;
       setTxHash(generatedTxHash);
 
       // Update user balances
