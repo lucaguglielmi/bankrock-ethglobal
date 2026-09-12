@@ -499,7 +499,8 @@ by what kind of value it is, and never in two:
    `RELAYER_DAILY_CAP_WEI` (`20000000000000000`, 0.02 ETH per UTC day). The addresses are copied
    from `contracts/deployments/sepolia.json` and `contracts/deployments/sepolia-aqua-app.json`.
 2. **Account-specific public identifiers are GitHub Actions inputs**, not git:
-   `NEXT_PUBLIC_PRIVY_APP_ID` as a repository *variable*, `NEXT_PUBLIC_PIMLICO_API_KEY` as a
+   ~~`NEXT_PUBLIC_PRIVY_APP_ID` as a repository *variable*~~ (amended 2026-09-12: the Privy app id is a
+   public identifier and lives in `wrangler.jsonc` `vars` with the addresses), `NEXT_PUBLIC_PIMLICO_API_KEY` as a
    repository *secret* (browser-visible by construction, but still a key).
 3. **True secrets are encrypted secrets on the Worker** — RPC URL, every private key, the NFC
    master key, `ADMIN_*`, `CRON_SECRET`, `RESEND_API_KEY`, the webhook secret — set by hand, never

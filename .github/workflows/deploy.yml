@@ -28,9 +28,9 @@ jobs:
     #  1. Non-secret configuration is in git, in web/wrangler.jsonc `vars`. The "Export the public
     #     build-time variables" step below reads the NEXT_PUBLIC_* ones out of that file into this
     #     job's environment, because Next inlines them at build time and `npm run deploy` builds.
-    #  2. Account-specific public identifiers are the two GitHub inputs below: a repository
-    #     *variable* for the Privy app id, a repository *secret* for the browser-visible Pimlico
-    #     key (it is public by construction, but it is still a key, so it is not committed).
+    #  2. One account-specific value is a GitHub input: a repository *secret* for the browser-visible
+    #     Pimlico key (public by construction, but still a key, so it is not committed). The Privy
+    #     app id is a plain public identifier and lives in wrangler.jsonc with the addresses.
     #  3. True secrets are set on the Cloudflare Worker `web` as encrypted secrets and never appear
     #     here or anywhere in git. A deploy never touches them.
     #
@@ -43,7 +43,6 @@ jobs:
     # Only the two Cloudflare credentials are needed to publish.
     env:
       NEXT_PUBLIC_DEMO_MODE: "false"
-      NEXT_PUBLIC_PRIVY_APP_ID: ${{ vars.NEXT_PUBLIC_PRIVY_APP_ID }}
       NEXT_PUBLIC_PIMLICO_API_KEY: ${{ secrets.NEXT_PUBLIC_PIMLICO_API_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

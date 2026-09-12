@@ -70,7 +70,7 @@ diff, and the deployed configuration could not be compared with the deploy recor
 | | Home | What lives there | Changed by |
 | --- | --- | --- | --- |
 | **[1]** | `web/wrangler.jsonc` `vars`, **in git** | Non-secret, account-independent configuration: `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CHAIN_ID`, `NEXT_PUBLIC_DEMO_MODE`, the six addresses, `REGISTRY_DEPLOY_BLOCK`, `AQUA_APP_DEPLOY_BLOCK`, `RELAYER_DAILY_CAP_WEI` | A commit, reviewed like code, applied by the next deploy |
-| **[2]** | GitHub Actions inputs, read by `deploy.yml` | Account-specific *public* identifiers: `NEXT_PUBLIC_PRIVY_APP_ID` (repository **variable**), `NEXT_PUBLIC_PIMLICO_API_KEY` (repository **secret**) | The operator, once, in repository settings |
+| **[2]** | GitHub Actions input, read by `deploy.yml` | `NEXT_PUBLIC_PIMLICO_API_KEY` (repository **secret**). The Privy app id moved to **[1]** on 2026-09-12: it is a public identifier shipped in every bundle, so git is its honest home | The operator, once, in repository settings |
 | **[3]** | Encrypted **secrets on the Worker** (`wrangler secret put`, or dashboard → Variables and Secrets → Secret) | `SEPOLIA_RPC_URL`, `PIMLICO_API_KEY`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY`, `FAUCET_PRIVATE_KEY`, `NXP_MASTER_KEY`, `ADMIN_*`, `CRON_SECRET`, `RESEND_API_KEY`, `ALCHEMY_WEBHOOK_SECRET`, the web-push server pair | The operator, in the dashboard or with `wrangler` |
 
 Spec 16 §2.2 marks every variable with its home; §2.3 is the operator's whole remaining list.

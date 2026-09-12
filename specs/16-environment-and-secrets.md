@@ -170,7 +170,7 @@ secret you create locally (`openssl rand -hex 32`). *Output* = produced by a dep
 | | Home | What belongs there |
 | --- | --- | --- |
 | **[1]** | `web/wrangler.jsonc` `vars`, **in git** | Non-secret, account-independent configuration: the origin, the chain id, the demo flag, every contract address, the two deploy blocks, the relayer's daily cap. Changed by a commit and a deploy, reviewed like code. |
-| **[2]** | A **GitHub Actions input**, read by `deploy.yml` | Account-specific *public* identifiers: `NEXT_PUBLIC_PRIVY_APP_ID` (repository **variable**) and `NEXT_PUBLIC_PIMLICO_API_KEY` (repository **secret** — browser-visible by construction, but still a key). Set once by the operator. |
+| **[2]** | A **GitHub Actions input**, read by `deploy.yml` | `NEXT_PUBLIC_PIMLICO_API_KEY` (repository **secret** — browser-visible by construction, but still a key). Set once by the operator. The Privy app id is **[1]** since 2026-09-12: a public identifier, committed in `wrangler.jsonc`. |
 | **[3]** | A **Worker secret** — `wrangler secret put NAME`, or dashboard → Variables and Secrets → **Secret** | Everything a deploy must never carry. A few entries here are not secret in the cryptographic sense (`ALERT_FROM_ADDRESS`, `ALERT_EMAIL_ADDRESS`, `WEB_PUSH_SUBJECT`, the two `NXP_KEY_DIVERSIFY*`), but a **plain-text Worker variable is deleted by the next deploy** (see §2.3.2), so Secret is the only home on the Worker that survives one. |
 
 A value is in exactly one of the three. Whatever is not in one of them is not configuration of the
@@ -179,7 +179,7 @@ tooling variables are the operator's shell, and `BANKROCK_API_URL` is the agent'
 
 | # | Variable (today → target) | Provider | Where it lives in production | Where used | Needed from | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `NEXT_PUBLIC_PRIVY_APP_ID` | You — dashboard.privy.io | **[2]** GitHub repo *variable* | `providers.tsx` | Phase 0 | Also configure in the dashboard: allowed origin `https://bank-rock.com`, login methods email / Google / Apple / wallet, and enable Sepolia. Without it the app boots with a placeholder app ID and `login()` silently activates a **fabricated embedded wallet** (`0x71C8…1b47`, `collector@bankrock.eth`) — spec 15 A-1/A-2. Phase 1 replaces that with an `UNAVAILABLE` sign-in state. |
+| 1 | `NEXT_PUBLIC_PRIVY_APP_ID` | You — dashboard.privy.io; **set 2026-09-12** to `cmtytvqip029c0djknzi8qz4t` | **[1]** `wrangler.jsonc` `vars` (public identifier) | `providers.tsx` | Phase 0 | Also configure in the dashboard: allowed origin `https://bank-rock.com`, login methods email / Google / Apple / wallet, and enable Sepolia. Without it the app boots with a placeholder app ID and `login()` silently activates a **fabricated embedded wallet** (`0x71C8…1b47`, `collector@bankrock.eth`) — spec 15 A-1/A-2. Phase 1 replaces that with an `UNAVAILABLE` sign-in state. |
 | 2 | `NEXT_PUBLIC_APP_URL` | Fixed: `https://bank-rock.com` | **[1]** `wrangler.jsonc` `vars` | CORS in `middleware.ts`; email CTAs; MCP base URL | Phase 0 | Replaces the `bankrock.xyz` / `pages.dev` literals (D-022). |
 | 3 | `NEXT_PUBLIC_CHAIN_ID` | Fixed: `11155111` | **[1]** `wrangler.jsonc` `vars` | `lib/chain/index.ts` (D-015), `lib/demo.ts`, `lib/nfc/attestation.ts` | Phase 1 | **Read now** — the "currently unread" note this row used to carry is stale. It is also the EIP-712 domain's `chainId`, so a wrong value makes every attestation unverifiable rather than merely mis-routed. |
 | 4 | `SEPOLIA_RPC_URL` | You — Alchemy or Infura Sepolia endpoint | **[3]** Worker secret | `lib/chain`, `lib/indexer.ts`, `lib/aqua/read.ts`, faucet, relayer, Rock Account derivation | Phase 1 | **Done:** one name, no aliases. **D-036:** `https://ethereum-sepolia-rpc.publicnode.com` is a measured, working value (filtered `eth_getLogs` over 2,000 and 10,000 blocks served); a keyed provider is the recommendation for demo day because a public endpoint's rate limit is shared, not a condition. |
@@ -229,7 +229,7 @@ live in production?" at a glance:
   `REGISTRY_DEPLOY_BLOCK` (#28), `NEXT_PUBLIC_AQUA_APP_ADDRESS` and
   `NEXT_PUBLIC_AQUA_TAKER_ADDRESS` (#12), `AQUA_APP_DEPLOY_BLOCK` (#29),
   `RELAYER_DAILY_CAP_WEI` (#34).
-- **[2] GitHub Actions inputs:** `NEXT_PUBLIC_PRIVY_APP_ID` (#1),
+- **[2] GitHub Actions inputs:** ~~`NEXT_PUBLIC_PRIVY_APP_ID` (#1)~~ (moved to [1] on 2026-09-12),
   `NEXT_PUBLIC_PIMLICO_API_KEY` (#15).
 - **[3] Worker secrets:** `SEPOLIA_RPC_URL` (#4), `ADMIN_PASSWORD` (#5), `ADMIN_JWT_SECRET` (#6),
   `ADMIN_API_KEY` (#21), `CRON_SECRET` (#7), `PIMLICO_API_KEY` (#15), `FAUCET_PRIVATE_KEY` (#16),
@@ -284,7 +284,7 @@ they identify *your* vendor accounts rather than this application, so they are n
 
 | Input | Kind | Why it is here and not in `wrangler.jsonc` |
 | --- | --- | --- |
-| `NEXT_PUBLIC_PRIVY_APP_ID` (#1) | Repository **variable** (`${{ vars.… }}`) — Settings → Secrets and variables → Actions → **Variables** | The Privy app id of your Privy account. Visible in the browser bundle either way; a variable, not a secret, so its value is readable in the Actions UI, which is the honest description of what it is |
+| ~~`NEXT_PUBLIC_PRIVY_APP_ID` (#1)~~ | **No longer a GitHub input** — committed in `web/wrangler.jsonc` `vars` since 2026-09-12 | A public identifier visible in every browser bundle; git is its honest home |
 | `NEXT_PUBLIC_PIMLICO_API_KEY` (#15) | Repository **secret** (`${{ secrets.… }}`) | Browser-visible by construction, and restricted by origin in the Pimlico dashboard — but it is still a key, and a key does not go in git |
 
 Both are inlined into the build by Next, so a change to either needs a **re-deploy**, not just a

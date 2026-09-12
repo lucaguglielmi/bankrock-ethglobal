@@ -45,10 +45,16 @@
   // this file into the build environment first (web/scripts/export-public-vars.mjs). The copies
   // here are what the Worker runtime reads; the exported copies are what the bundle carries.
   //
-  // Not here, deliberately: NEXT_PUBLIC_PRIVY_APP_ID and NEXT_PUBLIC_PIMLICO_API_KEY (account
+  // Not here, deliberately: NEXT_PUBLIC_PIMLICO_API_KEY (an account-specific key — a GitHub Actions
+  // secret) and every secret (Worker secrets, set by hand). The Privy app id IS here: it is a public
+  // identifier by design, shipped in every browser bundle (D-034, amended 2026-09-12).
+  // Superseded line kept for the diff reader: NEXT_PUBLIC_PRIVY_APP_ID and NEXT_PUBLIC_PIMLICO_API_KEY (account
   // identifiers — GitHub Actions inputs), and every secret (Worker secrets, set by hand).
   "vars": {
     "NEXT_PUBLIC_APP_URL": "https://bank-rock.com",
+    // dashboard.privy.io → the Bank Rock app. Public identifier; the dashboard holds the origin,
+    // login methods and chain list that go with it (spec 18 Part 2.2 step 3).
+    "NEXT_PUBLIC_PRIVY_APP_ID": "cmtytvqip029c0djknzi8qz4t",
     "NEXT_PUBLIC_CHAIN_ID": "11155111",
     // D-013: only the literal "true" enables simulation. Production is never a simulation, and
     // .github/workflows/deploy.yml pins the same value in the build job.
