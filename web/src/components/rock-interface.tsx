@@ -31,7 +31,6 @@ import { UnavailableState } from "@/components/ui/unavailable-state";
 import { DemoSwitcher, type DemoScenario } from "@/components/demo-switcher";
 import { TradeModal } from "@/components/trade-modal";
 import { TransferModal } from "@/components/transfer-modal";
-import { CrossChainModal } from "@/components/cross-chain-modal";
 import { PrivyOnboardingModal } from "@/components/privy-onboarding-modal";
 import { AttestationLine } from "@/components/rock/attestation-line";
 import { RockIdentity } from "@/components/rock/rock-identity";
@@ -106,7 +105,6 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
   const [pendingAction, setPendingAction] = useState<"give" | "trade" | null>(null);
   const [isTradeOpen, setTradeOpen] = useState(false);
   const [isGiveOpen, setGiveOpen] = useState(false);
-  const [isCrossChainOpen, setCrossChainOpen] = useState(false);
 
   const isOwner = sameAddress(record?.owner, address);
 
@@ -201,7 +199,6 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         isOwner={isOwner}
         onTrade={handleTrade}
         onGive={handleGive}
-        onCrossChain={() => setCrossChainOpen(true)}
         onRefresh={refreshAll}
         isRefreshing={isLoading}
       />
@@ -261,14 +258,6 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         rockId={rockId}
         currentOwner={record?.owner ?? ""}
         onTransferSuccess={refreshAll}
-      />
-
-      <CrossChainModal
-        isOpen={isCrossChainOpen}
-        onClose={() => setCrossChainOpen(false)}
-        rockId={rockId}
-        smartAccountAddress={record?.smartAccount ?? ""}
-        onDepositSuccess={refreshAll}
       />
 
       <PrivyOnboardingModal

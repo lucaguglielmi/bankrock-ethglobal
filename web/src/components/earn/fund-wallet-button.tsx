@@ -1,12 +1,13 @@
 "use client";
 
 /**
- * "Get USDC" — Privy's funding flow for the embedded wallet (spec 20 Part 5, Flow G).
+ * "Buy with a card" — Privy's onramp flow for the embedded wallet (spec 20 Part 5, Flow G).
  *
  * `useFundWallet` opens whatever funding methods the Privy dashboard has switched on: a card
- * onramp, a transfer from an external wallet, or an exchange. When none is switched on the call
- * rejects, and the fallback is the plain truth — the wallet's address, so the asset can be sent
- * to it from anywhere. Never a simulated top-up (D-013).
+ * onramp (MoonPay, Coinbase), a transfer from an external wallet, or an exchange. Transfers from
+ * other chains have their own, better path — `DepositAnywhereButton` — so this one is labelled
+ * for the card. When nothing is switched on the call rejects, and the fallback is the plain truth:
+ * the wallet's address. Never a simulated top-up (D-013).
  */
 
 import * as React from "react";
@@ -53,7 +54,7 @@ export function FundWalletButton({ address, chain, symbol, explorerHref }: FundW
   return (
     <div className="flex flex-col gap-2">
       <Button variant="outline" className="w-full" onClick={handleClick} disabled={busy}>
-        {busy ? "Opening…" : `Get ${symbol.toUpperCase()}${chain ? ` on ${chain.name}` : ""}`}
+        {busy ? "Opening…" : `Buy ${symbol.toUpperCase()} with a card`}
       </Button>
       {fallback ? (
         <div className="flex flex-col gap-1">

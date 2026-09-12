@@ -7,8 +7,9 @@
 #   specs/15-exit-demo-mode.md  Part 7  — demo mode, synthesized evidence, one adapter,
 #                                         one origin, fail-closed secrets, no APY
 #   specs/17-mobile-ui-and-typography.md Part 7 — typography scale, viewport units, overlays
-#   specs/20-privy-earn-and-hackathon-qualification.md Part 7 — no rate reaches a bundle, the
-#                                         app secret is read in one file, the signed path exists
+#   specs/20-privy-earn-and-hackathon-qualification.md Parts 7 and 11 — no rate reaches a bundle,
+#                                         the app secret is read in one file, the signed path
+#                                         exists, deposit addresses replace the simulated bridge
 #
 # Only the *static* checks live here. The build, lint, typecheck, test and `npm run build`
 # steps from the same sections are separate CI jobs, and the live `curl` / `cast code`
@@ -270,6 +271,25 @@ expect_present "E-4" "privy-api.ts forwards privy-authorization-signature" \
 expect_present "E-5" "the earn write route refuses a request without the wallet's signature" \
   1 "web/src/lib/earn/write-route.server.ts" \
   -F 'the wallet must sign the request'
+
+# E-6 — D-035: cross-chain money arrives through a Privy universal deposit address.
+expect_present "E-6" "the savings surface uses useDepositAddress" \
+  1 "web/src/components/earn" \
+  -r -F 'useDepositAddress'
+
+# E-7 — the simulated bridge is gone: no component may render a simulated deposit.
+e7_id="E-7"
+e7_desc="no simulated cross-chain modal, and no 'no transaction — simulated' deposit in components"
+if [ -e "$REPO_ROOT/web/src/components/cross-chain-modal.tsx" ]; then
+  fail "$e7_id" "$e7_desc" "web/src/components/cross-chain-modal.tsx still exists"
+elif paths_exist "$e7_id" "$e7_desc" "web/src/components"; then
+  e7_out="$(grep -rn 'Simulate sending\|Simulated deposit complete' "${EXCLUDES[@]}" -- "web/src/components" 2>/dev/null)" || true
+  if [ -n "$e7_out" ]; then
+    fail "$e7_id" "$e7_desc" "$e7_out"
+  else
+    pass "$e7_id" "$e7_desc"
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 printf '\n%s%d passed, %d failed%s\n' "$BOLD" "$PASSED" "$FAILED" "$RESET"

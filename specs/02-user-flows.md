@@ -157,9 +157,12 @@ otherwise. **A recipient must be named** — the app issues no open gifts.
 
 1. Owner authenticates via Privy.
 2. Owner selects **Top Up** on the rock's management page.
-3. User is presented with a simplified fiat on-ramp (via Privy integration or similar) or a cross-chain deposit flow.
-4. User completes the payment flow (e.g., Apple Pay).
-5. The Rock Account receives the new tokens and optionally autoships them into the active Aqua strategy.
+3. User is presented with Privy's onramp (a card) or a Privy **universal deposit address** that
+   accepts any chain or exchange and converts what arrives into USDC on Base (spec 20, D-035).
+4. User completes the payment or sends the funds.
+5. The user's embedded wallet receives USDC on Base, ready for savings (Privy Earn, D-033). The
+   Rock Account's Sepolia reserve is funded separately, from the testnet faucets (spec 16 Part 3):
+   deposit addresses route between mainnets and cannot land on a testnet.
 
 ## Flow H — Cash In
 

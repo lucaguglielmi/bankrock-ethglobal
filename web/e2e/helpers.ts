@@ -7,7 +7,7 @@ import type { Page } from "@playwright/test";
  * (no `NEXT_PUBLIC_REGISTRY_ADDRESS` in CI) — the state spec 17's own preamble assumes ("so every
  * surface renders") and spec 15 Part 3 calls `UNAVAILABLE`. `/rock/1` and `/rock/2` therefore
  * show the honest empty state plus, in demo mode, a disabled `RockSample` — never the live
- * `Trade`/`Give`/`cross-chain` UI, which only mounts once a rock record actually reads `REAL`.
+ * `Trade`/`Give` UI, which only mounts once a rock record actually reads `REAL`.
  * Checks 7 and 8, which need those controls, detect this and skip with a clear reason (per the
  * task) instead of failing on data nobody configured for CI.
  */

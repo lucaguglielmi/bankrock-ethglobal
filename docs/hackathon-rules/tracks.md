@@ -51,7 +51,14 @@
 * **🏢 Best B2B Financial Product — $2,500**
   * **Focus**: Treasury platforms, business accounts, payroll, spend management, shared organization wallets with policies, quorums, and signers.
 
-#### Qualification Requirements (as published for the Earn prize — assessed in [`specs/20`](../../specs/20-privy-earn-and-hackathon-qualification.md))
+#### The four prizes at `ethglobal.com/events/newyork2026/prizes/privy` ($1,250 each — assessed in [`specs/20`](../../specs/20-privy-earn-and-hackathon-qualification.md))
+
+Bank Rock is in the **build-from-scratch track**, so *Best Existing Project Upgraded with Privy*
+(Continuity Track only) is out. The other three are targeted together: **Best Onchain Financial
+Product** (Earn → *Savings*), **Best Cross-Chain Funding Experience** (universal deposit addresses
+→ *Add from anywhere*), **Best AI Agent Built with Privy** (Agent Wallet CLI → `/agent/SKILL.md`).
+
+#### Qualification Requirements (Best Onchain Financial Product)
 
 * Your project must use Privy embedded wallets.
 * Your project must integrate Privy's Earn capability.

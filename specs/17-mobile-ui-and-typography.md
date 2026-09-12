@@ -374,10 +374,10 @@ block under the title.
 | Landing hero | `min-h-dvh`; `text-display` headline wraps by word, three lines maximum; `text-lead` paragraph, `max-w-prose`, zero tracking; two CTAs stacked full-width (`flex-col sm:flex-row`); canvas per 4.8. |
 | Landing sections | Cards `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`; the newsletter trust line wraps; section padding `py-16 sm:py-24`, never `p-24` on phones. |
 | Rock page — dormant | Title, state badge, attestation line, then the primary button, all within the first viewport; the demo switcher (if present) does not overlap the button. |
-| Rock page — active | Order on phones: identity row (title + state badge) → attestation line → headline reserve (`text-num-lg` + unit) → `Trade` (primary, 56 px) and `Give` (secondary) → cross-chain entry → position card → alerts → provenance. Metric cards become one card with two rows; the second card's "strategy" copy becomes a `text-caption` line under the reserve. The primary action is above the fold (L-13). |
+| Rock page — active | Order on phones: identity row (title + state badge) → attestation line → headline reserve (`text-num-lg` + unit) → `Trade` (primary, 56 px) and `Give` (secondary) → position card → savings (owner only, spec 20) → alerts → provenance. Metric cards become one card with two rows; the second card's "strategy" copy becomes a `text-caption` line under the reserve. The primary action is above the fold (L-13). |
 | Trade sheet | Amount input `text-num-lg`, unit selector as a 44 px chip; the fee card is a two-column definition list at `text-sm`; price impact uses `text-warning`/`text-danger` tokens; confirmation is a button (4.5). |
 | Give sheet | Recipient field `text-base` with a 44 px `Paste` button; ENS names are either resolved or rejected before enabling the action (spec 15 X-3); the confirmation shows `<Address>` for both parties; the consent checkbox has a 44 px label. |
-| Cross-chain sheet | Chain tiles 44 px, `grid-cols-2 sm:grid-cols-5`; the Rock Account address through `<Address>`; the disclaimer at `text-sm`, not 11 px; the whole sheet carries the `SIMULATED` badge (spec 15). |
+| ~~Cross-chain sheet~~ | Retired by spec 20 D-035: cross-chain money arrives through a Privy universal deposit address on the savings card, in Privy's own modal. The savings add/take-out sheets follow the trade sheet's amount → review → result shape. |
 | Aqua explainer | Sheet with tabs; no background canvas; glossary terms are tappable `Popover`s (`@base-ui/react`), not hover tooltips (L-12); the comparison table is a stacked list below `sm`. |
 | Position card | Reserve figures in `text-num` tabular; labels `text-label text-ink-3`; spread selector `grid-cols-1 sm:grid-cols-3` with 48 px options (L-9); `Sync state` is a real button. |
 | Alerts | Topic title `text-sm` 600, description `text-sm text-ink-2` (not 11 px), category badge `text-label`; the email field and frequency select at `text-base`; `Enable push` is a 48 px button in its own row. |
@@ -468,7 +468,7 @@ viewport in 320 × 568, 360 × 640, 390 × 844, 768 × 1024, 1280 × 800:
 5. `getComputedStyle(document.body).fontFamily` starts with `Inter`.
 6. The first `h1` is not covered by the header (`top >= header.bottom`).
 7. On `/rock/2` at 360 × 640 the `Trade with this rock` button is fully inside the first viewport.
-8. Open each sheet (trade, give, cross-chain, contact, explainer): the primary button's bounding
+8. Open each sheet (trade, give, savings add / take out, contact, explainer): the primary button's bounding
    box is inside the viewport without scrolling the page; the sheet body is scrollable.
 9. `axe-core` reports zero `color-contrast` and zero `target-size` violations.
 10. Lighthouse mobile on `/` and `/rock/2`: performance ≥ 80, accessibility ≥ 95, LCP ≤ 2.5 s,

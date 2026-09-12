@@ -29,6 +29,9 @@ What exists:
   wallet-signed requests, a `useEarn` hook, a card on the owner's rock page and at `/savings`.
   Real in code, unproven live until a vault id and the app secret are set (`DEMO-STATE.md` K-10,
   P-11).
+- **Money from anywhere and a trading agent** — a Privy universal deposit address into savings,
+  and `web/scripts/agent/trade-with-rock.mjs` for an agent on Privy's Agent Wallet CLI. Both
+  unproven live (`DEMO-STATE.md` P-12, P-13).
 
 What is not real yet, and why, is tracked one line at a time in
 **[`DEMO-STATE.md`](./DEMO-STATE.md)** — the answer to rule 1 of
@@ -52,10 +55,16 @@ rail:
   see what the vault has actually paid. No rate is shown, only the realised figure (D-004).
 - **User authorization signatures** — each deposit and withdrawal is signed by the user's wallet
   and forwarded unchanged; the app secret cannot move money on its own (D-034).
+- **Universal deposit addresses** — *Add from any wallet, exchange or chain*: Privy issues an
+  address for whatever the person holds and converts it on arrival into USDC on Base, ready for
+  savings (D-035). The simulated cross-chain modal is gone.
+- **Agent Wallet CLI** — an AI agent with its own Privy wallet can trade with a rock as a visitor,
+  following the skill at [`/agent/SKILL.md`](./web/public/agent/SKILL.md) (D-036).
 - **Gas sponsorship** — a saver never needs ETH.
 
 The submission text is [`docs/submission/privy.md`](./docs/submission/privy.md); the
-requirement-by-requirement assessment and the design are
+prize-by-prize assessment (three of Privy's four prizes are open to a build-from-scratch project)
+and the design are
 [`specs/20-privy-earn-and-hackathon-qualification.md`](./specs/20-privy-earn-and-hackathon-qualification.md).
 
 ## Documentation

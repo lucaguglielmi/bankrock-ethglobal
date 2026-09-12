@@ -17,7 +17,7 @@ import {
  * preamble: "so every surface renders") and, in this CI job, no chain configured — no
  * `NEXT_PUBLIC_REGISTRY_ADDRESS`. That means `/rock/1` and `/rock/2` read `UNAVAILABLE` (spec 15
  * Part 3) and show the honest empty state plus a disabled `RockSample`, never the live
- * `Trade`/`Give`/cross-chain controls, which only mount once a rock record actually reads `REAL`.
+ * `Trade`/`Give` controls, which only mount once a rock record actually reads `REAL`.
  * Items 7 and 8 detect that and skip with a clear reason instead of failing on data nobody
  * configured — see the two `skipReasonIfDisabled` sites below. Point this job's env at a real
  * deployed registry and those checks exercise the genuine sheets instead.
@@ -250,16 +250,9 @@ test.describe("sheets are reachable without sign-in — item 8", () => {
     });
   });
 
-  test("cross-chain sheet, from /rock/2", async ({ page }) => {
-    await gotoAndSettle(page, "/rock/2");
-    await assertSheetReachable(page, {
-      triggerName: "Add funds from another chain",
-      sheetTitle: "Top up from another chain",
-      primaryButtonName: /Enter an amount|Simulate sending|Deposit from another chain/,
-      skipReasonIfDisabled:
-        "'Add funds from another chain' is disabled — /rock/2 reads UNAVAILABLE (no registry configured), so only the demo sample's look-alike button rendered",
-    });
-  });
+  // The cross-chain sheet that used to be checked here was simulated (DEMO-STATE S-1) and is
+  // retired by spec 20 D-035: cross-chain money now arrives through a Privy universal deposit
+  // address on the owner's savings card, which needs a Privy session and cannot mount in CI.
 });
 
 test.describe("accessibility: zero color-contrast / target-size violations — item 9", () => {

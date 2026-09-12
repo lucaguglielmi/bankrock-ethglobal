@@ -53,7 +53,9 @@ from the way the registry verifies that binding:
 | Access tokens, verified server-side against Privy's JWKS | `lib/auth/privy.ts` | Every owner-only and savings route. |
 | **Earn** — deposit, withdraw, position, vault, action status and history | `lib/earn/*`, `app/api/earn/*`, `hooks/useEarn.ts`, `components/earn/*` | *Savings*: USDC in a Morpho vault on Base from the embedded wallet (D-033). |
 | **User authorization signatures** (`useAuthorizationSignature`) | `hooks/useEarn.ts` → `privy-authorization-signature` on the forward | Every earn write is signed by the user's wallet; the server cannot alter it (D-034). |
-| Funding (`useFundWallet`) | `components/earn/fund-wallet-button.tsx` | *Get USDC on Base* through whatever the dashboard enables; the wallet address is the fallback. |
+| **Universal deposit addresses** (`useDepositAddress`) | `components/earn/deposit-anywhere-button.tsx` | *Add from any wallet, exchange or chain*: any source, converted on arrival into USDC on Base in the embedded wallet (D-035). |
+| Funding (`useFundWallet`) | `components/earn/fund-wallet-button.tsx` | *Buy USDC with a card* through whatever the dashboard enables; the wallet address is the fallback. |
+| **Agent Wallet CLI** | `web/scripts/agent/trade-with-rock.mjs`, `web/public/agent/SKILL.md` | An AI agent with its own Privy wallet trades with a rock as a visitor (D-036). Not part of the web app's runtime. |
 | Gas sponsorship for earn actions | Privy dashboard, App pays | A saver never needs ETH. |
 
 Not used, on purpose: session signers / delegated actions (they would give the operator standing

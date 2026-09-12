@@ -25,6 +25,10 @@ Target integrations are Aqua and Privy. Exact sponsor prize eligibility and requ
 13. Proof of physical tap using NTAG 424 DNA signatures.
 14. **Savings through Privy Earn** — add USDC to a vault, see what it has actually paid, take it
     out — from the same embedded wallet, signed by that wallet each time (spec 20, D-033, D-034).
+15. **Money from anywhere** — a Privy universal deposit address that turns any chain's or
+    exchange's USDC into USDC on Base in the embedded wallet, ready for savings (spec 20, D-035).
+16. **An agent that trades with a rock** — through Privy's Agent Wallet CLI, as a visitor, with
+    the published skill at `/agent/SKILL.md` (spec 20, D-036).
 
 ## Strong target
 
@@ -73,9 +77,16 @@ Use a fresh browser session. Sign in with email or passkey and obtain a wallet w
 
 Explain that scanning identifies the object; Privy identifies and authorizes the person.
 
-### 0:55–1:20 — Savings (Privy Earn)
+### 0:55–1:05 — Money from anywhere (Privy deposit addresses)
 
-Still signed in, no wallet installed, no seed phrase. Open **Savings** on the rock (or `/savings`).
+Still signed in, no wallet installed, no seed phrase. Open **Savings** on the rock (or `/savings`)
+and tap **Add from any wallet, exchange or chain**. Pick Arbitrum USDC, or an exchange withdrawal.
+Privy shows an address; send 5 USDC to it from the second phone.
+
+"No bridge, no network switch, no gas. Whatever chain it left, it lands on Base as USDC, in a
+wallet that did not exist ten seconds before I signed in." **Ready to add** moves.
+
+### 1:05–1:25 — Savings (Privy Earn)
 
 "The rock trades on Aqua. The dollars that are not trading do not sit still."
 
@@ -90,7 +101,7 @@ what it earned is a fact and what it will earn is not."
 If time is short, cut the *Take out* half, never the deposit. Deposit the night before so the
 earned figure is positive on stage (spec 20 Part 8 step 7).
 
-### 1:20–1:45 — Aqua liquidity
+### 1:25–1:45 — Aqua liquidity
 
 Show the Rock Account's actual two-token reserve. Open or reveal the Aqua strategy and explain that the assets remain with the maker while Aqua tracks strategy balances.
 
@@ -111,9 +122,16 @@ claim is relayed: the registry credits the subject named inside the attestation,
 owner swap follows, so the account and everything in it move with the object. **Zero gas fees,
 no native tokens, and the giver did not need to be present.**
 
-### 2:35–3:00 — The AI Oracle & Agentic Strategies (MCP)
+### 2:35–3:00 — An agent trades with the rock (Privy Agent Wallet CLI)
 
-Open an external chat interface with an AI agent (e.g., ChatGPT or Claude Desktop). Say, "I want to fund this rock with 50 USDC but keep it low risk." The user's external agent connects via the Bank Rock MCP Server, bridges the funds from an L2 (Cross-chain Abstraction), and automatically generates and ships a customized Aqua strategy. *Note: We do not run our own AI agent in the app; we simply expose the MCP server for the user's preferred agent to connect to.*
+Open Claude Code, or Cursor. "Read bank-rock.com/agent/SKILL.md and sell 1 USDC to rock #1." The
+agent lists its Privy wallet, quotes the rock through the public API, says the floor out loud,
+sends the approval and the swap through the Privy Agent Wallet CLI, and pastes two Etherscan
+links. Refresh the rock page: the reserve moved, and the fee is in the owner's balance.
+
+"The agent never held a key. Privy signed, a human approved the wallet once, and a rock on a table
+just made a market for a machine." *(The read-only MCP server is still there for agents that
+speak MCP; it is what the skill reads through. We do not run an agent in the app.)*
 
 ### 3:00–3:15 — Platform potential
 

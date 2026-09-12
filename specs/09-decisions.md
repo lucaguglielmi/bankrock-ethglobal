@@ -508,6 +508,36 @@ user-owned (TEE-executed) embedded wallets — spec 20 Part 7 item 3 proves it a
 
 **Threat model:** spec 20 Part 4.3.
 
+### D-035 — Money from anywhere lands in savings through a Privy universal deposit address
+
+**Decision:** the savings card offers *Add from any wallet, exchange or chain* through Privy's
+`useDepositAddress`, destination fixed to the user's embedded wallet in the vault's asset on the
+vault's chain (USDC on Base). The simulated cross-chain modal (DEMO-STATE S-1) is deleted with its
+e2e check; there is no simulated deposit anywhere any more.
+
+**Consequence:** cross-chain money funds *savings*, not the Rock Account — deposit addresses route
+between mainnets and the Rock Account is on Sepolia, still funded from the testnet faucets. Every
+failure is a fixed sentence keyed on Privy's error code, and the fallback is the wallet's plain
+address. Prerequisites in the Privy dashboard: swaps, app-pays gas sponsorship on each source
+chain, deposit addresses enabled. Spec 20 Part 11.
+
+**Files:** `web/src/components/earn/deposit-anywhere-button.tsx`, `savings-card.tsx`;
+`cross-chain-modal.tsx` deleted; `rock-awake.tsx`, `rock-interface.tsx`, `web/e2e`.
+
+### D-036 — An AI agent trades with a rock as a visitor, from its own Privy agent wallet
+
+**Decision:** Bank Rock publishes a skill (`/agent/SKILL.md`) and a runner
+(`web/scripts/agent/trade-with-rock.mjs`) through which an agent, holding a wallet from Privy's
+Agent Wallet CLI, trades against a rock's strategy on Sepolia with the same two transactions a
+human's wallet sends: `approve(periphery, amountIn)`, then `XYCSwapTaker.swapExactIn(...)`. The
+agent is a visitor (spec 02 Flow D), never an owner; the MCP server stays read-only (D-008,
+D-019).
+
+**Consequence:** the agent cannot ship, dock, gift or save — those need a Bank Rock session or the
+Rock Account's owner, and the CLI wallet is neither. It can do the one thing any wallet can, and
+the rock's owner earns the fee on it. No key is ever held by the agent or by this repository: the
+CLI signs inside Privy's enclave under a human's approval. Spec 20 Part 12.
+
 ## Open product questions
 
 1. **Is the hackathon's main story gifting, a public micro-exchange, or both?** Gifting is the core product journey; public tap-to-trade is the primary demonstration of the liquidity.

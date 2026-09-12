@@ -16,6 +16,10 @@
  * sign-in, not to a rock — give the rock away and the savings stay with the giver — and the
  * copy says so where the card sits on a rock page.
  *
+ * Money comes in two ways, both Privy's: a universal deposit address that accepts any chain or
+ * asset and converts on arrival (D-035, spec 20 Part 12), and the card onramp. The wallet's plain
+ * address is the fallback for both, never a simulated top-up.
+ *
  * `useEarn` needs the Privy SDK, so the inner card mounts only when sign-in is configured and a
  * session exists; every other state renders the honest empty state instead (D-013).
  */
@@ -29,6 +33,7 @@ import { HelpTerm } from "@/components/ui/popover";
 import { TxHash } from "@/components/ui/tx-hash";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { EarnActionSheet } from "@/components/earn/earn-action-sheet";
+import { DepositAnywhereButton } from "@/components/earn/deposit-anywhere-button";
 import { FundWalletButton } from "@/components/earn/fund-wallet-button";
 import { formatDateTime } from "@/components/rock/util";
 import { useAuth } from "@/context/auth-context";
@@ -193,6 +198,12 @@ function SavingsCardBody({ context }: { context: "rock" | "page" }) {
             Take out
           </Button>
         </div>
+        <DepositAnywhereButton
+          address={address}
+          vault={vault}
+          explorerHref={earn.explorer?.address(address)}
+          onCompleted={earn.refresh}
+        />
         <FundWalletButton
           address={address}
           chain={chain}
