@@ -63,7 +63,8 @@ This is the authoritative list of what is faked, required by rule 1 of [`../STEE
 | C-1 | **The registry is not deployed.** `eth_getCode` on Base Sepolia returns `0x` for both addresses present in the repo. | `0x89f735f4c74f878d3aac6e60b134d115e5e29631` (`lib/contracts.ts:1`) and `0x83B1A8a09f87258385698b9C433e143FDF2A9F52` (`.env.example`, `mcp/index.ts:20`, `contracts/scripts/deploy.js:26`) |
 | C-2 | The two addresses disagree with each other, and no build step reconciles them. | as above |
 | C-3 | `contracts/scripts/deploy.js` deploys nothing. It reads the artifact and prints a hardcoded address. | `contracts/scripts/deploy.js` |
-| C-4 | **Aqua is not integrated.** `AQUA_ADDRESSES.aquaContract` is `0x111111125421cA6dc452d289314280a0f8842A65` — the 1inch Aggregation Router V6, which has no `ship`/`dock`. `swapVmContract` `0x2222…842a65` has no code on Base Sepolia. | `lib/contracts.ts`; `eth_getCode` returns 23942 bytes and `0x` respectively |
+| C-4 | **Aqua is not integrated.** `AQUA_ADDRESSES.aquaContract` is `0x111111125421cA6dc452d289314280a0f8842A65` — the 1inch Aggregation Router V6, which has no `ship`/`dock`. `swapVmContract` `0x2222…842a65` has no code on Base Sepolia, Base mainnet or Ethereum mainnet; it is the router address with the vanity prefix altered from `1111` to `2222` — fabricated, not looked up. | `lib/contracts.ts`; `eth_getCode` returns 23942 bytes and `0x` respectively, on three RPCs |
+| C-4a | The canonical addresses per the official READMEs are Aqua `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` and SwapVM router `0x111111338c5091e8440b67b168bae16a668ac0de` (deterministic, same on every supported chain). **Neither has code on Base Sepolia.** Both exist on Base mainnet (5619 and 20541 bytes). Aqua exists on Ethereum Sepolia (5619 bytes, identical to mainnet); the SwapVM router does not. No official testnet deployment of SwapVM exists anywhere. | `eth_getCode` across Base Sepolia, Base mainnet, Ethereum Sepolia, Arbitrum/OP/Unichain Sepolia; `github.com/1inch/aqua`, `github.com/1inch/swap-vm` READMEs; `swap-vm/ignition/parameters/chain-11155111.json` has `"aqua": "0x000…000"` |
 | C-5 | No strategy is ever shipped, docked, or read. No virtual balances exist. Spec 04's requirement of two strategies sharing one reserve is absent. | no `ship`/`dock` call sites outside dead code |
 | C-6 | **ERC-4337 is not wired.** `lib/aa.ts` — Safe accounts, dual Pimlico paymaster, atomic `executeBatch` — is dead code. Nothing imports it. | `grep "@/lib/aa"` → no results |
 | C-7 | `smartAccountAddress` is a hardcoded literal, identical for every rock, and equal to the non-existent registry address. | `components/rock-interface.tsx:133` |
@@ -399,10 +400,11 @@ Two browsers show the same state for the same rock.
 
 This is the sponsor integration and the reason the project exists.
 
-1. **Spike first.** Resolve the actual Aqua and SwapVM deployment addresses on the target testnet
-   and confirm the `ship`/`dock` interface. C-4 exists because an address was assumed rather than
-   verified. *(Hypothesis: Aqua is deployed on Base Sepolia. If it is not, the target network
-   changes — decide before building.)*
+1. **Decide the network first.** The spike is done (C-4a): Aqua and SwapVM are **not** on Base
+   Sepolia. The hypothesis that they were is disproven. Choose one of the three options recorded
+   under open question 11 in [`09-decisions.md`](./09-decisions.md) — Ethereum Sepolia with a
+   self-deployed `SwapVMRouter`, Base mainnet with dust, or self-deploying both on Base Sepolia —
+   and record it as D-023. Every subsequent step in this phase depends on that choice.
 2. Implement `ship` via the atomic batch already written in `lib/aa.ts` (D-012).
 3. Implement the visitor swap path against the strategy — from the Rock Account, not the registry
    (SC-4, D-020).
