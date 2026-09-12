@@ -183,4 +183,69 @@ contract BankRockRegistryReviewTest {
         require(_state() != BankRockRegistry.RockState.Archived, "Bob's rock must still be alive");
         require(!safe.isOwner(BOB), "and Bob must not have been left holding anything either");
     }
+
+    /**
+     * N-1, second door — the one the rebind does not shut.
+     *
+     * `claimHandover` now writes `rock.smartAccount = att.smartAccount`, which makes the hole
+     * *closable*. It does not close it, because the registry never asks whether the account it is
+     * told to bind has anything to do with the new owner, and the only signer in this repository
+     * never names a different one: `resolveSmartAccount`
+     * (`web/src/lib/nfc/rock-resolution.ts` L165-167) returns the rock's **existing** account for
+     * every rock in `awake` or `handover_pending`, which on a claim is the giver's Safe. So the
+     * rebind is a no-op write of the same address, and the account only becomes the recipient's
+     * because the relay route swaps the Safe's owner off chain first.
+     *
+     * A claimant who does not use that route — self-relaying a captured attestation, which
+     * `contracts/README.md` explicitly invites, or a future client-side broadcast — lands in
+     * exactly the state N-1 described, with the giver's Safe recorded as the rock's account.
+     *
+     * THE FIX MUST MAKE TRUE: after a claim, the rock's account cannot be one that answers to the
+     * previous owner and not to the new one. On-chain, that is one line in `claimHandover`:
+     * `if (!_accountAnswersTo(att.smartAccount, att.subject)) revert ...`, which makes the route's
+     * ordering an invariant for every caller instead of a convention for one. (It must be weighed
+     * against a Rock Account that has never been deployed: a counterfactual account has no code,
+     * so `_accountAnswersTo` is false and such a claim would revert until the account exists.)
+     */
+    function testReview_N1_aClaimNamingTheGiversAccountMustNotLeaveItInControl() public {
+        // Exactly the supported path: a *named* gift to Bob, and a claim attestation carrying the
+        // account the verifier actually signs for a rock in `handover_pending` — the rock's own,
+        // which is still Alice's Safe. No owner swap has happened; nothing on chain requires one.
+        BankRockRegistry.Attestation memory awaken = _att(1, ALICE, address(safe));
+        vm.prank(RELAYER);
+        registry.awakenRock(ROCK, address(safe), awaken, _sign(awaken));
+
+        vm.prank(ALICE);
+        registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 3600), bytes32(0));
+
+        BankRockRegistry.Attestation memory claim = _att(2, BOB, address(safe));
+        vm.prank(RELAYER);
+        registry.claimHandover(ROCK, claim, _sign(claim));
+
+        (address rockOwner, address rockAccount,,,,) = registry.getRock(ROCK);
+        require(rockOwner == BOB, "precondition: Bob owns the rock");
+        require(rockAccount == address(safe), "precondition: the rebind wrote back the giver's Safe");
+        require(safe.isOwner(ALICE), "precondition: the Safe is still Alice's");
+
+        address[] memory targets = new address[](3);
+        bytes[] memory payloads = new bytes[](3);
+
+        targets[0] = address(safe);
+        payloads[0] = abi.encodeWithSelector(GiverSafe.addOwnerWithThreshold.selector, BOB, uint256(1));
+
+        targets[1] = address(registry);
+        payloads[1] = abi.encodeWithSelector(BankRockRegistry.archiveRock.selector, ROCK);
+
+        targets[2] = address(safe);
+        payloads[2] = abi.encodeWithSelector(GiverSafe.removeOwner.selector, address(0x1), BOB, uint256(1));
+
+        vm.prank(ALICE);
+        try safe.execBatch(targets, payloads) {
+            require(false, "the giver must not be able to retire the recipient's rock");
+        } catch {
+            // Expected once fixed: the batched archiveRock reverts NotRockOwner.
+        }
+
+        require(_state() != BankRockRegistry.RockState.Archived, "Bob's rock must still be alive");
+    }
 }
