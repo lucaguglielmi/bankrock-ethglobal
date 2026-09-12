@@ -78,10 +78,12 @@ export interface AttestationMessage {
    * is credited, not which account the registry writes. Naming the smart
    * account in the signed struct closes that.
    *
-   * The zero address means "this attestation does not name one". Claims do not
-   * need a smart account and sign the zero address; an **awakening must supply
-   * a real one**, and the registry must reject a zero `smartAccount` on that
-   * path rather than treat it as a wildcard.
+   * Resolved server-side, never supplied by the client (`lib/nfc/rock-resolution`):
+   * a claim signs the account the registry already holds for the rock, an
+   * awakening signs the account derived from `subject` and the tag. It is the
+   * zero address only when no account could be named at all, and the registry
+   * must reject a zero `smartAccount` on the awaken path rather than treat it
+   * as a wildcard.
    */
   smartAccount: Address;
 }
@@ -93,6 +95,7 @@ export type AttestationUnavailableReason =
   | "invalid_rock_id"
   | "missing_subject"
   | "invalid_smart_account"
+  | "rock_account_unavailable"
   | "signing_failed";
 
 export type AttestationResult =
@@ -121,9 +124,9 @@ export interface SignAttestationInput {
    */
   subject?: string;
   /**
-   * The Rock Account this tap authorises. Optional: absent signs the zero
-   * address, which is correct for a claim. An awakening must pass a real
-   * address or a front-runner can substitute their own Safe.
+   * The Rock Account this tap authorises, resolved server-side. Optional only
+   * for a direct caller that names no account; the verifier always passes one
+   * or reports `rock_account_unavailable` instead of signing.
    */
   smartAccount?: string;
   /** Override the clock, for tests. Unix seconds. */
@@ -135,6 +138,24 @@ const UINT256_MAX = BigInt(
   "115792089237316195423570985008687907853269984665640564039457584007913129639935",
 );
 const UINT32_MAX = 4294967295;
+
+/**
+ * Why this deployment cannot sign at all, or `null` if it can.
+ *
+ * Separated from `signAttestation` so a caller can find out before spending an
+ * RPC round trip deriving a Rock Account for a signature it could never make.
+ * `signAttestation` repeats these checks for direct callers.
+ */
+export function attestationConfigIssue(): AttestationUnavailableReason | null {
+  const privateKey = process.env.ATTESTATION_SIGNER_PRIVATE_KEY;
+  if (!privateKey) return "signer_unconfigured";
+  if (!PRIVATE_KEY_PATTERN.test(privateKey)) return "signer_key_invalid";
+
+  const registry = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS;
+  if (!registry || !isAddress(registry)) return "registry_unconfigured";
+
+  return null;
+}
 
 /** keccak256 of the raw UID bytes — never of a hex string. */
 export function hashUid(uid: Buffer): Hex {

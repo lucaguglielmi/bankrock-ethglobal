@@ -9,11 +9,17 @@
  * strictly-monotonic counter advance in durable storage. Nothing else sets it.
  */
 
-import { isAddress } from "viem";
+import { getAddress, isAddress } from "viem";
 
 import { isHex, loadSdmKeyConfig } from "./config";
 import { resolveCounterStore, type CounterStoreKind } from "./counter-store";
-import { signAttestation, type AttestationResult } from "./attestation";
+import {
+  attestationConfigIssue,
+  hashUid,
+  signAttestation,
+  type AttestationResult,
+} from "./attestation";
+import { resolveEffectiveRock, resolveSmartAccount, type RockResolution } from "./rock-resolution";
 import { PICC_DATA_LENGTH, SDM_MAC_LENGTH, verifySdm } from "./sdm";
 
 export type VerifyFailureReason =
@@ -56,15 +62,6 @@ export interface VerifyTapInput {
    * Present but not an address: the whole request is `malformed_request`.
    */
   subject?: string;
-  /**
-   * The Rock Account this tap authorises, bound into the attestation so a
-   * front-runner cannot swap in a Safe they deployed.
-   *
-   * Optional. Absent signs the zero address, which is what a claim wants; an
-   * awakening must supply a real address. Present but not an address makes the
-   * whole request `malformed_request`.
-   */
-  smartAccount?: string;
 }
 
 export interface VerifyTapResponse {
@@ -77,6 +74,13 @@ export interface VerifyTapResponse {
    */
   uid?: string;
   counter?: number;
+  /**
+   * The rock this tap is actually for, resolved from the registry rather than
+   * taken from the URL. The page navigates to it. Present once the CMAC matches.
+   */
+  effectiveRockId?: string;
+  /** How `effectiveRockId` was arrived at. Present once the CMAC matches. */
+  resolution?: RockResolution;
   attestation?: AttestationResult;
 }
 
@@ -103,21 +107,22 @@ function normaliseHexParam(value: string | undefined): string | undefined {
 /**
  * Verify one tap.
  *
- * The amount of work is bounded and the same for every request that carries
- * well-formed parameters: one AES-CBC block decryption, three AES-CMACs, one
- * constant-time comparison and at most one database statement. There are no
- * retries, no loops over attacker-controlled lengths and no network calls, so
- * this endpoint is cheap to rate-limit in front of.
+ * Work is bounded and identical for every request up to the CMAC comparison:
+ * one AES-CBC block decryption, three AES-CMACs and one constant-time compare.
+ * Nothing before that point touches the database, the registry or the RPC, so a
+ * forged or replayed URL costs exactly that and no more, which is what makes
+ * this endpoint cheap to rate-limit in front of.
  *
- * The counter store is only touched after the CMAC matches, so forged requests
- * never reach the database.
+ * Only after the CMAC matches does the request become expensive: up to three
+ * registry reads to resolve the rock, one indexed-events query, one Safe
+ * address derivation and one database statement. Every one of those is bounded
+ * and none is retried.
  */
 export async function verifyTap(input: VerifyTapInput): Promise<VerifyTapOutcome> {
   const e = normaliseHexParam(input.e);
   const c = normaliseHexParam(input.c);
   const enc = normaliseHexParam(input.enc);
   const subject = normaliseHexParam(input.subject);
-  const smartAccount = normaliseHexParam(input.smartAccount);
 
   if (!e || !c || !isHex(e, PICC_DATA_LENGTH) || !isHex(c, SDM_MAC_LENGTH)) {
     return { status: 400, body: { verified: false, reason: "malformed_request" } };
@@ -126,9 +131,6 @@ export async function verifyTap(input: VerifyTapInput): Promise<VerifyTapOutcome
     return { status: 400, body: { verified: false, reason: "malformed_request" } };
   }
   if (subject !== undefined && !isAddress(subject, { strict: false })) {
-    return { status: 400, body: { verified: false, reason: "malformed_request" } };
-  }
-  if (smartAccount !== undefined && !isAddress(smartAccount, { strict: false })) {
     return { status: 400, body: { verified: false, reason: "malformed_request" } };
   }
 
@@ -155,6 +157,11 @@ export async function verifyTap(input: VerifyTapInput): Promise<VerifyTapOutcome
     return { status: 200, body: { verified: false, reason } };
   }
 
+  // Resolve which rock this tap is for before advancing the counter, so a tap
+  // that cannot be attributed to a rock still burns its counter exactly once.
+  const uidHash = hashUid(sdm.uid);
+  const rock = await resolveEffectiveRock(uidHash, input.rockId);
+
   const store = await resolveCounterStore();
   if (!store.available) {
     return { status: 200, body: { verified: false, reason: "counter_store_unavailable" } };
@@ -170,16 +177,19 @@ export async function verifyTap(input: VerifyTapInput): Promise<VerifyTapOutcome
         reason: "stale_counter",
         uid: uidSuffix(sdm.uid),
         counter: sdm.readCounter,
+        effectiveRockId: rock.effectiveRockId,
+        resolution: rock.resolution,
       },
     };
   }
 
-  const attestation = await signAttestation({
-    rockId: input.rockId ?? "",
+  const attestation = await signTapAttestation({
+    rockId: rock.effectiveRockId,
     uid: sdm.uid,
+    uidHash,
     counter: sdm.readCounter,
     subject,
-    smartAccount,
+    record: rock.record,
   });
 
   return {
@@ -189,7 +199,51 @@ export async function verifyTap(input: VerifyTapInput): Promise<VerifyTapOutcome
       verified: true,
       uid: uidSuffix(sdm.uid),
       counter: sdm.readCounter,
+      effectiveRockId: rock.effectiveRockId,
+      resolution: rock.resolution,
       attestation,
     },
   };
+}
+
+/**
+ * Sign for the resolved rock and the resolved Rock Account.
+ *
+ * Checks run cheapest first: a deployment that cannot sign at all, then a
+ * request that names nobody to authorise, and only then the Safe derivation,
+ * which costs an RPC round trip.
+ */
+async function signTapAttestation(params: {
+  rockId: string;
+  uid: Buffer;
+  uidHash: `0x${string}`;
+  counter: number;
+  subject: string | undefined;
+  record: Awaited<ReturnType<typeof resolveEffectiveRock>>["record"];
+}): Promise<AttestationResult> {
+  const configIssue = attestationConfigIssue();
+  if (configIssue !== null) {
+    return { state: "UNAVAILABLE", reason: configIssue };
+  }
+
+  if (!params.subject || !isAddress(params.subject, { strict: false })) {
+    return { state: "UNAVAILABLE", reason: "missing_subject" };
+  }
+
+  const account = await resolveSmartAccount({
+    subject: getAddress(params.subject),
+    uidHash: params.uidHash,
+    record: params.record,
+  });
+  if (!account.ok) {
+    return { state: "UNAVAILABLE", reason: account.reason };
+  }
+
+  return signAttestation({
+    rockId: params.rockId,
+    uid: params.uid,
+    counter: params.counter,
+    subject: params.subject,
+    smartAccount: account.smartAccount,
+  });
 }

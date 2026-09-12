@@ -4,9 +4,9 @@
  * neither may report `verified: true` without a real CMAC match (D-018, F-1).
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { privateKeyToAccount } from "viem/accounts";
-import { zeroAddress, type Hex } from "viem";
+import { keccak256, zeroAddress, type Hex } from "viem";
 
 import { GET, POST } from "@/app/api/nfc/verify/route";
 import { verifyNtagSignature } from "@/actions/verify-ntag";
@@ -21,6 +21,56 @@ const SIGNER_KEY = ("0x" + "11".repeat(32)) as Hex;
 const REGISTRY_KEY = ("0x" + "22".repeat(32)) as Hex;
 const SUBJECT_KEY = ("0x" + "33".repeat(32)) as Hex;
 const SMART_ACCOUNT_KEY = ("0x" + "44".repeat(32)) as Hex;
+const DERIVED_ACCOUNT = privateKeyToAccount(SMART_ACCOUNT_KEY).address;
+const EXISTING_ACCOUNT = privateKeyToAccount(REGISTRY_KEY).address;
+
+/** Same registry stub as verify.test.ts; see the note there on why it is total. */
+const registry = vi.hoisted(() => ({
+  boundRockId: null as string | null,
+  boundUnavailable: false,
+  rocks: new Map<string, { state: string; smartAccount: string } | "unavailable">(),
+  derived: null as string | null,
+  saltNonces: [] as bigint[],
+}));
+
+vi.mock("@/lib/rock-account", () => {
+  const parseRockId = (value: string) => {
+    const trimmed = String(value ?? "").trim();
+    if (!/^\d+$/.test(trimmed)) return null;
+    const parsed = BigInt(trimmed);
+    return parsed > BigInt(0) ? parsed : null;
+  };
+  return {
+    parseRockId,
+    nextFreeRockId: (ids: readonly string[]) => {
+      let highest = BigInt(0);
+      for (const raw of ids) {
+        const parsed = parseRockId(String(raw));
+        if (parsed !== null && parsed > highest) highest = parsed;
+      }
+      return (highest + BigInt(1)).toString();
+    },
+    resolveRockForTag: async () =>
+      registry.boundUnavailable
+        ? { state: "UNAVAILABLE", reason: "no registry" }
+        : { state: "REAL", value: { rockId: registry.boundRockId } },
+    readRock: async (rockId: string) => {
+      const record = registry.rocks.get(rockId);
+      if (!record || record === "unavailable") {
+        return { state: "UNAVAILABLE", reason: "no registry" };
+      }
+      return { state: "REAL", value: { rockId, ...record } };
+    },
+    computeRockAccountAddress: async (params: { ownerAddress: string; saltNonce: bigint }) => {
+      registry.saltNonces.push(params.saltNonce);
+      return registry.derived === null
+        ? { state: "UNAVAILABLE", reason: "no rpc" }
+        : { state: "REAL", value: registry.derived };
+    },
+  };
+});
+
+vi.mock("@/lib/db", () => ({ getDb: () => null, getD1: () => null }));
 
 /** SELF-GENERATED, test-only: the (e, c) a provisioned tag would emit. */
 function tap(counter: number): { e: string; c: string } {
@@ -56,6 +106,11 @@ beforeEach(() => {
   process.env.NXP_MASTER_KEY = MASTER_KEY_HEX;
   process.env.NEXT_PUBLIC_DEMO_MODE = "true";
   resetSharedMemoryCounterStore();
+  registry.boundRockId = null;
+  registry.boundUnavailable = false;
+  registry.rocks.clear();
+  registry.derived = null;
+  registry.saltNonces = [];
 });
 
 afterEach(() => {
@@ -65,6 +120,11 @@ afterEach(() => {
   }
   resetSharedMemoryCounterStore();
 });
+
+function configureSigner(): void {
+  process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
+  process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+}
 
 function url(params: Record<string, string>): string {
   const query = new URLSearchParams(params).toString();
@@ -126,35 +186,39 @@ describe("GET /api/nfc/verify", () => {
     });
   });
 
-  it("400s on a smartAccount that is not an address", async () => {
-    const { e, c } = tap(7);
-    const response = await GET(
-      new Request(url({ rockId: "1", e, c, smartAccount: "0xnope" })),
-    );
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      verified: false,
-      reason: "malformed_request",
-    });
-  });
-
-  it("signs an attestation bound to the subject and smart account", async () => {
-    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
-    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+  it("ignores a smartAccount in the query string and derives its own", async () => {
+    configureSigner();
+    registry.derived = DERIVED_ACCOUNT;
     const subject = privateKeyToAccount(SUBJECT_KEY).address;
-    const smartAccount = privateKeyToAccount(SMART_ACCOUNT_KEY).address;
 
     const { e, c } = tap(7);
     const response = await GET(
-      new Request(url({ rockId: "42", e, c, subject, smartAccount })),
+      new Request(url({ rockId: "1", e, c, subject, smartAccount: zeroAddress })),
     );
     const body = await response.json();
-    expect(body.verified).toBe(true);
+    expect(body.attestation.message.smartAccount).toBe(DERIVED_ACCOUNT);
+  });
+
+  it("signs an attestation for the effective rock and the derived account", async () => {
+    configureSigner();
+    registry.derived = DERIVED_ACCOUNT;
+    registry.boundRockId = "9";
+    registry.rocks.set("9", { state: "dormant", smartAccount: zeroAddress });
+    const subject = privateKeyToAccount(SUBJECT_KEY).address;
+
+    const { e, c } = tap(7);
+    const response = await GET(new Request(url({ rockId: "1", e, c, subject })));
+    const body = await response.json();
+    expect(body).toMatchObject({
+      verified: true,
+      effectiveRockId: "9",
+      resolution: "bound",
+    });
     expect(body.attestation).toMatchObject({
       state: "SIGNED",
       typeString:
         "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)",
-      message: { rockId: "42", counter: 7, subject, smartAccount },
+      message: { rockId: "9", counter: 7, subject, smartAccount: DERIVED_ACCOUNT },
     });
     expect(Object.keys(body.attestation.message)).toEqual([
       "rockId",
@@ -166,15 +230,34 @@ describe("GET /api/nfc/verify", () => {
     ]);
   });
 
-  it("signs the zero smart account when none is supplied", async () => {
-    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
-    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
-    const subject = privateKeyToAccount(SUBJECT_KEY).address;
+  it("signs the registry's account for a claim", async () => {
+    configureSigner();
+    registry.derived = DERIVED_ACCOUNT;
+    registry.boundRockId = "4";
+    registry.rocks.set("4", { state: "awake", smartAccount: EXISTING_ACCOUNT });
 
     const { e, c } = tap(7);
-    const response = await GET(new Request(url({ rockId: "42", e, c, subject })));
+    const response = await GET(
+      new Request(
+        url({ rockId: "4", e, c, subject: privateKeyToAccount(SUBJECT_KEY).address }),
+      ),
+    );
     const body = await response.json();
-    expect(body.attestation.message.smartAccount).toBe(zeroAddress);
+    expect(body.attestation.message.smartAccount).toBe(EXISTING_ACCOUNT);
+    expect(registry.saltNonces).toEqual([]);
+  });
+
+  it("reports the resolution even with no subject", async () => {
+    registry.boundRockId = null;
+    registry.rocks.set("1", { state: "dormant", smartAccount: zeroAddress });
+
+    const { e, c } = tap(7);
+    const response = await GET(new Request(url({ rockId: "1", e, c })));
+    await expect(response.json()).resolves.toMatchObject({
+      verified: true,
+      effectiveRockId: "1",
+      resolution: "url",
+    });
   });
 
   it("fails closed when NXP_MASTER_KEY is unset", async () => {
@@ -199,8 +282,8 @@ describe("POST /api/nfc/verify", () => {
   });
 
   it("reads subject from the JSON body", async () => {
-    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
-    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+    configureSigner();
+    registry.derived = DERIVED_ACCOUNT;
     const subject = privateKeyToAccount(SUBJECT_KEY).address;
 
     const { e, c } = tap(7);
@@ -243,19 +326,22 @@ describe("verifyNtagSignature (server action)", () => {
     });
   });
 
-  it("passes subject and smartAccount through to the attestation", async () => {
-    process.env.ATTESTATION_SIGNER_PRIVATE_KEY = SIGNER_KEY;
-    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS = privateKeyToAccount(REGISTRY_KEY).address;
+  it("passes subject through and returns the resolved rock and account", async () => {
+    configureSigner();
+    registry.derived = DERIVED_ACCOUNT;
+    registry.rocks.set("42", { state: "dormant", smartAccount: zeroAddress });
     const subject = privateKeyToAccount(SUBJECT_KEY).address;
 
     const { e, c } = tap(7);
-    const smartAccount = privateKeyToAccount(SMART_ACCOUNT_KEY).address;
-    const result = await verifyNtagSignature({ rockId: "42", e, c, subject, smartAccount });
+    const result = await verifyNtagSignature({ rockId: "42", e, c, subject });
     expect(result.verified).toBe(true);
+    expect(result.effectiveRockId).toBe("42");
+    expect(result.resolution).toBe("url");
     expect(result.attestation).toMatchObject({
       state: "SIGNED",
-      message: { rockId: "42", counter: 7, subject, smartAccount },
+      message: { rockId: "42", counter: 7, subject, smartAccount: DERIVED_ACCOUNT },
     });
+    expect(registry.saltNonces).toEqual([BigInt(keccak256(`0x${UID.toString("hex")}`))]);
     const attestation = result.attestation;
     expect(attestation?.state === "SIGNED" && Object.keys(attestation.message)).toEqual([
       "rockId",
@@ -267,17 +353,22 @@ describe("verifyNtagSignature (server action)", () => {
     ]);
   });
 
-  it("rejects an invalid smartAccount as malformed_request", async () => {
+  it("reports rock_account_unavailable when the derivation cannot run", async () => {
+    configureSigner();
+    registry.derived = null;
+
     const { e, c } = tap(7);
     const result = await verifyNtagSignature({
       rockId: "42",
       e,
       c,
       subject: privateKeyToAccount(SUBJECT_KEY).address,
-      smartAccount: "0xnope",
     });
-    expect(result.verified).toBe(false);
-    expect(result.reason).toBe("malformed_request");
+    expect(result.verified).toBe(true);
+    expect(result.attestation).toEqual({
+      state: "UNAVAILABLE",
+      reason: "rock_account_unavailable",
+    });
   });
 
   it("rejects an invalid subject as malformed_request", async () => {

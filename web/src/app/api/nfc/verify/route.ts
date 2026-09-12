@@ -1,8 +1,8 @@
 /**
  * The single NFC verifier endpoint (D-018, Phase 4 step 1).
  *
- * GET  /api/nfc/verify?rockId=…&e=…&c=…[&enc=…][&subject=0x…][&smartAccount=0x…]
- * POST /api/nfc/verify   { rockId, e, c, enc?, subject?, smartAccount? }
+ * GET  /api/nfc/verify?rockId=…&e=…&c=…[&enc=…][&subject=0x…]
+ * POST /api/nfc/verify   { rockId, e, c, enc?, subject? }
  *
  * `e` / `picc_data` is the 16-byte encrypted PICCData and `c` / `cmac` the
  * 8-byte truncated SDM CMAC, both hex, exactly as the NTAG 424 DNA mirrors them
@@ -15,12 +15,17 @@
  * be relayed or sent from a sponsored Safe without the relayer redirecting the
  * rock to itself.
  *
- * `smartAccount` is the Rock Account the tap authorises. It is optional and
- * defaults to the zero address in the signed struct. **A claim does not need
- * one; an awakening must supply it** — without it in the signed struct a
- * front-runner who sees the attestation can bind the rock to a Safe they
- * deployed, so the registry must reject a zero `smartAccount` on the awaken
- * path rather than treat it as a wildcard.
+ * There is deliberately **no `smartAccount` parameter**. The Rock Account is
+ * resolved server-side: a claim signs the account the registry already holds
+ * for the rock, an awakening signs the account derived from `subject` and the
+ * tag. Letting the client name it is the front-running hole the field exists to
+ * close, so a `smartAccount` in the query string is ignored, not honoured.
+ *
+ * `rockId` is likewise a hint, not the answer. The id written on a tag at
+ * provisioning time can be stale — the tag may have been moved to a replacement
+ * rock, or its rock archived — so the response carries `effectiveRockId` and
+ * `resolution`, resolved from the registry, and the page navigates to those.
+ * The attestation is signed for the effective id, never for the URL id.
  *
  * No `export const runtime`: OpenNext runs route handlers on the Worker and the
  * declaration only confuses the adapter (D-016).
@@ -48,7 +53,6 @@ function readParams(url: URL): VerifyTapInput {
     c: q.get("c") ?? q.get("cmac") ?? undefined,
     enc: q.get("enc") ?? undefined,
     subject: q.get("subject") ?? undefined,
-    smartAccount: q.get("smartAccount") ?? q.get("smart_account") ?? undefined,
   };
 }
 
@@ -62,6 +66,8 @@ function log(input: VerifyTapInput, body: VerifyTapResponse, latencyMs: number):
     rockId: input.rockId,
     uidSuffix: body.uid,
     counter: body.counter,
+    effectiveRockId: body.effectiveRockId,
+    resolution: body.resolution,
     reason: body.reason,
     latencyMs,
   };
@@ -118,6 +124,5 @@ export async function POST(request: Request): Promise<NextResponse> {
     c: pick("c", pick("cmac", fromQuery.c)),
     enc: pick("enc", fromQuery.enc),
     subject: pick("subject", fromQuery.subject),
-    smartAccount: pick("smartAccount", pick("smart_account", fromQuery.smartAccount)),
   });
 }

@@ -11,7 +11,7 @@
  * after a real CMAC match and a successful monotonic counter advance.
  */
 
-import { verifyTap, type VerifyFailureReason } from "@/lib/nfc/verify";
+import { verifyTap, type VerifyFailureReason, type VerifyTapResponse } from "@/lib/nfc/verify";
 import type { AttestationResult } from "@/lib/nfc/attestation";
 import { logger } from "@/lib/telemetry";
 
@@ -35,11 +35,14 @@ export interface VerifyNtagParams {
    */
   subject?: string;
   /**
-   * The Rock Account this tap authorises, bound into the attestation so a
-   * front-runner cannot substitute a Safe they deployed. Optional: absent signs
-   * the zero address, which is right for a claim. An awakening must supply it.
+   * A hint, not the answer. The id written on a tag can be stale, so the
+   * verifier resolves the rock from the registry and returns
+   * `effectiveRockId` / `resolution`; the attestation is signed for that id.
+   *
+   * There is deliberately no `smartAccount` parameter: the Rock Account is
+   * derived server-side, because letting the client name it is the
+   * front-running hole the attestation field exists to close.
    */
-  smartAccount?: string;
   rockId?: string | number;
 }
 
@@ -58,6 +61,10 @@ export interface VerifyResult {
   counter?: number;
   /** Alias of `counter`, kept for the existing component contract. */
   readCount?: number;
+  /** The rock this tap is actually for, resolved from the registry. */
+  effectiveRockId?: string;
+  /** How `effectiveRockId` was arrived at. */
+  resolution?: VerifyTapResponse["resolution"];
   /** Server-signed EIP-712 attestation, or why it is unavailable. */
   attestation?: AttestationResult;
   /** Human-readable explanation for the UI. */
@@ -92,7 +99,6 @@ export async function verifyNtagSignature(params: VerifyNtagParams): Promise<Ver
       c: params.c,
       enc: params.enc,
       subject: params.subject,
-      smartAccount: params.smartAccount,
     });
 
     const { body } = outcome;
@@ -107,6 +113,8 @@ export async function verifyNtagSignature(params: VerifyNtagParams): Promise<Ver
         rockId: params.rockId,
         uidSuffix: body.uid,
         counter: body.counter,
+        effectiveRockId: body.effectiveRockId,
+        resolution: body.resolution,
         reason: body.reason,
         latencyMs,
       },
@@ -120,6 +128,8 @@ export async function verifyNtagSignature(params: VerifyNtagParams): Promise<Ver
       uid: body.uid,
       counter: body.counter,
       readCount: body.counter,
+      effectiveRockId: body.effectiveRockId,
+      resolution: body.resolution,
       attestation: body.attestation,
       message: body.reason ? MESSAGES[body.reason] : undefined,
       latencyMs,
