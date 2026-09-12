@@ -153,6 +153,32 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: [],
         },
       },
+      {
+        name: "dispatch_rock_alert",
+        description: "Dispatches an automated Sentinel alert email or notification to a Bank Rock owner via the Resend email engine.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            rockId: { type: "string", description: "The Rock ID" },
+            toEmail: { type: "string", description: "Recipient email address" },
+            topic: {
+              type: "string",
+              enum: [
+                "loss_warning",
+                "dangerous_trade",
+                "profit_milestone",
+                "keeper_rebalance",
+                "custody_transfer",
+                "gas_depletion",
+                "genesis_drop",
+              ],
+              description: "The alert topic category",
+            },
+            customMessage: { type: "string", description: "Optional custom note or diagnostic details from the AI agent" },
+          },
+          required: ["rockId", "toEmail", "topic"],
+        },
+      },
     ],
   };
 });
@@ -432,6 +458,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const data = await res.json();
       return {
         content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      };
+    }
+
+    if (name === "dispatch_rock_alert") {
+      const rockId = String(args?.rockId || "1");
+      const toEmail = String(args?.toEmail);
+      const topic = String(args?.topic || "loss_warning");
+      const customMessage = args?.customMessage ? String(args.customMessage) : undefined;
+
+      const res = await fetch(`${LIVE_API_URL}/api/alerts/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: toEmail,
+          topic,
+          rockId,
+          customNote: customMessage,
+        }),
+      });
+
+      const result = await res.json();
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: res.ok ? "DISPATCHED" : "FAILED",
+            httpStatus: res.status,
+            result,
+          }, null, 2),
+        }],
       };
     }
 

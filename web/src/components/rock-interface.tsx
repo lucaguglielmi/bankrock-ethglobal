@@ -9,6 +9,7 @@ import { CrossChainModal } from "@/components/cross-chain-modal";
 import { DemoSwitcher, type DemoScenario } from "@/components/demo-switcher";
 import { RockActivity, type ActivityEvent } from "@/components/rock-activity";
 import { AquaPositionCard } from "@/components/aqua-position-card";
+import { RockAlerts } from "@/components/rock-alerts";
 import { PrivyOnboardingModal } from "@/components/privy-onboarding-modal";
 import { useRockOnchainEvents, useRockActions } from "@/hooks/useBankRock";
 import { useAudio } from "@/context/audio-context";
@@ -603,6 +604,9 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           earnedFeesUSDC={earnedFees}
           onPositionUpdated={handlePositionUpdated}
         />
+
+        {/* Real-Time Sentinel Alerts & Notifications */}
+        <RockAlerts rockId={rockId} />
 
         {/* Provenance & On-Chain Activity Timeline */}
         <RockActivity rockId={rockId} events={displayEvents} isSyncing={isSyncingEvents} />
