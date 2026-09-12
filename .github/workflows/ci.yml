@@ -141,9 +141,8 @@ jobs:
   spec-checks:
     name: Spec definition-of-done checks
     runs-on: ubuntu-latest
-    # Non-blocking for now: most of these greps target the web UI, which is mid-migration and
-    # still fails many of them. Made blocking in Wave 3 once the UI migration lands.
-    continue-on-error: true
+    # Blocking: the Wave 3 UI migration has landed, so every static check in spec 15 Part 7 and
+    # spec 17 Part 7 is expected to pass on every PR from here on.
 
     steps:
       - name: Check out repository
@@ -151,3 +150,40 @@ jobs:
 
       - name: Run the spec 15 and spec 17 static checks
         run: bash scripts/spec-checks.sh
+
+  e2e-responsive:
+    name: Responsive UI and accessibility (Playwright)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright's Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Built in demo mode so every surface renders (spec 17 Part 7's own preamble). No chain is
+      # configured here, so a rock page reads UNAVAILABLE and shows its honest empty state
+      # (spec 15 Part 3) — the browser checks are written to skip, not fail, the assertions that
+      # depend on a real registry (see the comment at the top of web/e2e/responsive.spec.ts).
+      - name: Build (demo mode)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_DEMO_MODE: "true"
+
+      # `npm run e2e` starts `next start` itself via Playwright's `webServer` (playwright.config.ts).
+      - name: Run the spec 17 Part 7 browser checks
+        run: npm run e2e
