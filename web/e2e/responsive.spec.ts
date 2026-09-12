@@ -269,7 +269,8 @@ test.describe("accessibility: zero color-contrast / target-size violations — i
     }) => {
       await gotoAndSettle(page, route);
 
-      const results = await new AxeBuilder({ page })
+      // @axe-core/playwright types against its own copy of playwright; the runtime object is the same.
+      const results = await new AxeBuilder({ page: page as unknown as ConstructorParameters<typeof AxeBuilder>[0]["page"] })
         .withRules(["color-contrast", "target-size"])
         .analyze();
 
