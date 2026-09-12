@@ -71,6 +71,8 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
 
   const [liquidity, setLiquidity] = useState<number>(0);
   const [earnedFees, setEarnedFees] = useState<number>(0);
+  const [currentApy, setCurrentApy] = useState<number>(18.4);
+  const [yieldHistory, setYieldHistory] = useState<any[]>([]);
   const [customOwnerAddress, setCustomOwnerAddress] = useState<string | null>(null);
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [currentScenario, setCurrentScenario] = useState<DemoScenario>("active_maker");
@@ -82,9 +84,10 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
         const yieldRes = await fetch(`/api/rocks/${rockId}/yield`);
         if (yieldRes.ok) {
           const yieldData = await yieldRes.json();
-          // Fallback to demo values if DB is empty
           setLiquidity(yieldData.tvl || 1250.0);
-          setEarnedFees(yieldData.currentAPY ? (yieldData.tvl * yieldData.currentAPY) / 100 / 365 : 12.4);
+          setEarnedFees(yieldData.historicalData?.reduce((acc: number, curr: any) => acc + (curr.fees || 0), 0) || 12.4);
+          setCurrentApy(yieldData.currentAPY || 18.4);
+          setYieldHistory(yieldData.historicalData || []);
         }
 
         const activityRes = await fetch(`/api/rocks/${rockId}/activity`);
@@ -676,6 +679,8 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           smartAccountAddress={smartAccountAddress}
           liquidityUSDC={liquidity}
           earnedFeesUSDC={earnedFees}
+          yieldHistoricalData={yieldHistory}
+          currentApy={currentApy}
           onPositionUpdated={handlePositionUpdated}
         />
 

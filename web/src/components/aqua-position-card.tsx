@@ -1,3 +1,4 @@
+import { AnalyticsDashboard, YieldDataPoint } from "./analytics-dashboard";
 "use client";
 
 import { useState } from "react";
@@ -10,6 +11,8 @@ interface AquaPositionCardProps {
   smartAccountAddress: string;
   liquidityUSDC: number;
   earnedFeesUSDC: number;
+  yieldHistoricalData: YieldDataPoint[];
+  currentApy: number;
   onPositionUpdated?: (newLiquidity: number) => void;
 }
 
@@ -18,6 +21,8 @@ export function AquaPositionCard({
   smartAccountAddress,
   liquidityUSDC,
   earnedFeesUSDC,
+  yieldHistoricalData,
+  currentApy,
   onPositionUpdated,
 }: AquaPositionCardProps) {
   const [isManageOpen, setIsManageOpen] = useState(false);
@@ -127,7 +132,7 @@ export function AquaPositionCard({
             <Sparkles className="w-3.5 h-3.5 text-green-600" />
             +${earnedFeesUSDC.toFixed(2)}
           </div>
-          <span className="text-[10px] text-green-600 font-medium">18.4% Est. APR</span>
+          <span className="text-[10px] text-green-600 font-medium">{currentApy.toFixed(1)}% Est. APR</span>
         </div>
 
         <div>
@@ -147,8 +152,18 @@ export function AquaPositionCard({
         </div>
       </div>
 
+      <div className="mt-8 border-t border-neutral-200/80 pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-bold text-black flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-neutral-500" />
+            Live Gelato / Aqua Analytics
+          </h4>
+        </div>
+        <AnalyticsDashboard data={yieldHistoricalData} />
+      </div>
+
       {/* Contracts link strip */}
-      <div className="pt-4 flex flex-wrap items-center justify-between gap-3 text-[11px] text-neutral-500 font-mono">
+      <div className="pt-6 mt-4 border-t border-neutral-200/80 flex flex-wrap items-center justify-between gap-3 text-[11px] text-neutral-500 font-mono">
         <div className="flex flex-wrap items-center gap-4">
           <span className="flex items-center gap-1">
             <span>Aqua Core:</span>

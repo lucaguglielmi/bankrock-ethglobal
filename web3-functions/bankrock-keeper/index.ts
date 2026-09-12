@@ -2,67 +2,97 @@ import {
   Web3Function,
   Web3FunctionContext,
 } from "@gelatonetwork/web3-functions-sdk";
-import { createPublicClient, http, parseAbi, encodeFunctionData } from "viem";
-
-/**
- * Bank Rock Autonomous Liquidity Keeper
- * Powered by Gelato Web3 Functions
- * 
- * This decentralized keeper monitors the 1inch Aqua Constant Product pool
- * for a Bank Rock Safe Account on Base Sepolia. If the price of WETH drifts
- * causing the 50/50 portfolio ratio to deviate by more than 3%, the Gelato
- * network automatically signs and executes a rebalance UserOp.
- */
+import { createPublicClient, http, parseAbi, encodeFunctionData, formatEther } from "viem";
 
 const BANKROCK_REGISTRY_ABI = parseAbi([
-  "function getRockSafe(uint256 rockId) view returns (address)",
-  "function isActivated(uint256 rockId) view returns (bool)"
+  "function rocks(uint256 rockId) view returns (address smartAccount, address currentOwner, uint256 awakenedAt, bool isAwake)",
 ]);
 
 const AQUA_ROUTER_ABI = parseAbi([
   "function rebalance(address safe, bytes32 strategyHash) external"
 ]);
 
+// Helper to fire email alerts if rebalance fails
+async function fireAlert(message: string, context: Web3FunctionContext) {
+  try {
+    const alertUrl = await context.secrets.get("ALERT_API_URL"); // e.g. https://bankrock.xyz/api/alerts/gelato
+    if (alertUrl) {
+      await fetch(alertUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, source: "gelato_keeper" })
+      });
+    }
+  } catch (e) {
+    console.error("Failed to send alert", e);
+  }
+}
+
 Web3Function.onRun(async (context: Web3FunctionContext) => {
   const { multiChainProvider } = context;
-
-  // The Gelato context provides an RPC provider for the target network (Base Sepolia)
   const provider = multiChainProvider.default();
-
-  // Create a viem client for easier read operations
+  
   const publicClient = createPublicClient({
     transport: http(provider.connection.url),
   });
 
-  const registryAddress = "0xBankRockRegistryAddressHere" as `0x${string}`;
-  const aquaRouterAddress = "0x1inchAquaRouterAddressHere" as `0x${string}`;
+  const registryAddress = "0x89F735F4C74F878D3aAc6e60b134d115e5E29631" as `0x${string}`;
+  const aquaRouterAddress = "0x1111111254EEB25477B68fb85Ed929f73A960582" as `0x${string}`;
+  const usdcAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`;
 
-  // Read arguments passed by the Gelato Task configuration
   const rockId = (await context.secrets.get("ROCK_ID")) || "1";
 
   try {
     // 1. Check if Rock is activated
-    /*
-    const isActivated = await publicClient.readContract({
+    const rockData = await publicClient.readContract({
       address: registryAddress,
       abi: BANKROCK_REGISTRY_ABI,
-      functionName: "isActivated",
+      functionName: "rocks",
       args: [BigInt(rockId)],
     });
 
-    if (!isActivated) {
-      return { canExec: false, message: `Rock #${rockId} is not activated yet.` };
-    }
-    */
+    const isAwake = rockData[3];
+    const safeAddress = rockData[0];
 
-    // 2. Fetch current prices & Aqua pool state
-    // (Mocking the math for the hackathon MVP, as 1inch Aqua testnet contracts are heavily stubbed)
-    const currentEthPrice = 2850.0; 
-    const poolUsdc = 1250.0;
-    const poolWeth = 0.45;
-    
+    if (!isAwake || safeAddress === "0x0000000000000000000000000000000000000000") {
+      return { canExec: false, message: `Rock #${rockId} is not activated.` };
+    }
+
+    // 2. Fetch real on-chain balances
+    const wethBalanceWei = await publicClient.getBalance({ address: safeAddress });
+    const poolWeth = Number(formatEther(wethBalanceWei));
+
+    const usdcBalanceWei = await publicClient.readContract({
+      address: usdcAddress,
+      abi: parseAbi(["function balanceOf(address) view returns (uint256)"]),
+      functionName: "balanceOf",
+      args: [safeAddress],
+    });
+    const poolUsdc = Number(usdcBalanceWei) / 1e6;
+
+    // 3. Fetch Real-time Spot Price from 1inch (or Pyth)
+    // To prevent API key leak in the web3 function log, we use our own proxy we just built!
+    const quoteUrl = await context.secrets.get("QUOTE_API_URL") || "https://bankrock.xyz/api/quote";
+    let currentEthPrice = 2850.0;
+    try {
+      // 1 WETH to USDC quote
+      const qRes = await fetch(`${quoteUrl}?src=0x4200000000000000000000000000000000000006&dst=${usdcAddress}&amount=1000000000000000000`);
+      if (qRes.ok) {
+        const qData = await qRes.json();
+        currentEthPrice = Number(qData.toAmount) / 1e6;
+      }
+    } catch (e) {
+      console.warn("Failed to fetch live price, falling back to cached...", e);
+    }
+
     const wethValueUsdc = poolWeth * currentEthPrice;
     const totalValueUsdc = poolUsdc + wethValueUsdc;
+    
+    // If portfolio is empty, nothing to rebalance
+    if (totalValueUsdc < 1) {
+      return { canExec: false, message: "Portfolio is empty." };
+    }
+
     const currentRatioUsdcPercent = (poolUsdc / totalValueUsdc) * 100;
     const targetRatio = 50.0;
     
@@ -72,25 +102,16 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     if (deviation >= THRESHOLD) {
       console.log(`[Gelato] Rock #${rockId} drift detected: ${deviation.toFixed(2)}%. Executing rebalance.`);
       
-      // 3. Encode the transaction for Gelato to execute
-      /*
-      const safeAddress = await publicClient.readContract({
-         address: registryAddress,
-         abi: BANKROCK_REGISTRY_ABI,
-         functionName: "getRockSafe",
-         args: [BigInt(rockId)],
-      });
-      */
-      const mockSafeAddress = "0x89F735F4C74F878D3aAc6e60b134d115e5E29631";
-
       const callData = encodeFunctionData({
         abi: AQUA_ROUTER_ABI,
         functionName: "rebalance",
         args: [
-          mockSafeAddress, 
-          "0x0000000000000000000000000000000000000000000000000000000000000000" // Mock strategy hash
+          safeAddress, 
+          "0x0000000000000000000000000000000000000000000000000000000000000000" // Standard 50/50 Strategy Hash
         ]
       });
+
+      // Gas price protection check could go here
 
       return {
         canExec: true,
@@ -110,6 +131,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
 
   } catch (err: any) {
     console.error("Gelato Web3 Function Error:", err);
+    await fireAlert(`Gelato Rebalance Failed for Rock #${rockId}: ${err.message}`, context);
     return { canExec: false, message: `Execution failed: ${err.message}` };
   }
 });

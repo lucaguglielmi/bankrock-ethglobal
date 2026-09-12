@@ -25,16 +25,16 @@ export async function GET(
         currentAPY: 18.5,
         tvl: 45000.0,
         historicalData: [
-          { date: "2023-01-01", apy: 10, volume: 1000 },
-          { date: "2023-02-01", apy: 12, volume: 2000 },
-          { date: "2023-03-01", apy: 18.5, volume: 3500 },
+          { date: "2023-01-01", tvl: 1200, fees: 5, apy: 10 },
+          { date: "2023-02-01", tvl: 1250, fees: 8, apy: 12 },
+          { date: "2023-03-01", tvl: 1300, fees: 12.4, apy: 18.5 },
         ]
       });
     }
 
     // Prepare and execute real D1 SQL query
     const stmt = db.prepare(`
-      SELECT date, apy, volume 
+      SELECT date, apy, tvl, fees 
       FROM DailyYield 
       WHERE rockId = ? 
       ORDER BY date ASC 
