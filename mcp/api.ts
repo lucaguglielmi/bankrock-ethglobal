@@ -72,8 +72,14 @@ export function newsletterStats(): Promise<ApiResult> {
   return request("/api/newsletter", { admin: true });
 }
 
-export function sendAlert(body: Record<string, unknown>): Promise<ApiResult> {
-  return request("/api/alerts/test", { method: "POST", body, admin: true });
+/**
+ * `GET /api/rocks/{id}/strategy` — the same route the rock page reads for its Aqua position
+ * (spec 04, D-030). Public and unauthenticated, like the page itself; `?fees=1` (the default)
+ * also asks it to scan `Pushed` events for realised fees, which costs it an extra `eth_getLogs`
+ * round trip.
+ */
+export function rockStrategy(rockId: string): Promise<ApiResult> {
+  return request(`/api/rocks/${encodeURIComponent(rockId)}/strategy?fees=1`);
 }
 
 /**

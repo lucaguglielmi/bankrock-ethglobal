@@ -29,7 +29,7 @@ physical possession; the stone's account holds two tokens and anyone may trade a
 
 Tools:
 1. get_rock_status({ rockId }) — lifecycle state, owner and account address.
-2. analyze_strategy_yield({ rockId }) — the strategy a rock runs and the fees it has recorded.
+2. get_strategy_fees({ rockId }) — the strategy a rock runs and the fees it has recorded.
 3. simulate_cross_chain_intent({ rockId, sourceChain, amount }) — a funding route, simulated.
 4. explain_recent_fees({ rockId }) — recorded fees, in plain language.
 5. query_logs({ level, limit, rockId }) — recent server-side events.
@@ -85,7 +85,7 @@ const TOOLS = [
     description: "The rock's lifecycle state, its owner and the account that holds its tokens.",
   },
   {
-    name: "analyze_strategy_yield",
+    name: "get_strategy_fees",
     badge: "Strategy",
     signature: "rockId: string",
     description: "Which strategy a rock runs, and the fees recorded against it.",

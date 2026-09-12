@@ -320,8 +320,12 @@ account. See D-026 in [`09-decisions.md`](./09-decisions.md) for the full reason
 volume, or execution status.
 
 **Consequence:** M-1 and M-2 resolved. `trace_transaction` must perform an actual
-`eth_getTransactionReceipt`. `get_rock_status` must read the registry. `analyze_strategy_yield`
-returns `unavailable` until Aqua is real.
+`eth_getTransactionReceipt`. `get_rock_status` must read the registry. **Done, since Phase 3
+shipped Aqua:** the tool once named `analyze_strategy_yield`, which returned `unavailable` until
+Aqua was real, now reads the same `GET /api/rocks/{id}/strategy` route the rock page reads and is
+renamed `get_strategy_fees` — a yield or APR figure was never something it could honestly report
+(D-004), so the name changed to match what it returns instead of waiting on a number that will
+never exist (spec 11).
 
 **Rationale:** an agent relays these values to a human as fact. A stable fabrication is more
 dangerous than an obvious one.

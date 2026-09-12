@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { fenceUntrusted, newsletterStats, sendAlert, telemetry } from "./api.js";
+import { fenceUntrusted, newsletterStats, rockStrategy, telemetry } from "./api.js";
 import { CHAIN_ID, CHAIN_NAME, EXPLORER_BASE, REASONS, config } from "./config.js";
 import { hasCode, publicClient, readRock, readTokenBalance } from "./chain.js";
 
@@ -144,11 +144,15 @@ const TOOLS = [
     inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
-    name: "analyze_strategy_yield",
+    name: "get_strategy_fees",
     description:
-      "Intended to report a rock's Aqua strategy reserves and realised fees. The Aqua " +
-      "integration does not exist yet, so this always returns 'unavailable'. It will not " +
-      "estimate, and it will never report an APR or APY.",
+      "Reads a rock's live Aqua strategy from `GET /api/rocks/{id}/strategy` — the same route " +
+      "the rock page itself reads: the rock's actual USDC/WETH reserve, each shipped stream's " +
+      "virtual and executable balances, its immutable swap fee rate (feeBps), and the fees " +
+      "realised on that stream so far (summed from Aqua's own Pushed events, D-030). Was named " +
+      "'analyze_strategy_yield' before this integration existed and always answered " +
+      "'unavailable'; renamed because it reports fees, never a yield. It will not estimate, " +
+      "annualise or otherwise report an APR or APY (D-004) — there is no such figure to read.",
     inputSchema: {
       type: "object",
       properties: { rockId: { type: "string", description: "The rock id." } },
@@ -158,8 +162,11 @@ const TOOLS = [
   {
     name: "explain_recent_fees",
     description:
-      "Intended to explain fees earned by a rock's liquidity. Depends on the Aqua integration, " +
-      "which does not exist yet, so this always returns 'unavailable'.",
+      "Reads the same `GET /api/rocks/{id}/strategy` route as get_strategy_fees and narrates, " +
+      "per live stream, the fee amount actually earned, how many swaps it came from, and the " +
+      "exact block range scanned to compute it — naming a stream 'unavailable' rather than " +
+      "guessing when its swap history could not be scanned. Fees accrue inside the rock's own " +
+      "reserve; there is no separate fee balance to withdraw.",
     inputSchema: {
       type: "object",
       properties: { rockId: { type: "string", description: "The rock id." } },
@@ -169,8 +176,11 @@ const TOOLS = [
   {
     name: "get_strategy_volume",
     description:
-      "Intended to report trading volume against a rock's strategy. Depends on the Aqua " +
-      "integration, which does not exist yet, so this always returns 'unavailable'.",
+      "Reads the same `GET /api/rocks/{id}/strategy` route and reports, per live stream, the " +
+      "number of swaps observed in the scanned Pushed-event range. This is an activity count, " +
+      "not a token- or dollar-denominated trading volume: the reference Aqua app keeps no " +
+      "volume ledger, and this server does not derive one from the amounts it can see (D-019). " +
+      "Use get_strategy_fees or explain_recent_fees for the actual token amounts earned.",
     inputSchema: {
       type: "object",
       properties: { rockId: { type: "string", description: "The rock id." } },
@@ -209,34 +219,6 @@ const TOOLS = [
       "Reads aggregate waitlist counts from the Bank Rock API. Returns the API's own response, " +
       "or 'unavailable' when the endpoint is unreachable or rejects the request.",
     inputSchema: { type: "object", properties: {}, required: [] },
-  },
-  {
-    name: "dispatch_rock_alert",
-    description:
-      "Asks the Bank Rock API to send an alert email. Reports the API's own success flag; it " +
-      "does not claim delivery on its own. Returns 'unavailable' when the endpoint is " +
-      "unreachable or rejects the request.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        rockId: { type: "string", description: "The rock id." },
-        toEmail: { type: "string", description: "Recipient email address." },
-        topic: {
-          type: "string",
-          enum: [
-            "loss_warning",
-            "dangerous_trade",
-            "profit_milestone",
-            "custody_transfer",
-            "gas_depletion",
-            "genesis_drop",
-          ],
-          description: "Alert topic.",
-        },
-        customMessage: { type: "string", description: "Optional note to include." },
-      },
-      required: ["rockId", "toEmail", "topic"],
-    },
   },
 ];
 
@@ -454,42 +436,181 @@ async function getWaitlistStats(): Promise<ToolResult> {
   });
 }
 
-async function dispatchRockAlert(args: Record<string, unknown> | undefined): Promise<ToolResult> {
-  const toEmail = String(args?.["toEmail"] ?? "").trim();
-  if (toEmail === "") return unavailable("toEmail is required.");
-  const rockId = args?.["rockId"];
-  if (rockId === undefined || rockId === null) return unavailable("rockId is required.");
+// ---------------------------------------------------------------------------
+// Aqua strategy reads (A6) — all three tools below read the same route,
+// `GET /api/rocks/{id}/strategy` (web/src/app/api/rocks/[id]/strategy/route.ts), which is what the
+// rock page itself reads for its Aqua position. No strategy hash, balance or fee is recomputed
+// here: this server relays that route's own REAL/UNAVAILABLE answer, which keeps D-030's strategy
+// encoding in exactly one implementation.
+// ---------------------------------------------------------------------------
 
-  const body: Record<string, unknown> = {
-    to: toEmail,
-    topic: String(args?.["topic"] ?? "loss_warning"),
-    rockId: String(rockId),
+/** The fields this server reads from `serializeStrategyView` (web/src/lib/aqua/serialize.ts). */
+interface StrategyStreamJson {
+  streamIndex: string;
+  label?: string;
+  feeBps: string;
+  virtual: { usdc: string; weth: string };
+  executable: { usdc: string; weth: string };
+  fees?: {
+    earned: { usdc: string; weth: string };
+    swapCount: number;
+    fromBlock: string;
+    toBlock: string;
+    complete: boolean;
   };
-  const note = args?.["customMessage"];
-  if (typeof note === "string" && note !== "") body["customNote"] = note;
+  feesUnavailable?: string;
+}
 
-  const result = await sendAlert(body);
-  if (!result.ok) return unavailable(result.reason);
+interface StrategyViewJson {
+  rockId: string;
+  maker: string;
+  app: string;
+  aqua: string;
+  actual: { usdc: string; weth: string };
+  allowance: { usdc: string; weth: string };
+  streams: StrategyStreamJson[];
+}
 
-  const payload = result.body as { success?: unknown } | null;
-  const success = typeof payload?.success === "boolean" ? payload.success : null;
+/**
+ * Calls `GET /api/rocks/{id}/strategy` and returns its own REAL/UNAVAILABLE answer, never a
+ * second-guessed one.
+ */
+async function fetchStrategyView(
+  rockId: string,
+): Promise<{ ok: true; value: StrategyViewJson } | { ok: false; reason: string }> {
+  const result = await rockStrategy(rockId);
+  if (!result.ok) return { ok: false, reason: result.reason };
 
-  if (success === null) {
-    return unavailable(
-      `${config.apiUrl}/api/alerts/test accepted the request but did not report whether the ` +
-        "message was sent, so delivery cannot be confirmed.",
-      { httpStatus: result.status, response: result.body },
-    );
+  const body = result.body as { state?: unknown; reason?: unknown; value?: unknown } | null;
+  if (body === null || typeof body !== "object" || typeof body.state !== "string") {
+    return {
+      ok: false,
+      reason: `${config.apiUrl}/api/rocks/${rockId}/strategy returned an unexpected response shape.`,
+    };
+  }
+  if (body.state === "UNAVAILABLE") {
+    return { ok: false, reason: typeof body.reason === "string" ? body.reason : "unavailable" };
+  }
+  if (body.state !== "REAL" || typeof body.value !== "object" || body.value === null) {
+    return {
+      ok: false,
+      reason: `${config.apiUrl}/api/rocks/${rockId}/strategy returned an unrecognised state ` +
+        `("${body.state}").`,
+    };
+  }
+  return { ok: true, value: body.value as StrategyViewJson };
+}
+
+async function getStrategyFees(args: Record<string, unknown> | undefined): Promise<ToolResult> {
+  const rockId = rockIdOf(args);
+  if (rockId === null) return unavailable("rockId must be a decimal integer, e.g. '1'.");
+
+  const view = await fetchStrategyView(String(rockId));
+  if (!view.ok) return unavailable(view.reason, { rockId: String(rockId) });
+  const value = view.value;
+
+  return json({
+    status: "ok",
+    source: `${config.apiUrl}/api/rocks/${rockId}/strategy`,
+    rockId: value.rockId,
+    maker: value.maker,
+    aquaApp: value.app,
+    aquaAddress: value.aqua,
+    actualReserve: value.actual,
+    streams: value.streams.map((stream) => ({
+      streamIndex: stream.streamIndex,
+      label: stream.label ?? null,
+      feeBpsRate: stream.feeBps,
+      virtualBalance: stream.virtual,
+      executableBalance: stream.executable,
+      feesEarned: stream.fees?.earned ?? null,
+      feesUnavailable: stream.feesUnavailable ?? null,
+    })),
+    notes: [
+      "actualReserve is ERC20.balanceOf on the Rock Account for USDC and WETH, in base units.",
+      "Each stream's virtualBalance is Aqua.safeBalances — an allowance the strategy may trade " +
+        "against, not a deposit; do not sum it across streams.",
+      "executableBalance is min(virtual, actual, allowance): what the stream could settle right now.",
+      "feeBpsRate is the strategy's own immutable swap fee, authenticated by its hash. " +
+        "feesEarned is the amount actually accrued from real swaps, read from Aqua's Pushed events.",
+      "This is a fee rate and a realised fee amount, never a yield, APY or APR (D-004) — the " +
+        "reference constant-product app has no return rate to project.",
+    ],
+  });
+}
+
+async function explainRecentFees(args: Record<string, unknown> | undefined): Promise<ToolResult> {
+  const rockId = rockIdOf(args);
+  if (rockId === null) return unavailable("rockId must be a decimal integer, e.g. '1'.");
+
+  const view = await fetchStrategyView(String(rockId));
+  if (!view.ok) return unavailable(view.reason, { rockId: String(rockId) });
+  const value = view.value;
+
+  return json({
+    status: "ok",
+    source: `${config.apiUrl}/api/rocks/${rockId}/strategy?fees=1`,
+    rockId: value.rockId,
+    streams: value.streams.map((stream) => ({
+      streamIndex: stream.streamIndex,
+      label: stream.label ?? null,
+      feeBps: stream.feeBps,
+      earned: stream.fees?.earned ?? null,
+      swapCount: stream.fees?.swapCount ?? null,
+      scannedFromBlock: stream.fees?.fromBlock ?? null,
+      scannedToBlock: stream.fees?.toBlock ?? null,
+      scanComplete: stream.fees?.complete ?? null,
+      unavailableReason: stream.feesUnavailable ?? null,
+    })),
+    notes: [
+      "'earned' is Σ Pushed.amount · feeBps / 10000 over that stream's real Pushed events on " +
+        "Ethereum Sepolia, excluding the two Pushed events the ship itself emits (D-030). XYCSwap " +
+        "keeps no separate fee balance: fees accrue inside the rock's own reserve, so there is " +
+        "nothing to withdraw beyond the reserve itself.",
+      "'scanComplete' is true only when the scan reached back to the Aqua app's deploy block; " +
+        "false means the figure covers a recent window only and may undercount.",
+      "A stream with 'unavailableReason' set could not be scanned (RPC or configuration); no fee " +
+        "figure is substituted for it (D-019).",
+    ],
+  });
+}
+
+async function getStrategyVolume(args: Record<string, unknown> | undefined): Promise<ToolResult> {
+  const rockId = rockIdOf(args);
+  if (rockId === null) return unavailable("rockId must be a decimal integer, e.g. '1'.");
+
+  const view = await fetchStrategyView(String(rockId));
+  if (!view.ok) return unavailable(view.reason, { rockId: String(rockId) });
+  const value = view.value;
+
+  const anyScanned = value.streams.some((stream) => stream.fees !== undefined);
+  if (!anyScanned) {
+    const reason =
+      value.streams.find((stream) => stream.feesUnavailable !== undefined)?.feesUnavailable ??
+      "no stream's swap history could be scanned";
+    return unavailable(reason, { rockId: String(rockId) });
   }
 
   return json({
     status: "ok",
-    sent: success,
-    httpStatus: result.status,
-    response: result.body,
+    source: `${config.apiUrl}/api/rocks/${rockId}/strategy?fees=1`,
+    rockId: value.rockId,
+    streams: value.streams.map((stream) => ({
+      streamIndex: stream.streamIndex,
+      label: stream.label ?? null,
+      swapsObserved: stream.fees?.swapCount ?? null,
+      scannedFromBlock: stream.fees?.fromBlock ?? null,
+      scannedToBlock: stream.fees?.toBlock ?? null,
+      scanComplete: stream.fees?.complete ?? null,
+      unavailableReason: stream.feesUnavailable ?? null,
+    })),
     notes: [
-      "'sent' is the API's own success flag, relayed as received. This server does not send " +
-        "mail and cannot confirm delivery beyond what the API reported.",
+      "'swapsObserved' counts Pushed events attributed to real swaps against that stream in the " +
+        "scanned block range (the same scan explain_recent_fees uses) — a count of trades, not a " +
+        "token- or dollar-denominated trading volume.",
+      "The reference Aqua app keeps no volume ledger, and this server does not derive one from " +
+        "the amounts it can see (D-019): use get_strategy_fees or explain_recent_fees for the " +
+        "actual token amounts earned.",
     ],
   });
 }
@@ -520,13 +641,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await getServerMetrics();
       case "get_waitlist_stats":
         return await getWaitlistStats();
-      case "dispatch_rock_alert":
-        return await dispatchRockAlert(args);
 
-      case "analyze_strategy_yield":
+      case "get_strategy_fees":
+        return await getStrategyFees(args);
       case "explain_recent_fees":
+        return await explainRecentFees(args);
       case "get_strategy_volume":
-        return unavailable(REASONS.noAqua);
+        return await getStrategyVolume(args);
       case "simulate_cross_chain_intent":
         return unavailable(REASONS.noBridge);
       case "optimize_idle_yield":

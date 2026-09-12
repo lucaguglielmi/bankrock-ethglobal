@@ -43,9 +43,9 @@ export default function SecurityPage() {
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-3">
-              <AccordionTrigger className="text-lg font-semibold">3. Scoped Session Keys (AI Guardrails)</AccordionTrigger>
+              <AccordionTrigger className="text-lg font-semibold">3. The AI Oracle is read-only</AccordionTrigger>
               <AccordionContent className="text-ink-2 text-base leading-relaxed">
-                When the AI Oracle (MCP) autonomously rebalances your Aqua strategies, it acts using an ERC-7579 Session Key. This key is cryptographically restricted. It can only execute trades within predefined slippage tolerances and can never authorize a transfer to an external address. 
+                The AI Oracle (MCP) never moves your funds. It can read your rock&apos;s live owner, reserve balances and fees straight from chain and answer questions about them, and that is all it can do — it holds no key, session or otherwise, and cannot sign a transaction on your behalf. Scoped ERC-7579 session keys for a bounded, agent-driven rebalancer are on the post-hackathon roadmap (spec 13), not something this build does today.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-4">
