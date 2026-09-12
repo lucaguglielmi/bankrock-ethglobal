@@ -90,7 +90,10 @@ function deployBlock(variable: string): number | null {
 }
 
 export async function GET(req: Request) {
-  await consumeIpRateLimit(req, "version", 60, 60_000);
+  const limit = await consumeIpRateLimit(req, "version", 60, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
+  }
 
   const keys: AddressKey[] = ["registry", "aquaApp", "aquaTaker", "aqua", "usdc", "weth"];
   const reports = await Promise.all(keys.map((key) => describe(key)));

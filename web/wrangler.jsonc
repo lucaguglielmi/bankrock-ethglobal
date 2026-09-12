@@ -64,9 +64,9 @@
     // Fixed, published testnet tokens (specs/16 §1.1)
     "NEXT_PUBLIC_USDC_ADDRESS": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
     "NEXT_PUBLIC_WETH_ADDRESS": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
-    // 0.02 ETH per UTC day. Unset or "0" disables relaying entirely — that is the closed branch
+    // 0.05 ETH per UTC day (about 25 relayed claims at the 0.002 ETH reservation). Unset or "0" disables relaying entirely — that is the closed branch
     // (D-032, audit P-1), so this value is what makes gift claims possible at all.
-    "RELAYER_DAILY_CAP_WEI": "20000000000000000"
+    "RELAYER_DAILY_CAP_WEI": "50000000000000000"
   },
   "d1_databases": [
     {

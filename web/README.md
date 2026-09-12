@@ -1,36 +1,28 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bank Rock — web
 
-## Getting Started
+The Next.js 16 application behind `https://bank-rock.com`: the rock pages, the NFC verifier, the
+API routes, and the service worker. Deployed as the Cloudflare Worker `web` with
+`@opennextjs/cloudflare` (`wrangler.jsonc`; D1 binding `DB`). Product and architecture live in
+[`../specs/`](../specs/README.md); what is still unconfigured or unproven is
+[`../DEMO-STATE.md`](../DEMO-STATE.md).
 
-First, run the development server:
+## Commands
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+| Command | What |
+| --- | --- |
+| `npm ci` | Install (Node 22) |
+| `npm run dev` | Local dev server |
+| `npm run lint`, `npm run typecheck`, `npm test` | The gate CI runs |
+| `npm run e2e` | Playwright viewport × route matrix with axe (spec 17 Part 7) |
+| `npm run build` | `next build` (the `prebuild` step generates `public/sw.js`) |
+| `npm run deploy` | OpenNext build + publish the Worker — what `.github/workflows/deploy.yml` runs on `main` |
+| `npm run deploy:pages` | Manual Cloudflare Pages preview; no domain points at it |
+| `npm run rehearse:sepolia -- --dry-run` | The live-chain rehearsal (`scripts/rehearse-sepolia.ts`, spec 20 WP-2) |
+| `node scripts/export-public-vars.mjs` | Prints the `NEXT_PUBLIC_*` values from `wrangler.jsonc` for a build (D-034) |
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Configuration
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Non-secret values are in `wrangler.jsonc` `vars` (committed; the single source of truth — D-034).
+Secrets are set on the Worker and never in a file; `.env.example` lists every variable and where
+it lives in production. `NEXT_PUBLIC_DEMO_MODE=true` enables the badged simulation surfaces for
+local rehearsal only; production pins it to `false`.

@@ -1,3 +1,8 @@
+> **Superseded.** This document predates the exit from demo mode and describes a keeper, Redis counters,
+> multi-chain deposits and session keys that were cut or deferred (decisions D-010, D-011, D-035; DEMO-STATE
+> §2). The current roadmap is [`specs/13-after-the-hackathon-ideas.md`](../specs/13-after-the-hackathon-ideas.md).
+> Kept as history only.
+
 # Bank Rock: Production Architecture & Post-Hackathon Specification
 
 This document details the enterprise-grade production specifications, hardware cryptographic key management, and infrastructural roadmap for Bank Rock following the ETHGlobal hackathon MVP.

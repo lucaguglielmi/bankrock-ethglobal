@@ -3,6 +3,9 @@ name: Rehearse on Sepolia
 # Manual only. This workflow spends real Sepolia ETH, moves USDC and WETH, and writes to the
 # deployed registry — it must never be triggered by a push, a pull request or a schedule
 # (spec 20 WP-2).
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:

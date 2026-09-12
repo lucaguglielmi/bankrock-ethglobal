@@ -1725,7 +1725,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
+  // Never the raw message: a viem error can embed the RPC or bundler URL, and this line reaches the
+  // job log. The name is enough to find the failing step in the buffered output above.
+  const message = error instanceof Error ? `${error.name} (see the step output above)` : "unknown error";
   say("");
   say(`FAILED: ${message}`);
   if (steps.length > 0) {

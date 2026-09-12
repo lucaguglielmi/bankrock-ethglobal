@@ -37,8 +37,8 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 | N-1 | AR / WebXR view | 15 Part 6, 08 must-have 12 | Never for this submission. Cut; the demo's opening beat no longer mentions it. |
 | N-2 | Alert delivery | 15 Part 6 | A delivery pipeline is built. Preferences persist behind a verified Privy token; nothing dispatches. |
 | N-3 | Fiat on-ramp / off-ramp (Flows G and H fiat legs) | 08 | Out of scope. Note that Flow H's on-chain leg is real: docking *is* the withdrawal. |
-| N-4 | ERC-7579 scoped session keys for the MCP runtime | 15 Part 6, 05 D-010 | Post-hackathon. MCP is read-only (D-008, D-019). |
-| N-5 | ERC-20 token paymaster ("self-sustaining rock") | 15 Part 6, 05 D-011 | Post-hackathon. The verifying paymaster alone covers the zero-gas beat. |
+| N-4 | ERC-7579 scoped session keys for the MCP runtime | 15 Part 6, 09 D-010 | Post-hackathon. MCP is read-only (D-008, D-019). |
+| N-5 | ERC-20 token paymaster ("self-sustaining rock") | 15 Part 6, 09 D-011 | Post-hackathon. The verifying paymaster alone covers the zero-gas beat. |
 | N-6 | Idle yield into Aave v3 / Morpho | 15 Part 6, 04 | Post-hackathon. |
 | N-7 | Replacement tags; creator registration UI | 15 Part 6, 02 Flows A and F | Cut. `markLost` / `clearLost` exist and are informational only — they freeze nothing. |
 | N-8 | A second strategy sharing one reserve | 04, 15 P3.8 | Unblocked: it is one more `streamIndex`. Not shipped; item 4 in spec 08's fallback order. |

@@ -8,10 +8,12 @@ A person taps a rock, signs in through Privy, and can inspect, fund, trade with 
 
 ## Current phase
 
-Implementation, on branch `exit-from-demo-mode`. The web app, the registry contract, the NFC
-verifier and the Aqua integration are written; **nothing is deployed yet**, so most of the
-product currently renders an honest `UNAVAILABLE` state naming what is missing rather than a
-number (decision D-013).
+Going live on Ethereum Sepolia (`specs/20-live-sepolia-plan.md`). The registry, the Aqua app
+and the taker periphery are **deployed and verified on Sepolia** (`contracts/deployments/*.json`,
+addresses committed in `web/wrangler.jsonc` — decision D-034) and `https://bank-rock.com` reads
+them. What is not configured yet (Privy, gas sponsorship, the Worker secrets, the physical tag)
+still renders an honest `UNAVAILABLE` state naming what is missing rather than a number
+(decision D-013); the operator runbook is `specs/18-demo-readiness.md` Part 2.
 
 What exists:
 
@@ -49,7 +51,9 @@ The specifications cover:
 - mobile-first frontend direction;
 - hackathon MVP, demo and open decisions;
 - the exit from demo mode, the environment and secrets inventory, the phone-first UI contract,
-  and demo readiness.
+  and demo readiness;
+- the contract security review and Etherscan-readability standard (spec 19), and the plan for
+  going live on Sepolia (spec 20).
 
 ## Independence
 

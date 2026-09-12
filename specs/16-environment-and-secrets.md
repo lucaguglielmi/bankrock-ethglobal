@@ -338,7 +338,7 @@ is the **Secret** list below.
 | **Non-secret configuration** | Not set here. It is `web/wrangler.jsonc` `vars` (#2, #3, #11–#14, #27–#29, #34), replaced on every deploy from the file |
 | **Custom domains** | `bank-rock.com` and `www.bank-rock.com`, declared in `wrangler.jsonc` `routes` with `custom_domain: true`. Attaching them is what the token's two Zone scopes are for |
 | **`NEXT_PUBLIC_DEMO_MODE`** | `false`, in `wrangler.jsonc`. The deploy job pins the same value in the job environment *and* refuses to build if the file says anything else, so a simulated production build needs two deliberate changes and a passing CI lie (D-013) |
-| **`RELAYER_DAILY_CAP_WEI`** | `20000000000000000` (0.02 ETH/UTC day), in `wrangler.jsonc`. Must be non-zero for gift claims to work at all (#34); unset is the closed branch. The key it caps, `RELAYER_PRIVATE_KEY`, is a Secret — configuration and credential deliberately split |
+| **`RELAYER_DAILY_CAP_WEI`** | `50000000000000000` (0.05 ETH/UTC day, about 25 relayed claims at the 0.002 ETH reservation; 0.02 left only ten, which a rehearsal morning can spend), in `wrangler.jsonc`. Must be non-zero for gift claims to work at all (#34); unset is the closed branch. The key it caps, `RELAYER_PRIVATE_KEY`, is a Secret — configuration and credential deliberately split |
 | **Migrations** | Applied **by the deploy job**, before the Worker is published (`wrangler d1 migrations apply bankrock-db --remote`). The same command is `npm run db:migrate:prod` by hand. Consequence, stated because it is a change: **a destructive migration must not be merged to `main`** — merging it applies it (spec 12, Database) |
 
 #### 2.3.3 Dashboard and DNS actions
