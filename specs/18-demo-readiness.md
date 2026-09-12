@@ -52,33 +52,52 @@ deploy, a dashboard, a faucet, or a physical tag.
 
 # Part 2 — Blockers only the operator can clear
 
-Dependency order. Nothing below is code work; all of it is a dashboard, a faucet or a shell.
+**Refreshed 2026-09-12 evening.** The contracts are deployed and verified, the deploy pipeline
+publishes the Worker that owns `bank-rock.com`, and every non-secret value is committed
+(D-034). What is left is short, and all of it is a dashboard or a wallet.
 
-**Node 22 everywhere.** Every CI and deploy job sets up Node 22, because Hardhat 3 requires
-`>= 22.13`; use the same locally (`node -v`) or `npm test` in `contracts/` will not run and the
-lockfiles may resolve differently from CI's (spec 12, CI).
+## 2.1 Done today (Fact)
 
-| # | Action | Where / command | Blocks |
+| Step | Evidence |
+| --- | --- |
+| GitHub secrets set; token re-scoped to Workers Scripts / D1 / Workers Routes / DNS | Deploy run 22 published the Worker; the apex version stamp changed (spec 12 history) |
+| Registry deployed | `contracts/deployments/sepolia.json` — `0x2A3101Fc525C6DBEc39bef45034E23b13f28F757`, block 11689716 |
+| XYCSwap + XYCSwapTaker deployed | `contracts/deployments/sepolia-aqua-app.json` — app `0x8a293F43Eb0DBaA834b40b2eC4E0751e3ce6316B`, taker `0xCd7899E37D50B226E882e79572AB189080fD0016` |
+| All three verified on Sepolia Etherscan | `contracts/scripts/verify.md`; the Read and Write tabs work |
+| Attester key generated; its address is the registry's `attester` | `0xF27ccB37FCDab74116D4Ad8E1F980879e6D979a4` (the private key was handed to the operator once, in chat, for the Worker secret) |
+| D1 migrations applied to production | The deploy job's "Apply D1 migrations" step, run 19 onward |
+| Addresses and deploy blocks committed as Worker `vars` | `web/wrangler.jsonc` (D-034); a spec check fails on drift from the deployments JSON |
+| Secrets generated for the remaining roles (tag master key, relayer, faucet, admin, cron) | Handed to the operator once, in chat; never in a file in this repository |
+
+The registry's **owner is still the throwaway deployer** `0x66D1bCE0C9Ea1aDDa7B6a8b8Fa52bDbDA52e3d0F`,
+whose key lives only in the session that deployed it. Step 1 below fixes that and is not optional:
+without it nobody can pause the registry or rotate the attester once that session is gone.
+
+## 2.2 Left to do, in order
+
+| # | Action | Where | Blocks |
 | --- | --- | --- | --- |
-| **0** | **Add the two GitHub repository secrets.** `CLOUDFLARE_API_TOKEN` — token scopes **Account → Workers Scripts: Edit**, **Account → D1: Edit**, **Zone (`bank-rock.com`) → Workers Routes: Edit** and **Zone → DNS: Edit** — and `CLOUDFLARE_ACCOUNT_ID` | `https://github.com/lucaguglielmi/bankrock-ethglobal/settings/secrets/actions` — spec 16 §2.3.1. Then re-run the deploy from the Actions tab (`workflow_dispatch`), not by pushing a commit | **Every deploy.** Nothing below this line reaches production without it: the first run that ever got past `npm ci` stopped on exactly these two, and on nothing else |
-| 1 | **Delete** the old `www` redirect rule (unsubstituted `:path*`) | Cloudflare dashboard → Rules → Redirect Rules (R-1). The app now ships the redirect in `web/next.config.ts`, but a dashboard rule is evaluated before the Worker, so the broken one must go | Everything; `curl -sIL https://www.bank-rock.com` must end 200 |
-| 2 | Create the Privy app; allowed origin `https://bank-rock.com`; enable email + passkey/Google; enable Sepolia; set it **first** in the chain list | dashboard.privy.io → `NEXT_PUBLIC_PRIVY_APP_ID` | Beat 4 (spec 16 #1) |
-| 3 | Create a Sepolia RPC app | Alchemy/Infura → `SEPOLIA_RPC_URL` | Indexer, MCP, deploy (spec 16 #4) |
-| 4 | Generate secrets | `openssl rand -hex 16` → `ADMIN_PASSWORD`; `-hex 32` → `ADMIN_JWT_SECRET`, `ADMIN_API_KEY`, `CRON_SECRET`; `-hex 16` → **`NXP_MASTER_KEY`** (16 bytes = 32 hex chars, `lib/nfc/config.ts` enforces it) | Admin, cron, NFC |
-| 5 | Generate three fresh keys | deployer, faucet, attester (`DEPLOYER_PRIVATE_KEY`, `FAUCET_PRIVATE_KEY`, `ATTESTATION_SIGNER_PRIVATE_KEY`). Never reuse across roles. | Deploy, faucet, attestation |
-| 6 | Fund deployer **0.3 ETH**, faucet **1.0 ETH**; attester stays at 0 | Google Cloud Web3 faucet, Alchemy faucet, ETHGlobal faucet. Most gate on a mainnet balance — **start days early** (spec 16 Part 3) | Deploy + 100 awakenings @ 0.01 ETH |
-| 7 | Deploy the registry | `cd contracts && npm ci && npm run compile && SEPOLIA_RPC_URL=… DEPLOYER_PRIVATE_KEY=0x… ATTESTATION_SIGNER_ADDRESS=0x… npm run deploy` → writes `contracts/deployments/sepolia.json`, prints `NEXT_PUBLIC_REGISTRY_ADDRESS` and `REGISTRY_DEPLOY_BLOCK` | Beats 5, 6, 12, 13 |
-| 8 | Verify the source on Sepolia Etherscan | `contracts/scripts/verify.md` | Judge trust |
-| 9 | Create the Pimlico API key **and a sponsorship policy for chain 11155111**; restrict the public key by origin | dashboard.pimlico.io → `PIMLICO_API_KEY`, `NEXT_PUBLIC_PIMLICO_API_KEY`. Without the policy the verifying paymaster rejects **every** UserOp. | Beats 6, 12 (zero-gas claim) |
-| 10 | Deploy the Aqua app and the taker periphery — **not** a SwapVM router (D-030) | `cd contracts && SEPOLIA_RPC_URL=… DEPLOYER_PRIVATE_KEY=… NEXT_PUBLIC_AQUA_ADDRESS=0x1111113ccf1426a8e30e2bff5e005d929bf6a90a node scripts/deploy-aqua-app.js` → `NEXT_PUBLIC_AQUA_APP_ADDRESS`, `NEXT_PUBLIC_AQUA_TAKER_ADDRESS`, `AQUA_APP_DEPLOY_BLOCK`. Aqua itself is never deployed; the script refuses to continue if that address has no code. | Beats 8, 10, 11 |
-| 10a | Generate and fund the **relayer** key (D-027) | `RELAYER_PRIVATE_KEY`, ~0.2 ETH. Unset ⇒ gift claims are UNAVAILABLE, never free. | Beat 12 |
-| 11 | Claim **20 USDC / 2 h / address** to each Rock Account Safe and to the taker wallet | `faucet.circle.com` or `ethglobal.com/faucet/sepolia-11155111-usdc` | Beats 7, 10 |
-| 12 | Wrap ETH → WETH: 0.01 per rock, 0.005 for the taker | `deposit()` on `0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14` | Beats 7, 10 |
-| 13 | Verify `bank-rock.com` in Resend (SPF + DKIM); set `ALERT_FROM_ADDRESS`, `ALERT_EMAIL_ADDRESS` | resend.com (E-6) | Alerts only — **cuttable** |
-| 14 | Set every variable **on the Worker `web`** (Workers & Pages → `web` → Settings → Variables and Secrets), **not** in a file and **not** on the Pages project — no domain points at Pages; `NEXT_PUBLIC_DEMO_MODE=false`; confirm the D1 binding is named `DB` | Cloudflare dashboard; `web/.env.example` is the authoritative list (spec 16 §2.3.2). **`RELAYER_DAILY_CAP_WEI` must be set or gift claims are off** — unset is the closed branch, not the permissive one | Deploy; beat 12 |
-| 15 | *(done at step 0)* Cloudflare API token and the two GitHub secrets | `.github/workflows/deploy.yml` fails early by name without them — spec 16 §2.3.1 | CI deploy |
-| 16 | *(automatic)* D1 migrations to production | The deploy job applies them before publishing the Worker. By hand if needed: `cd web && npm run db:migrate:prod` — `drizzle/0003_gifted_boomer.sql` creates `nfc_counters`, `faucet_ip_claims`, `alert_preferences`, `contact_requests`. **Never merge a destructive migration to `main`** (spec 12, Database) | Replay protection, faucet limits |
-| 17 | **Program the tag** (Part 4) | NXP TagWriter / TagXplorer | Beats 1–2 |
+| **1** | **Take ownership of the registry.** The deployer calls `transferOwnership(yourWallet)` (Ownable2Step), then you call `acceptOwnership()` once from that wallet: Etherscan → registry → Contract → Write → `acceptOwnership`, connected with MetaMask on Sepolia | Etherscan Write tab (the contract is verified) | Every admin action after the deploying session ends |
+| 2 | **Delete** the old `www` redirect rule (unsubstituted `:path*`) | Cloudflare → Rules → Redirect Rules (R-1). The app ships the redirect itself; a dashboard rule runs before the Worker, so the broken one wins until deleted | `curl -sIL https://www.bank-rock.com` must end 200; tag programming |
+| 3 | Create the Privy app: allowed origin `https://bank-rock.com`, email + passkey/Google, Sepolia enabled and **first** in the chain list | dashboard.privy.io → app id → GitHub repository **variable** `NEXT_PUBLIC_PRIVY_APP_ID` (D-034) | Beat 4 |
+| 4 | Create the Pimlico API key **and a sponsorship policy for chain 11155111**, restricted to the registry, the app, the taker, USDC and WETH; restrict the public key by origin | dashboard.pimlico.io → Worker secret `PIMLICO_API_KEY`; GitHub repository **secret** `NEXT_PUBLIC_PIMLICO_API_KEY` | Beats 6, 10, 12 — without the policy every UserOperation is rejected |
+| 5 | Set the Worker secrets — and nothing else on the Worker; plain variables are in git and are overwritten on every deploy (D-034) | Workers & Pages → `web` → Settings → Variables and Secrets → *Secret*: `SEPOLIA_RPC_URL`, `PIMLICO_API_KEY`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RELAYER_PRIVATE_KEY`, `FAUCET_PRIVATE_KEY`, `ADMIN_PASSWORD`, `ADMIN_JWT_SECRET`, `ADMIN_API_KEY`, `CRON_SECRET`. `RESEND_API_KEY` and `ALERT_EMAIL_ADDRESS` only if email is wanted (cuttable) | Everything server-side |
+| 6 | Redeploy so the build picks up the two GitHub inputs: Actions → Deploy → Run workflow, or push to `main` | github.com → Actions | Beats 4, 6 |
+| 7 | `bash scripts/check-live.sh` from the repository | Green on every line, including the six addresses reporting code | Proof of steps 2–6 |
+| 8 | Fund: **relayer 0.05 ETH**, **faucet 0.05 ETH (optional — nothing on the demo path needs the in-app ETH faucet; every operation is sponsored)**, attester 0. Then, per Rock Account and per taker Safe: 10–20 USDC from `faucet.circle.com` and 0.01 WETH (wrap ETH with `deposit()` on the WETH contract from MetaMask, then transfer) | MetaMask on Sepolia. Sepolia gas is ~1 gwei: 0.05 ETH is roughly 50 million gas, hundreds of claims | Beats 7, 10, 12 |
+| 9 | Run the live rehearsal: `npm run rehearse:sepolia` in `web/` with the keys from spec 20 WP-2, or the `Rehearse on Sepolia` workflow with those keys as repository secrets | Its report lands in `contracts/deployments/rehearsal-<date>.md`; DEMO-STATE §5 P-2…P-5 are deleted on the first green run | Confidence that the chain path works before a phone touches it |
+| 10 | **Program the tag** (Part 4) with the `NXP_MASTER_KEY` value set in step 5 | NXP TagWriter / TagXplorer | Beats 1–2; the D-002 acceptance test |
+| 11 | Claude Desktop config for the MCP beat, on the laptop that will be on stage | `mcp/` build, then the `env` block: `SEPOLIA_RPC_URL`, `NEXT_PUBLIC_REGISTRY_ADDRESS=0x2A3101Fc525C6DBEc39bef45034E23b13f28F757`, `BANKROCK_API_URL=https://bank-rock.com` (spec 11) | Beat 13 |
+
+**RPC (D-036).** `SEPOLIA_RPC_URL` may be `https://ethereum-sepolia-rpc.publicnode.com`: it is
+reachable from the Worker and from CI and it served filtered `eth_getLogs` over 2,000 and
+10,000-block ranges when measured today, which is what the indexer asks for. A keyed provider
+(Alchemy, Infura) is the recommendation for the demo day itself, because a public endpoint's
+rate limits are shared with strangers; it is not a blocker.
+
+**Budget.** The earlier figures (deployer 0.3 ETH, faucet 1.0 ETH, relayer 0.2 ETH) were written
+before anything had been measured. The whole deployment cost under 0.003 ETH. Total still to
+fund: about 0.1 Sepolia ETH plus faucet USDC.
 
 ---
 
@@ -270,13 +289,13 @@ Per spec 15 Part 8, plus what Part 1 above adds:
 | --- | --- | --- |
 | 1 | `npm ci && npm run lint && npm run typecheck && npm test && npm run build` in `web/`; `npm test` in `contracts/`; `npm run build` in `mcp/` | all exit 0 from a clean checkout |
 | 2 | `bash scripts/spec-checks.sh`, and the CI run itself | all 20 checks pass. The job is blocking, as is the Playwright `e2e-responsive` matrix. `D-014*` and `D-015` are the two a judge can see |
-| 3 | Registry deployed and verified; `contracts/deployments/sepolia.json` committed | `cast code $NEXT_PUBLIC_REGISTRY_ADDRESS --rpc-url $SEPOLIA_RPC_URL` non-empty |
-| 4 | XYCSwap + XYCSwapTaker deployed (**not** a SwapVM router — D-030); one strategy shipped on a throwaway rock; one swap executed against it from a second account | `Shipped` and `Pushed` events on Sepolia Etherscan, and `safeBalances` answering for the recomputed `strategyHash` |
+| 3 | ~~Registry deployed and verified; `contracts/deployments/sepolia.json` committed~~ **done 2026-09-12** | `bash scripts/check-live.sh` shows code at the registry address |
+| 4 | ~~XYCSwap + XYCSwapTaker deployed~~ **done 2026-09-12**; one strategy shipped on a throwaway rock; one swap executed against it from a second account (the rehearsal script does both) | `Shipped` and `Pushed` events on Sepolia Etherscan, and `safeBalances` answering for the recomputed `strategyHash` |
 | 5 | Every Part 2 secret set **on the Worker `web`**; `NEXT_PUBLIC_DEMO_MODE=false` | deploy job green **and** `NEXT_PUBLIC_APP_VERSION` on `https://bank-rock.com` has changed — a green deploy to a surface no domain points at is the failure this catches (spec 12) |
 | 6 | D1 migrations applied to production (the deploy job does this) | `nfc_counters` exists |
 | 7 | Tag programmed per Part 4 | a tap on a phone opens `/r/{id}?e=…&c=…` |
-| 8 | Wallets funded: deployer 0.3 ETH, faucet 1.0 ETH, **relayer 0.2 ETH**, attester 0, Rock Account 20 USDC + 0.01 WETH, taker 20 USDC + 0.005 WETH | balances read on Etherscan |
-| 9 | Pimlico sponsorship policy exists for chain 11155111 | one sponsored UserOp lands |
+| 8 | Wallets funded: **relayer 0.05 ETH**, faucet 0.05 ETH (optional), attester 0, Rock Account 10–20 USDC + 0.01 WETH, taker 10–20 USDC + 0.005 WETH (Part 2.2 step 8) | balances read on Etherscan |
+| 9 | Pimlico sponsorship policy exists for chain 11155111 | one sponsored UserOp lands — the rehearsal script's first step |
 | 10 | **Full rehearsal of the spec 08 acceptance test**, on the demo phone, on conference wifi and on cellular: tap → inspect signed out → sign in fresh → real transaction → copy the URL into a second browser and confirm the badge reads **`unverified`** → MCP `get_rock_status` from the laptop that will be on stage | all six pass. **This is the first time the SDM implementation meets a physical tag** — do it days early, not the night before |
 | 10a | Rehearse the restart: `archiveRock` on the rehearsal rock, tap again, confirm the verifier offers `next_free` and the Rock Account address is unchanged (D-028, D-029) | a second awakening succeeds on the same tag, and the first rock still reads as `Archived` with its history intact |
 | 11 | Screenshot every screen after step 10 | a still to fall back to |
