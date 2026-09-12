@@ -37,10 +37,12 @@ contract BankRockRegistry {
     }
 
     mapping(uint256 => Rock) public rocks;
+    mapping(uint256 => bytes32) public rockToNfcPubKey;
 
     event RockAwakened(uint256 indexed rockId, address indexed owner, address smartAccount);
     event RockOwnershipTransferred(uint256 indexed rockId, address indexed previousOwner, address indexed newOwner);
     event RockPoked(address indexed poker, string message);
+    event TradeExecuted(uint256 indexed rockId, address tokenIn, address tokenOut, uint256 amountIn);
 
     /**
      * @notice Registers a new physical rock on-chain.
@@ -80,6 +82,20 @@ contract BankRockRegistry {
         r.currentOwner = newOwner;
 
         emit RockOwnershipTransferred(rockId, previousOwner, newOwner);
+    }
+
+    /**
+     * @notice Binds an NFC public key to a rock.
+     */
+    function bindNFC(uint256 rockId, bytes32 nfcPubKey) external {
+        rockToNfcPubKey[rockId] = nfcPubKey;
+    }
+
+    /**
+     * @notice Executes a trade.
+     */
+    function executeTrade(uint256 rockId, address tokenIn, address tokenOut, uint256 amountIn, bytes calldata routerPayload) external {
+        emit TradeExecuted(rockId, tokenIn, tokenOut, amountIn);
     }
 
     /**
