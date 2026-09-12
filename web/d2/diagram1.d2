@@ -1,0 +1,75 @@
+direction: right
+classes: {
+  darkNode: {
+    style: {
+      fill: "#111111"
+      stroke: "#333333"
+      font-color: "#ffffff"
+      border-radius: 8
+      shadow: true
+    }
+  }
+  highlightNode: {
+    style: {
+      fill: "#0066ff"
+      stroke: "#00aaff"
+      font-color: "#ffffff"
+      border-radius: 8
+      shadow: true
+    }
+  }
+}
+
+rock: Bank Rock {
+  class: darkNode
+  shape: cylinder
+}
+
+aqua: Aqua Protocol {
+  class: highlightNode
+  shape: rectangle
+}
+
+swap: SwapVM Strategy {
+  class: darkNode
+  shape: document
+}
+
+1inch: 1inch Aggregator {
+  class: darkNode
+  shape: cloud
+}
+
+user: External Trader {
+  class: darkNode
+  shape: person
+}
+
+rock -> aqua: Allocates Virtual Balance {
+  style.animated: true
+  style.stroke: "#0066ff"
+  style.stroke-dash: 5
+}
+
+aqua -> swap: Deploys Curve {
+  style.animated: true
+  style.stroke: "#0066ff"
+  style.stroke-dash: 5
+}
+
+user -> 1inch: Submits Trade {
+  style.animated: true
+  style.stroke: "#aaaaaa"
+}
+
+1inch -> swap: Routes through Aqua {
+  style.animated: true
+  style.stroke: "#00aaff"
+  style.stroke-dash: 5
+}
+
+swap -> rock: Executes against Account {
+  style.animated: true
+  style.stroke: "#00aaff"
+  style.stroke-width: 2
+}

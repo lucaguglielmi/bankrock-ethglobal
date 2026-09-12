@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, createConfig } from "@privy-io/wagmi";
 import { baseSepolia, base, mainnet, optimism, arbitrum, polygon } from "viem/chains";
 import { http } from "wagmi";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { BankRockAuthProvider, isValidPrivyAppId } from "@/context/auth-context";
 
@@ -51,7 +52,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={wagmiConfig}>
           <BankRockAuthProvider isRealPrivyConfigured={isRealApp}>
-            {children}
+            <TooltipProvider>
+              {children}
+            </TooltipProvider>
           </BankRockAuthProvider>
         </WagmiProvider>
       </QueryClientProvider>

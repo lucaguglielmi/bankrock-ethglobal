@@ -1,0 +1,88 @@
+direction: down
+classes: {
+  darkNode: {
+    style: {
+      fill: "#111111"
+      stroke: "#333333"
+      font-color: "#ffffff"
+      border-radius: 8
+      shadow: true
+    }
+  }
+  highlightNode: {
+    style: {
+      fill: "#0066ff"
+      stroke: "#00aaff"
+      font-color: "#ffffff"
+      border-radius: 8
+      shadow: true
+    }
+  }
+  yieldNode: {
+    style: {
+      fill: "#004400"
+      stroke: "#00aa00"
+      font-color: "#ffffff"
+      border-radius: 8
+      shadow: true
+    }
+  }
+}
+
+rock: Bank Rock\n(Smart Account) {
+  class: darkNode
+  shape: cylinder
+}
+
+aave: Aave v3 Pool\n(Idle Yield) {
+  class: yieldNode
+  shape: queue
+}
+
+aqua: Aqua Shared Liquidity {
+  class: highlightNode
+  shape: package
+}
+
+swap1: WETH/USDC SwapVM {
+  class: darkNode
+  shape: document
+}
+
+swap2: WBTC/USDC SwapVM {
+  class: darkNode
+  shape: document
+}
+
+rock -> aave: 100% USDC Deposited {
+  style.animated: true
+  style.stroke: "#00aa00"
+  style.stroke-dash: 5
+}
+
+aave -> rock: aUSDC Interest {
+  style.animated: true
+  style.stroke: "#00ff00"
+}
+
+rock -> aqua: Virtual Balances {
+  style.animated: true
+  style.stroke: "#0066ff"
+  style.stroke-dash: 5
+}
+
+aqua -> swap1: Supports {
+  style.animated: true
+  style.stroke: "#00aaff"
+}
+
+aqua -> swap2: Supports {
+  style.animated: true
+  style.stroke: "#00aaff"
+}
+
+swap1 -> rock: JIT Liquidity Pull\nOn Trade Execution {
+  style.animated: true
+  style.stroke: "#ff0000"
+  style.stroke-dash: 5
+}
