@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Sheet, SheetBody } from "@/components/ui/sheet";
 import { useRockActions } from "@/hooks/useBankRock";
+import type { Capability } from "@/lib/demo";
 import {
   ActionOutcomeNotice,
   outcomeFrom,
@@ -22,6 +23,13 @@ import {
 
 export interface OwnerMenuProps {
   rockId: string;
+  /**
+   * Whether this wallet may send owner actions from the rock's account, from `useRockAccount`
+   * (D-037). Every button here is a UserOperation from that account, so when it is UNAVAILABLE
+   * they are disabled and its reason is shown instead — the alternative is a sheet full of
+   * buttons whose transactions revert.
+   */
+  ownerActions: Capability<string>;
   handoverPending: boolean;
   lost: boolean;
   /** A live stream the owner can stop. Absent when the rock is not trading. */
@@ -31,6 +39,7 @@ export interface OwnerMenuProps {
 
 export function OwnerMenu({
   rockId,
+  ownerActions,
   handoverPending,
   lost,
   streamIndex,
@@ -42,6 +51,9 @@ export function OwnerMenu({
   const [isRetireOpen, setRetireOpen] = useState(false);
   const [isCashInOpen, setCashInOpen] = useState(false);
   const [outcome, setOutcome] = useState<ActionOutcome | null>(null);
+
+  const blockedReason = ownerActions.state === "UNAVAILABLE" ? ownerActions.reason : null;
+  const blocked = blockedReason !== null;
 
   const runCancel = async () => {
     const result = outcomeFrom(await cancelHandover(rockId));
@@ -91,8 +103,19 @@ export function OwnerMenu({
         description="Only you can see these."
       >
         <SheetBody className="flex flex-col gap-4">
+          {blockedReason ? (
+            <p role="status" className="max-w-prose text-base text-ink-2">
+              {blockedReason}
+            </p>
+          ) : null}
+
           {handoverPending ? (
-            <Button variant="outline" className="w-full" onClick={runCancel} disabled={isPending}>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={runCancel}
+              disabled={isPending || blocked}
+            >
               Cancel handover
             </Button>
           ) : null}
@@ -101,6 +124,7 @@ export function OwnerMenu({
             <Button
               variant="outline"
               className="w-full"
+              disabled={blocked}
               onClick={() => {
                 setMenuOpen(false);
                 setOutcome(null);
@@ -114,6 +138,7 @@ export function OwnerMenu({
           <Button
             variant="outline"
             className="w-full"
+            disabled={blocked}
             onClick={() => {
               setMenuOpen(false);
               setOutcome(null);
@@ -128,7 +153,7 @@ export function OwnerMenu({
               variant="outline"
               className="w-full"
               onClick={runLostFlag}
-              disabled={isPending}
+              disabled={isPending || blocked}
             >
               {lost ? "Clear the lost mark" : "Mark tag as lost"}
             </Button>

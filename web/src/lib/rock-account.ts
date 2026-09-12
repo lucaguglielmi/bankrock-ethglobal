@@ -34,6 +34,7 @@ import {
   SAFE_SENTINEL_OWNER,
 } from "@/lib/chain";
 import { BANK_ROCK_REGISTRY_ABI } from "@/lib/chain/abi/registry";
+import { SAFE_OWNER_MANAGER_ABI } from "@/lib/chain/abi/safe";
 import { ERC20_ABI } from "@/lib/chain/abi/erc20";
 import { env, optionalEnv, real, unavailable, type Capability } from "@/lib/demo";
 import { publicReasonWith } from "@/lib/errors";
@@ -132,7 +133,7 @@ export function checkAwakenAttestation(
   const id = parseRockId(params.rockId);
   if (id === null) return unavailable(`"${params.rockId}" is not a rock id`);
 
-  if (!params.signedInAddress) return unavailable("Sign in to act on this rock");
+  if (!params.signedInAddress) return unavailable(SIGNED_OUT_REASON);
 
   if (attestation.message.rockId !== id.toString()) {
     return unavailable("This tap was verified for a different rock");
@@ -383,6 +384,198 @@ export async function resolveRockForTag(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Which account, and whose word for it (D-037)                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * For an **awakened** rock the Rock Account is whatever the registry reports, never a fresh
+ * derivation, and authority over it is the account's own answer rather than an address the app
+ * recomputes. That is D-037, and it exists because the two disagree the moment a rock is given
+ * away: `claimHandover` swaps the Safe's single owner to the recipient and rebinds
+ * `rock.smartAccount` to that same Safe (D-032), whose address was derived from the *giver's*
+ * wallet and the tag (D-029). Deriving from (recipient, tag) therefore yields a different, empty
+ * address, and an app that insists on it locks the new owner out of a rock the registry says is
+ * theirs.
+ *
+ * Derivation survives in exactly the two places where there is no account to read: the
+ * counterfactual address the verifier signs into an awakening attestation, and a visitor's
+ * personal Safe (`PERSONAL_ACCOUNT_SALT`).
+ */
+
+/** The one reason a signed-out user is given for any owner action. */
+export const SIGNED_OUT_REASON = "Sign in to act on this rock";
+
+/** The rock exists but its record names no account to act from. */
+export const NOT_AWAKENED_REASON = "This rock has not been awakened yet";
+
+/** The registry answered, but with no account — only possible off a chain matching this ABI. */
+export const NO_REGISTRY_ACCOUNT_REASON = "The registry holds no Rock Account for this rock";
+
+/** Archiving is terminal: the registry refuses every owner action afterwards (D-028). */
+export const ARCHIVED_REASON = "This rock is retired, so it has no owner actions left";
+
+/** The signed-in wallet is not the wallet the registry records as this rock's owner. */
+export const NOT_ROCK_OWNER_REASON = "This rock is owned by a different wallet";
+
+/** `isOwner` returned false: the account belongs to someone else now. */
+export const ACCOUNT_ANSWERS_ELSEWHERE_REASON = "This account answers to a different wallet";
+
+/** No code at the address, so it can answer for nobody — the `code.length` half of the gate. */
+export const ACCOUNT_NOT_DEPLOYED_REASON =
+  "This rock's account has not executed anything yet, so it answers to nobody";
+
+/** `isOwner` did not return cleanly. On chain that is false, and it is false here. */
+export const ACCOUNT_DID_NOT_ANSWER_REASON =
+  "This rock's account did not answer when asked whose wallet it belongs to";
+
+/**
+ * What an account said when asked whether a wallet is one of its owners.
+ *
+ * `answers: false` always carries the reason to show, because "not yours" and "not deployed" are
+ * different facts and neither may be rendered as the other.
+ */
+export type AccountAnswer = { answers: true } | { answers: false; reason: string };
+
+/**
+ * The pure reading of the two facts `_accountAnswersTo` gathers on chain, in its order: no code is
+ * false, an unclean answer is false, and only a clean `true` is true.
+ */
+export function interpretAccountAnswer(params: {
+  hasCode: boolean;
+  /** `null` when the call reverted or returned something that is not a boolean. */
+  isOwner: boolean | null;
+}): AccountAnswer {
+  if (!params.hasCode) return { answers: false, reason: ACCOUNT_NOT_DEPLOYED_REASON };
+  if (params.isOwner === null) return { answers: false, reason: ACCOUNT_DID_NOT_ANSWER_REASON };
+  if (!params.isOwner) return { answers: false, reason: ACCOUNT_ANSWERS_ELSEWHERE_REASON };
+  return { answers: true };
+}
+
+/**
+ * Asks a Rock Account whether a wallet is one of its owners — the same staticcall the registry's
+ * `_accountAnswersTo` makes before it admits an owner action from that account.
+ *
+ * UNAVAILABLE means the question could not be put (no address, no wallet, unreachable RPC). A REAL
+ * `answers: false` means the account was asked and did not claim this wallet; that is a fact about
+ * the chain, not a failure to read it, and the two are never conflated (D-013).
+ */
+export async function readAccountAnswersTo(
+  account: Address | undefined,
+  wallet: string | undefined,
+): Promise<Capability<AccountAnswer>> {
+  if (!account || account === zeroAddress) return unavailable(NO_REGISTRY_ACCOUNT_REASON);
+  if (!wallet) return unavailable(SIGNED_OUT_REASON);
+
+  let accountAddress: Address;
+  let walletAddress: Address;
+  try {
+    accountAddress = getAddress(account);
+    walletAddress = getAddress(wallet);
+  } catch {
+    return unavailable(`"${wallet}" is not an address`);
+  }
+
+  const client = readClient();
+
+  let code: Hex | undefined;
+  try {
+    code = await client.getCode({ address: accountAddress });
+  } catch (err) {
+    return unavailable(publicReasonWith("The Rock Account could not be read", err));
+  }
+  if (!code || code === "0x") {
+    return real(interpretAccountAnswer({ hasCode: false, isOwner: null }));
+  }
+
+  let isOwner: boolean | null = null;
+  try {
+    const answer = await client.readContract({
+      address: accountAddress,
+      abi: SAFE_OWNER_MANAGER_ABI,
+      functionName: "isOwner",
+      args: [walletAddress],
+    });
+    isOwner = typeof answer === "boolean" ? answer : null;
+  } catch {
+    // A revert, a missing function, or anything else unclean. The chain counts that as "no", and
+    // so does this: the code read above already proved the RPC is answering.
+    isOwner = null;
+  }
+
+  return real(interpretAccountAnswer({ hasCode: true, isOwner }));
+}
+
+/** Where a Rock Account address came from. Only `"derivation"` is a prediction. */
+export type RockAccountSource = "registry" | "derivation";
+
+export interface RockAccountPlan {
+  smartAccount: Address;
+  source: RockAccountSource;
+}
+
+/**
+ * The Rock Account to use for one rock: the registry's if the rock has ever been awakened,
+ * otherwise the address this wallet and this tag derive (D-037).
+ *
+ * Pure, so the rule is stated once and is testable: the caller does the registry read and, when
+ * there is nothing to read, the derivation.
+ */
+export function planRockAccount(params: {
+  record: RockRecord | null;
+  /** `deriveRockAccountAddress(wallet, uidHash)`, when it has been computed. */
+  derived?: Address;
+}): Capability<RockAccountPlan> {
+  const record = params.record;
+  const bound =
+    record && record.state !== "dormant" && record.smartAccount !== zeroAddress
+      ? record.smartAccount
+      : null;
+
+  if (bound) return real({ smartAccount: getAddress(bound), source: "registry" });
+
+  if (record && record.state !== "dormant") return unavailable(NO_REGISTRY_ACCOUNT_REASON);
+
+  if (params.derived && params.derived !== zeroAddress) {
+    return real({ smartAccount: getAddress(params.derived), source: "derivation" });
+  }
+
+  return unavailable(NOT_AWAKENED_REASON);
+}
+
+/**
+ * Whether the signed-in wallet may send this rock's owner actions, and from which account.
+ *
+ * The two conditions are the registry's own, restated where the user can be told about them
+ * before a transaction is built rather than after one reverts:
+ *
+ *  1. the wallet is the owner the registry records — `_requireRockController` admits nobody
+ *     else's Safe; and
+ *  2. the Rock Account answers to that wallet — the `isOwner` staticcall `_accountAnswersTo`
+ *     makes, which is what lets the action be sent from the account and sponsored.
+ *
+ * Pure. `answer` is what `readAccountAnswersTo` returned for the registry's account.
+ */
+export function ownerActionAuthority(params: {
+  record: RockRecord;
+  wallet: string | undefined;
+  answer: AccountAnswer;
+}): Capability<Address> {
+  const plan = planRockAccount({ record: params.record });
+  if (plan.state === "UNAVAILABLE") return unavailable(plan.reason);
+
+  if (params.record.state === "archived") return unavailable(ARCHIVED_REASON);
+  if (!params.wallet) return unavailable(SIGNED_OUT_REASON);
+
+  if (params.record.owner.toLowerCase() !== params.wallet.toLowerCase()) {
+    return unavailable(NOT_ROCK_OWNER_REASON);
+  }
+
+  if (!params.answer.answers) return unavailable(params.answer.reason);
+
+  return real(plan.value.smartAccount);
+}
+
+/* -------------------------------------------------------------------------- */
 /* Calldata                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -624,7 +817,9 @@ export function pimlicoRpcUrl(apiKey: string): string {
  *    transaction exists;
  *  - the address follows the *tag*, not the rock id. A tag whose rock was archived awakens a new
  *    rock id into the same account for the same owner, which is the behaviour the archive-and-
- *    rehearse flow needs.
+ *    rehearse flow needs — for the owner who derived it. After a gift the rock's account is the
+ *    giver's derivation (D-032, D-037), so the recipient's next awakening lands in a different
+ *    account and the retired rock's reserve stays where it is.
  *
  * It deliberately does not include the rock id: the id is not settled at the moment of the tap
  * (an archived rock's tag awakens a different one), and the attestation must name the account.
