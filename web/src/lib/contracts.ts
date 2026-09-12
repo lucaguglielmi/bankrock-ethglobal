@@ -1,106 +1,392 @@
-// BankRockRegistry ABI & Known Addresses
-export const BANK_ROCK_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ||
-  "0x83B1A8a09f87258385698b9C433e143FDF2A9F52") as `0x${string}`;
+export const BANK_ROCK_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || '0x83B1A8a09f87258385698b9C433e143FDF2A9F52') as `0x${string}`;
 
-export const BANK_ROCK_REGISTRY_ABI = [
+export const BANK_ROCK_REGISTRY_ABI = 
+[
   {
-    type: "function",
-    name: "awakenRock",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "rockId", type: "uint256" },
-      { name: "smartAccount", type: "address" },
-    ],
-    outputs: [],
+    "inputs": [],
+    "name": "InvalidNFCSequence",
+    "type": "error"
   },
   {
-    type: "function",
-    name: "transferOwnership",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "rockId", type: "uint256" },
-      { name: "newOwner", type: "address" },
-    ],
-    outputs: [],
+    "inputs": [],
+    "name": "InvalidNewOwner",
+    "type": "error"
   },
   {
-    type: "function",
-    name: "rocks",
-    stateMutability: "view",
-    inputs: [{ name: "", type: "uint256" }],
-    outputs: [
-      { name: "smartAccount", type: "address" },
-      { name: "currentOwner", type: "address" },
-      { name: "awakenedAt", type: "uint256" },
-      { name: "isAwake", type: "bool" },
-    ],
-  },
-  {
-    type: "function",
-    name: "getRockStatusJSON",
-    stateMutability: "view",
-    inputs: [{ name: "rockId", type: "uint256" }],
-    outputs: [{ name: "", type: "string" }],
-  },
-  {
-    type: "function",
-    name: "isAwakened",
-    stateMutability: "view",
-    inputs: [{ name: "rockId", type: "uint256" }],
-    outputs: [{ name: "", type: "bool" }],
-  },
-  {
-    type: "function",
-    name: "getRock",
-    stateMutability: "view",
-    inputs: [{ name: "rockId", type: "uint256" }],
-    outputs: [
+    "inputs": [
       {
-        name: "",
-        type: "tuple",
-        components: [
-          { name: "smartAccount", type: "address" },
-          { name: "currentOwner", type: "address" },
-          { name: "awakenedAt", type: "uint256" },
-          { name: "isAwake", type: "bool" },
-        ],
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
+    "name": "RockAlreadyAwakened",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
+    "name": "RockNotAwakened",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "caller",
+        "type": "address"
       },
+      {
+        "internalType": "address",
+        "name": "expectedOwner",
+        "type": "address"
+      }
     ],
+    "name": "UnauthorizedTapper",
+    "type": "error"
   },
   {
-    type: "function",
-    name: "poke",
-    stateMutability: "nonpayable",
-    inputs: [],
-    outputs: [{ name: "", type: "string" }],
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "smartAccount",
+        "type": "address"
+      }
+    ],
+    "name": "RockAwakened",
+    "type": "event"
   },
   {
-    type: "event",
-    name: "RockAwakened",
-    inputs: [
-      { name: "rockId", type: "uint256", indexed: true },
-      { name: "owner", type: "address", indexed: true },
-      { name: "smartAccount", type: "address", indexed: false },
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
     ],
+    "name": "RockOwnershipTransferred",
+    "type": "event"
   },
   {
-    type: "event",
-    name: "RockOwnershipTransferred",
-    inputs: [
-      { name: "rockId", type: "uint256", indexed: true },
-      { name: "previousOwner", type: "address", indexed: true },
-      { name: "newOwner", type: "address", indexed: true },
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "poker",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "message",
+        "type": "string"
+      }
     ],
+    "name": "RockPoked",
+    "type": "event"
   },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "tokenIn",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "tokenOut",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amountIn",
+        "type": "uint256"
+      }
+    ],
+    "name": "TradeExecuted",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "smartAccount",
+        "type": "address"
+      }
+    ],
+    "name": "awakenRock",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "nfcPubKey",
+        "type": "bytes32"
+      }
+    ],
+    "name": "bindNFC",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "tokenIn",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "tokenOut",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amountIn",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "routerPayload",
+        "type": "bytes"
+      }
+    ],
+    "name": "executeTrade",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRock",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "smartAccount",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "currentOwner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "awakenedAt",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isAwake",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct BankRockRegistry.Rock",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRockStatusJSON",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
+    "name": "isAwakened",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "poke",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "rockToNfcPubKey",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "rocks",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "smartAccount",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "currentOwner",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "awakenedAt",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "isAwake",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
 ] as const;
 
-// 1inch Aqua Protocol Official Addresses on Base Sepolia
 export const AQUA_ADDRESSES = {
-  // 1inch Aqua Core Engine
-  aquaContract: "0x111111125421cA6dc452d289314280a0f8842A65" as `0x${string}`,
-  // 1inch SwapVM Interpreter
-  swapVmContract: "0x222222225421ca6dc452d289314280a0f8842a65" as `0x${string}`,
-  // Testnet Token Pair
-  testUSDC: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as `0x${string}`, // Base Sepolia Official USDC
-  testWETH: "0x4200000000000000000000000000000000000006" as `0x${string}`, // Base Sepolia WETH
+  aquaContract: '0x111111125421cA6dc452d289314280a0f8842A65' as `0x${string}`,
+  swapVmContract: '0x222222225421ca6dc452d289314280a0f8842a65' as `0x${string}`,
+  testUSDC: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as `0x${string}`,
+  testWETH: '0x4200000000000000000000000000000000000006' as `0x${string}`,
 };

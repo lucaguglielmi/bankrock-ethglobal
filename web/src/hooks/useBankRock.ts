@@ -105,11 +105,14 @@ export function useRockActions() {
   };
 
   const tradeOnchain = async (rockId: number | string, amountIn: bigint, amountOutMin: bigint, tokenIn: `0x${string}`) => {
+    // Determine tokenOut (if USDC is tokenIn, WETH is out, else USDC)
+    const tokenOut = tokenIn === AQUA_ADDRESSES.testUSDC ? AQUA_ADDRESSES.testWETH : AQUA_ADDRESSES.testUSDC;
+    
     return await writeContractAsync({
       address: BANK_ROCK_REGISTRY_ADDRESS,
       abi: BANK_ROCK_REGISTRY_ABI,
       functionName: "executeTrade",
-      args: [BigInt(rockId), amountIn, amountOutMin, tokenIn],
+      args: [BigInt(rockId), tokenIn, tokenOut, amountIn, "0x" as `0x${string}`],
       chainId: baseSepolia.id,
     });
   };
