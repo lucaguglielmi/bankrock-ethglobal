@@ -20,7 +20,7 @@ names an owner: **operator** (needs dashboards, keys or a physical rock) or **ag
 | WP | State | Evidence |
 | --- | --- | --- |
 | WP-1 deploy and configure | **contracts done; secrets are the operator's** | Registry, XYCSwap and XYCSwapTaker deployed and verified on Sepolia Etherscan (`contracts/deployments/*.json`, `contracts/scripts/verify.md`); addresses committed as Worker vars (D-034) and live: `/api/rocks/next-id` and `/api/rocks/1/activity` answer `REAL` on `bank-rock.com`. Left: spec 18 Part 2.2 (ownership acceptance, `www` rule, Privy, Pimlico, ten Worker secrets, funding, the tag) |
-| WP-2 rehearsal script | **delivered; dry run green; live run blocked on a Pimlico key and funded keys** | `web/scripts/rehearse-sepolia.ts`, `.github/workflows/rehearse.yml` |
+| WP-2 rehearsal script | **done — live run green on Sepolia, 2026-09-12 21:24 UTC** | `contracts/deployments/rehearsal-2026-09-12.md`; five steps, eleven transactions, every assertion passed |
 | WP-3 physical rock | not started (operator) | needs `NXP_MASTER_KEY` on the Worker and on the tag |
 | WP-4 demo rehearsal | not started | after WP-3 |
 | WP-8 keeper | **done — deleted** (D-035) | commit 5316889 |
