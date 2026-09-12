@@ -39,8 +39,8 @@ export default function RockPage() {
           </div>
 
           <div className="order-1 md:order-2 flex flex-col gap-6">
-            <div className="w-full max-w-md aspect-[4/3] mx-auto bg-ink-4/10 rounded-3xl flex items-center justify-center relative overflow-hidden border border-black/5">
-              <span className="text-ink-3 font-mono text-sm">[ Photo: Rock with Silicon & NFC tag ]</span>
+            <div className="w-full max-w-md aspect-[4/3] mx-auto bg-ink-4/10 rounded-3xl flex items-center justify-center relative overflow-hidden border border-black/5 shadow-xl">
+              <Image src="/infographics/photo_rock_silicon_nfc.jpg" alt="Rock with Silicon and NFC tag" fill className="object-cover" />
             </div>
             <div className="w-full max-w-md aspect-[4/3] mx-auto bg-ink-4/10 rounded-3xl flex items-center justify-center relative overflow-hidden border border-black/5">
               <span className="text-ink-3 font-mono text-sm">[ Photo: Finger with tag for size reference ]</span>
