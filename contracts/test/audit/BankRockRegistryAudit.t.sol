@@ -19,6 +19,20 @@ interface Vm {
     function warp(uint256 timestamp) external;
 }
 
+/// @dev A Rock Account that reports one signing owner — the minimum the registry now requires of
+///      an account a claim binds.
+contract ClaimantAccount {
+    address private immutable OWNER;
+
+    constructor(address owner) {
+        OWNER = owner;
+    }
+
+    function isOwner(address account) external view returns (bool) {
+        return account == OWNER;
+    }
+}
+
 contract BankRockRegistryAuditTest {
     Vm constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
@@ -33,8 +47,9 @@ contract BankRockRegistryAuditTest {
     ///      for an open gift, so this address remains under the giver's control.
     address constant SAFE = address(0x4444444444444444444444444444444444444444);
     /// @dev Bob's own Rock Account. Since the N-1 fix a claim rebinds the rock's account to the
-    ///      one the attestation names, so a claim attestation must carry a real address.
-    address constant BOB_ACCOUNT = address(0x6666666666666666666666666666666666666666);
+    ///      one the attestation names, and the registry checks that the named account already
+    ///      reports the new owner as one of its signers — so it has to be a real deployed account.
+    address BOB_ACCOUNT;
     address constant RELAYER = address(0x5555555555555555555555555555555555555555);
 
     uint256 constant ROCK = 42;
@@ -46,6 +61,7 @@ contract BankRockRegistryAuditTest {
     function setUp() public {
         attester = vm.addr(ATTESTER_PK);
         registry = new BankRockRegistry(address(this), attester);
+        BOB_ACCOUNT = address(new ClaimantAccount(BOB));
     }
 
     // -----------------------------------------------------------------

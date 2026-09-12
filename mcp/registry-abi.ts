@@ -20,6 +20,22 @@ export const registryAbi = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "rockOwner",
+        "type": "address"
+      }
+    ],
+    "name": "AccountDoesNotAnswerToOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "deadline",
         "type": "uint256"

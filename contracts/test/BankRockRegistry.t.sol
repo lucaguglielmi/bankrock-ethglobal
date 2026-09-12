@@ -1017,6 +1017,76 @@ contract BankRockRegistryTest {
         require(lost, "the rebound account may act for its owner");
     }
 
+    /**
+     * @dev The claim-time check on the bound account (re-review N-1, second door). Rebinding alone
+     *      left the registry trusting the attester's word about which account it was told to bind,
+     *      and the only signer in the repository names the rock's *existing* account — the giver's
+     *      Safe — for a rock in `handover_pending`. So the rebind could be a no-op write of the
+     *      same address, and the giver's Safe stayed the rock's account for anyone who did not go
+     *      through the relay route that swaps its owner first.
+     *
+     *      The registry now asks the account itself. An account that does not report the new owner
+     *      is refused, and the route's ordering becomes an invariant for every caller.
+     */
+    function testAClaimIsRefusedWhenTheBoundAccountDoesNotAnswerToTheNewOwner() public {
+        _awaken();
+        registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
+
+        // The giver's own Safe: it answers to this contract, not to Bob.
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, BOB, SAFE);
+        bytes memory sig = _sign(ATTESTER_PK, att);
+
+        bytes4 sel;
+        vm.prank(RELAYER);
+        try registry.claimHandover(ROCK, att, sig) {
+            require(false, "an account that answers to the giver must not be bound to Bob's rock");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.AccountDoesNotAnswerToOwner.selector, "wrong error");
+
+        (address rockOwner, address smartAccount,, BankRockRegistry.RockState state,,) = registry.getRock(ROCK);
+        require(rockOwner == address(this), "the refused claim moved nothing");
+        require(smartAccount == SAFE, "and bound nothing");
+        require(state == BankRockRegistry.RockState.HandoverPending, "the gift is still outstanding");
+        require(registry.lastCounter(UID) == 1, "and no tap was consumed");
+
+        // Once the account does answer to Bob — which is what the Safe owner swap achieves — the
+        // very same attestation is accepted.
+        safeAccount.setOwner(BOB, true);
+        vm.prank(RELAYER);
+        registry.claimHandover(ROCK, att, sig);
+
+        (rockOwner, smartAccount,,,,) = registry.getRock(ROCK);
+        require(rockOwner == BOB, "Bob owns the rock");
+        require(smartAccount == SAFE, "bound to the account that answers to him");
+    }
+
+    /**
+     * @dev The deliberate cost of the check above: an account that has never been deployed cannot
+     *      be bound, because a counterfactual address has no code to answer `isOwner`. A claim
+     *      naming one is refused until the account exists on chain.
+     */
+    function testAClaimCannotBindACounterfactualAccount() public {
+        _awaken();
+        registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
+
+        address notYetDeployed = address(0xdEADbeEF00000000000000000000000000000001);
+        BankRockRegistry.Attestation memory att =
+            _att(ROCK, UID, 2, block.timestamp + 300, BOB, notYetDeployed);
+        bytes memory sig = _sign(ATTESTER_PK, att);
+
+        bytes4 sel;
+        vm.prank(RELAYER);
+        try registry.claimHandover(ROCK, att, sig) {
+            require(false, "an undeployed account cannot answer for its owner and must be refused");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.AccountDoesNotAnswerToOwner.selector, "wrong error");
+        require(registry.lastCounter(UID) == 1, "no tap was consumed");
+    }
+
     function testSmartAccountStopsBeingAControllerWhenItNoLongerAnswersToTheOwner() public {
         _awaken();
 

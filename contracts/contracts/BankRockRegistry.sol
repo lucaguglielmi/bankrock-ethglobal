@@ -162,9 +162,10 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
         /// @notice The Rock Account this attestation binds to the rock — on both attested paths.
         ///         Covering it in the signature is what stops a front-runner re-submitting a
         ///         captured attestation with an account of their own. Must not be the zero
-        ///         address. On a claim it *replaces* the rock's existing account, so the attester
-        ///         chooses: the rock's current account when the claimant is about to become a
-        ///         signing owner of it, otherwise the claimant's own account.
+        ///         address. On a claim it *replaces* the rock's existing account, and the registry
+        ///         additionally requires that account to already report `subject` as one of its
+        ///         signing owners — so it must be deployed, and its owner swap must have landed,
+        ///         before the claim.
         address smartAccount;
     }
 
@@ -382,6 +383,13 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
     /// @param recipient The wallet the gift was reserved for.
     error NotHandoverRecipient(address subject, address recipient);
 
+    /// @notice The Rock Account this claim would bind does not report the new owner as one of its
+    ///         signing owners, so binding it would hand the rock to an account that answers to
+    ///         somebody else.
+    /// @param account The Rock Account the attestation named.
+    /// @param rockOwner The wallet that would have become the rock's owner.
+    error AccountDoesNotAnswerToOwner(address account, address rockOwner);
+
     /// @notice No attestation signer is configured, so no attested action can be verified.
     error AttesterNotSet();
 
@@ -500,19 +508,33 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
      *      because a Safe's owner set is writable by the Safe — the giver can make the answer
      *      `true` for one transaction, retire the recipient's rock, and put it back.
      *
-     *      So the authority follows the object. Whichever account the attester names becomes the
-     *      rock's account, and the giver's Safe is no longer connected to the rock at all.
+     *      So the authority follows the object. The account the attester names becomes the rock's
+     *      account, and the giver's Safe is no longer connected to the rock at all.
      *
-     *      That places a real decision with the attester, the verifier that signs after a tap. It
-     *      names the rock's *existing* account when the claimant is about to become a signing
-     *      owner of it — the named-gift path, where the owner swap is pre-signed and does land, so
-     *      the rock's money stays where it is — and the claimant's *own* account otherwise, which
-     *      is the open-gift path, where no swap can be pre-signed. The registry does not and
-     *      cannot make that choice; it records what it is told and refuses the zero address, so a
-     *      rock is never left with no account at all.
+     *      The attester's word is not sufficient on its own, and that is the second half of the
+     *      fix. The registry asks the named account, through `isOwner`, whether it already answers
+     *      to `att.subject`, and refuses the claim otherwise. Without it the check is only as good
+     *      as the signer: a verifier that names the rock's *existing* account — which is the
+     *      natural thing to name for a rock that is mid-handover — would write the giver's Safe
+     *      straight back, and the rebind would be a no-op for anyone not going through the relay
+     *      route that swaps the Safe's owner first. Asking the account makes that ordering an
+     *      invariant of the contract rather than a convention of one caller.
+     *
+     *      Two consequences worth stating plainly.
+     *
+     *      First, **the Safe owner swap must land before the claim, not after**. The relay route
+     *      already does it in that order; any other caller must too.
+     *
+     *      Second, **a counterfactual account cannot be bound**. An ERC-4337 account that has not
+     *      been deployed yet has no code, so it cannot answer `isOwner` and the claim reverts
+     *      until it exists. That is intended: an address that has never executed anything cannot
+     *      be shown to answer to anybody, and binding a rock to one would record an authority no
+     *      one can verify. A claimant in that position deploys their account first — which the
+     *      sponsored path does for them anyway — and claims after.
      * @param rockId The rock being claimed.
      * @param att The attestation from the Bank Rock verifier. `att.subject` becomes the owner and
-     *        `att.smartAccount` becomes the Rock Account; neither may be the zero address.
+     *        `att.smartAccount` becomes the Rock Account; neither may be the zero address, and the
+     *        account must already report `att.subject` as one of its signing owners.
      * @param sig The attester's EIP-712 signature over `att`, 65 bytes.
      */
     function claimHandover(uint256 rockId, Attestation calldata att, bytes calldata sig) external whenNotPaused {
@@ -534,6 +556,14 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
         address previousOwner = rock.currentOwner;
         rock.currentOwner = att.subject;
         rock.smartAccount = att.smartAccount;
+
+        // The attester's word is not sufficient on its own. Ask the account itself whether it
+        // answers to the new owner, so that the ordering the relay route follows by convention
+        // holds for every caller as an invariant.
+        if (!_accountAnswersTo(att.smartAccount, att.subject)) {
+            revert AccountDoesNotAnswerToOwner(att.smartAccount, att.subject);
+        }
+
         rock.state = RockState.Awake;
         delete rock.handover;
 
@@ -865,11 +895,14 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
      *      its *current* owner and the giver's Safe is out of the picture the moment the rock
      *      changes hands.
      *
-     *      `isOwner` still earns its place for the case rebinding cannot reach: an owner who keeps
-     *      the rock and changes the signers of their own account. What it must not be asked to do
-     *      alone is arbitrate between two parties, because the contract it questions belongs to
-     *      one of them and a Safe's owner set is writable by that Safe. That was the defect the
-     *      2026-09-12 re-review found (N-1); rebinding is what closes it.
+     *      `isOwner` is asked twice, and the two uses are different. Here it guards ongoing
+     *      actions, for the case rebinding cannot reach: an owner who keeps the rock and changes
+     *      the signers of their own account. In `claimHandover` it guards the binding itself, so
+     *      an account that answers to the previous owner can never be recorded against the new
+     *      one. What it must not be asked to do is arbitrate between two parties *after* the fact,
+     *      because the contract it questions belongs to one of them and a Safe's owner set is
+     *      writable by that Safe. That was the 2026-09-12 re-review's finding (N-1); rebinding
+     *      plus the claim-time check is what closes it.
      *
      *      `isOwner` is called inside a try/catch and anything other than a clean `true` — a
      *      revert, a missing function, an address with no code — counts as false. That fails

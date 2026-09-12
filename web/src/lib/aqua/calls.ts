@@ -197,21 +197,15 @@ export interface SwapParams {
   /** The floor the visitor accepts, in base units of the other token. */
   minAmountOut: bigint;
   /**
-   * Who receives the output. **Required in practice** — a plan without it is `UNAVAILABLE`.
+   * Who receives the output. Required.
    *
    * The periphery used to read `to == 0` as "pay the caller"; the 2026-09-12 re-review removed
    * that sentinel (finding N-2), because a value every reader takes for a burn address must not
    * quietly mean a payout, and because the periphery's own address — the one a visitor has just
    * approved and therefore just had in their clipboard — would silently destroy the output. Both
-   * are rejected on-chain now, so the recipient has to be named.
-   *
-   * It stays optional in the *type* only so that the contract change and the caller change can
-   * land separately: `useTakerActions` builds the plan before it knows the smart account that
-   * will send it, and moving that is a change to a file this one cannot reach. Omitting it
-   * returns an `UNAVAILABLE` whose reason names the fix, rather than encoding calldata that
-   * reverts on-chain. Make it required once that caller passes `to: sender`.
+   * are rejected on-chain, so the recipient is named explicitly here.
    */
-  to?: Address;
+  to: Address;
   /** Override the periphery address. Defaults to NEXT_PUBLIC_AQUA_TAKER_ADDRESS. */
   taker?: Address;
   /** Override the app address. Defaults to the strategy's configured app. */
@@ -267,12 +261,6 @@ export function buildSwapCall(params: SwapParams): Capability<SwapPlan> {
     return unavailable("A swap needs a positive input amount");
   }
 
-  if (params.to === undefined) {
-    return unavailable(
-      "A swap needs an explicit recipient: pass `to` (the address that will receive the output). " +
-        "The periphery no longer treats the zero address as \"pay the caller\".",
-    );
-  }
   const recipient = getAddress(params.to);
   if (recipient === zeroAddress || recipient === taker) {
     return unavailable(

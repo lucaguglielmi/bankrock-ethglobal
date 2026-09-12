@@ -185,8 +185,16 @@ requires `att.smartAccount == smartAccount`, so the two must match exactly or it
 to confirm the struct decodes the way you meant before spending gas.
 
 For `claimHandover` the same tuple is used, and `att.smartAccount` is the account that will hold
-the rock **after** the claim — the claim rebinds it, so whatever you put there becomes the rock's
-Rock Account. The verifier decides that value; do not substitute one of your own.
+the rock **after** the claim — the claim rebinds it, so whatever is in that field becomes the
+rock's Rock Account. The verifier decides that value; do not substitute one of your own.
+
+Two things will make a claim revert that are easy to miss:
+
+- the account named there must **already** report the new owner as one of its signing owners, or
+  you get `AccountDoesNotAnswerToOwner`. If the rock is moving to a different Safe, or the same
+  Safe is changing hands, that change has to land **before** the claim, not after;
+- it must be a **deployed** account. A smart account address that has been computed but never
+  deployed has no code to answer with, so it cannot be bound — deploy it first.
 
 **Expect:** `RockAwakened(rockId, rockOwner, uidHash, smartAccount, counter)` or
 `HandoverClaimed(rockId, previousOwner, newOwner, smartAccount, counter)`.

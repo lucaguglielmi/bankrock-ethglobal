@@ -206,6 +206,15 @@ contract BankRockRegistryReviewTest {
      * ordering an invariant for every caller instead of a convention for one. (It must be weighed
      * against a Rock Account that has never been deployed: a counterfactual account has no code,
      * so `_accountAnswersTo` is false and such a claim would revert until the account exists.)
+     *
+     * NOTE ON THIS TEST'S SHAPE. It was written against the pre-fix contract, where the claim
+     * succeeded and the giver's Safe was left recorded as the rock's account. The fix refuses that
+     * claim, so the original body could not run past its first call — the reverting `claimHandover`
+     * was the fix working, not the test failing. The body below therefore asserts both halves: the
+     * claim the finding described is refused and moves nothing, and the supported path — swap the
+     * Safe's owner, then claim — still works. The three-call attack at the end is byte-identical to
+     * the original, and it now fails for a stronger reason than the fix was asked to provide:
+     * Alice is no longer an owner of the Safe at all, so she cannot even open the batch.
      */
     function testReview_N1_aClaimNamingTheGiversAccountMustNotLeaveItInControl() public {
         // Exactly the supported path: a *named* gift to Bob, and a claim attestation carrying the
@@ -219,13 +228,43 @@ contract BankRockRegistryReviewTest {
         registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 3600), bytes32(0));
 
         BankRockRegistry.Attestation memory claim = _att(2, BOB, address(safe));
+        bytes memory claimSig = _sign(claim);
+
+        // The claim this test was written around — carrying the rock's existing account, which is
+        // still Alice's Safe, with no owner swap having happened — is now refused outright. The
+        // state the finding described is unreachable rather than merely undesirable.
         vm.prank(RELAYER);
-        registry.claimHandover(ROCK, claim, _sign(claim));
+        try registry.claimHandover(ROCK, claim, claimSig) {
+            require(false, "a claim must not bind an account that answers to the previous owner");
+        } catch {
+            // Expected: AccountDoesNotAnswerToOwner(address(safe), BOB).
+        }
+
+        (address heldOwner, address heldAccount,,,,) = registry.getRock(ROCK);
+        require(heldOwner == ALICE, "the refused claim moved nothing");
+        require(heldAccount == address(safe), "and bound nothing");
+        require(registry.lastCounter(UID) == 1, "and consumed no tap");
+
+        // The supported path, which the relay route already follows: swap the Safe's owner first,
+        // then claim. The same attestation now works, because the account answers to Bob.
+        address[] memory swapTargets = new address[](2);
+        bytes[] memory swapPayloads = new bytes[](2);
+        swapTargets[0] = address(safe);
+        swapPayloads[0] = abi.encodeWithSelector(GiverSafe.addOwnerWithThreshold.selector, BOB, uint256(1));
+        swapTargets[1] = address(safe);
+        swapPayloads[1] = abi.encodeWithSelector(GiverSafe.removeOwner.selector, address(0x1), ALICE, uint256(1));
+
+        vm.prank(ALICE);
+        safe.execBatch(swapTargets, swapPayloads);
+
+        vm.prank(RELAYER);
+        registry.claimHandover(ROCK, claim, claimSig);
 
         (address rockOwner, address rockAccount,,,,) = registry.getRock(ROCK);
         require(rockOwner == BOB, "precondition: Bob owns the rock");
-        require(rockAccount == address(safe), "precondition: the rebind wrote back the giver's Safe");
-        require(safe.isOwner(ALICE), "precondition: the Safe is still Alice's");
+        require(rockAccount == address(safe), "precondition: the account followed the rock");
+        require(safe.isOwner(BOB), "precondition: and it answers to Bob now");
+        require(!safe.isOwner(ALICE), "precondition: and no longer to Alice");
 
         address[] memory targets = new address[](3);
         bytes[] memory payloads = new bytes[](3);
