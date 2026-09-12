@@ -56,7 +56,7 @@ function playClick() {
   } catch (e) {}
 }
 
-function RockMesh({ isHovered }: { isHovered: boolean }) {
+function RockMesh({ isHovered, isMobile }: { isHovered: boolean, isMobile?: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
   const rockRef = useRef<THREE.Mesh>(null);
   const liquidGroupRef = useRef<THREE.Group>(null);
@@ -163,7 +163,7 @@ function RockMesh({ isHovered }: { isHovered: boolean }) {
 
   return (
     <Float speed={isHovered ? 0.5 : 1.5} rotationIntensity={isHovered ? 0.1 : 0.3} floatIntensity={isHovered ? 0.2 : 1.0}>
-      <group ref={groupRef}>
+      <group ref={groupRef} scale={isMobile ? 0.65 : 1} position={isMobile ? [0, 1.2, 0] : [0, 0, 0]}>
         {/* Main Stone */}
         <mesh ref={rockRef} castShadow receiveShadow>
           <icosahedronGeometry args={[1, 16]} />
@@ -178,7 +178,7 @@ function RockMesh({ isHovered }: { isHovered: boolean }) {
           <Html position={[-0.8, -0.2, 0.5]}>
             <div className={`transition-all duration-1000 flex flex-row-reverse items-center font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#001144] whitespace-nowrap -translate-x-full ${isHovered ? 'opacity-100 translate-y-0 pointer-events-none delay-300' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
               <div className="w-1.5 h-1.5 rounded-full bg-[#001144]" />
-              <div className="w-24 h-[1px] bg-[#001144]/80 ml-4" />
+              <div className="w-10 md:w-24 h-[1px] bg-[#001144]/80 ml-2 md:ml-4" />
               a normal rock
             </div>
           </Html>
@@ -211,7 +211,7 @@ function RockMesh({ isHovered }: { isHovered: boolean }) {
              <Html position={[0.1, -0.1, 0]}>
               <div className={`transition-all duration-1000 flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#001144] whitespace-nowrap ${isHovered ? 'opacity-100 translate-y-0 pointer-events-none delay-500' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#001144]" />
-                <div className="w-32 h-[1px] bg-[#001144]/80 mr-4" />
+                <div className="w-12 md:w-32 h-[1px] bg-[#001144]/80 mr-2 md:mr-4" />
                 a tiny NFC sensor
               </div>
             </Html>
@@ -238,7 +238,7 @@ function RockMesh({ isHovered }: { isHovered: boolean }) {
             <Html position={[0.5, 0.5, 0.1]}>
               <div className={`transition-all duration-1000 flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#001144] whitespace-nowrap ${isHovered ? 'opacity-100 translate-y-0 pointer-events-none delay-700' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#001144]" />
-                <div className="w-32 h-[1px] bg-[#001144]/80 mr-4" />
+                <div className="w-12 md:w-32 h-[1px] bg-[#001144]/80 mr-2 md:mr-4" />
                 a sparkly silicon
               </div>
             </Html>
@@ -287,6 +287,14 @@ function SmallRock({ position, scale, speed, rotationIntensity, color = "#f8f8f8
 
 export function RockCanvas() {
   const [isHovered, setIsHovered] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -314,7 +322,7 @@ export function RockCanvas() {
     <div className="absolute inset-0 pointer-events-none z-0 flex items-center justify-center">
       {/* Invisible DOM hit area for the rock */}
       <div 
-        className="w-[80vw] max-w-[600px] aspect-square rounded-full pointer-events-auto cursor-pointer absolute z-10"
+        className="w-[80vw] max-w-[600px] aspect-square rounded-full pointer-events-auto cursor-pointer absolute z-10 -translate-y-[20vh] md:translate-y-0"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleToggle}
@@ -329,7 +337,7 @@ export function RockCanvas() {
         <Environment preset="studio" />
         
         {/* Main Rock */}
-        <RockMesh isHovered={isHovered} />
+        <RockMesh isHovered={isHovered} isMobile={isMobile} />
         
         {/* Small floating rocks around */}
         <SmallRock position={[-2.5, 1.2, -1]} scale={0.3} speed={2.5} rotationIntensity={isHovered ? 0.5 : 1.5} offset={1.2} />
