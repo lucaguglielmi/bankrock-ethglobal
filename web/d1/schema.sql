@@ -19,3 +19,16 @@ CREATE TABLE IF NOT EXISTS DailyYield (
 
 CREATE INDEX IF NOT EXISTS idx_events_rock_id ON Events(rockId);
 CREATE INDEX IF NOT EXISTS idx_yield_rock_id ON DailyYield(rockId);
+
+CREATE TABLE IF NOT EXISTS PushSubscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rockId TEXT NOT NULL,
+  userId TEXT NOT NULL,
+  endpoint TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(endpoint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_rock_id ON PushSubscriptions(rockId);

@@ -57,62 +57,76 @@ export function RockActivity({ rockId, events, isSyncing = false }: RockActivity
         </div>
       </div>
 
-      {/* Timeline */}
-      <div className="relative border-l-2 border-neutral-100 ml-4 space-y-6">
-        {events.map((event) => (
-          <div key={event.id} className="relative pl-6 group">
-            {/* Timeline bullet icon */}
-            <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-2 border-black flex items-center justify-center">
-              {event.type === "trade" && <ArrowRightLeft className="w-2 h-2 text-black" />}
-              {event.type === "transfer" && <Gift className="w-2 h-2 text-black" />}
-              {event.type === "awaken" && <Sparkles className="w-2 h-2 text-black" />}
-              {event.type === "hardware" && <CheckCircle2 className="w-2 h-2 text-black" />}
-            </div>
+      {events.length === 0 && !isSyncing && (
+        <div className="w-full flex flex-col items-center justify-center py-12 px-6 bg-neutral-50/50 rounded-3xl border border-neutral-100 border-dashed text-center mb-6">
+          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-neutral-200">
+            <Sparkles className="w-5 h-5 text-neutral-400" />
+          </div>
+          <h3 className="text-sm font-bold text-neutral-800 mb-1">No On-Chain Activity</h3>
+          <p className="text-xs text-neutral-500 max-w-[250px] mx-auto leading-relaxed">
+            This Rock is freshly forged. Awaken it to cast its first cryptographic footprint.
+          </p>
+        </div>
+      )}
 
-            <div className="bg-neutral-50/70 hover:bg-neutral-50 p-4 rounded-2xl border border-neutral-100 transition-colors">
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="text-sm font-bold tracking-tight text-black">{event.title}</span>
-                <span className="text-[11px] font-mono text-neutral-400">{event.timestamp}</span>
+      {/* Timeline */}
+      {events.length > 0 && (
+        <div className="relative border-l-2 border-neutral-100 ml-4 space-y-6">
+          {events.map((event) => (
+            <div key={event.id} className="relative pl-6 group">
+              {/* Timeline bullet icon */}
+              <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-white border-2 border-black flex items-center justify-center">
+                {event.type === "trade" && <ArrowRightLeft className="w-2 h-2 text-black" />}
+                {event.type === "transfer" && <Gift className="w-2 h-2 text-black" />}
+                {event.type === "awaken" && <Sparkles className="w-2 h-2 text-black" />}
+                {event.type === "hardware" && <CheckCircle2 className="w-2 h-2 text-black" />}
               </div>
 
-              <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                {event.description}
-              </p>
-
-              {event.detail && (
-                <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-mono font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-lg border border-green-100">
-                  <Sparkles className="w-3 h-3 text-green-600" />
-                  {event.detail}
+              <div className="bg-neutral-50/70 hover:bg-neutral-50 p-4 rounded-2xl border border-neutral-100 transition-colors">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-sm font-bold tracking-tight text-black">{event.title}</span>
+                  <span className="text-[11px] font-mono text-neutral-400">{event.timestamp}</span>
                 </div>
-              )}
 
-              {event.txHash && TX_HASH_REGEX.test(event.txHash) && (
-                <div className="mt-3 pt-2.5 border-t border-neutral-200/60 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-neutral-400 font-mono">
-                      {event.isOnchain ? "On-Chain Tx" : "UserOperation"}
-                    </span>
-                    {event.isOnchain && (
-                      <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded font-mono">
-                        BaseScan Verified
-                      </span>
-                    )}
+                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                  {event.description}
+                </p>
+
+                {event.detail && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-mono font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-lg border border-green-100">
+                    <Sparkles className="w-3 h-3 text-green-600" />
+                    {event.detail}
                   </div>
-                  <a
-                    href={`https://sepolia.basescan.org/tx/${encodeURIComponent(event.txHash)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-mono text-[11px] text-neutral-700 hover:text-black font-medium hover:underline"
-                  >
-                    <span>{event.txHash.slice(0, 10)}...{event.txHash.slice(-8)}</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              )}
+                )}
+
+                {event.txHash && TX_HASH_REGEX.test(event.txHash) && (
+                  <div className="mt-3 pt-2.5 border-t border-neutral-200/60 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-neutral-400 font-mono">
+                        {event.isOnchain ? "On-Chain Tx" : "UserOperation"}
+                      </span>
+                      {event.isOnchain && (
+                        <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded font-mono">
+                          BaseScan Verified
+                        </span>
+                      )}
+                    </div>
+                    <a
+                      href={`https://sepolia.basescan.org/tx/${encodeURIComponent(event.txHash)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-mono text-[11px] text-neutral-700 hover:text-black font-medium hover:underline"
+                    >
+                      <span>{event.txHash.slice(0, 10)}...{event.txHash.slice(-8)}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -148,7 +148,7 @@ export function useRockOnchainEvents(rockId: string | number | undefined) {
       if (!res.ok) {
         throw new Error(`Events API responded with status ${res.status}`);
       }
-      const data = await res.json();
+      const data = await res.json() as any;
       if (data.success && Array.isArray(data.events)) {
         setEvents(data.events);
       }

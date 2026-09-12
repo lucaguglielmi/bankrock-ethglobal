@@ -42,7 +42,6 @@ contract BankRockRegistry {
     event RockAwakened(uint256 indexed rockId, address indexed owner, address smartAccount);
     event RockOwnershipTransferred(uint256 indexed rockId, address indexed previousOwner, address indexed newOwner);
     event RockPoked(address indexed poker, string message);
-    event TradeExecuted(uint256 indexed rockId, address tokenIn, address tokenOut, uint256 amountIn);
 
     /**
      * @notice Registers a new physical rock on-chain.
@@ -96,55 +95,6 @@ contract BankRockRegistry {
         rockToNfcPubKey[rockId] = nfcPubKey;
     }
 
-    /**
-     * @notice Executes a trade.
-     */
-    // Allowed routers (e.g. 1inch v6 Base Sepolia)
-    mapping(address => bool) public whitelistedRouters;
-
-    event RouterWhitelisted(address indexed router, bool status);
-
-    function setRouterWhitelist(address router, bool status) external {
-        // In a real production environment, this should be protected by an onlyOwner or Admin role.
-        // For hackathon simplicity, we leave it open or hardcode it in constructor.
-        whitelistedRouters[router] = status;
-        emit RouterWhitelisted(router, status);
-    }
-
-    function executeTrade(uint256 rockId, address router, address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut, bytes calldata routerPayload) external {
-        Rock storage r = rocks[rockId];
-        if (!r.isAwake) revert RockNotAwakened(rockId);
-        if (msg.sender != r.currentOwner && msg.sender != r.smartAccount) {
-            revert UnauthorizedTapper(msg.sender, r.currentOwner);
-        }
-        require(whitelistedRouters[router], "Router not whitelisted");
-
-        // Since the user funds reside on the Smart Account, the call should technically happen FROM the smart account.
-        // However, if the funds reside on this Registry contract (e.g. an embedded vault), we execute here:
-        
-        // 1. Check initial balance
-        uint256 balanceBefore = 0;
-        if (tokenOut != address(0)) {
-            // Simplified ERC20 balance check
-            (bool success, bytes memory data) = tokenOut.staticcall(abi.encodeWithSignature("balanceOf(address)", address(this)));
-            if (success && data.length > 0) balanceBefore = abi.decode(data, (uint256));
-        }
-
-        // 2. Execute swap
-        (bool swapSuccess, ) = router.call{value: 0}(routerPayload);
-        require(swapSuccess, "Swap execution failed");
-
-        // 3. Verify slippage / balance increase
-        uint256 balanceAfter = 0;
-        if (tokenOut != address(0)) {
-            (bool success, bytes memory data) = tokenOut.staticcall(abi.encodeWithSignature("balanceOf(address)", address(this)));
-            if (success && data.length > 0) balanceAfter = abi.decode(data, (uint256));
-        }
-
-        require(balanceAfter >= balanceBefore + minAmountOut, "Slippage tolerance exceeded");
-
-        emit TradeExecuted(rockId, tokenIn, tokenOut, amountIn);
-    }
 
     /**
      * @notice Checks if a given rock ID is already awakened.

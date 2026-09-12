@@ -6,7 +6,7 @@ export const runtime = "edge";
 
 export async function POST(req: Request) {
   try {
-    const { message, source } = await req.json();
+    const { message, source } = await req.json() as any;
 
     if (source !== 'gelato_keeper') {
       return NextResponse.json({ error: 'Unauthorized source' }, { status: 401 });

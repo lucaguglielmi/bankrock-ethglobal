@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   const start = Date.now();
   
   try {
-    const { address } = await req.json();
+    const { address } = await req.json() as any;
 
     if (!address) {
       logger.warn("Faucet request missing destination address", {

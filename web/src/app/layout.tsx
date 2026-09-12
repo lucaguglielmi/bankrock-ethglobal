@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ClientProviders from "@/components/client-providers";
 import { Header } from "@/components/header";
+import { Toaster } from "sonner";
+import { VersionCheck } from "@/components/version-check";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,8 +43,6 @@ export const metadata: Metadata = {
   },
 };
 
-import { VersionCheck } from "@/components/version-check";
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -57,6 +57,17 @@ export default function RootLayout({
         <ClientProviders>
           <Header />
           {children}
+          <Toaster 
+            position="bottom-right" 
+            toastOptions={{
+              style: {
+                background: "black",
+                color: "white",
+                border: "1px solid #333",
+                fontFamily: "var(--font-geist-sans)",
+              }
+            }}
+          />
         </ClientProviders>
         <VersionCheck />
       </body>

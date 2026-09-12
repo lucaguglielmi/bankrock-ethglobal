@@ -9,9 +9,24 @@ export async function GET(req: Request) {
     const srcToken = searchParams.get('src');
     const dstToken = searchParams.get('dst');
     const amount = searchParams.get('amount');
+    const srcChain = searchParams.get('srcChain');
+    const dstChain = searchParams.get('dstChain');
 
     if (!srcToken || !dstToken || !amount) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    }
+
+    // If source and dest chains are different, route to Across Protocol
+    if (srcChain && dstChain && srcChain !== dstChain) {
+      // Across Protocol API: https://across.to/api
+      const acrossRes = await fetch(
+        `https://across.to/api/suggested-fees?inputToken=${srcToken}&outputToken=${dstToken}&originChainId=${srcChain}&destinationChainId=${dstChain}&amount=${amount}`
+      );
+      if (!acrossRes.ok) {
+        return NextResponse.json({ error: 'Across API Error' }, { status: acrossRes.status });
+      }
+      const acrossData: Record<string, any> = await acrossRes.json();
+      return NextResponse.json({ protocol: "Across", ...acrossData });
     }
 
     const apiKey = process.env["1INCH_API_KEY"];

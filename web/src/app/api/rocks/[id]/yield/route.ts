@@ -14,6 +14,23 @@ export async function GET(
   try {
     // In local dev without wrangler running, env will be empty. Fallback to mock data.
     const { id } = await params;
+    
+    // DEMO OVERRIDE FOR ROCK 420
+    if (id === "420") {
+      return NextResponse.json({
+        rockId: "420",
+        currentAPY: 32.4,
+        tvl: 1250400.0,
+        historicalData: [
+          { date: "2023-08-01", tvl: 1000000, fees: 1500, apy: 15.2 },
+          { date: "2023-09-01", tvl: 1050000, fees: 2800, apy: 18.1 },
+          { date: "2023-10-01", tvl: 1100000, fees: 4500, apy: 22.4 },
+          { date: "2023-11-01", tvl: 1180000, fees: 7200, apy: 28.5 },
+          { date: "2023-12-01", tvl: 1250400, fees: 11400, apy: 32.4 },
+        ]
+      });
+    }
+
     let db;
     try {
       db = (getRequestContext().env as any).DB;

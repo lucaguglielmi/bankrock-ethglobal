@@ -18,7 +18,7 @@ const readCounters = new Map<string, number>();
 
 export async function POST(req: Request) {
   try {
-    const { e, c } = await req.json();
+    const { e, c } = await req.json() as any;
 
     if (!e || !c) {
       return NextResponse.json({ error: 'Missing Secure Dynamic Messaging parameters' }, { status: 400 });

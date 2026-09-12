@@ -14,6 +14,7 @@ export default async function RockPage({ params, searchParams }: PageProps) {
     c: typeof resolvedSearchParams.c === "string" ? resolvedSearchParams.c : undefined,
     ctr: typeof resolvedSearchParams.ctr === "string" ? resolvedSearchParams.ctr : undefined,
     uid: typeof resolvedSearchParams.uid === "string" ? resolvedSearchParams.uid : undefined,
+    demo: typeof resolvedSearchParams.demo === "string" ? resolvedSearchParams.demo : undefined,
   };
 
   return (

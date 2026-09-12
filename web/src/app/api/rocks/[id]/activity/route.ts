@@ -13,6 +13,47 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    
+    // DEMO OVERRIDE FOR ROCK 420
+    if (id === "420") {
+      return NextResponse.json({
+        events: [
+          {
+            id: `rebalance-420-1`,
+            type: "trade",
+            title: "Gelato Keeper Rebalance",
+            description: "Automatically rebalanced to maintain delta neutral. Swapped 14,500 USDC for WETH.",
+            timestamp: new Date(Date.now() - 3600000).toISOString(),
+            txHash: "0x4200000000000000000000000000000000000000000000000000000000000000",
+          },
+          {
+            id: `fee-420-2`,
+            type: "fee",
+            title: "Yield Harvest",
+            description: "Harvested 4,200 USDC from Aqua pool fees.",
+            timestamp: new Date(Date.now() - 86400000 * 2).toISOString(),
+            txHash: "0x4200000000000000000000000000000000000000000000000000000000000001",
+          },
+          {
+            id: `mcp-420-3`,
+            type: "update",
+            title: "Strategy Updated by AI Oracle",
+            description: "Agent changed rebalance threshold to 5% due to high market volatility.",
+            timestamp: new Date(Date.now() - 86400000 * 5).toISOString(),
+            txHash: "0x4200000000000000000000000000000000000000000000000000000000000002",
+          },
+          {
+            id: `init-420`,
+            type: "deployment",
+            title: "Genesis Capital Deployed",
+            description: "Initial deposit of 1,000,000 USDC.",
+            timestamp: new Date(Date.now() - 86400000 * 120).toISOString(),
+            txHash: "0x4200000000000000000000000000000000000000000000000000000000000003",
+          }
+        ]
+      });
+    }
+
     let db;
     try {
       db = (getRequestContext().env as any).DB;

@@ -58,7 +58,7 @@ export async function verifyAndIncrementCounter(
       });
 
       if (res.ok) {
-        const data = await res.json() as { result?: [number, number] };
+        const data = await res.json() as any as { result?: [number, number] };
         if (data.result && Array.isArray(data.result)) {
           const [successCode, prev] = data.result;
           const isSuccess = successCode === 1;
@@ -157,7 +157,7 @@ export async function getRecordedCounter(uid: string): Promise<number> {
         headers: { Authorization: `Bearer ${redisToken}` },
       });
       if (res.ok) {
-        const json = await res.json() as { result?: string | null };
+        const json = await res.json() as any as { result?: string | null };
         if (json.result) {
           return parseInt(json.result, 10);
         }

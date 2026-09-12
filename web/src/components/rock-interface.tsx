@@ -13,6 +13,7 @@ import { DemoSwitcher, type DemoScenario } from "@/components/demo-switcher";
 import { RockActivity, type ActivityEvent } from "@/components/rock-activity";
 import { AquaPositionCard } from "@/components/aqua-position-card";
 import { RockAlerts } from "@/components/rock-alerts";
+import { AIStrategySimulator } from "@/components/ai-strategy-simulator";
 import { PrivyOnboardingModal } from "@/components/privy-onboarding-modal";
 import { useRockOnchainEvents, useRockActions } from "@/hooks/useBankRock";
 import { useAudio } from "@/context/audio-context";
@@ -25,6 +26,7 @@ interface RockInterfaceProps {
     c?: string;
     ctr?: string;
     uid?: string;
+    demo?: string;
   };
 }
 
@@ -86,7 +88,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
       try {
         const yieldRes = await fetch(`/api/rocks/${rockId}/yield`);
         if (yieldRes.ok) {
-          const yieldData = await yieldRes.json();
+          const yieldData = await yieldRes.json() as any;
           setLiquidity(yieldData.tvl || 1250.0);
           setEarnedFees(yieldData.historicalData?.reduce((acc: number, curr: any) => acc + (curr.fees || 0), 0) || 12.4);
           setCurrentApy(yieldData.currentAPY || 18.4);
@@ -95,7 +97,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
 
         const activityRes = await fetch(`/api/rocks/${rockId}/activity`);
         if (activityRes.ok) {
-          const activityData = await activityRes.json();
+          const activityData = await activityRes.json() as any;
           if (activityData.events && activityData.events.length > 0) {
              // Map D1 rows to the UI Event shape
              setEvents(activityData.events.map((e: any) => ({
@@ -218,7 +220,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
         });
         
         if (verifyRes.ok) {
-          const verifyData = await verifyRes.json();
+          const verifyData = await verifyRes.json() as any;
           rawNfcPubKey = verifyData.verifiedPubKey;
         } else {
           console.warn("NFC Cryptographic validation failed or Replay Attack detected.");
@@ -245,7 +247,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           body: JSON.stringify({ address: targetAddress }),
         });
 
-        const data = await res.json();
+        const data = await res.json() as any as any;
         if (res.ok && data.txHash) {
           tx = data.txHash;
         } else {
@@ -475,6 +477,15 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           Awaken this rock
         </button>
 
+        {urlParams.demo === "true" && (
+          <button
+            onClick={() => setStep("active")}
+            className="w-full mt-4 bg-purple-600 text-white px-8 py-3 rounded-full font-bold text-md hover:bg-purple-700 transition-colors shadow-lg cursor-pointer flex items-center justify-center gap-2"
+          >
+            <Sparkles className="w-4 h-4" /> Fast-forward Demo
+          </button>
+        )}
+
         {/* Demo Switcher for Judges */}
         <DemoSwitcher
           currentScenario={currentScenario}
@@ -650,6 +661,19 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
           >
             Give this rock
           </button>
+          
+          {urlParams.demo === "true" && (
+            <button
+              onClick={() => {
+                setStep("unactivated");
+                setLiquidity(0);
+                setEarnedFees(0);
+              }}
+              className="flex-1 bg-red-50 text-red-600 px-8 py-4 rounded-full font-bold text-base hover:bg-red-100 transition-all text-center border border-red-200 cursor-pointer active:scale-[0.99]"
+            >
+              Delist Demo
+            </button>
+          )}
         </div>
 
         {/* Cross-Chain Deposit Action */}
@@ -675,6 +699,9 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
             </div>
           </button>
         </div>
+
+        {/* AI Strategy Simulator for Demo purposes */}
+        <AIStrategySimulator rockId={rockId} />
 
         {/* 1inch Aqua Liquidity Position & Strategy Manager */}
         <AquaPositionCard

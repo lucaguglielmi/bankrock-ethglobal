@@ -5,7 +5,7 @@ export const runtime = "edge";
 
 export async function POST(req: Request) {
   try {
-    const { password } = await req.json();
+    const { password } = await req.json() as any;
     const correctPassword = process.env.ADMIN_PASSWORD;
     const userAgent = req.headers.get('user-agent') || 'unknown';
 
