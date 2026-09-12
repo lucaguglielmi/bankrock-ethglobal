@@ -300,7 +300,11 @@ export function TransferModal({
                 ))}
               </div>
               <p className="text-sm text-ink-2">
-                After that the gift lapses and the rock is simply still yours.
+                After that the gift lapses and the rock is simply still yours. That window is how
+                long they have to <em>open</em> the gift. The gasless part — the sponsored
+                transaction that hands over the account — only stays valid for a short time after
+                you sign. If they tap in after it expires, you&apos;ll get asked to sign once more
+                before the handover can finish.
               </p>
             </fieldset>
 

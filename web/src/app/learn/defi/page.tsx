@@ -63,10 +63,10 @@ export default function DefiPage() {
             <h2 className="text-3xl font-bold">Autonomous Agents</h2>
             <div className="prose prose-lg text-ink-2">
               <p>
-                Because capital remains in the rock, idle stablecoins are automatically deployed into yield protocols like <TooltipLink term="Aave v3" description="A decentralized non-custodial liquidity protocol." href="https://aave.com/" /> to earn passive yield.
+                Because capital remains in the rock, its reserve earns a share of the swap fees Aqua settles against it on every trade — there is no separate yield to chase, and no idle balance sitting outside the strategy. Routing idle stablecoins into lending protocols like <TooltipLink term="Aave v3" description="A decentralized non-custodial liquidity protocol." href="https://aave.com/" /> is a roadmap idea (spec 13), not something this build does: no such integration exists today.
               </p>
               <p>
-                A future automation layer would manage this complexity without bothering the user, using <TooltipLink term="ERC-7579 Session Keys" description="A standard for modular smart accounts, allowing scoped permissions." href="https://erc7579.com/" /> to let a delegated agent rebalance strategies and harvest yield within tight, bounded limits. This is a post-hackathon roadmap item — Bank Rock runs no automated rebalancer today.
+                A future automation layer would manage that complexity without bothering the user, using <TooltipLink term="ERC-7579 Session Keys" description="A standard for modular smart accounts, allowing scoped permissions." href="https://erc7579.com/" /> to let a delegated agent rebalance strategies within tight, bounded limits. This is a post-hackathon roadmap item — Bank Rock runs no automated rebalancer today.
               </p>
             </div>
           </div>

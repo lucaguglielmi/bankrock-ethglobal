@@ -13,10 +13,9 @@
  *
  *  1. a maker or a strategy hash **cannot** be filtered server-side by topic. Fetch by address
  *     and signature, decode, then filter in JavaScript;
- *  2. `web/src/lib/chain/abi/aqua.ts` currently marks `maker`, `app` and `strategyHash` as
- *     `indexed: true` on `Shipped` and `Docked`. Against the real contract that ABI matches
- *     nothing and mis-decodes anything it is handed. It needs correcting by whoever owns
- *     `lib/chain`; until then this file is the copy any log work must use.
+ *  2. `web/src/lib/chain/abi/aqua.ts` also marks every parameter `indexed: false`, matching the
+ *     real contract. That ABI is the copy `lib/chain` call sites use; this one is the copy the
+ *     rest of `lib/aqua` uses. Keep both in sync if the deployed contract ever changes.
  *     (Recorded in `contracts/aqua/NOTES.md` §8.2.)
  */
 

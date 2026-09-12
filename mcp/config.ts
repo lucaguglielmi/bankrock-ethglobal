@@ -82,7 +82,6 @@ export const REASONS = {
   noAdminKey:
     "ADMIN_API_KEY is not set. The Bank Rock telemetry and operator endpoints require an " +
     "admin key and reject anonymous requests.",
-  noAqua: "Aqua strategy not integrated (spec 15 Phase 3).",
   noBridge: "cross-chain bridging is not integrated; it remains a labelled simulation in the web app only (spec 15 Part 6).",
   noIdleYield: "idle-yield routing (Aave/Morpho) was cut from scope (spec 15 Part 6).",
   noTokenConfig: "USDC_ADDRESS / WETH_ADDRESS are not configured, so no balance can be read.",
