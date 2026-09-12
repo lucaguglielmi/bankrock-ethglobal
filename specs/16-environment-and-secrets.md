@@ -165,63 +165,82 @@ it. §2.1 is kept as history of what the mismatch was.
 secret you create locally (`openssl rand -hex 32`). *Output* = produced by a deploy step.
 *Wallet* = a fresh private key you generate and fund; never reuse across roles.
 
-| # | Variable (today → target) | Provider | Where used | Needed from | Notes |
-| --- | --- | --- | --- | --- | --- |
-| 1 | `NEXT_PUBLIC_PRIVY_APP_ID` | You — dashboard.privy.io | `providers.tsx` | Phase 0 | Also configure in the dashboard: allowed origin `https://bank-rock.com`, login methods email / Google / Apple / wallet, and enable Sepolia. Without it the app boots with a placeholder app ID and `login()` silently activates a **fabricated embedded wallet** (`0x71C8…1b47`, `collector@bankrock.eth`) — spec 15 A-1/A-2. Phase 1 replaces that with an `UNAVAILABLE` sign-in state. |
-| 2 | `NEXT_PUBLIC_APP_URL` | Fixed: `https://bank-rock.com` | CORS in `middleware.ts`; email CTAs; MCP base URL | Phase 0 | Replaces the `bankrock.xyz` / `pages.dev` literals (D-022). |
-| 3 | `NEXT_PUBLIC_CHAIN_ID` | Fixed: `11155111` | `lib/chain/index.ts` (D-015), `lib/demo.ts`, `lib/nfc/attestation.ts` | Phase 1 | **Read now** — the "currently unread" note this row used to carry is stale. It is also the EIP-712 domain's `chainId`, so a wrong value makes every attestation unverifiable rather than merely mis-routed. |
-| 4 | `SEPOLIA_RPC_URL` | You — Alchemy or Infura Sepolia endpoint | `lib/chain`, `lib/indexer.ts`, `lib/aqua/read.ts`, faucet, relayer, Rock Account derivation | Phase 1 | **Done:** one name, no aliases. Public RPCs rate-limit and reject wide `eth_getLogs`; the indexer and the fee log scan need a real provider. |
-| 5 | `ADMIN_PASSWORD` | Generate | `/api/admin/login` | Phase 0 | |
-| 6 | `ADMIN_JWT_SECRET` | Generate, 32 bytes | `lib/auth.ts`, `middleware.ts` | Phase 0 | Must be set; the fallback string makes admin sessions forgeable (SA-8). |
-| 7 | `CRON_SECRET` | Generate | `/api/cron/snapshot` | Phase 1 | Moves from query string to header in Phase 5. |
-| 8 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | You — Cloudflare dashboard, token scoped as in §2.3.1 (Workers Scripts, D1, Workers Routes, DNS — **not** Pages) | GitHub Actions secrets for `deploy.yml` | Phase 0 | `deploy.yml` must be rewritten first (B-5). |
-| 9 | `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` | You — same token; ID is `f0a28d6f-0a36-46aa-b711-8b5297913d2e` | `drizzle.config.ts` (migrations / studio only) | Phase 1 | Not needed at runtime; the Worker uses the `DB` binding. |
-| 10 | `DEPLOYER_PRIVATE_KEY` | Wallet — fresh, funded | `contracts/scripts/deploy.js`, `contracts/scripts/deploy-aqua-app.js` — the operator's shell only, never a file | Phase 2 | Deploys the registry and becomes its administrator (pause, rotate attester). Also deploys XYCSwap + XYCSwapTaker, **neither of which has an owner**, so it keeps no privilege there. |
-| 11 | `REGISTRY_ADDRESS` / `NEXT_PUBLIC_REGISTRY_ADDRESS` → `NEXT_PUBLIC_REGISTRY_ADDRESS` | Output of registry deploy | chain module, MCP | Phase 2 | Startup must assert code exists at it (D-015). |
-| 12 | `NEXT_PUBLIC_AQUA_APP_ADDRESS`, `NEXT_PUBLIC_AQUA_TAKER_ADDRESS` | Output of `deploy-aqua-app.js` | chain module, `lib/aqua`, taker hook | Phase 3 | Replaces `NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS`, which is **removed**: no SwapVM router is deployed (D-030). The app is the reference XYCSwap; the taker is the periphery a visitor calls. Both unset ⇒ every Aqua surface is UNAVAILABLE. |
-| 13 | `NEXT_PUBLIC_AQUA_ADDRESS` (new) | Fixed: `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` | chain module | Phase 3 | |
-| 14 | `NEXT_PUBLIC_USDC_ADDRESS`, `NEXT_PUBLIC_WETH_ADDRESS` (new) | Fixed: `0x1c7D…7238`, `0xfFf9…6B14` | chain module | Phase 2 | |
-| 15 | `PIMLICO_API_KEY` and `NEXT_PUBLIC_PIMLICO_API_KEY` | You — dashboard.pimlico.io | `lib/aa.ts` | Phase 2 | Create a **sponsorship policy** for chain 11155111 in the dashboard or the verifying paymaster rejects every UserOp. Testnet sponsorship is free. The `NEXT_PUBLIC_` copy is exposed to browsers — restrict the key by origin in the dashboard. |
-| 16 | `FAUCET_PRIVATE_KEY` | Wallet — fresh, funded | `/api/faucet` | Phase 2 | **Must be set.** The current default is the public Anvil key (SA-4). Sends 0.01 ETH per claim. |
-| 17 | `ATTESTATION_SIGNER_PRIVATE_KEY` | Wallet — fresh, **unfunded** | `lib/nfc/attestation.ts`; `lib/rock-account.server.ts` derives the expected attester from it | Phase 4 | **Renamed from `SIGNER_PRIVATE_KEY`, which is removed.** Its address is the registry's trusted attester and is passed to the deploy script as `ATTESTATION_SIGNER_ADDRESS`. Signs the six-field struct (D-026) and nothing else. Never holds funds. |
-| 18 | `NXP_MASTER_KEY` | Generate, 16 bytes hex, at tag provisioning | `/api/nfc/verify` | Phase 4 | Must equal the key written to the physical NTAG 424 DNA tags. Store in Cloudflare secrets only. |
-| 19 | `RESEND_API_KEY` | You — resend.com | `lib/email-service.ts`, Gelato alert route | Phase 5 | **Plus** domain verification for `bank-rock.com` (add the SPF/DKIM records Resend shows) and change `from` to `alerts@bank-rock.com`. Without verification, mail reaches only your own inbox. |
-| 20 | `ALERT_EMAIL_ADDRESS` | Fixed: an inbox you read | Gelato alert route | Phase 5 | **No default.** The `security@bankrock.xyz` fallback is gone (D-017, D-022): unset means `/api/alerts/gelato` answers UNAVAILABLE rather than mailing anyone. |
-| 21 | `ADMIN_API_KEY` | Generate | `/api/newsletter` operator view | Phase 5 | |
-| 22 | `ALCHEMY_WEBHOOK_SECRET` | You — Alchemy Notify, only if used | `/api/webhooks/alchemy` | Optional | If unset the route must reject, not accept (D-017). |
-| 23 | `BANKROCK_API_URL` | Fixed: `https://bank-rock.com` | `mcp/index.ts` | Phase 1 | |
-| 24 | ~~`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`~~ | — | — | — | **Removed.** The counter store is D1 (`nfc_counters`); the in-memory store is used only when `NEXT_PUBLIC_DEMO_MODE=true`. |
-| 25 | ~~`1INCH_API_KEY`~~ | — | — | — | **Removed** with `/api/quote`. The API does not serve Sepolia (§1.4); quotes come from `XYCSwap.quoteExactIn` (spec 04). |
-| 26 | `ALERT_API_URL`, `QUOTE_API_URL`, `ROCK_ID` (Gelato secrets) | — | `web3-functions/` | — | `DEMO`; not needed. |
-| 27 | `NEXT_PUBLIC_DEMO_MODE` | Fixed: `false` in production | everywhere, through `lib/demo.ts` | Phase 1 | D-013. Only the literal `"true"` enables simulation; the deploy job sets `"false"` explicitly and a spec check asserts it. |
-| 28 | `REGISTRY_DEPLOY_BLOCK` | Output of the registry deploy | `lib/indexer.ts` | Phase 2 | The indexer scans forward from here in 2,000-block chunks. Unset ⇒ provenance is UNAVAILABLE, never scanned from block 0. |
-| 29 | `AQUA_APP_DEPLOY_BLOCK` | Output of `deploy-aqua-app.js` | `lib/chain`, `lib/aqua/read.ts` | Phase 3 | Bounds the `Pushed` log scan the cumulative fee figure is summed from. Unset ⇒ a short recent window, reported as partial. |
-| 30 | `RELAYER_PRIVATE_KEY` | Wallet — fresh, **funded** | `lib/rock-account.server.ts`, `POST /api/rocks/[id]/claim` | Phase 2 | Pays gas for `claimHandover` (D-027): a gift recipient has no gas and does not yet control the Rock Account. Safe because the registry credits `att.subject`, not `msg.sender` (D-026). Unset ⇒ claims are UNAVAILABLE, never free. |
-| 31 | `NXP_KEY_DIVERSIFY` | Optional, default off | `lib/nfc/config.ts` | Phase 4 | `"true"` enables AN10922 per-tag key diversification. Must match how the tags were provisioned. Keep it **off** for the hackathon (spec 18 §4.2 item 4). |
-| 32 | `NXP_KEY_DIVERSIFY_APP_ID` | With #31 only | `lib/nfc/config.ts` | Phase 4 | The 3-byte AID used in the derivation. Meaningless unless #31 is on. |
-| 33 | `ALERT_FROM_ADDRESS` | You — a verified Resend sender | `lib/email-service.ts` | Phase 5 | e.g. `Bank Rock <alerts@bank-rock.com>`, once the domain is verified. Until then the sandbox sender reaches only your own inbox (E-6). |
-| 34 | `RELAYER_DAILY_CAP_WEI` | You — a number, in wei | `lib/rock-account.server.ts` (`relayerDailyCapWei`, `reserveRelayerSpend`), `POST /api/rocks/[id]/claim` | Phase 2 | **Fails closed, and that is the point (audit `F-10`/`P-1`, D-032).** How much the relayer may spend per **UTC day**, accumulated in D1 and reserved *before* each claim is broadcast, in one atomic statement so two concurrent claims cannot both fit under a cap only one of them fits. **Unset or `0` disables relaying entirely** — an uncapped funded key is the finding this closes, so "no cap" is the closed branch, not the permissive one. Also refused: a non-integer, and a value larger than the ledger can track. 0.05 ETH = `50000000000000000`; one claim is estimated at 0.002 ETH. Pairs with #30 |
-| 35 | `NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY` | Generate — `npx web-push generate-vapid-keys` | `hooks/useNotifications.ts` (browser), `app/api/webpush/route.ts` | Phase 5, optional | The browser subscribes with this key and the server signs with #36; **the two must be halves of one pair, or every delivery fails silently.** Perimeter `P-7` was exactly that mismatch, under two different variable names — the browser read `NEXT_PUBLIC_VAPID_PUBLIC_KEY` while the route read `WEB_PUSH_VAPID_PUBLIC_KEY`. One name now, and it is `NEXT_PUBLIC_`-prefixed because the public key is public by construction |
-| 36 | `WEB_PUSH_VAPID_PRIVATE_KEY` | Generate — the other half of #35 | `app/api/webpush/route.ts` | Phase 5, optional | Server-side only. Never `NEXT_PUBLIC_`. Cloudflare secret, not a file |
-| 37 | `WEB_PUSH_SUBJECT` | Fixed — a `mailto:` or `https:` URL you own | `app/api/webpush/route.ts` | Phase 5, optional | The VAPID `sub` claim: who a push service should contact about this sender. e.g. `mailto:security@bank-rock.com`. All three of #35–#37 unset ⇒ push is `UNAVAILABLE`, which is the correct state; a partial set is the failure mode worth avoiding (spec 14) |
+**"Where it lives in production" legend (D-034 — one source of truth per kind of value):**
+
+| | Home | What belongs there |
+| --- | --- | --- |
+| **[1]** | `web/wrangler.jsonc` `vars`, **in git** | Non-secret, account-independent configuration: the origin, the chain id, the demo flag, every contract address, the two deploy blocks, the relayer's daily cap. Changed by a commit and a deploy, reviewed like code. |
+| **[2]** | A **GitHub Actions input**, read by `deploy.yml` | Account-specific *public* identifiers: `NEXT_PUBLIC_PRIVY_APP_ID` (repository **variable**) and `NEXT_PUBLIC_PIMLICO_API_KEY` (repository **secret** — browser-visible by construction, but still a key). Set once by the operator. |
+| **[3]** | A **Worker secret** — `wrangler secret put NAME`, or dashboard → Variables and Secrets → **Secret** | Everything a deploy must never carry. A few entries here are not secret in the cryptographic sense (`ALERT_FROM_ADDRESS`, `ALERT_EMAIL_ADDRESS`, `WEB_PUSH_SUBJECT`, the two `NXP_KEY_DIVERSIFY*`), but a **plain-text Worker variable is deleted by the next deploy** (see §2.3.2), so Secret is the only home on the Worker that survives one. |
+
+A value is in exactly one of the three. Whatever is not in one of them is not configuration of the
+running app: the deploy credentials are GitHub Actions secrets, `DEPLOYER_PRIVATE_KEY` and the D1
+tooling variables are the operator's shell, and `BANKROCK_API_URL` is the agent's MCP `env`.
+
+| # | Variable (today → target) | Provider | Where it lives in production | Where used | Needed from | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `NEXT_PUBLIC_PRIVY_APP_ID` | You — dashboard.privy.io | **[2]** GitHub repo *variable* | `providers.tsx` | Phase 0 | Also configure in the dashboard: allowed origin `https://bank-rock.com`, login methods email / Google / Apple / wallet, and enable Sepolia. Without it the app boots with a placeholder app ID and `login()` silently activates a **fabricated embedded wallet** (`0x71C8…1b47`, `collector@bankrock.eth`) — spec 15 A-1/A-2. Phase 1 replaces that with an `UNAVAILABLE` sign-in state. |
+| 2 | `NEXT_PUBLIC_APP_URL` | Fixed: `https://bank-rock.com` | **[1]** `wrangler.jsonc` `vars` | CORS in `middleware.ts`; email CTAs; MCP base URL | Phase 0 | Replaces the `bankrock.xyz` / `pages.dev` literals (D-022). |
+| 3 | `NEXT_PUBLIC_CHAIN_ID` | Fixed: `11155111` | **[1]** `wrangler.jsonc` `vars` | `lib/chain/index.ts` (D-015), `lib/demo.ts`, `lib/nfc/attestation.ts` | Phase 1 | **Read now** — the "currently unread" note this row used to carry is stale. It is also the EIP-712 domain's `chainId`, so a wrong value makes every attestation unverifiable rather than merely mis-routed. |
+| 4 | `SEPOLIA_RPC_URL` | You — Alchemy or Infura Sepolia endpoint | **[3]** Worker secret | `lib/chain`, `lib/indexer.ts`, `lib/aqua/read.ts`, faucet, relayer, Rock Account derivation | Phase 1 | **Done:** one name, no aliases. Public RPCs rate-limit and reject wide `eth_getLogs`; the indexer and the fee log scan need a real provider. |
+| 5 | `ADMIN_PASSWORD` | Generate | **[3]** Worker secret | `/api/admin/login` | Phase 0 | |
+| 6 | `ADMIN_JWT_SECRET` | Generate, 32 bytes | **[3]** Worker secret | `lib/auth.ts`, `middleware.ts` | Phase 0 | Must be set; the fallback string makes admin sessions forgeable (SA-8). |
+| 7 | `CRON_SECRET` | Generate | **[3]** Worker secret | `/api/cron/snapshot` | Phase 1 | Moves from query string to header in Phase 5. |
+| 8 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | You — Cloudflare dashboard, token scoped as in §2.3.1 (Workers Scripts, D1, Workers Routes, DNS — **not** Pages) | GitHub Actions secrets (deploy credentials, not app config) | GitHub Actions secrets for `deploy.yml` | Phase 0 | `deploy.yml` must be rewritten first (B-5). |
+| 9 | `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` | You — same token; ID is `f0a28d6f-0a36-46aa-b711-8b5297913d2e` | Operator's shell / local `.env` (tooling only) | `drizzle.config.ts` (migrations / studio only) | Phase 1 | Not needed at runtime; the Worker uses the `DB` binding. |
+| 10 | `DEPLOYER_PRIVATE_KEY` | Wallet — fresh, funded | Operator's shell only (never a file) | `contracts/scripts/deploy.js`, `contracts/scripts/deploy-aqua-app.js` — the operator's shell only, never a file | Phase 2 | Deploys the registry and becomes its administrator (pause, rotate attester). Also deploys XYCSwap + XYCSwapTaker, **neither of which has an owner**, so it keeps no privilege there. |
+| 11 | `REGISTRY_ADDRESS` / `NEXT_PUBLIC_REGISTRY_ADDRESS` → `NEXT_PUBLIC_REGISTRY_ADDRESS` | Output of registry deploy | **[1]** `wrangler.jsonc` `vars` | chain module, MCP | Phase 2 | Startup must assert code exists at it (D-015). |
+| 12 | `NEXT_PUBLIC_AQUA_APP_ADDRESS`, `NEXT_PUBLIC_AQUA_TAKER_ADDRESS` | Output of `deploy-aqua-app.js` | **[1]** `wrangler.jsonc` `vars` | chain module, `lib/aqua`, taker hook | Phase 3 | Replaces `NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS`, which is **removed**: no SwapVM router is deployed (D-030). The app is the reference XYCSwap; the taker is the periphery a visitor calls. Both unset ⇒ every Aqua surface is UNAVAILABLE. |
+| 13 | `NEXT_PUBLIC_AQUA_ADDRESS` (new) | Fixed: `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` | **[1]** `wrangler.jsonc` `vars` | chain module | Phase 3 | |
+| 14 | `NEXT_PUBLIC_USDC_ADDRESS`, `NEXT_PUBLIC_WETH_ADDRESS` (new) | Fixed: `0x1c7D…7238`, `0xfFf9…6B14` | **[1]** `wrangler.jsonc` `vars` | chain module | Phase 2 | |
+| 15 | `PIMLICO_API_KEY` and `NEXT_PUBLIC_PIMLICO_API_KEY` | You — dashboard.pimlico.io | **[3]** Worker secret / **[2]** GitHub repo secret for the `NEXT_PUBLIC_` copy | `lib/aa.ts` | Phase 2 | Create a **sponsorship policy** for chain 11155111 in the dashboard or the verifying paymaster rejects every UserOp. Testnet sponsorship is free. The `NEXT_PUBLIC_` copy is exposed to browsers — restrict the key by origin in the dashboard. |
+| 16 | `FAUCET_PRIVATE_KEY` | Wallet — fresh, funded | **[3]** Worker secret | `/api/faucet` | Phase 2 | **Must be set.** The current default is the public Anvil key (SA-4). Sends 0.01 ETH per claim. |
+| 17 | `ATTESTATION_SIGNER_PRIVATE_KEY` | Wallet — fresh, **unfunded** | **[3]** Worker secret | `lib/nfc/attestation.ts`; `lib/rock-account.server.ts` derives the expected attester from it | Phase 4 | **Renamed from `SIGNER_PRIVATE_KEY`, which is removed.** Its address is the registry's trusted attester and is passed to the deploy script as `ATTESTATION_SIGNER_ADDRESS`. Signs the six-field struct (D-026) and nothing else. Never holds funds. |
+| 18 | `NXP_MASTER_KEY` | Generate, 16 bytes hex, at tag provisioning | **[3]** Worker secret | `/api/nfc/verify` | Phase 4 | Must equal the key written to the physical NTAG 424 DNA tags. Store in Cloudflare secrets only. |
+| 19 | `RESEND_API_KEY` | You — resend.com | **[3]** Worker secret | `lib/email-service.ts`, Gelato alert route | Phase 5 | **Plus** domain verification for `bank-rock.com` (add the SPF/DKIM records Resend shows) and change `from` to `alerts@bank-rock.com`. Without verification, mail reaches only your own inbox. |
+| 20 | `ALERT_EMAIL_ADDRESS` | Fixed: an inbox you read | **[3]** Worker secret | Gelato alert route | Phase 5 | **No default.** The `security@bankrock.xyz` fallback is gone (D-017, D-022): unset means `/api/alerts/gelato` answers UNAVAILABLE rather than mailing anyone. |
+| 21 | `ADMIN_API_KEY` | Generate | **[3]** Worker secret | `/api/newsletter` operator view | Phase 5 | |
+| 22 | `ALCHEMY_WEBHOOK_SECRET` | You — Alchemy Notify, only if used | **[3]** Worker secret | `/api/webhooks/alchemy` | Optional | If unset the route must reject, not accept (D-017). |
+| 23 | `BANKROCK_API_URL` | Fixed: `https://bank-rock.com` | The agent's MCP `env` block | `mcp/index.ts` | Phase 1 | |
+| 24 | ~~`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`~~ | — | — | — | — | **Removed.** The counter store is D1 (`nfc_counters`); the in-memory store is used only when `NEXT_PUBLIC_DEMO_MODE=true`. |
+| 25 | ~~`1INCH_API_KEY`~~ | — | — | — | — | **Removed** with `/api/quote`. The API does not serve Sepolia (§1.4); quotes come from `XYCSwap.quoteExactIn` (spec 04). |
+| 26 | `ALERT_API_URL`, `QUOTE_API_URL`, `ROCK_ID` (Gelato secrets) | — | Gelato task secrets | `web3-functions/` | — | `DEMO`; not needed. |
+| 27 | `NEXT_PUBLIC_DEMO_MODE` | Fixed: `false` in production | **[1]** `wrangler.jsonc` `vars` | everywhere, through `lib/demo.ts` | Phase 1 | D-013. Only the literal `"true"` enables simulation; the deploy job sets `"false"` explicitly and a spec check asserts it. |
+| 28 | `REGISTRY_DEPLOY_BLOCK` | Output of the registry deploy | **[1]** `wrangler.jsonc` `vars` | `lib/indexer.ts` | Phase 2 | The indexer scans forward from here in 2,000-block chunks. Unset ⇒ provenance is UNAVAILABLE, never scanned from block 0. |
+| 29 | `AQUA_APP_DEPLOY_BLOCK` | Output of `deploy-aqua-app.js` | **[1]** `wrangler.jsonc` `vars` | `lib/chain`, `lib/aqua/read.ts` | Phase 3 | Bounds the `Pushed` log scan the cumulative fee figure is summed from. Unset ⇒ a short recent window, reported as partial. |
+| 30 | `RELAYER_PRIVATE_KEY` | Wallet — fresh, **funded** | **[3]** Worker secret | `lib/rock-account.server.ts`, `POST /api/rocks/[id]/claim` | Phase 2 | Pays gas for `claimHandover` (D-027): a gift recipient has no gas and does not yet control the Rock Account. Safe because the registry credits `att.subject`, not `msg.sender` (D-026). Unset ⇒ claims are UNAVAILABLE, never free. |
+| 31 | `NXP_KEY_DIVERSIFY` | Optional, default off | **[3]** Worker secret | `lib/nfc/config.ts` | Phase 4 | `"true"` enables AN10922 per-tag key diversification. Must match how the tags were provisioned. Keep it **off** for the hackathon (spec 18 §4.2 item 4). |
+| 32 | `NXP_KEY_DIVERSIFY_APP_ID` | With #31 only | **[3]** Worker secret | `lib/nfc/config.ts` | Phase 4 | The 3-byte AID used in the derivation. Meaningless unless #31 is on. |
+| 33 | `ALERT_FROM_ADDRESS` | You — a verified Resend sender | **[3]** Worker secret | `lib/email-service.ts` | Phase 5 | e.g. `Bank Rock <alerts@bank-rock.com>`, once the domain is verified. Until then the sandbox sender reaches only your own inbox (E-6). |
+| 34 | `RELAYER_DAILY_CAP_WEI` | You — a number, in wei | **[1]** `wrangler.jsonc` `vars` | `lib/rock-account.server.ts` (`relayerDailyCapWei`, `reserveRelayerSpend`), `POST /api/rocks/[id]/claim` | Phase 2 | **Fails closed, and that is the point (audit `F-10`/`P-1`, D-032).** How much the relayer may spend per **UTC day**, accumulated in D1 and reserved *before* each claim is broadcast, in one atomic statement so two concurrent claims cannot both fit under a cap only one of them fits. **Unset or `0` disables relaying entirely** — an uncapped funded key is the finding this closes, so "no cap" is the closed branch, not the permissive one. Also refused: a non-integer, and a value larger than the ledger can track. 0.05 ETH = `50000000000000000`; one claim is estimated at 0.002 ETH. Pairs with #30 |
+| 35 | `NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY` | Generate — `npx web-push generate-vapid-keys` | **[1]** `wrangler.jsonc` `vars`, once a pair is generated | `hooks/useNotifications.ts` (browser), `app/api/webpush/route.ts` | Phase 5, optional | The browser subscribes with this key and the server signs with #36; **the two must be halves of one pair, or every delivery fails silently.** Perimeter `P-7` was exactly that mismatch, under two different variable names — the browser read `NEXT_PUBLIC_VAPID_PUBLIC_KEY` while the route read `WEB_PUSH_VAPID_PUBLIC_KEY`. One name now, and it is `NEXT_PUBLIC_`-prefixed because the public key is public by construction |
+| 36 | `WEB_PUSH_VAPID_PRIVATE_KEY` | Generate — the other half of #35 | **[3]** Worker secret | `app/api/webpush/route.ts` | Phase 5, optional | Server-side only. Never `NEXT_PUBLIC_`. Cloudflare secret, not a file |
+| 37 | `WEB_PUSH_SUBJECT` | Fixed — a `mailto:` or `https:` URL you own | **[3]** Worker secret | `app/api/webpush/route.ts` | Phase 5, optional | The VAPID `sub` claim: who a push service should contact about this sender. e.g. `mailto:security@bank-rock.com`. All three of #35–#37 unset ⇒ push is `UNAVAILABLE`, which is the correct state; a partial set is the failure mode worth avoiding (spec 14) |
 
 ### 2.2a Cross-check against `web/.env.example`
 
-The table above covers exactly the variables in [`../web/.env.example`](../web/.env.example), in
-its order: `NEXT_PUBLIC_APP_URL` (#2), `NEXT_PUBLIC_CHAIN_ID` (#3), `NEXT_PUBLIC_DEMO_MODE` (#27),
-`NEXT_PUBLIC_PRIVY_APP_ID` (#1), `SEPOLIA_RPC_URL` (#4), `REGISTRY_DEPLOY_BLOCK` (#28),
-`ADMIN_PASSWORD` (#5), `ADMIN_JWT_SECRET` (#6), `ADMIN_API_KEY` (#21), `CRON_SECRET` (#7),
-`NEXT_PUBLIC_AQUA_ADDRESS` (#13), `NEXT_PUBLIC_USDC_ADDRESS` and `NEXT_PUBLIC_WETH_ADDRESS`
-(#14), `NEXT_PUBLIC_REGISTRY_ADDRESS` (#11), `NEXT_PUBLIC_AQUA_APP_ADDRESS` and
-`NEXT_PUBLIC_AQUA_TAKER_ADDRESS` (#12), `AQUA_APP_DEPLOY_BLOCK` (#29), `PIMLICO_API_KEY` and
-`NEXT_PUBLIC_PIMLICO_API_KEY` (#15), `FAUCET_PRIVATE_KEY` (#16),
-`ATTESTATION_SIGNER_PRIVATE_KEY` (#17), `RELAYER_PRIVATE_KEY` (#30),
-`RELAYER_DAILY_CAP_WEI` (#34), `NXP_MASTER_KEY` (#18),
-`NXP_KEY_DIVERSIFY` (#31), `NXP_KEY_DIVERSIFY_APP_ID` (#32), `RESEND_API_KEY` (#19),
-`ALERT_FROM_ADDRESS` (#33), `ALERT_EMAIL_ADDRESS` (#20), `ALCHEMY_WEBHOOK_SECRET` (#22),
-`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` (#8, #9),
-`NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY`, `WEB_PUSH_VAPID_PRIVATE_KEY`, `WEB_PUSH_SUBJECT`
-(#35–#37).
+The table above covers exactly the variables in [`../web/.env.example`](../web/.env.example), which
+since D-034 is **grouped by home** rather than by subject, so that the file answers "where does this
+live in production?" at a glance:
+
+- **[1] in git, `wrangler.jsonc` `vars`:** `NEXT_PUBLIC_APP_URL` (#2), `NEXT_PUBLIC_CHAIN_ID` (#3),
+  `NEXT_PUBLIC_DEMO_MODE` (#27), `NEXT_PUBLIC_AQUA_ADDRESS` (#13), `NEXT_PUBLIC_USDC_ADDRESS` and
+  `NEXT_PUBLIC_WETH_ADDRESS` (#14), `NEXT_PUBLIC_REGISTRY_ADDRESS` (#11),
+  `REGISTRY_DEPLOY_BLOCK` (#28), `NEXT_PUBLIC_AQUA_APP_ADDRESS` and
+  `NEXT_PUBLIC_AQUA_TAKER_ADDRESS` (#12), `AQUA_APP_DEPLOY_BLOCK` (#29),
+  `RELAYER_DAILY_CAP_WEI` (#34).
+- **[2] GitHub Actions inputs:** `NEXT_PUBLIC_PRIVY_APP_ID` (#1),
+  `NEXT_PUBLIC_PIMLICO_API_KEY` (#15).
+- **[3] Worker secrets:** `SEPOLIA_RPC_URL` (#4), `ADMIN_PASSWORD` (#5), `ADMIN_JWT_SECRET` (#6),
+  `ADMIN_API_KEY` (#21), `CRON_SECRET` (#7), `PIMLICO_API_KEY` (#15), `FAUCET_PRIVATE_KEY` (#16),
+  `ATTESTATION_SIGNER_PRIVATE_KEY` (#17), `RELAYER_PRIVATE_KEY` (#30), `NXP_MASTER_KEY` (#18),
+  `NXP_KEY_DIVERSIFY` (#31), `NXP_KEY_DIVERSIFY_APP_ID` (#32), `RESEND_API_KEY` (#19),
+  `ALERT_FROM_ADDRESS` (#33), `ALERT_EMAIL_ADDRESS` (#20), `ALCHEMY_WEBHOOK_SECRET` (#22),
+  `WEB_PUSH_VAPID_PRIVATE_KEY` (#36), `WEB_PUSH_SUBJECT` (#37) — plus
+  `NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY` (#35), which moves to **[1]** if push is ever enabled,
+  because a `NEXT_PUBLIC_` value set on the Worker never reaches the browser bundle.
+- **Tooling only, no home in the running app:** `CLOUDFLARE_ACCOUNT_ID`,
+  `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` (#8, #9).
 
 **Nothing was removed in this pass.** Every variable the table names is still read by the code as
 spelled — re-checked 2026-09-12 against `web/src/`, `mcp/` and `web/drizzle.config.ts`. The
@@ -242,22 +261,40 @@ D-030), `SIGNER_PRIVATE_KEY` (renamed to `ATTESTATION_SIGNER_PRIVATE_KEY`), `1IN
 
 ### 2.3 What only you can do
 
-#### 2.3.1 The two GitHub repository secrets (Fact — this is what blocks the deploy)
+**The whole of it, since D-034:** set the secrets on the Worker (§2.3.2), set the four GitHub
+inputs (§2.3.1), and do the vendor-dashboard and DNS actions that are not variables at all
+(§2.3.3). Every other value — the origin, the chain id, the demo flag, the addresses, the deploy
+blocks, the relayer cap — is in `web/wrangler.jsonc` and needs no operator action: it ships with
+the commit. **Nothing is typed into the Cloudflare dashboard's *Variables* pane any more**, and a
+value typed there survives only until the next deploy (§2.3.2).
 
-`.github/workflows/deploy.yml` reads exactly two credentials, and fails early and by name if either
-is missing. They are **repository secrets**, not Pages variables, because they authenticate the
-upload rather than the running app:
+#### 2.3.1 The four GitHub inputs (Fact — two credentials and two identifiers)
+
+`.github/workflows/deploy.yml` reads two credentials, and fails early and by name if either is
+missing. They are **repository secrets** because they authenticate the upload rather than the
+running app:
 
 | Secret | What it is | Scopes the token needs |
 | --- | --- | --- |
 | `CLOUDFLARE_API_TOKEN` | A Cloudflare API token, created in the Cloudflare dashboard under My Profile → API Tokens | **Account → Workers Scripts: Edit** (publish the Worker), **Account → D1: Edit** (the migration step and the `DB` binding), **Zone (`bank-rock.com`) → Workers Routes: Edit** and **Zone → DNS: Edit** (the two custom domains in `wrangler.jsonc`) |
 | `CLOUDFLARE_ACCOUNT_ID` | The account id shown in the Cloudflare dashboard sidebar. Not a secret in the cryptographic sense; it is stored alongside the token so the workflow needs no dashboard lookup | — |
 
-Set both here:
+It also reads the two **account-specific public identifiers** — home **[2]**. They are public, but
+they identify *your* vendor accounts rather than this application, so they are not committed:
+
+| Input | Kind | Why it is here and not in `wrangler.jsonc` |
+| --- | --- | --- |
+| `NEXT_PUBLIC_PRIVY_APP_ID` (#1) | Repository **variable** (`${{ vars.… }}`) — Settings → Secrets and variables → Actions → **Variables** | The Privy app id of your Privy account. Visible in the browser bundle either way; a variable, not a secret, so its value is readable in the Actions UI, which is the honest description of what it is |
+| `NEXT_PUBLIC_PIMLICO_API_KEY` (#15) | Repository **secret** (`${{ secrets.… }}`) | Browser-visible by construction, and restricted by origin in the Pimlico dashboard — but it is still a key, and a key does not go in git |
+
+Both are inlined into the build by Next, so a change to either needs a **re-deploy**, not just a
+Worker restart. Set the secrets here:
 
 ```
 https://github.com/lucaguglielmi/bankrock-ethglobal/settings/secrets/actions
 ```
+
+and the variable on the *Variables* tab of the same page.
 
 The two **Zone** scopes are the ones easiest to leave off, and their absence does not stop the
 Worker from publishing — it stops the custom domains from being attached, which looks like a green
@@ -273,17 +310,35 @@ not.*
 #### 2.3.2 The Cloudflare Worker `web`
 
 **Production is a Worker, not a Pages project** (spec 12 §1). Dashboard path: Workers & Pages →
-`web` → Settings. It holds everything the *running* app reads. The Pages project
-`bankrock-ethglobal` exists and can be published to by hand, but **no domain points at it**, so a
-variable set there has no effect on production.
+`web` → Settings. The Pages project `bankrock-ethglobal` exists and can be published to by hand,
+but **no domain points at it**, so a variable set there has no effect on production.
+
+**The Worker holds the secrets, and nothing else you have to type.** Since D-034 the non-secret
+configuration is in `web/wrangler.jsonc` `vars` and arrives with the deploy — so the only work here
+is the **Secret** list below.
+
+> **A plain-text variable typed in the dashboard does not survive a deploy.** `wrangler deploy`
+> deletes every plain-text variable on the Worker and re-sets exactly the `vars` block from the
+> configuration file; `keep_vars` is not set and must not be. Cloudflare's own wording: *"When not
+> used (or set to false), Wrangler will delete all vars before setting those found in the Wrangler
+> configuration"*, and *"Secrets are never deleted by a deployment whether this flag is true or
+> false"* ([Wrangler commands](https://developers.cloudflare.com/workers/wrangler/commands/workers/),
+> [Configuration → source of truth](https://developers.cloudflare.com/workers/wrangler/configuration/)).
+> That asymmetry is the whole mechanism: committed configuration is authoritative and cannot drift,
+> secrets are untouched and never pass through git or a workflow log. It is also why a value that
+> is merely *account-specific* rather than confidential — `ALERT_FROM_ADDRESS`,
+> `ALERT_EMAIL_ADDRESS`, `WEB_PUSH_SUBJECT`, `NXP_KEY_DIVERSIFY*` — is set as a **Secret**: a
+> Text variable there would be deleted by the next deploy and the capability would silently go
+> `UNAVAILABLE`.
 
 | What | Value |
 | --- | --- |
 | **D1 binding** | Binding name **`DB`**, database `bankrock-db`, id `f0a28d6f-0a36-46aa-b711-8b5297913d2e`, `migrations_dir: drizzle`. Declared in `web/wrangler.jsonc` and bound on the project. The Worker uses the binding; it never reads `CLOUDFLARE_DATABASE_ID` or `CLOUDFLARE_D1_TOKEN`, which are migration tooling only (#9). Unbound ⇒ counters, rate limits and the relayer spend ledger are all `UNAVAILABLE`, and the relayer therefore refuses to spend |
-| **Environment variables** | Every variable in [`../web/.env.example`](../web/.env.example) that the deployment needs, set under **Settings → Variables and Secrets** on the Worker — **never in a file**. Secrets (`ADMIN_*`, `CRON_SECRET`, `*_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RESEND_API_KEY`, `ALCHEMY_WEBHOOK_SECRET`, `WEB_PUSH_VAPID_PRIVATE_KEY`) go in as **Secret**, not Text |
+| **Secrets — the operator's list** | `SEPOLIA_RPC_URL`, `PIMLICO_API_KEY`, `ADMIN_PASSWORD`, `ADMIN_JWT_SECRET`, `ADMIN_API_KEY`, `CRON_SECRET`, `FAUCET_PRIVATE_KEY`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RESEND_API_KEY`, `ALERT_FROM_ADDRESS`, `ALERT_EMAIL_ADDRESS`, `ALCHEMY_WEBHOOK_SECRET`, and the two web-push server values `WEB_PUSH_VAPID_PRIVATE_KEY` and `WEB_PUSH_SUBJECT` — all as **Secret**, never Text, never in a file. `wrangler secret put NAME` from `web/` does the same thing as the dashboard. Each unset one makes exactly one capability `UNAVAILABLE` (§2.2, and DEMO-STATE §4) |
+| **Non-secret configuration** | Not set here. It is `web/wrangler.jsonc` `vars` (#2, #3, #11–#14, #27–#29, #34), replaced on every deploy from the file |
 | **Custom domains** | `bank-rock.com` and `www.bank-rock.com`, declared in `wrangler.jsonc` `routes` with `custom_domain: true`. Attaching them is what the token's two Zone scopes are for |
-| **`NEXT_PUBLIC_DEMO_MODE`** | `false` in production. The deploy job also pins it in the job environment, so the two would have to disagree *and* the pin would have to be removed for a simulated build to ship (D-013) |
-| **`RELAYER_DAILY_CAP_WEI`** | Must be set for gift claims to work at all (#34). Unset is the closed branch |
+| **`NEXT_PUBLIC_DEMO_MODE`** | `false`, in `wrangler.jsonc`. The deploy job pins the same value in the job environment *and* refuses to build if the file says anything else, so a simulated production build needs two deliberate changes and a passing CI lie (D-013) |
+| **`RELAYER_DAILY_CAP_WEI`** | `20000000000000000` (0.02 ETH/UTC day), in `wrangler.jsonc`. Must be non-zero for gift claims to work at all (#34); unset is the closed branch. The key it caps, `RELAYER_PRIVATE_KEY`, is a Secret — configuration and credential deliberately split |
 | **Migrations** | Applied **by the deploy job**, before the Worker is published (`wrangler d1 migrations apply bankrock-db --remote`). The same command is `npm run db:migrate:prod` by hand. Consequence, stated because it is a change: **a destructive migration must not be merged to `main`** — merging it applies it (spec 12, Database) |
 
 #### 2.3.3 Dashboard and DNS actions
@@ -292,12 +347,14 @@ These are dashboard or DNS actions, not env vars:
 
 1. **Privy dashboard** — create the app; add `https://bank-rock.com` (and the `pages.dev` preview
    origin if you use it) to allowed origins; enable email, Google, Apple, wallet; enable Sepolia.
+   The app id itself goes in the GitHub repository *variable* (§2.3.1), not the dashboard.
 2. **Pimlico dashboard** — create the API key; create a sponsorship policy for chain 11155111;
    restrict the public key by origin.
 3. **Cloudflare dashboard** — remove or fix the `www` redirect rule with the unsubstituted
    `:path*` (R-1); the app now ships the redirect itself in `web/next.config.ts`, but a dashboard
-   rule is evaluated first, so the broken one must go. Create the API token (§2.3.1) and configure
-   the Pages project (§2.3.2).
+   rule is evaluated first, so the broken one must go. Create the API token (§2.3.1) and set the
+   Worker's secrets (§2.3.2). **Do not add anything to the Worker's *Variables* pane** — a deploy
+   deletes it.
 4. **Resend** — add `bank-rock.com`; publish the SPF, DKIM and MX records it gives you; wait for
    verification.
 5. **Alchemy or Infura** — create a Sepolia app for `SEPOLIA_RPC_URL`.

@@ -470,6 +470,62 @@ is a transfer of title, rotatable through `setAttester`.
 `web/src/lib/rock-account.server.ts` (`submitSignedUserOp`'s receipt check, `reserveRelayerSpend`);
 `web/src/lib/nfc/rock-resolution.ts` (`resolveSmartAccount`).
 
+### D-034 — Configuration has one source of truth per kind, and non-secret configuration is in git
+
+**Decision:** every value the running application reads lives in exactly one of three homes, chosen
+by what kind of value it is, and never in two:
+
+1. **Non-secret, account-independent configuration is in git**, in `web/wrangler.jsonc` `vars`:
+   `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CHAIN_ID`, `NEXT_PUBLIC_DEMO_MODE`, all six addresses,
+   `REGISTRY_DEPLOY_BLOCK` (`11689716`), `AQUA_APP_DEPLOY_BLOCK` (`11689724`) and
+   `RELAYER_DAILY_CAP_WEI` (`20000000000000000`, 0.02 ETH per UTC day). The addresses are copied
+   from `contracts/deployments/sepolia.json` and `contracts/deployments/sepolia-aqua-app.json`.
+2. **Account-specific public identifiers are GitHub Actions inputs**, not git:
+   `NEXT_PUBLIC_PRIVY_APP_ID` as a repository *variable*, `NEXT_PUBLIC_PIMLICO_API_KEY` as a
+   repository *secret* (browser-visible by construction, but still a key).
+3. **True secrets are encrypted secrets on the Worker** — RPC URL, every private key, the NFC
+   master key, `ADMIN_*`, `CRON_SECRET`, `RESEND_API_KEY`, the webhook secret — set by hand, never
+   in git and never in a workflow.
+
+**Consequence:**
+
+1. **The Cloudflare dashboard's *Variables* pane is not a place configuration lives.**
+   `wrangler deploy` deletes every plain-text variable on the Worker and re-sets exactly the `vars`
+   block from the file (`keep_vars` is not set, and must not be); secrets are never deleted by a
+   deploy. So committed configuration cannot drift, and a value typed into the Variables pane
+   silently disappears at the next deploy. A value that is merely account-specific rather than
+   confidential — `ALERT_FROM_ADDRESS`, `ALERT_EMAIL_ADDRESS`, `WEB_PUSH_SUBJECT`,
+   `NXP_KEY_DIVERSIFY*` — is therefore set as a **Secret**, which is the only home on the Worker
+   that survives a deploy.
+2. **The build needs the public values, and the runtime needs them too.** Next inlines
+   `process.env.NEXT_PUBLIC_*` at build time — **verified, not assumed**: with the values exported,
+   `opennextjs-cloudflare build` puts the literal `registryAddress:"0x2A3101Fc…F757"` into *both* a
+   client chunk and the server bundle (11 files under `.open-next/`), while a server-only variable
+   left unset at build (`AQUA_APP_DEPLOY_BLOCK`) appears nowhere and is emitted as a runtime
+   `process.env` read. So `web/scripts/export-public-vars.mjs` parses the JSONC config and prints
+   the `NEXT_PUBLIC_*` vars as `KEY=VALUE`, and `deploy.yml` appends them to `$GITHUB_ENV` before
+   the build. The runtime half needs nothing extra: `@opennextjs/cloudflare`'s `populateProcessEnv`
+   copies every string binding — `vars` and secrets — into `process.env` on the first request.
+   Changing [1] or [2] therefore requires a **re-deploy**, not a restart.
+3. **Drift between the committed configuration and the deploy records is a blocking CI failure.**
+   `scripts/spec-checks.sh` gains check `D-034` (the script now runs **21** checks; the counts in
+   spec 15 Part 7 and spec 18 still say 20 and are stale): the address and deploy-block `vars` must
+   equal `contracts/deployments/*.json`, case-insensitively for addresses. That is the bug this
+   decision exists to prevent — a stale address is inlined into the bundle and points the whole app
+   at a contract we did not deploy, on a deploy that looks green.
+4. **D-013 is now asserted twice.** `wrangler.jsonc` sets `NEXT_PUBLIC_DEMO_MODE` to `"false"`, the
+   deploy job still pins the same value in its job environment (which spec check `D-013a` asserts),
+   and the export step fails the deploy outright if the file ever says anything else. Production
+   can never be a simulation by accident.
+5. **The operator's remaining work is two lists and nothing else:** the Worker's secrets, and the
+   four GitHub inputs (two deploy credentials, two identifiers). Spec 16 §2.3.
+
+**Files:** `web/wrangler.jsonc` (the `vars` block); `web/scripts/export-public-vars.mjs`;
+`.github/workflows/deploy.yml` (the export step and the two new job env entries);
+`scripts/spec-checks.sh` (check `D-034`); `web/.env.example` (regrouped by home);
+`specs/12-deployment.md` (*Configuration model (D-034)*); `specs/16-environment-and-secrets.md`
+(§2.2 "Where it lives in production", §2.2a, §2.3); `DEMO-STATE.md` §3.
+
 ## Open product questions
 
 1. **Is the hackathon's main story gifting, a public micro-exchange, or both?** Gifting is the core product journey; public tap-to-trade is the primary demonstration of the liquidity.
