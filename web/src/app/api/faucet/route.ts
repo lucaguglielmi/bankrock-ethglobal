@@ -20,8 +20,22 @@ const walletClient = createWalletClient({
 
 import { logger } from "@/lib/telemetry";
 
+const rateLimitMap = new Map<string, number>();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const MAX_REQUESTS = 3;
+
 export async function POST(req: Request) {
   const start = Date.now();
+  
+  const ip = req.headers.get("x-forwarded-for") || "unknown";
+  const userRequests = rateLimitMap.get(ip) || 0;
+  
+  if (userRequests >= MAX_REQUESTS) {
+    logger.warn("Rate limit exceeded for IP", { ip });
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+  rateLimitMap.set(ip, userRequests + 1);
+  setTimeout(() => rateLimitMap.set(ip, (rateLimitMap.get(ip) || 1) - 1), RATE_LIMIT_WINDOW_MS);
 
   try {
     const { address } = await req.json();
