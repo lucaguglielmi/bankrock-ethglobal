@@ -10,6 +10,13 @@ const SECRET_KEY = new TextEncoder().encode(
   process.env.ADMIN_JWT_SECRET || 'fallback-secret-do-not-use-in-prod'
 );
 
+async function hashUserAgent(userAgent: string): Promise<string> {
+  const data = new TextEncoder().encode(userAgent || 'unknown');
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export async function middleware(request: NextRequest) {
   const url = request.nextUrl.pathname;
   
@@ -26,8 +33,18 @@ export async function middleware(request: NextRequest) {
       if (payload.role !== 'admin') {
         throw new Error('Invalid role');
       }
+
+      // User-Agent Fingerprinting verification against session hijacking
+      const currentUserAgent = request.headers.get('user-agent') || 'unknown';
+      const currentUah = await hashUserAgent(currentUserAgent);
+      
+      if (payload.uah && payload.uah !== currentUah) {
+        console.warn(`[Security] Session hijacked or User-Agent changed! Expected UAH: ${payload.uah}, got: ${currentUah}`);
+        throw new Error('User-Agent mismatch');
+      }
+
     } catch (err) {
-      // Token is invalid or expired
+      // Token is invalid, expired, or failed fingerprinting
       const response = NextResponse.redirect(new URL('/admin/login', request.url));
       response.cookies.delete('bankrock_sentinel_session');
       return response;

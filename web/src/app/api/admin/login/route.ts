@@ -6,10 +6,11 @@ export const runtime = "edge";
 export async function POST(req: Request) {
   try {
     const { password } = await req.json();
-    const correctPassword = process.env.ADMIN_PASSWORD || 'bankrock-demo-123';
+    const correctPassword = process.env.ADMIN_PASSWORD;
+    const userAgent = req.headers.get('user-agent') || 'unknown';
 
-    if (password === correctPassword) {
-      await createAdminSession();
+    if (correctPassword && password === correctPassword) {
+      await createAdminSession(userAgent);
       return NextResponse.json({ success: true });
     }
 
