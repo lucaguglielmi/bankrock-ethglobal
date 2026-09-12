@@ -485,8 +485,10 @@ Stop lying before starting to tell the truth. This phase adds no features.
 **Acceptance:** with `NEXT_PUBLIC_DEMO_MODE=false`, a rock page shows no balance, no fee figure,
 no APY and no provenance entries — because none of it is real yet. With no Privy app ID
 configured, sign-in shows `UNAVAILABLE` and no wallet address appears anywhere. No control on
-the page can produce the green `Verified Physical` badge. `GET /api/rocks/1/yield`
-returns 200 with an empty series rather than 500 or fiction. `grep -rE "Math\.random\(\).*16"`
+the page can produce the green `Verified Physical` badge. *(The `GET /api/rocks/1/yield` clause of
+this acceptance is void: the route, and the empty History chart it was meant to fill, have since
+been deleted — nothing called either, and the position card's fee figures are summed from Aqua's
+own `Pushed` events instead.)* `grep -rE "Math\.random\(\).*16"`
 over `web/src` returns nothing.
 
 ## Phase 2 — Real chain
@@ -779,7 +781,8 @@ Live assertions:
 ```
 curl -sL -o /dev/null -w "%{http_code}" https://www.bank-rock.com          # 200
 curl -s -o /dev/null -w "%{http_code}" https://bank-rock.com/r/1           # 200
-curl -s -o /dev/null -w "%{http_code}" https://bank-rock.com/api/rocks/1/yield  # 200
+curl -s -o /dev/null -w "%{http_code}" https://bank-rock.com/api/rocks/1/activity  # 200
+# (/api/rocks/1/yield was deleted with the empty History chart — nothing called it.)
 curl -s https://bank-rock.com/api/telemetry                                # 401 or 404
 curl -s -X POST https://bank-rock.com/api/alerts/test -d '{"to":"x@y.z"}'  # 401
 cast code $REGISTRY_ADDRESS --rpc-url $RPC_URL                             # non-empty

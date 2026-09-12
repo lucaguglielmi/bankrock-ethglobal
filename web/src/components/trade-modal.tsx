@@ -15,6 +15,12 @@
  * except the slippage floor, which is arithmetic on the quote. The confirmation is a single
  * 56 px button in the sticky footer (L-6, §4.5) that calls `useTakerActions().swap`, and the
  * receipt is whatever that returns — a real hash, or an honest reason.
+ *
+ * It also shows **the account the swap comes from**: the visitor's personal Safe (D-029, salt 0),
+ * its address with a copy button and its two balances. That address used to exist only inside the
+ * hook, so a visitor whose account held nothing was told to swap, and the swap failed during
+ * estimation with a bundler error — with no way to learn where to send the tokens. An empty
+ * account now says so, and blocks the button, before anything is signed.
  */
 
 import * as React from "react";
@@ -23,12 +29,14 @@ import { ArrowUpDown, Loader2 } from "lucide-react";
 import { Sheet, SheetBody } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+// Aliased: `Address` is viem's address *type* in this file, and the primitive is a component.
+import { Address as AddressLine } from "@/components/ui/address";
 import { Amount } from "@/components/ui/amount";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { HelpTerm } from "@/components/ui/popover";
 import { CapabilityResult } from "@/components/sheets/capability-result";
 import { cn } from "@/lib/ui/cn";
-import { tokens, type TokenSymbol } from "@/lib/chain";
+import { explorer, tokens, type TokenSymbol } from "@/lib/chain";
 import type { Capability } from "@/lib/demo";
 import { useAuth } from "@/context/auth-context";
 import { useTakerActions } from "@/hooks/useTakerActions";
@@ -109,6 +117,15 @@ function isBaseUnits(value: unknown): value is string {
   return typeof value === "string" && /^\d+$/.test(value);
 }
 
+/** Base units for a string that already matched `DECIMAL_INPUT`, or null if viem refuses it. */
+function toBaseUnits(value: string, decimals: number): bigint | null {
+  try {
+    return parseUnits(value, decimals);
+  } catch {
+    return null;
+  }
+}
+
 /** Deal quality, in the user's words (STEERING.md). Colours are tokens only (§3.5). */
 function impactTone(bps: number): { text: string; bar: string } {
   if (bps < 50) return { text: "text-positive", bar: "bg-positive" };
@@ -152,7 +169,7 @@ export function TradeModal({
   onRequestSignIn,
 }: TradeModalProps) {
   const { authenticated, login } = useAuth();
-  const { account, swap, isPending } = useTakerActions();
+  const { account, balances, swap, isPending } = useTakerActions();
 
   const [tokenIn, setTokenIn] = React.useState<TokenSymbol>("USDC");
   const [amountIn, setAmountIn] = React.useState("");
@@ -268,8 +285,44 @@ export function TradeModal({
         BigInt(BPS_DENOMINATOR)
       : null;
 
+  /* ---------------------------------------------------------------------- */
+  /* The account the swap comes from, and whether it can pay for one.        */
+  /* ---------------------------------------------------------------------- */
+
+  const heldIn =
+    balances.state === "UNAVAILABLE"
+      ? null
+      : tokenIn === "USDC"
+        ? balances.value.usdc
+        : balances.value.weth;
+
+  // Memoised deliberately: the React Compiler cannot see through `toBaseUnits`, and an
+  // unmemoised call here makes it give up on the quote memo above (react-hooks lint rule).
+  const amountInUnits = React.useMemo(
+    () => toBaseUnits(trimmedAmount, decimalsIn),
+    [trimmedAmount, decimalsIn],
+  );
+  const shortfall =
+    heldIn !== null &&
+    amountInUnits !== null &&
+    amountInUnits > BigInt(0) &&
+    amountInUnits > heldIn;
+
+  /**
+   * Said before anything is signed. An account with no input token cannot swap: the UserOperation
+   * fails in estimation, and the bundler's reason is not something a visitor can act on.
+   */
+  const fundingMessage =
+    heldIn === null
+      ? null
+      : heldIn === BigInt(0)
+        ? `This account holds no ${tokenIn} — send some to the address above`
+        : shortfall
+          ? `This account holds ${formatUnits(heldIn, decimalsIn)} ${tokenIn} — send more to the address above`
+          : null;
+
   const handleSwap = React.useCallback(async () => {
-    if (!maker || quote.status !== "real" || minAmountOut === null) return;
+    if (!maker || quote.status !== "real" || minAmountOut === null || shortfall) return;
     setSwapError(null);
 
     try {
@@ -311,6 +364,7 @@ export function TradeModal({
     maker,
     quote,
     minAmountOut,
+    shortfall,
     swap,
     rockId,
     streamIndex,
@@ -335,6 +389,7 @@ export function TradeModal({
     quote.status === "real" &&
     authenticated &&
     account.state !== "UNAVAILABLE" &&
+    !shortfall &&
     !isPending;
 
   const swapLabel = !hasAmount
@@ -367,6 +422,7 @@ export function TradeModal({
         {authenticated && account.state === "UNAVAILABLE" ? (
           <p className="text-sm text-ink-2">{account.reason}</p>
         ) : null}
+        {fundingMessage ? <p className="text-sm text-warning">{fundingMessage}</p> : null}
         {quote.status === "unavailable" ? (
           <p className="text-sm text-ink-2">{quote.reason}</p>
         ) : null}
@@ -497,6 +553,46 @@ export function TradeModal({
             {quote.status === "unavailable" ? (
               <UnavailableState reason={quote.reason} className="px-4 py-6" />
             ) : null}
+
+            {/* The account the swap comes from (D-029: one personal Safe per visitor) */}
+            <section className="flex flex-col gap-3 rounded-2xl border border-border p-4">
+              <h3 className="text-h3 font-semibold text-ink">You pay from</h3>
+              {account.state === "UNAVAILABLE" ? (
+                <UnavailableState reason={account.reason} />
+              ) : (
+                <>
+                  <AddressLine
+                    value={account.value}
+                    explorerHref={explorer.address(account.value)}
+                  />
+                  <p className="max-w-prose text-sm text-ink-3">
+                    Your own account — one per person, not tied to any rock. Gas is paid for you,
+                    but the tokens you swap have to be in it.
+                  </p>
+                  {balances.state === "UNAVAILABLE" ? (
+                    <UnavailableState reason={balances.reason} />
+                  ) : (
+                    <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+                      <Amount
+                        value={balances.value.usdc}
+                        decimals={tokens.USDC.decimals}
+                        symbol="USDC"
+                        size="sm"
+                      />
+                      <Amount
+                        value={balances.value.weth}
+                        decimals={tokens.WETH.decimals}
+                        symbol="WETH"
+                        size="sm"
+                      />
+                    </div>
+                  )}
+                  {fundingMessage ? (
+                    <p className="max-w-prose text-sm text-warning">{fundingMessage}</p>
+                  ) : null}
+                </>
+              )}
+            </section>
 
             {/* Fee card — a two-column definition list at text-sm (Part 5) */}
             <section className="rounded-2xl border border-border p-4">

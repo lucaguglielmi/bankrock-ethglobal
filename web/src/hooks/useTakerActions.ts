@@ -18,6 +18,11 @@
  * The account here is the visitor's *personal* Safe: salt `PERSONAL_ACCOUNT_SALT`, owner their
  * Privy wallet, not tied to any tag. A visitor who swaps against three rocks uses one account.
  *
+ * The hook also reports that account's **address and its token balances**, because they are what a
+ * visitor needs before a swap can work at all: the account is counterfactual, it starts empty, and
+ * a swap from an empty account fails during estimation with a bundler error nobody can act on. The
+ * balances are REAL reads of the same two ERC-20s the rock page reads, or UNAVAILABLE with a reason.
+ *
  * Everything degrades to UNAVAILABLE with a reason (D-013): signed out, no Pimlico key, no app or
  * periphery address, no live strategy. `amountOut` is read from the chain — the app's return value
  * in the receipt's `Pushed`/`Pulled` events — never from the preview the user was shown (D-014).
@@ -55,8 +60,10 @@ import {
   pimlicoApiKey,
   pimlicoRpcUrl,
   readAllowance,
+  readReserves,
   PERSONAL_ACCOUNT_SALT,
   type Call,
+  type RockReserves,
 } from "@/lib/rock-account";
 import { useAuth } from "@/context/auth-context";
 import { publicReasonWith } from "@/lib/errors";
@@ -76,6 +83,8 @@ export interface SwapParams {
 export interface UseTakerActions {
   /** The visitor's personal smart account. UNAVAILABLE when signed out or AA is unconfigured. */
   account: Capability<Address>;
+  /** That account's USDC and WETH balances — what it can actually pay a swap with. */
+  balances: Capability<RockReserves>;
   swap(params: SwapParams): Promise<Capability<{ txHash: Hex; amountOut: bigint }>>;
   isPending: boolean;
 }
@@ -175,6 +184,13 @@ export function takerAccountQueryKey(owner: string | undefined) {
   return ["taker-account", owner ?? "none"] as const;
 }
 
+export function takerBalancesQueryKey(account: string | undefined) {
+  return ["taker-balances", account ?? "none"] as const;
+}
+
+/** The cadence the rock page polls on, so tokens sent to the account appear without a reload. */
+const BALANCE_REFETCH_MS = 15_000;
+
 export function useTakerActions(): UseTakerActions {
   const { wallets } = useWallets();
   const { authenticated, address } = useAuth();
@@ -205,6 +221,24 @@ export function useTakerActions(): UseTakerActions {
   const account: Capability<Address> = !authenticated || !wallet
     ? unavailable(SIGNED_OUT_REASON)
     : (accountQuery.data ?? unavailable("Preparing your account…"));
+
+  const accountAddress = account.state === "REAL" ? account.value : undefined;
+
+  // What that account can pay with: the same `ERC20.balanceOf` pair the rock page reads for a
+  // Rock Account. A taker Safe is an ordinary holder of the two tokens.
+  const balancesQuery = useQuery({
+    queryKey: takerBalancesQueryKey(accountAddress),
+    enabled: Boolean(accountAddress),
+    refetchInterval: BALANCE_REFETCH_MS,
+    staleTime: BALANCE_REFETCH_MS,
+    retry: false,
+    queryFn: async (): Promise<Capability<RockReserves>> => readReserves(accountAddress),
+  });
+
+  const balances: Capability<RockReserves> =
+    account.state === "UNAVAILABLE"
+      ? unavailable(account.reason)
+      : (balancesQuery.data ?? unavailable("Reading this account's balances…"));
 
   const swap = useCallback(
     async (params: SwapParams): Promise<Capability<{ txHash: Hex; amountOut: bigint }>> => {
@@ -324,5 +358,5 @@ export function useTakerActions(): UseTakerActions {
     [authenticated, wallet],
   );
 
-  return { account, swap, isPending };
+  return { account, balances, swap, isPending };
 }

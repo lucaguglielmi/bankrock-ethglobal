@@ -27,7 +27,7 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 
 | # | What | Spec | Becomes real when |
 | --- | --- | --- | --- |
-| S-1 | Cross-chain deposit (the bridge modal) | 15 Part 6, 04 | A bridge is integrated. Cut from MVP scope; it stays a badged `DEMO` beat. |
+| S-1 | Cross-chain deposit (the bridge modal) | 15 Part 6, 04 | A bridge is integrated. Cut from MVP scope; it stays a badged `DEMO` beat. **Its button renders only under `NEXT_PUBLIC_DEMO_MODE=true`**: with the flag off the rock page offers "Fund this rock" instead — the Rock Account, its balances, the two token contracts and the Etherscan link, all REAL. |
 | S-3 | The judge scenario switcher's sample views | 15 D-013, 17 | Never. It exists only to pick which badged sample renders, only under the flag, and it can set neither the attestation nor a balance. |
 
 ## 2. Unavailable — no path at all, on purpose
