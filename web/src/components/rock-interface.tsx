@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { useRock } from "@/hooks/useRock";
+import { useAquaStrategy } from "@/hooks/useAquaStrategy";
 import { isDemoMode } from "@/lib/demo";
 import { tokens } from "@/lib/chain";
 import { toDisplayNumber } from "@/lib/ui/format";
@@ -62,6 +63,24 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
   const { rock, reserves, isLoading, refresh } = useRock(rockId);
 
   const record = rock.state === "UNAVAILABLE" ? null : rock.value;
+
+  // One strategy read for the whole page: the reserve caption, the trade button, the position
+  // card and the owner's Cash in all describe the same streams and must not disagree.
+  const {
+    strategy,
+    isLoading: isStrategyLoading,
+    refresh: refreshStrategy,
+  } = useAquaStrategy(rockId, record?.smartAccount);
+
+  const liveStreamIndex =
+    strategy.state === "UNAVAILABLE" || strategy.value.streams.length === 0
+      ? undefined
+      : Number(strategy.value.streams[0].streamIndex);
+
+  const refreshAll = useCallback(() => {
+    refresh();
+    refreshStrategy();
+  }, [refresh, refreshStrategy]);
 
   /*
    * Verifying a tap consumes its counter, so it happens once, at the moment its answer is worth
@@ -153,7 +172,7 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         authenticated={authenticated}
         address={address}
         onSignIn={() => requireSignIn(null)}
-        onAwakened={refresh}
+        onAwakened={refreshAll}
       />
     );
   } else if (record?.state === "handover_pending") {
@@ -166,7 +185,7 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         address={address}
         tap={tap}
         onSignIn={() => requireSignIn(null)}
-        onChanged={refresh}
+        onChanged={refreshAll}
       />
     );
   } else if (record?.state === "archived") {
@@ -177,11 +196,13 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         rockId={rockId}
         smartAccount={record.smartAccount}
         reserves={reserves}
+        strategy={strategy}
+        isStrategyLoading={isStrategyLoading}
         isOwner={isOwner}
         onTrade={handleTrade}
         onGive={handleGive}
         onCrossChain={() => setCrossChainOpen(true)}
-        onRefresh={refresh}
+        onRefresh={refreshAll}
         isRefreshing={isLoading}
       />
     );
@@ -209,7 +230,8 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
                 rockId={rockId}
                 handoverPending={record.state === "handover_pending"}
                 lost={record.lost}
-                onChanged={refresh}
+                streamIndex={liveStreamIndex}
+                onChanged={refreshAll}
               />
             ) : null}
           </span>
@@ -226,8 +248,11 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         isOpen={isTradeOpen}
         onClose={() => setTradeOpen(false)}
         rockId={rockId}
+        maker={record?.smartAccount}
+        streamIndex={liveStreamIndex ?? 0}
         currentReserve={usdcReserve}
-        onTradeSuccess={refresh}
+        onRequestSignIn={() => requireSignIn(null)}
+        onTradeSuccess={refreshAll}
       />
 
       <TransferModal
@@ -235,7 +260,7 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         onClose={() => setGiveOpen(false)}
         rockId={rockId}
         currentOwner={record?.owner ?? ""}
-        onTransferSuccess={refresh}
+        onTransferSuccess={refreshAll}
       />
 
       <CrossChainModal
@@ -243,7 +268,7 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         onClose={() => setCrossChainOpen(false)}
         rockId={rockId}
         smartAccountAddress={record?.smartAccount ?? ""}
-        onDepositSuccess={refresh}
+        onDepositSuccess={refreshAll}
       />
 
       <PrivyOnboardingModal

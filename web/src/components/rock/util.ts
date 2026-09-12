@@ -66,3 +66,14 @@ export function formatDateTime(value: string | number | null | undefined): strin
   if (Number.isNaN(date.getTime())) return null;
   return DATE_TIME_FORMAT.format(date);
 }
+
+/**
+ * The strategy's fee as a percentage of every trade, e.g. 30 bps -> "0.30%".
+ *
+ * The rate is the honest half of "earned fees": it is authenticated by the chain, because a
+ * strategy whose `feeBps` differs by one basis point hashes differently and has no balances
+ * (`contracts/aqua/NOTES.md` §6). It is never annualised (D-004).
+ */
+export function formatFeeRate(feeBps: number | bigint): string {
+  return `${(Number(feeBps) / 100).toFixed(2)}%`;
+}
