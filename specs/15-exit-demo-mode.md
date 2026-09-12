@@ -36,6 +36,7 @@ Per the spec rules in [`README.md`](./README.md), claims are tagged:
 | B-5 | `deploy.yml` runs `wrangler pages deploy .` from `web/`, publishing the entire source directory as static assets, with no `_worker.js`, targeting project `bankrock-web` while `package.json` targets `bankrock-ethglobal`. | `.github/workflows/deploy.yml` |
 | B-6 | Two lockfiles (`package-lock.json`, `pnpm-lock.yaml`) coexist; `packageManager` declares pnpm; CI uses npm. | `web/` |
 | B-7 | Contract tests exist but no workflow runs them. | `contracts/test/BankRockRegistry.t.sol`, `.github/workflows/ci.yml` |
+| B-9 | `mcp/node_modules` is tracked in git — 4,919 files, including the `@typescript/typescript-darwin-arm64` platform binary — despite `mcp/.gitignore` listing `node_modules`. Every `npm ci` on Linux shows hundreds of spurious deletions. | `git ls-files mcp/node_modules \| wc -l` → 4919 |
 | B-8 | ~~`mcp/package.json` pins versions that do not exist.~~ **Withdrawn.** `typescript@7.0.2` and `cors@2.8.6` exist; `mcp/` installs and builds cleanly. `contracts/` installs and its 6 tests pass. | `npm ci && npm run build` in `mcp/` exit 0; `npx hardhat test` → 6 passing |
 
 ## 1.2 Runtime — live site
