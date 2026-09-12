@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import { useState, useEffect } from "react";
 import {
@@ -137,7 +138,7 @@ export function RockAlerts({ rockId }: RockAlertsProps) {
 
       // Load saved preferences from API / localStorage
       fetch(`/api/alerts?rockId=${rockId}`)
-        .then((res) => res.json())
+        .then((res) => res.json() as Promise<any>)
         .then((data) => {
           if (data.preferences) {
             if (data.preferences.email) setEmail(data.preferences.email);
@@ -232,7 +233,7 @@ export function RockAlerts({ rockId }: RockAlertsProps) {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json() as any as any;
 
       if (res.ok && data.success) {
         playSuccess();
@@ -261,7 +262,7 @@ export function RockAlerts({ rockId }: RockAlertsProps) {
   const handleRequestPush = async () => {
     playTap();
     if (!pushSupported) {
-      alert("Web Push notifications are not supported in this browser.");
+      toast.error("Web Push notifications are not supported in this browser.");
       return;
     }
 
@@ -333,7 +334,7 @@ export function RockAlerts({ rockId }: RockAlertsProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="satoshi@bankrock.xyz"
-                className="w-full bg-white border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 text-sm font-medium rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                className="w-full bg-white border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 text-sm font-medium rounded-xl px-4 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all"
               />
             </div>
             <button
@@ -362,7 +363,7 @@ export function RockAlerts({ rockId }: RockAlertsProps) {
                 <select
                   value={selectedTestTopic}
                   onChange={(e) => setSelectedTestTopic(e.target.value)}
-                  className="appearance-none bg-white border border-neutral-200 rounded-lg px-3 py-1.5 pr-7 text-xs font-medium text-neutral-800 focus:outline-none focus:border-black cursor-pointer"
+                  className="appearance-none bg-white border border-neutral-200 rounded-lg px-3 py-1.5 pr-7 text-xs font-medium text-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent cursor-pointer"
                 >
                   <option value="profit_milestone">💰 Profit Milestone (+14.85 USDC)</option>
                   <option value="loss_warning">🚨 High Volatility Warning (16.4%)</option>

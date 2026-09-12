@@ -26,7 +26,7 @@ export function NewsletterSignup() {
         body: JSON.stringify({ email, source: "landing_page" }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as any;
 
       if (!res.ok) {
         throw new Error(data.error || "Failed to join newsletter.");
@@ -99,7 +99,7 @@ export function NewsletterSignup() {
                 placeholder="vitalik@ethereum.org"
                 aria-label="Email address"
                 required
-                className="w-full bg-neutral-50 border border-neutral-200 text-black placeholder:text-neutral-400 text-base font-medium rounded-full pl-11 pr-5 py-4 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all shadow-sm"
+                className="w-full bg-neutral-50 border border-neutral-200 text-black placeholder:text-neutral-400 text-base font-medium rounded-full pl-11 pr-5 py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all shadow-sm"
               />
             </div>
             <button

@@ -301,7 +301,14 @@ function CrossChainModalInner({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && modalStep !== "executing") {
+          onClose();
+        }
+      }}
+    >
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -318,6 +325,7 @@ function CrossChainModalInner({
         exit={{ opacity: 0, scale: 0.95, y: 12 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
         className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-black/10 z-10 text-black"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-5 border-b border-black/5 mb-6">
@@ -434,7 +442,16 @@ function CrossChainModalInner({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.0"
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-4 py-3.5 pr-20 text-lg font-mono font-bold text-black placeholder:text-neutral-400 focus:outline-none focus:border-black transition-colors"
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-4 py-3.5 pr-20 text-lg font-mono font-bold text-black placeholder:text-neutral-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && parsedAmount > 0) {
+                      if (!authenticated) {
+                        login();
+                      } else {
+                        handleExecuteDeposit();
+                      }
+                    }
+                  }}
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-sm text-neutral-500 font-mono">
                   {token}

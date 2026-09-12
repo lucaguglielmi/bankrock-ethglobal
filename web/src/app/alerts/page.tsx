@@ -120,7 +120,7 @@ export default function AlertsPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="w-full bg-white border border-neutral-200 rounded-2xl px-5 py-4 text-lg font-medium focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all"
+                    className="w-full bg-white border border-neutral-200 rounded-2xl px-5 py-4 text-lg font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all"
                   />
                   <p className="text-xs text-neutral-500 mt-2 flex items-start gap-1">
                     <Info className="w-4 h-4 shrink-0" />

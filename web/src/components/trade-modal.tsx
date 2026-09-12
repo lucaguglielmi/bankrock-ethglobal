@@ -120,7 +120,7 @@ function TradeModalInner({
 
         if (!response.ok) throw new Error("1inch proxy API failed");
         
-        const data = await response.json();
+        const data = await response.json() as any;
         const outDecimals = to === "USDC" ? 6 : 18;
         const rawOutput = Number(data.toAmount) / (10 ** outDecimals);
         
@@ -266,7 +266,14 @@ function TradeModalInner({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && (status === "idle" || status === "success")) {
+          onClose();
+        }
+      }}
+    >
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -283,6 +290,7 @@ function TradeModalInner({
         exit={{ opacity: 0, scale: 0.95, y: 12 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
         className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-black/10 z-10 text-black"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-5 border-b border-black/5 mb-6">
@@ -418,7 +426,7 @@ function TradeModalInner({
           /* Main Swap Form */
           <div>
             {/* Pay Token Section */}
-            <div className="bg-neutral-50 p-4 rounded-2xl border border-neutral-100 mb-2 focus-within:border-black/30 transition-colors">
+            <div className="bg-neutral-50 p-4 rounded-2xl border border-neutral-100 mb-2 focus-within:ring-2 focus-within:ring-black focus-within:ring-offset-2 focus-within:border-transparent transition-all">
               <div className="flex items-center justify-between text-xs font-semibold text-neutral-400 mb-1.5">
                 <span>You Pay</span>
                 <span>

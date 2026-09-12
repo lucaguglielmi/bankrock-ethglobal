@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -94,9 +95,9 @@ function TransferModalInner({
     } catch (err: any) {
       console.error("Transfer execution failed:", err);
       if (err.message === "Paymaster sponsorship failed") {
-        alert("Gas sponsorship temporarily unavailable from Pimlico. Please try again later.");
+        toast.error("Gas sponsorship temporarily unavailable from Pimlico. Please try again later.");
       } else {
-        alert("Transfer execution failed. Please try again.");
+        toast.error("Transfer execution failed. Please try again.");
       }
       setStep("confirm");
       playError();
@@ -119,7 +120,14 @@ function TransferModalInner({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && step !== "submitting") {
+          onClose();
+        }
+      }}
+    >
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -136,6 +144,7 @@ function TransferModalInner({
         exit={{ opacity: 0, scale: 0.95, y: 12 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
         className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-black/10 z-10 text-black"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-5 border-b border-black/5 mb-6">
@@ -177,8 +186,13 @@ function TransferModalInner({
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
                   placeholder="0x... or name.eth"
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-4 py-3.5 pr-20 text-sm font-mono text-black placeholder:text-neutral-400 focus:outline-none focus:border-black transition-colors"
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-4 py-3.5 pr-20 text-sm font-mono text-black placeholder:text-neutral-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-colors"
                   autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && isValidRecipient) {
+                      setStep("confirm");
+                    }
+                  }}
                 />
                 <button
                   type="button"

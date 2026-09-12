@@ -51,7 +51,7 @@ export default function AdminLoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Passphrase"
-            className="w-full bg-neutral-900 border border-neutral-800 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-neutral-500 transition-colors font-mono text-sm"
+            className="w-full bg-neutral-900 border border-neutral-800 text-white rounded-xl px-4 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900 focus-visible:border-transparent transition-colors font-mono text-sm"
           />
           
           {error && <div className="text-red-400 text-sm font-medium text-center">{error}</div>}

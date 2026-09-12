@@ -17,6 +17,17 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (isOpen) setIsOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
+
+  useEffect(() => {
     setMounted(true);
   }, []);
 
@@ -87,7 +98,7 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
                 required 
                 type="text" 
                 id="name"
-                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus:border-black transition-all placeholder-transparent" 
+                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all placeholder-transparent" 
                 placeholder="Your name" 
               />
               <label 
@@ -102,7 +113,7 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
                 required 
                 type="text" 
                 id="contact"
-                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus:border-black transition-all placeholder-transparent" 
+                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all placeholder-transparent" 
                 placeholder="Email or Telegram/Twitter handle" 
               />
               <label 
@@ -117,7 +128,7 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
                 required 
                 type="text" 
                 id="skill"
-                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus:border-black transition-all placeholder-transparent" 
+                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all placeholder-transparent" 
                 placeholder="What's something you can do very well?" 
               />
               <label 
@@ -132,7 +143,7 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
                 required 
                 id="message"
                 rows={4} 
-                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus:border-black transition-all resize-none placeholder-transparent" 
+                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all resize-none placeholder-transparent" 
                 placeholder={messageLabel}
               ></textarea>
               <label 

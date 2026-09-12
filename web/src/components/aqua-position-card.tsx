@@ -86,10 +86,7 @@ export function AquaPositionCard({
             </h3>
           </div>
           <h2 className="text-xl sm:text-2xl font-black tracking-tight text-black flex items-center gap-2">
-            USDC / WETH Maker Reserve
-            <span className="bg-black text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
-              Fee {selectedSpread}
-            </span>
+            Shared Multi-Strategy Reserve
           </h2>
         </div>
 
@@ -102,32 +99,52 @@ export function AquaPositionCard({
         </button>
       </div>
 
-      {/* Grid of details */}
+      {/* Strategies Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6 border-b border-neutral-200/60">
+        {/* Strategy 1 */}
+        <div className="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+          <h4 className="text-sm font-bold text-black flex items-center gap-2 mb-3">
+            Strategy A: Constant Product
+            <span className="bg-black text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
+              Fee {selectedSpread}
+            </span>
+          </h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">USDC</div>
+              <div className="text-base font-bold font-mono text-black">{displayUSDC.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">WETH</div>
+              <div className="text-base font-bold font-mono text-black">{displayWETH.toFixed(4)}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Strategy 2 */}
+        <div className="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+          <h4 className="text-sm font-bold text-black flex items-center gap-2 mb-3">
+            Strategy B: Fixed Price Limit
+            <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
+              Zero Fee
+            </span>
+          </h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Status</div>
+              <div className="text-sm font-medium text-black">Active</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Target</div>
+              <div className="text-base font-bold font-mono text-black">2750 USDC/ETH</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-6 border-b border-neutral-200/60">
         <div>
-          <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
-            USDC Liquidity
-          </div>
-          <div className="text-lg sm:text-xl font-bold font-mono text-black">
-            {displayUSDC.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-          <span className="text-[10px] text-neutral-400">Base Sepolia</span>
-        </div>
-
-        <div>
-          <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
-            WETH Liquidity
-          </div>
-          <div className="text-lg sm:text-xl font-bold font-mono text-black">
-            {displayWETH.toFixed(4)} <span className="text-xs text-neutral-500 font-sans">ETH</span>
-          </div>
-          <span className="text-[10px] text-neutral-400">Base Sepolia</span>
-        </div>
-
-        <div>
-          <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
-            Fee Yield Earned
-          </div>
+          <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Total Fee Yield</div>
           <div className="text-lg sm:text-xl font-bold font-mono text-green-700 flex items-center gap-1">
             <Sparkles className="w-3.5 h-3.5 text-green-600" />
             +${earnedFeesUSDC.toFixed(2)}
@@ -136,9 +153,7 @@ export function AquaPositionCard({
         </div>
 
         <div>
-          <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
-            Safe Custody
-          </div>
+          <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Shared Safe Custody</div>
           <a
             href={`https://sepolia.basescan.org/address/${smartAccountAddress}`}
             target="_blank"
@@ -247,7 +262,7 @@ export function AquaPositionCard({
                   placeholder="0.00"
                   value={depositAmount}
                   onChange={(e) => setDepositAmount(e.target.value)}
-                  className="w-full bg-white border border-neutral-200 rounded-2xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-black transition-colors"
+                  className="w-full bg-white border border-neutral-200 rounded-2xl px-4 py-3 text-sm font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-colors"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-400">
                   USDC

@@ -91,7 +91,7 @@ export function SocialBridge({ rockId }: { rockId: string }) {
                 placeholder="your-name"
                 value={vanityName}
                 onChange={(e) => setVanityName(e.target.value)}
-                className="bg-transparent border-b border-dashed border-neutral-300 focus:border-black outline-none text-black px-1 pb-0.5 w-32 ml-1"
+                className="bg-transparent border-b border-dashed border-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent text-black px-1 pb-0.5 w-32 ml-1"
                 disabled={saved}
               />
             </div>

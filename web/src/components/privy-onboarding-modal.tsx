@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/context/auth-context";
+import { useEffect } from "react";
 import { X, KeyRound, Shield, Coins, ArrowRight, CheckCircle2 } from "lucide-react";
 
 interface PrivyOnboardingModalProps {
@@ -27,9 +28,25 @@ export function PrivyOnboardingModal({ isOpen, onClose, rockId, onAuthenticated 
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white text-black w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-2xl border border-neutral-100 relative max-h-[90vh] overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white text-black w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-2xl border border-neutral-100 relative max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close Button */}
         <button
           onClick={onClose}

@@ -109,6 +109,17 @@ export function AquaInfoModal({ triggerText }: AquaInfoModalProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (isOpen) setIsOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
+
+  useEffect(() => {
     setMounted(true);
   }, []);
 
