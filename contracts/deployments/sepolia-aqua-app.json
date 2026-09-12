@@ -1,0 +1,20 @@
+{
+  "chainId": 11155111,
+  "aqua": "0x1111113CCf1426A8E30e2bfF5E005d929bF6a90a",
+  "app": {
+    "contractName": "XYCSwap",
+    "upstream": "github.com/1inch/aqua examples/apps/XYCSwap.sol @ 9c5c42e5840e8741fba3597c48456c9510212b66",
+    "address": "0x8a293F43Eb0DBaA834b40b2eC4E0751e3ce6316B",
+    "deployBlock": 11689724,
+    "txHash": "0x002b17d0ca186293739eef9916a3b4d69b5a0a78fb374cc83dc3c69f434b8717",
+    "gasUsed": "865726"
+  },
+  "taker": {
+    "contractName": "XYCSwapTaker",
+    "address": "0xCd7899E37D50B226E882e79572AB189080fD0016",
+    "deployBlock": 11689726,
+    "txHash": "0x5af1f6acc3ddee6ed00d302dee3b4b9c6d788f5f510422d6a41bb7f9c1ee783d",
+    "gasUsed": "781123"
+  },
+  "deployer": "0x66D1bCE0C9Ea1aDDa7B6a8b8Fa52bDbDA52e3d0F"
+}
