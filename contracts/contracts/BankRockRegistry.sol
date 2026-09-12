@@ -93,7 +93,13 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
         Archived
     }
 
-    /// @notice An outstanding gift: the standing offer to hand a rock to its next owner.
+    /**
+     * @notice An outstanding gift: the standing offer to hand a rock to its next owner.
+     * @dev `Handover` is part of this contract's ABI — `getRock` returns it by value — so it will
+     *      not gain fields. Adding one would change that return type and silently break every
+     *      existing decoder at once: the web chain library, the MCP server's copy, and any
+     *      Etherscan bookmark. A future field goes in a new view, not in this struct.
+     */
     struct Handover {
         /// @notice The named recipient, or the zero address for "whoever taps the rock next".
         address recipient;
@@ -153,10 +159,12 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
         ///         Named in the signed payload rather than taken from `msg.sender`, so the call
         ///         can be relayed. Must not be the zero address.
         address subject;
-        /// @notice The Rock Account `awakenRock` may bind. Covering it in the signature is what
-        ///         stops a front-runner re-submitting a captured attestation with an account of
-        ///         their own. `claimHandover` ignores this field — it binds no account — and the
-        ///         signer sets it to the zero address for claim attestations.
+        /// @notice The Rock Account this attestation binds to the rock — on both attested paths.
+        ///         Covering it in the signature is what stops a front-runner re-submitting a
+        ///         captured attestation with an account of their own. Must not be the zero
+        ///         address. On a claim it *replaces* the rock's existing account, so the attester
+        ///         chooses: the rock's current account when the claimant is about to become a
+        ///         signing owner of it, otherwise the claimant's own account.
         address smartAccount;
     }
 
@@ -254,10 +262,16 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
      * @param rockId The rock that changed hands.
      * @param previousOwner Who owned it until this call.
      * @param newOwner Who owns it now — the attestation's subject, not the sender.
+     * @param smartAccount The Rock Account bound by this claim. It replaces the one the rock
+     *        carried before, so authority over a rock never outlives ownership of it.
      * @param counter The tag read counter consumed by this claim.
      */
     event HandoverClaimed(
-        uint256 indexed rockId, address indexed previousOwner, address indexed newOwner, uint32 counter
+        uint256 indexed rockId,
+        address indexed previousOwner,
+        address indexed newOwner,
+        address smartAccount,
+        uint32 counter
     );
 
     /**
@@ -472,13 +486,33 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
 
     /**
      * @notice Collect a rock that was given to you: the wallet the attestation names becomes the
-     *         new owner. Anyone may send this transaction, so a recipient with no ETH can still
-     *         receive a rock. Requires a fresh tap of that rock's own tag, before the gift's
-     *         expiry, and — if the gift named a recipient — an attestation for that recipient.
-     *         The Rock Account is deliberately left unchanged. Emits `HandoverClaimed`.
+     *         new owner, and the account the attestation names becomes the rock's Rock Account.
+     *         Anyone may send this transaction, so a recipient with no ETH can still receive a
+     *         rock. Requires a fresh tap of that rock's own tag, before the gift's expiry, and —
+     *         if the gift named a recipient — an attestation for that recipient. Emits
+     *         `HandoverClaimed`.
+     * @dev The Rock Account is rebound here, and that is the whole point.
+     *
+     *      Leaving it alone was the original design, on the reasoning that the account address and
+     *      its assets should be stable across a change of owner. The re-review of 2026-09-12
+     *      showed what that costs: the account recorded at awakening stayed a *controller* of the
+     *      rock, and it belonged to the giver. Asking it `isOwner(currentOwner)` is not enough,
+     *      because a Safe's owner set is writable by the Safe — the giver can make the answer
+     *      `true` for one transaction, retire the recipient's rock, and put it back.
+     *
+     *      So the authority follows the object. Whichever account the attester names becomes the
+     *      rock's account, and the giver's Safe is no longer connected to the rock at all.
+     *
+     *      That places a real decision with the attester, the verifier that signs after a tap. It
+     *      names the rock's *existing* account when the claimant is about to become a signing
+     *      owner of it — the named-gift path, where the owner swap is pre-signed and does land, so
+     *      the rock's money stays where it is — and the claimant's *own* account otherwise, which
+     *      is the open-gift path, where no swap can be pre-signed. The registry does not and
+     *      cannot make that choice; it records what it is told and refuses the zero address, so a
+     *      rock is never left with no account at all.
      * @param rockId The rock being claimed.
-     * @param att The attestation from the Bank Rock verifier. Its `smartAccount` field is ignored
-     *        here, because claiming binds no account; the signer sets it to zero.
+     * @param att The attestation from the Bank Rock verifier. `att.subject` becomes the owner and
+     *        `att.smartAccount` becomes the Rock Account; neither may be the zero address.
      * @param sig The attester's EIP-712 signature over `att`, 65 bytes.
      */
     function claimHandover(uint256 rockId, Attestation calldata att, bytes calldata sig) external whenNotPaused {
@@ -493,14 +527,17 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
             revert NotHandoverRecipient(att.subject, gift.recipient);
         }
 
+        if (att.smartAccount == address(0)) revert InvalidSmartAccount(att.smartAccount);
+
         _consumeAttestation(rockId, rock.uidHash, att, sig);
 
         address previousOwner = rock.currentOwner;
         rock.currentOwner = att.subject;
+        rock.smartAccount = att.smartAccount;
         rock.state = RockState.Awake;
         delete rock.handover;
 
-        emit HandoverClaimed(rockId, previousOwner, att.subject, att.counter);
+        emit HandoverClaimed(rockId, previousOwner, att.subject, att.smartAccount, att.counter);
     }
 
     /* --------------------------------------------------------------------- */
@@ -681,7 +718,8 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
      *      a tag backs *now*.
      * @param rockId The rock to read.
      * @return rockOwner The wallet that owns the object; for a retired rock, who retired it.
-     * @return smartAccount The Rock Account that holds this rock's tokens.
+     * @return smartAccount The Rock Account that holds this rock's tokens. Rebound on every
+     *         claim, so it always belongs to the current owner and never to a previous one.
      * @return uidHash `keccak256(rawUid7Bytes)` of the bound tag, or zero if never awakened.
      * @return state Effective lifecycle state: 0 Dormant, 1 Awake, 2 HandoverPending, 3 Archived.
      * @return lost The owner's informational lost flag.
@@ -712,7 +750,9 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
      * @param rockId The rock to read.
      * @return state One of `"Dormant"`, `"Awake"`, `"HandoverPending"`, `"Archived"`.
      * @return owner The wallet that owns the object, or the zero address if it was never awakened.
-     * @return rockAccount The smart account that holds this rock's tokens.
+     * @return rockAccount The smart account that holds this rock's tokens and may act for the
+     *         owner. Always the account the current owner was given the rock with: awakening sets
+     *         it and every claim rebinds it.
      * @return lost Whether the owner has flagged the tag as lost.
      * @return handoverExpiresAt Unix seconds at which the outstanding gift stops being claimable,
      *         or 0 when no gift is outstanding.
@@ -820,13 +860,16 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
      *      as a UserOp executed *by* the Safe, so `msg.sender` is the account rather than the
      *      person.
      *
-     *      The `isOwner` check is the part that must not be dropped. `claimHandover` changes the
-     *      owner and deliberately leaves `smartAccount` alone, and for an *open* gift the
-     *      off-chain swap of the Safe's signing owner cannot be pre-signed and does not happen at
-     *      all. Without this check the giver's Safe would keep passing the gate for a rock it no
-     *      longer owns, and one call to `archiveRock` would destroy the recipient's rock
-     *      permanently. Asking the account who its owners are converts a sentence of prose into
-     *      the invariant it always claimed to be.
+     *      The `isOwner` check is the second line, not the first. The first is that
+     *      `claimHandover` rebinds `smartAccount`, so the account a rock carries always belongs to
+     *      its *current* owner and the giver's Safe is out of the picture the moment the rock
+     *      changes hands.
+     *
+     *      `isOwner` still earns its place for the case rebinding cannot reach: an owner who keeps
+     *      the rock and changes the signers of their own account. What it must not be asked to do
+     *      alone is arbitrate between two parties, because the contract it questions belongs to
+     *      one of them and a Safe's owner set is writable by that Safe. That was the defect the
+     *      2026-09-12 re-review found (N-1); rebinding is what closes it.
      *
      *      `isOwner` is called inside a try/catch and anything other than a clean `true` — a
      *      revert, a missing function, an address with no code — counts as false. That fails

@@ -62,6 +62,11 @@ contract BankRockRegistryTest {
     ///      current owner as one of its signing owners.
     address SAFE;
     MockSafe safeAccount;
+    /// @dev The claimant's own Rock Account. Since the N-1 fix a claim rebinds the rock's account
+    ///      to the one the attestation names, which is what keeps a giver's Safe from retaining
+    ///      any authority over a rock it has given away.
+    address CLAIM_SAFE;
+    MockSafe claimantAccount;
     /// @dev An unrelated address that pays the gas. It is never authorised by anything.
     address constant RELAYER = address(0x5555555555555555555555555555555555555555);
     address constant MALLORY = address(0x6666666666666666666666666666666666666666);
@@ -81,6 +86,12 @@ contract BankRockRegistryTest {
         safeAccount = new MockSafe();
         safeAccount.setOwner(address(this), true);
         SAFE = address(safeAccount);
+
+        claimantAccount = new MockSafe();
+        claimantAccount.setOwner(BOB, true);
+        claimantAccount.setOwner(CAROL, true);
+        claimantAccount.setOwner(MALLORY, true);
+        CLAIM_SAFE = address(claimantAccount);
     }
 
     // -----------------------------------------------------------------
@@ -114,14 +125,14 @@ contract BankRockRegistryTest {
         return _att(rockId, uidHash, counter, deadline, subject, SAFE);
     }
 
-    /// @dev A claim attestation. The signer sets `smartAccount` to zero for claims, and
-    ///      `claimHandover` ignores the field; these tests mirror that.
+    /// @dev A claim attestation. Since the N-1 fix it carries the Rock Account the claim binds —
+    ///      here the claimant's own — and the registry refuses a zero one.
     function _claimAtt(uint256 rockId, bytes32 uidHash, uint32 counter, uint256 deadline, address subject)
         internal
-        pure
+        view
         returns (BankRockRegistry.Attestation memory)
     {
-        return _att(rockId, uidHash, counter, deadline, subject, address(0));
+        return _att(rockId, uidHash, counter, deadline, subject, CLAIM_SAFE);
     }
 
     function _sign(uint256 pk, BankRockRegistry.Attestation memory att) internal view returns (bytes memory) {
@@ -505,7 +516,10 @@ contract BankRockRegistryTest {
             BankRockRegistry.Handover memory cleared
         ) = registry.getRock(ROCK);
         require(rockOwner == BOB, "ownership should move to Bob");
-        require(smartAccount == SAFE, "smart account must be unchanged");
+        // Since the N-1 fix the claim rebinds the account to the one the attestation names, so
+        // authority over the rock never outlives ownership of it.
+        require(smartAccount == CLAIM_SAFE, "the claim binds the attested account");
+        require(smartAccount != SAFE, "and the giver's account is released");
         require(state == BankRockRegistry.RockState.Awake, "state should return to Awake");
         require(cleared.expiresAt == 0 && cleared.recipient == address(0), "handover should be cleared");
         require(registry.lastCounter(UID) == 2, "counter should advance");
@@ -907,11 +921,15 @@ contract BankRockRegistryTest {
     }
 
     // -----------------------------------------------------------------
-    // The Rock Account is a controller only while it answers to the owner
-    // (audit F-1)
+    // Authority follows the object (audit F-1, re-review N-1)
     // -----------------------------------------------------------------
 
-    function testSmartAccountStopsBeingAControllerWhenItNoLongerAnswersToTheOwner() public {
+    /**
+     * @dev The claim rebinds the Rock Account, so the giver's Safe is not merely refused — it is
+     *      not the rock's account at all any more. This is the property that makes the answer to
+     *      `isOwner` irrelevant on this path: there is nothing left for the giver to answer *for*.
+     */
+    function testAClaimRebindsTheRockAccountToTheOneTheAttestationNames() public {
         _awaken();
         registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
 
@@ -920,41 +938,111 @@ contract BankRockRegistryTest {
         vm.prank(RELAYER);
         registry.claimHandover(ROCK, att, sig);
 
-        // Bob owns the rock. The Rock Account is unchanged and still belongs to the giver, which
-        // is exactly what happens after an open gift: the off-chain owner swap cannot be
-        // pre-signed, so it never lands.
         (address rockOwner, address smartAccount,,,,) = registry.getRock(ROCK);
         require(rockOwner == BOB, "Bob owns the rock");
-        require(smartAccount == SAFE, "the Rock Account is unchanged by a claim");
-        require(!safeAccount.isOwner(BOB), "the giver's Safe does not answer to Bob");
+        require(smartAccount == CLAIM_SAFE, "the claim bound the account the attestation named");
+        require(smartAccount != SAFE, "the giver's Safe is no longer this rock's account");
+
+        (, , address described,,) = registry.describeRock(ROCK);
+        require(described == CLAIM_SAFE, "describeRock reports the rebound account");
+    }
+
+    /**
+     * @dev N-1, the re-review's finding, as a regression test in the main suite.
+     *
+     *      Before the rebinding fix the giver's Safe stayed the rock's recorded account, and the
+     *      controller gate asked that Safe whether the new owner was one of its signers — a
+     *      question the giver could answer however she liked, because a Safe's owner set is
+     *      writable by the Safe. Adding Bob as a signer for one transaction was enough to retire
+     *      his rock permanently.
+     *
+     *      Now the account is rebound on claim, so adding the new owner as a signer buys nothing:
+     *      the giver's Safe is not the rock's account, and every owner action refuses it.
+     */
+    function testThePreviousAccountCannotActEvenAfterAddingTheNewOwnerAsASigner() public {
+        _awaken();
+        registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
+
+        BankRockRegistry.Attestation memory att = _claimAtt(ROCK, UID, 2, block.timestamp + 300, BOB);
+        bytes memory sig = _sign(ATTESTER_PK, att);
+        vm.prank(RELAYER);
+        registry.claimHandover(ROCK, att, sig);
+
+        // The giver does exactly what N-1 describes: makes her own Safe answer `isOwner(BOB)`.
+        safeAccount.setOwner(BOB, true);
+        require(safeAccount.isOwner(BOB), "the giver's Safe now answers to Bob");
 
         bytes4 sel;
+
         vm.prank(SAFE);
         try registry.archiveRock(ROCK) {
-            require(false, "the giver's Rock Account must not retire the recipient's rock");
+            require(false, "the giver's old account must not retire the recipient's rock");
         } catch (bytes memory reason) {
             sel = _selector(reason);
         }
-        require(sel == BankRockRegistry.NotRockOwner.selector, "wrong error");
+        require(sel == BankRockRegistry.NotRockOwner.selector, "wrong error for archiveRock");
 
         vm.prank(SAFE);
         try registry.initiateHandover(ROCK, CAROL, uint64(block.timestamp + 1 days), bytes32(0)) {
-            require(false, "the giver's Rock Account must not give the recipient's rock away");
+            require(false, "the giver's old account must not give the recipient's rock away");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.NotRockOwner.selector, "wrong error for initiateHandover");
+
+        vm.prank(SAFE);
+        try registry.markLost(ROCK) {
+            require(false, "the giver's old account must not flag the recipient's rock");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.NotRockOwner.selector, "wrong error for markLost");
+
+        vm.prank(SAFE);
+        try registry.clearLost(ROCK) {
+            require(false, "the giver's old account must not unflag the recipient's rock");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.NotRockOwner.selector, "wrong error for clearLost");
+
+        (address rockOwner,,, BankRockRegistry.RockState state,,) = registry.getRock(ROCK);
+        require(rockOwner == BOB, "Bob still owns his rock");
+        require(state == BankRockRegistry.RockState.Awake, "and it is untouched");
+
+        // Meanwhile the account the claim did bind is a controller, because it answers to Bob.
+        vm.prank(CLAIM_SAFE);
+        registry.markLost(ROCK);
+        (,,,, bool lost,) = registry.getRock(ROCK);
+        require(lost, "the rebound account may act for its owner");
+    }
+
+    function testSmartAccountStopsBeingAControllerWhenItNoLongerAnswersToTheOwner() public {
+        _awaken();
+
+        // No claim here: the owner keeps the rock and simply changes the signers of their own
+        // account. Rebinding cannot reach this case, which is why the `isOwner` gate still earns
+        // its place.
+        vm.prank(SAFE);
+        registry.markLost(ROCK);
+        (,,,, bool lost,) = registry.getRock(ROCK);
+        require(lost, "the account answers to the owner, so it may act");
+
+        safeAccount.setOwner(address(this), false);
+
+        bytes4 sel;
+        vm.prank(SAFE);
+        try registry.clearLost(ROCK) {
+            require(false, "an account that no longer answers to the owner must not act");
         } catch (bytes memory reason) {
             sel = _selector(reason);
         }
         require(sel == BankRockRegistry.NotRockOwner.selector, "wrong error");
 
-        (,,, BankRockRegistry.RockState state,,) = registry.getRock(ROCK);
-        require(state == BankRockRegistry.RockState.Awake, "the rock is untouched");
-
-        // And the moment the account does answer to Bob — the named-gift path, where the owner
-        // swap does land — it is a controller again.
-        safeAccount.setOwner(BOB, true);
-        vm.prank(SAFE);
-        registry.markLost(ROCK);
-        (,,,, bool lost,) = registry.getRock(ROCK);
-        require(lost, "an account that answers to the owner may act for the rock");
+        // The owner's own wallet always works, so the rock is never stranded.
+        registry.clearLost(ROCK);
+        (,,,, lost,) = registry.getRock(ROCK);
+        require(!lost, "the owner can always act directly");
     }
 
     function testAnAccountThatRevertsOnIsOwnerIsNotAController() public {
@@ -1253,6 +1341,83 @@ contract BankRockRegistryTest {
                 ),
             "EIP-712 type string changed"
         );
+    }
+
+    /**
+     * @dev N-4 (re-review). `testDomainSeparatorMatchesSpecifiedDomain` proves the separator is
+     *      built from *this* chain id and *this* address, which is strong but positive. Part 1.2
+     *      asks for the negative: a signature made under a foreign domain must be rejected. Both
+     *      halves of the domain are varied here — another chain, and another deployment on this
+     *      chain — because they are the two ways a signature travels somewhere it should not.
+     */
+    function testAnAttestationSignedUnderAForeignDomainIsRejected() public {
+        BankRockRegistry.Attestation memory att = _awakenAtt(ROCK, UID, 1, block.timestamp + 300, address(this));
+        bytes32 structHash = keccak256(
+            abi.encode(
+                registry.ATTESTATION_TYPEHASH(),
+                att.rockId,
+                att.uidHash,
+                att.counter,
+                att.deadline,
+                att.subject,
+                att.smartAccount
+            )
+        );
+
+        // Same struct, same signer, same contract address — but another chain id.
+        bytes memory foreignChainSig = _signDigest(ATTESTER_PK, _digest(structHash, block.chainid + 1, address(registry)));
+        _expectRejectedAwaken(att, foreignChainSig, "a signature for another chain must not work here");
+
+        // Same struct, same signer, this chain — but another deployment of this contract.
+        BankRockRegistry other = new BankRockRegistry(address(this), attester);
+        bytes memory foreignContractSig = _signDigest(ATTESTER_PK, _digest(structHash, block.chainid, address(other)));
+        _expectRejectedAwaken(att, foreignContractSig, "a signature for another deployment must not work here");
+
+        // The control: the same struct under this deployment's own domain is accepted, so the
+        // rejections above are about the domain and nothing else.
+        registry.awakenRock(ROCK, SAFE, att, _sign(ATTESTER_PK, att));
+        (address rockOwner,,,,,) = registry.getRock(ROCK);
+        require(rockOwner == address(this), "the control awakening must succeed");
+    }
+
+    /// @dev The EIP-712 digest for an arbitrary domain, so a test can forge one this registry
+    ///      must refuse. Mirrors OpenZeppelin's `_hashTypedDataV4`.
+    function _digest(bytes32 structHash, uint256 chainId, address verifyingContract)
+        internal
+        pure
+        returns (bytes32)
+    {
+        bytes32 domain = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("BankRockRegistry")),
+                keccak256(bytes("1")),
+                chainId,
+                verifyingContract
+            )
+        );
+        return keccak256(abi.encodePacked("\x19\x01", domain, structHash));
+    }
+
+    function _signDigest(uint256 pk, bytes32 digest) internal pure returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _expectRejectedAwaken(
+        BankRockRegistry.Attestation memory att,
+        bytes memory sig,
+        string memory message
+    ) internal {
+        bytes4 sel;
+        vm.prank(RELAYER);
+        try registry.awakenRock(ROCK, SAFE, att, sig) {
+            require(false, message);
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.InvalidAttestationSignature.selector, "wrong error");
+        require(registry.lastCounter(UID) == 0, "counter must not advance on failure");
     }
 
     function testDomainSeparatorMatchesSpecifiedDomain() public view {

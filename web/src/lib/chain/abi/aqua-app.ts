@@ -416,6 +416,17 @@ export const XYC_SWAP_TAKER_ABI = [
     "inputs": [
       {
         "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      }
+    ],
+    "name": "InvalidRecipient",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "token",
         "type": "address"
       }

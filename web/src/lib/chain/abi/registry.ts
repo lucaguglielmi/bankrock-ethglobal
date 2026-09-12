@@ -456,6 +456,12 @@ export const BANK_ROCK_REGISTRY_ABI = [
       },
       {
         "indexed": false,
+        "internalType": "address",
+        "name": "smartAccount",
+        "type": "address"
+      },
+      {
+        "indexed": false,
         "internalType": "uint32",
         "name": "counter",
         "type": "uint32"

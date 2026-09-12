@@ -21,8 +21,9 @@ import { IXYCSwapCallback } from "./examples/apps/interfaces/IXYCSwapCallback.so
  * @notice It is the taker equivalent of a swap router, and nothing more. Pricing, fees and
  *         balances are entirely XYCSwap's and Aqua's; this contract has no pricing logic, no
  *         owner, no administrator, no upgrade path and no privileged address of any kind.
- * @notice To use it: approve this contract for the token you are selling, then call `swapExactIn`.
- *         The output goes straight from the maker's wallet to the recipient you name.
+ * @notice To use it: approve this contract for the token you are selling, then call
+ *         `swapExactIn`. The output goes straight from the maker's wallet to the recipient you
+ *         name — and you must name one, because sending it here would destroy it.
  *
  * @dev **Tokens sent to this contract are lost.** It holds nothing between transactions by
  *      construction: a swap pulls exactly `amountIn` from the caller and the app consumes exactly
@@ -142,6 +143,11 @@ contract XYCSwapTaker is IXYCSwapCallback {
     /// @notice A swap cannot be started while one is already in progress.
     error SwapAlreadyInProgress();
 
+    /// @notice The output would go nowhere useful: the recipient is the zero address, or this
+    ///         contract itself — whose documented policy is that tokens sent to it are lost.
+    /// @param recipient The address that was supplied.
+    error InvalidRecipient(address recipient);
+
     /// @notice This transaction was mined after the deadline the caller set.
     /// @param deadline The deadline the caller set, in unix seconds.
     /// @param nowTimestamp The timestamp of the block it was mined in.
@@ -177,7 +183,10 @@ contract XYCSwapTaker is IXYCSwapCallback {
      * @param amountIn The exact amount of the input token to sell, in its own base units.
      * @param amountOutMin The least output you will accept, in the other token's base units. The
      *        swap reverts below it. Never pass 0 from a user interface.
-     * @param to Who receives the output token. Pass the zero address to mean "me".
+     * @param to Who receives the output token. Must be a real address: the zero address and this
+     *        contract's own address are both rejected. There is no "pay the caller" sentinel —
+     *        name yourself explicitly, so that what a reader of the transaction sees is what
+     *        happens.
      * @param deadline Unix seconds. The swap reverts if it is mined after this. Use roughly five
      *        minutes from now; a transaction that sits unmined executes against moved prices.
      * @return amountOut The output amount, as computed and executed by the app.
@@ -193,8 +202,15 @@ contract XYCSwapTaker is IXYCSwapCallback {
         if (block.timestamp > deadline) revert SwapExpired(deadline, block.timestamp);
         if (_swapInProgress) revert SwapAlreadyInProgress();
 
+        // The periphery's own address is the one value that silently destroys the output: it is
+        // what every visitor has just had in their clipboard, because step one of a swap is
+        // approving it, and tokens sent here are unrecoverable by design. The zero address goes
+        // with it — it used to mean "pay the caller", and a sentinel that turns what every reader
+        // takes for a burn address into a payout is exactly the ambiguity Etherscan cannot afford.
+        if (to == address(0) || to == address(this)) revert InvalidRecipient(to);
+
         IERC20 tokenIn = IERC20(zeroForOne ? strategy.token0 : strategy.token1);
-        address recipient = to == address(0) ? msg.sender : to;
+        address recipient = to;
 
         // Pull first, then write the ticket: a token with a transfer hook cannot observe a ticket
         // that does not exist yet.

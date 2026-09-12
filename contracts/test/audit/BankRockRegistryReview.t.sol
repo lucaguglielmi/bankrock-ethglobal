@@ -84,12 +84,18 @@ contract BankRockRegistryReviewTest {
 
     BankRockRegistry registry;
     GiverSafe safe;
+    /// @dev Bob's own Rock Account. Since the N-1 fix a claim rebinds the rock's account to the
+    ///      one the attestation names — on the open-gift path, the claimant's own — so a claim
+    ///      attestation has to carry a real address and the giver's Safe stops being the rock's
+    ///      account at the moment of the claim.
+    GiverSafe bobSafe;
     address attester;
 
     function setUp() public {
         attester = vm.addr(ATTESTER_PK);
         registry = new BankRockRegistry(address(this), attester);
         safe = new GiverSafe(ALICE);
+        bobSafe = new GiverSafe(BOB);
     }
 
     function _att(uint32 counter, address subject, address smartAccount)
@@ -124,7 +130,7 @@ contract BankRockRegistryReviewTest {
         vm.prank(ALICE);
         registry.initiateHandover(ROCK, address(0), uint64(block.timestamp + 3600), bytes32(0));
 
-        BankRockRegistry.Attestation memory claim = _att(2, BOB, address(0));
+        BankRockRegistry.Attestation memory claim = _att(2, BOB, address(bobSafe));
         vm.prank(RELAYER);
         registry.claimHandover(ROCK, claim, _sign(claim));
     }
@@ -151,8 +157,9 @@ contract BankRockRegistryReviewTest {
 
         (address rockOwner, address rockAccount,,,,) = registry.getRock(ROCK);
         require(rockOwner == BOB, "precondition: Bob owns the rock");
-        require(rockAccount == address(safe), "precondition: the Rock Account is still the giver's");
-        require(!safe.isOwner(BOB), "precondition: the Safe does not answer to Bob yet");
+        require(rockAccount == address(bobSafe), "precondition: the claim rebound the Rock Account to Bob's");
+        require(rockAccount != address(safe), "precondition: the giver's Safe is no longer the rock's account");
+        require(!safe.isOwner(BOB), "precondition: the giver's Safe does not answer to Bob yet");
 
         address[] memory targets = new address[](3);
         bytes[] memory payloads = new bytes[](3);

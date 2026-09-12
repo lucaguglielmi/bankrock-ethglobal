@@ -32,6 +32,9 @@ contract BankRockRegistryAuditTest {
     ///      after an *open* handover it stays Alice's — D-027 says the owner swap is UNAVAILABLE
     ///      for an open gift, so this address remains under the giver's control.
     address constant SAFE = address(0x4444444444444444444444444444444444444444);
+    /// @dev Bob's own Rock Account. Since the N-1 fix a claim rebinds the rock's account to the
+    ///      one the attestation names, so a claim attestation must carry a real address.
+    address constant BOB_ACCOUNT = address(0x6666666666666666666666666666666666666666);
     address constant RELAYER = address(0x5555555555555555555555555555555555555555);
 
     uint256 constant ROCK = 42;
@@ -84,7 +87,7 @@ contract BankRockRegistryAuditTest {
         vm.prank(ALICE);
         registry.initiateHandover(ROCK, address(0), uint64(block.timestamp + 3600), bytes32(0));
 
-        BankRockRegistry.Attestation memory claim = _att(2, block.timestamp + 300, BOB, address(0));
+        BankRockRegistry.Attestation memory claim = _att(2, block.timestamp + 300, BOB, BOB_ACCOUNT);
         vm.prank(RELAYER);
         registry.claimHandover(ROCK, claim, _sign(claim));
     }
@@ -246,7 +249,7 @@ contract BankRockRegistryAuditTest {
 
         vm.warp(expiresAt);
 
-        BankRockRegistry.Attestation memory claim = _att(2, block.timestamp + 300, BOB, address(0));
+        BankRockRegistry.Attestation memory claim = _att(2, block.timestamp + 300, BOB, BOB_ACCOUNT);
         vm.prank(RELAYER);
         registry.claimHandover(ROCK, claim, _sign(claim));
 

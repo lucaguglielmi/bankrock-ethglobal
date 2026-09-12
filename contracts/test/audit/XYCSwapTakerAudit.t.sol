@@ -281,6 +281,50 @@ contract XYCSwapTakerAuditTest is BankRockAquaBase {
     }
 
     /* ------------------------------------------------------------------ */
+    /* N-2 — the recipient must be somewhere the money can actually go     */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * N-2 (Low, re-review). `to` was passed through to the app unchecked, and
+     * `to == address(this)` sends the output into a contract whose documented policy is that
+     * tokens sent to it are lost — the one address every visitor has just had in their clipboard,
+     * because step one of a swap is approving it.
+     *
+     * THE FIX MUST MAKE TRUE: the periphery refuses to be its own recipient.
+     */
+    function testReview_N2_thePeripheryRefusesToBeItsOwnRecipient() public {
+        uint256 mine = usdc.balanceOf(address(this));
+
+        try taker.swapExactIn(strategy, true, ONE_USDC, 0, address(taker), _deadline()) {
+            require(false, "the periphery must not pay itself: those tokens are unrecoverable");
+        } catch {
+            // Expected: InvalidRecipient(address(taker)).
+        }
+
+        require(usdc.balanceOf(address(this)) == mine, "nothing was spent");
+        require(weth.balanceOf(address(taker)) == 0, "and nothing was stranded");
+    }
+
+    /**
+     * N-2, second half. The zero address used to mean "pay the caller". A sentinel that turns what
+     * every reader takes for a burn address into a payout is exactly the ambiguity Part 2 exists
+     * to remove, so it is rejected too and the recipient must be named.
+     */
+    function testReview_N2_theZeroSentinelIsGoneAndTheRecipientMustBeNamed() public {
+        try taker.swapExactIn(strategy, true, ONE_USDC, 0, address(0), _deadline()) {
+            require(false, "the zero address must not be accepted as a recipient");
+        } catch {
+            // Expected: InvalidRecipient(address(0)).
+        }
+
+        // Naming yourself explicitly is what replaces it, and it works.
+        uint256 wethBefore = weth.balanceOf(address(this));
+        uint256 amountOut = taker.swapExactIn(strategy, true, ONE_USDC, 0, address(this), _deadline());
+        require(amountOut > 0, "an explicit recipient swaps normally");
+        require(weth.balanceOf(address(this)) == wethBefore + amountOut, "and is paid");
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Helpers                                                             */
     /* ------------------------------------------------------------------ */
 

@@ -194,7 +194,7 @@ contract BankRockRegistryFuzzTest {
                     registry.getRock(rockId);
                 address claimant = gift.recipient == address(0) ? CAROL : gift.recipient;
 
-                BankRockRegistry.Attestation memory att = _att(rockId, counter, claimant, address(0));
+                BankRockRegistry.Attestation memory att = _att(rockId, counter, claimant, address(safeAccount));
                 bytes memory sig = _sign(att);
                 vm.prank(RELAYER);
                 try registry.claimHandover(rockId, att, sig) {

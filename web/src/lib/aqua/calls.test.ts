@@ -228,6 +228,7 @@ describe("buildSwapCall", () => {
       strategy,
       tokenIn: WETH,
       amountIn: BigInt(10) ** BigInt(17),
+      to: VISITOR,
       minAmountOut: BigInt(0),
     });
     if (swap.state !== "REAL") throw new Error("expected REAL");
@@ -241,6 +242,7 @@ describe("buildSwapCall", () => {
       strategy,
       tokenIn: sampleAddress("7"),
       amountIn: BigInt(1),
+      to: VISITOR,
       minAmountOut: BigInt(0),
     });
     expect(swap.state).toBe("UNAVAILABLE");
@@ -252,6 +254,7 @@ describe("buildSwapCall", () => {
       strategy,
       tokenIn: USDC,
       amountIn: BigInt(1),
+      to: VISITOR,
       minAmountOut: BigInt(0),
     });
     expect(swap.state).toBe("UNAVAILABLE");
@@ -266,6 +269,7 @@ describe("buildSwapCall", () => {
       strategy,
       tokenIn: USDC,
       amountIn: BigInt(0),
+      to: VISITOR,
       minAmountOut: BigInt(0),
     });
     expect(swap.state).toBe("UNAVAILABLE");

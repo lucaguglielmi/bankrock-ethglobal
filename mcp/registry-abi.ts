@@ -452,6 +452,12 @@ export const registryAbi = [
       },
       {
         "indexed": false,
+        "internalType": "address",
+        "name": "smartAccount",
+        "type": "address"
+      },
+      {
+        "indexed": false,
         "internalType": "uint32",
         "name": "counter",
         "type": "uint32"
