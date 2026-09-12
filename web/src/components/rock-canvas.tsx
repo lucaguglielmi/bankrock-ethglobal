@@ -105,11 +105,11 @@ function RockMesh({ isHovered }: { isHovered: boolean }) {
   ];
 
   const basicPosition = {
-    rockDistort: 0.1,
-    rockScale: [1.4, 1.2, 1.3] as [number, number, number],
-    liquidDistort: 0.1,
+    rockDistort: 0.18, // Increased for a bit more shape shifting in standing position
+    rockScale: [1.65, 0.95, 1.3] as [number, number, number], // More oval
+    liquidDistort: 0.15,
     liquidScale: [0.6, 0.6, 0.15] as [number, number, number],
-    liquidPosition: [-0.6, 0.8, 1.1] as [number, number, number], // Top left at an angle!
+    liquidPosition: [-0.65, 0.75, 1.05] as [number, number, number], // Adjusted slightly to sit on the tilted oval
     liquidColor: new THREE.Color("#0055ff"),
   };
 
@@ -118,9 +118,11 @@ function RockMesh({ isHovered }: { isHovered: boolean }) {
     
     if (groupRef.current) {
       if (isHovered) {
-        // Return to dead center smoothly
-        groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, 0, delta * 4);
-        groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, delta * 4);
+        // Return to center but keep a subtle, gentle wobble
+        const targetY = Math.sin(state.clock.elapsedTime * 0.8) * 0.08;
+        const targetX = Math.cos(state.clock.elapsedTime * 0.6) * 0.08;
+        groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetY, delta * 4);
+        groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetX, delta * 4);
       } else {
         // Normal wobble
         groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.4) * 0.6;
@@ -130,6 +132,9 @@ function RockMesh({ isHovered }: { isHovered: boolean }) {
 
     if (rockRef.current) {
       rockRef.current.scale.lerp(new THREE.Vector3(...target.rockScale), delta * 4);
+      // Tilt the rock diagonally from bottom-left to top-right when hovered
+      const targetZ = isHovered ? 0.5 : 0;
+      rockRef.current.rotation.z = THREE.MathUtils.lerp(rockRef.current.rotation.z, targetZ, delta * 4);
     }
     
     if (rockMaterialRef.current) {
