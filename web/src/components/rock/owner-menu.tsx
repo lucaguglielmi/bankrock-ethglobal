@@ -28,13 +28,19 @@ export interface OwnerMenuProps {
 }
 
 export function OwnerMenu({ rockId, handoverPending, lost, onChanged }: OwnerMenuProps) {
-  const { cancelHandover, archiveRock, isPending } = useRockActions();
+  const { cancelHandover, archiveRock, markLost, clearLost, isPending } = useRockActions();
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isRetireOpen, setRetireOpen] = useState(false);
   const [outcome, setOutcome] = useState<ActionOutcome | null>(null);
 
   const runCancel = async () => {
     const result = outcomeFrom(await cancelHandover(rockId));
+    setOutcome(result);
+    if (result.kind !== "error") onChanged();
+  };
+
+  const runLostFlag = async () => {
+    const result = outcomeFrom(await (lost ? clearLost(rockId) : markLost(rockId)));
     setOutcome(result);
     if (result.kind !== "error") onChanged();
   };
@@ -84,11 +90,16 @@ export function OwnerMenu({ rockId, handoverPending, lost, onChanged }: OwnerMen
           </Button>
 
           <div className="flex flex-col gap-2">
-            <Button variant="outline" className="w-full" disabled>
-              {lost ? "Clear lost" : "Mark lost"}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={runLostFlag}
+              disabled={isPending}
+            >
+              {lost ? "Clear the lost mark" : "Mark tag as lost"}
             </Button>
-            <p className="text-sm text-ink-3">
-              Marking a tag lost is not wired to the registry yet, so this does nothing.
+            <p className="max-w-prose text-sm text-ink-3">
+              Warns people who tap it. It does not freeze funds.
             </p>
           </div>
 
