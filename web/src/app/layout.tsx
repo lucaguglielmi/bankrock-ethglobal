@@ -1,12 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 import ClientProviders from "@/components/client-providers";
 import { Header } from "@/components/header";
+import { DemoBanner } from "@/components/ui/demo-banner";
+import { BottomDock } from "@/components/ui/bottom-dock";
+import { VersionCheck } from "@/components/version-check";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
   subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+  axes: ["opsz"],
 });
 
 const geistMono = Geist_Mono({
@@ -19,6 +25,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 export const metadata: Metadata = {
@@ -41,8 +48,6 @@ export const metadata: Metadata = {
   },
 };
 
-import { VersionCheck } from "@/components/version-check";
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -51,13 +56,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans bg-white text-black selection:bg-black selection:text-white">
+      <body className="min-h-dvh flex flex-col font-sans bg-white text-ink selection:bg-black selection:text-white">
         <ClientProviders>
+          <DemoBanner />
           <Header />
           {children}
         </ClientProviders>
+        <BottomDock />
+        <Toaster position="bottom-center" offset="var(--dock-h)" />
         <VersionCheck />
       </body>
     </html>

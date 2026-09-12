@@ -283,7 +283,7 @@ info, onboarding, about-rocks — is a `Sheet`.
 
 | | `< sm` (phones) | `≥ sm` |
 | --- | --- | --- |
-| Position | Bottom, full width, `rounded-t-3xl`, drag handle | Centred dialog, `max-w-md` (`max-w-2xl` for the explainer), `rounded-3xl` |
+| Position | Bottom, full width, `rounded-t-3xl`, visual grab bar (no swipe-to-dismiss; close button, Escape and backdrop dismiss) | Centred dialog, `max-w-md` (`max-w-2xl` for the explainer), `rounded-3xl` |
 | Height | `max-h-[90dvh]` | `max-h-[85dvh]` |
 | Structure | Sticky header (title `text-h2`, 44 px close button) · scrollable body · sticky footer holding the primary action | same |
 | Padding | `px-4`, footer `pb-[calc(1rem+var(--safe-bottom))]` | `p-6` |
@@ -435,7 +435,7 @@ grep -q "var(--font-inter)" web/src/app/globals.css
 
 # Scale only — no arbitrary sizes, no text-xs (T-5, 3.2)
 ! grep -rE "text-\[[0-9.]+(px|rem)\]" web/src
-! grep -rE "\btext-xs\b" web/src
+! grep -rE "\btext-xs\b" web/src --include=*.tsx --include=*.ts   # the theme line `--text-xs: initial` in globals.css is the fix, not a violation
 
 # Viewport units (L-1)
 ! grep -rE "\b(h|min-h|max-h)-(screen|\[[0-9]+vh\])" web/src

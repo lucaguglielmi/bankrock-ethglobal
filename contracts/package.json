@@ -1,18 +1,25 @@
 {
   "name": "contracts",
   "version": "1.0.0",
-  "main": "index.js",
+  "type": "module",
+  "private": true,
   "scripts": {
+    "build": "npm run compile",
     "compile": "hardhat compile",
+    "postcompile": "node scripts/export-abi.js",
+    "pretest": "npm run compile",
     "test": "hardhat test",
     "deploy": "node scripts/deploy.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "Bank Rock smart contracts for ERC-4337 Safe Registry and 1inch Aqua liquidity positions.",
-  "devDependencies": {
-    "hardhat": "^3.16.0"
+  "description": "Bank Rock identity and lifecycle registry for physical rocks (Ethereum Sepolia).",
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.6.1"
   },
-  "type": "module"
+  "devDependencies": {
+    "hardhat": "^3.16.0",
+    "viem": "^2.56.3"
+  }
 }

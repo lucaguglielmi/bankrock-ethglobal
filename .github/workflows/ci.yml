@@ -1,4 +1,4 @@
-name: Continuous Integration
+name: CI
 
 on:
   push:
@@ -8,9 +8,14 @@ on:
     branches:
       - main
 
+# A second push to the same branch cancels the run in flight.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-and-lint-web:
-    name: Build & Lint Web (Next.js)
+  web:
+    name: Web
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -24,20 +29,67 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-          cache-dependency-path: './web/package-lock.json'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run linter
+      - name: Lint
         run: npm run lint
 
-      - name: Build Next.js
-        run: npm run build
+      - name: Typecheck
+        run: npm run typecheck
 
-  build-mcp:
-    name: Build MCP Server
+      - name: Test
+        run: npm test
+
+      # The production build must never be produced with demo mode on. The flag defaults to
+      # false, and it is also set here explicitly so that a change to that default cannot turn
+      # CI's build into a simulated one without this line changing too (spec 15 D-013).
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_DEMO_MODE: "false"
+
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./contracts
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `pretest` compiles and refreshes contracts/abi/BankRockRegistry.json, so a stale
+      # committed ABI shows up as a dirty working tree in the next step.
+      - name: Test
+        run: npm test
+
+      - name: Check the exported ABI is committed and up to date
+        run: |
+          if [ -n "$(git status --porcelain -- abi)" ]; then
+            echo "contracts/abi does not match the compiled contracts."
+            echo "Run 'npm run build' in contracts/ and commit contracts/abi/BankRockRegistry.json."
+            git status --porcelain -- abi
+            git diff -- abi
+            exit 1
+          fi
+
+  mcp:
+    name: MCP server
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -51,11 +103,36 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-          cache-dependency-path: './mcp/package-lock.json'
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build TypeScript
+      # `prebuild` regenerates registry-abi.ts from contracts/abi, so this also catches the
+      # MCP server compiling against an ABI the contracts no longer have.
+      - name: Build
         run: npm run build
+
+      - name: Check the generated registry ABI module is committed and up to date
+        run: |
+          if [ -n "$(git status --porcelain -- registry-abi.ts)" ]; then
+            echo "mcp/registry-abi.ts does not match contracts/abi/BankRockRegistry.json."
+            echo "Run 'npm run sync-abi' in mcp/ and commit the result."
+            git diff -- registry-abi.ts
+            exit 1
+          fi
+
+  spec-checks:
+    name: Spec definition-of-done checks
+    runs-on: ubuntu-latest
+    # Non-blocking for now: most of these greps target the web UI, which is mid-migration and
+    # still fails many of them. Made blocking in Wave 3 once the UI migration lands.
+    continue-on-error: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run the spec 15 and spec 17 static checks
+        run: bash scripts/spec-checks.sh

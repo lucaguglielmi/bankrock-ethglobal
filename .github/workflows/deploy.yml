@@ -1,33 +1,62 @@
-name: Deploy to Cloudflare Pages
+name: Deploy
 
 on:
   push:
     branches:
       - main
 
+# One deploy at a time; a newer push waits rather than racing an in-flight upload.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
+    name: Cloudflare Pages
     runs-on: ubuntu-latest
-    name: Deploy
-    steps:
-      - uses: actions/checkout@v3
+    environment: production
+    defaults:
+      run:
+        working-directory: ./web
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+    # Decision D-013: demo mode is opt-in and must never be on in production. It defaults to
+    # false, and is pinned here as well so the production build cannot become a simulation
+    # through a change to that default alone. `npm run deploy:pages` runs the OpenNext build,
+    # so the flag has to be in scope for the whole job, not just a build step.
+    #
+    # Everything else comes from repository/environment secrets. No secret is committed to this
+    # repository (spec 16); the Cloudflare Pages project holds the runtime environment
+    # variables, and only the two credentials below are needed to publish.
+    env:
+      NEXT_PUBLIC_DEMO_MODE: "false"
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Fail early if Cloudflare credentials are missing
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID must be set as repository secrets."
+            echo "Create the token in the Cloudflare dashboard with Pages and D1 edit permissions."
+            exit 1
+          fi
 
       - name: Install dependencies
-        run: cd web && npm ci
+        run: npm ci
 
-      - name: Build Next.js
-        run: cd web && npm run build
-
-      - name: Build OpenNext
-        run: cd web && npx opennextjs-cloudflare build
-
-      - name: Deploy to Cloudflare Pages
-        run: cd web && npx wrangler pages deploy . --project-name bankrock-web
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # `deploy:pages` in web/package.json builds with @opennextjs/cloudflare (decision D-016)
+      # and publishes the built worker plus assets to the `bankrock-ethglobal` Pages project.
+      # It does not publish the source directory: the old `wrangler pages deploy .` shipped
+      # web/ verbatim as static files, with no worker, so nothing server-side ran (spec 15 B-5).
+      - name: Build and deploy to Cloudflare Pages
+        run: npm run deploy:pages

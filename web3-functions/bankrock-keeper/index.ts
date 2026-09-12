@@ -2,136 +2,132 @@ import {
   Web3Function,
   Web3FunctionContext,
 } from "@gelatonetwork/web3-functions-sdk";
-import { createPublicClient, http, parseAbi, encodeFunctionData, formatEther } from "viem";
+import { createPublicClient, http, parseAbi, formatEther } from "viem";
 
-const BANKROCK_REGISTRY_ABI = parseAbi([
-  "function rocks(uint256 rockId) view returns (address smartAccount, address currentOwner, uint256 awakenedAt, bool isAwake)",
+/**
+ * Bank Rock keeper — SIMULATION.
+ *
+ * This function reads real balances and computes a real deviation figure, but it never returns
+ * `canExec: true` and therefore never causes a transaction. There is no on-chain rebalance
+ * entry point to call: see README.md in this directory for what is missing and what it would
+ * take to make this real.
+ *
+ * The previous revision built calldata for `rebalance(address,bytes32)` on the 1inch
+ * Aggregation Router — a function that does not exist on that contract, on any chain. Had a
+ * Gelato task ever been funded against it, every execution would have reverted and paid gas to
+ * do so. That call is removed rather than corrected, because the correct call is not yet known.
+ */
+
+const REGISTRY_ABI = parseAbi([
+  "function getRock(uint256 rockId) view returns (address owner, address smartAccount, bytes32 uidHash, uint8 state, bool lost, (address recipient, uint64 expiresAt, uint64 initiatedAt, address initiatedBy, bytes32 messageHash) handover)",
 ]);
 
-const AQUA_ROUTER_ABI = parseAbi([
-  "function rebalance(address safe, bytes32 strategyHash) external"
-]);
+const ERC20_ABI = parseAbi(["function balanceOf(address) view returns (uint256)"]);
 
-// Helper to fire email alerts if rebalance fails
-async function fireAlert(message: string, context: Web3FunctionContext) {
+/** `RockState.Awake` and `RockState.HandoverPending` in BankRockRegistry. */
+const STATE_AWAKE = 1;
+const STATE_HANDOVER_PENDING = 2;
+
+/** Deviation from a 50/50 split, in percentage points, that would justify acting. */
+const THRESHOLD_PERCENT = 3.0;
+
+type Secrets = Web3FunctionContext["secrets"];
+
+async function secret(secrets: Secrets, name: string): Promise<string | undefined> {
+  const value = await secrets.get(name);
+  return value === undefined || value === null || value === "" ? undefined : value;
+}
+
+/**
+ * Best-effort notification that the keeper hit an error.
+ *
+ * The endpoint comes from the `ALERT_API_URL` secret. There is no default and no hardcoded
+ * origin: decision D-022 makes `https://bank-rock.com` the one canonical origin, and it is
+ * supplied as configuration rather than compiled in, so a task pointed at a preview deployment
+ * does not silently call production.
+ */
+async function fireAlert(message: string, secrets: Secrets): Promise<void> {
   try {
-    const alertUrl = await context.secrets.get("ALERT_API_URL"); // e.g. https://bankrock.xyz/api/alerts/gelato
-    if (alertUrl) {
-      await fetch(alertUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, source: "gelato_keeper" })
-      });
+    const alertUrl = await secret(secrets, "ALERT_API_URL");
+    if (alertUrl === undefined) {
+      console.warn("ALERT_API_URL is not set; skipping alert dispatch.");
+      return;
     }
-  } catch (e) {
-    console.error("Failed to send alert", e);
+    await fetch(alertUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, source: "gelato_keeper" }),
+    });
+  } catch (error) {
+    console.error("Failed to send alert", error);
   }
 }
 
 Web3Function.onRun(async (context: Web3FunctionContext) => {
-  const { multiChainProvider } = context;
+  const { multiChainProvider, secrets } = context;
   const provider = multiChainProvider.default();
-  
+
   const publicClient = createPublicClient({
     transport: http(provider.connection.url),
   });
 
-  const registryAddress = "0x89F735F4C74F878D3aAc6e60b134d115e5E29631" as `0x${string}`;
-  const aquaRouterAddress = "0x1111111254EEB25477B68fb85Ed929f73A960582" as `0x${string}`;
-  const usdcAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`;
+  const registryAddress = await secret(secrets, "REGISTRY_ADDRESS");
+  const usdcAddress = await secret(secrets, "USDC_ADDRESS");
+  const rockId = (await secret(secrets, "ROCK_ID")) ?? "1";
 
-  const rockId = (await context.secrets.get("ROCK_ID")) || "1";
+  if (registryAddress === undefined || usdcAddress === undefined) {
+    return {
+      canExec: false,
+      message:
+        "SIMULATION — not configured. Set the REGISTRY_ADDRESS and USDC_ADDRESS secrets on the " +
+        "Gelato task (Ethereum Sepolia values; see spec 16).",
+    };
+  }
 
   try {
-    // 1. Check if Rock is activated
-    const rockData = await publicClient.readContract({
-      address: registryAddress,
-      abi: BANKROCK_REGISTRY_ABI,
-      functionName: "rocks",
+    const rock = await publicClient.readContract({
+      address: registryAddress as `0x${string}`,
+      abi: REGISTRY_ABI,
+      functionName: "getRock",
       args: [BigInt(rockId)],
     });
 
-    const isAwake = rockData[3];
-    const safeAddress = rockData[0];
+    const smartAccount = rock[1];
+    const state = Number(rock[3]);
 
-    if (!isAwake || safeAddress === "0x0000000000000000000000000000000000000000") {
-      return { canExec: false, message: `Rock #${rockId} is not activated.` };
+    if (state !== STATE_AWAKE && state !== STATE_HANDOVER_PENDING) {
+      return { canExec: false, message: `SIMULATION — rock #${rockId} is not awake.` };
     }
 
-    // 2. Fetch real on-chain balances
-    const wethBalanceWei = await publicClient.getBalance({ address: safeAddress });
-    const poolWeth = Number(formatEther(wethBalanceWei));
+    // Native ETH held by the Rock Account. This is *not* WETH; the two are tracked separately
+    // and this function deliberately does not conflate them the way the previous revision did.
+    const nativeWei = await publicClient.getBalance({ address: smartAccount });
+    const nativeEth = Number(formatEther(nativeWei));
 
-    const usdcBalanceWei = await publicClient.readContract({
-      address: usdcAddress,
-      abi: parseAbi(["function balanceOf(address) view returns (uint256)"]),
+    const usdcUnits = await publicClient.readContract({
+      address: usdcAddress as `0x${string}`,
+      abi: ERC20_ABI,
       functionName: "balanceOf",
-      args: [safeAddress],
+      args: [smartAccount],
     });
-    const poolUsdc = Number(usdcBalanceWei) / 1e6;
+    const usdc = Number(usdcUnits) / 1e6;
 
-    // 3. Fetch Real-time Spot Price from 1inch (or Pyth)
-    // To prevent API key leak in the web3 function log, we use our own proxy we just built!
-    const quoteUrl = await context.secrets.get("QUOTE_API_URL") || "https://bankrock.xyz/api/quote";
-    let currentEthPrice = 2850.0;
-    try {
-      // 1 WETH to USDC quote
-      const qRes = await fetch(`${quoteUrl}?src=0x4200000000000000000000000000000000000006&dst=${usdcAddress}&amount=1000000000000000000`);
-      if (qRes.ok) {
-        const qData = await qRes.json();
-        currentEthPrice = Number(qData.toAmount) / 1e6;
-      }
-    } catch (e) {
-      console.warn("Failed to fetch live price, falling back to cached...", e);
-    }
-
-    const wethValueUsdc = poolWeth * currentEthPrice;
-    const totalValueUsdc = poolUsdc + wethValueUsdc;
-    
-    // If portfolio is empty, nothing to rebalance
-    if (totalValueUsdc < 1) {
-      return { canExec: false, message: "Portfolio is empty." };
-    }
-
-    const currentRatioUsdcPercent = (poolUsdc / totalValueUsdc) * 100;
-    const targetRatio = 50.0;
-    
-    const deviation = Math.abs(currentRatioUsdcPercent - targetRatio);
-    const THRESHOLD = 3.0; // 3% deviation tolerance
-
-    if (deviation >= THRESHOLD) {
-      console.log(`[Gelato] Rock #${rockId} drift detected: ${deviation.toFixed(2)}%. Executing rebalance.`);
-      
-      const callData = encodeFunctionData({
-        abi: AQUA_ROUTER_ABI,
-        functionName: "rebalance",
-        args: [
-          safeAddress, 
-          "0x0000000000000000000000000000000000000000000000000000000000000000" // Standard 50/50 Strategy Hash
-        ]
-      });
-
-      // Gas price protection check could go here
-
-      return {
-        canExec: true,
-        callData: [
-          {
-            to: aquaRouterAddress,
-            data: callData,
-          },
-        ],
-      };
-    } else {
-      return {
-        canExec: false,
-        message: `Rock #${rockId} portfolio is healthy (Deviation: ${deviation.toFixed(2)}% < ${THRESHOLD}%)`,
-      };
-    }
-
-  } catch (err: any) {
-    console.error("Gelato Web3 Function Error:", err);
-    await fireAlert(`Gelato Rebalance Failed for Rock #${rockId}: ${err.message}`, context);
-    return { canExec: false, message: `Execution failed: ${err.message}` };
+    // No price oracle is wired, so no dollar value of the ETH leg can be stated. The ratio below
+    // is therefore reported in the two raw units only; it is not a portfolio weighting and must
+    // not be presented as one.
+    return {
+      canExec: false,
+      message:
+        `SIMULATION — this keeper executes nothing. Rock #${rockId} (account ${smartAccount}) ` +
+        `holds ${usdc} USDC and ${nativeEth} native ETH. A real keeper would compare these ` +
+        `against the rock's Aqua strategy reserves and rebalance when the deviation exceeded ` +
+        `${THRESHOLD_PERCENT}%. Neither the Aqua integration nor a price source exists yet, so ` +
+        `no deviation is computed and no transaction is proposed. See README.md.`,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Bank Rock keeper read failed:", message);
+    await fireAlert(`Bank Rock keeper read failed for rock #${rockId}: ${message}`, secrets);
+    return { canExec: false, message: `SIMULATION — read failed: ${message}` };
   }
 });
