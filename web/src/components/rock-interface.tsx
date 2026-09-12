@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/auth-context";
+import { usePrivy } from "@privy-io/react-auth";
 import { verifyNtagSignature } from "@/actions/verify-ntag";
 import { TradeModal, type TradeDetails } from "@/components/trade-modal";
 import { TransferModal } from "@/components/transfer-modal";
@@ -175,9 +176,22 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
     verify();
   }, [rockId, urlParams]);
 
+  const { createWallet } = usePrivy();
+
   const startAwakening = useCallback(async () => {
     setStep("awakening");
     playTap();
+
+    // Gotcha Fix: If user logged in via email/passkey but hasn't created a wallet,
+    // proactively generate the embedded wallet here so AA flows don't crash.
+    if (authenticated && user && !user.wallet) {
+      setAwakeningStage("Provisioning secure embedded wallet...");
+      try {
+        await createWallet();
+      } catch (err) {
+        console.warn("Wallet creation skipped or failed:", err);
+      }
+    }
 
     // Target wallet address to fund
     const targetAddress =
@@ -251,7 +265,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
       setStep("active");
       playError();
     }
-  }, [user?.wallet?.address, address, rockId, awakenOnchain, playTap, playSuccess, playError, smartAccountAddress]);
+  }, [user, authenticated, address, rockId, awakenOnchain, playTap, playSuccess, playError, smartAccountAddress, createWallet]);
 
   const handleAwaken = async () => {
     if (!authenticated) {

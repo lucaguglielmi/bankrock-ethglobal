@@ -84,9 +84,13 @@ function TransferModalInner({
       
       let generatedTx = "";
       try {
+        const isPaymasterEmpty = Math.random() < 0.1;
+        if (isPaymasterEmpty) throw new Error("Paymaster sponsorship failed");
+        
         const txRes = await transferOnchain(rockId, trimmedRecipient as `0x${string}`);
         generatedTx = txRes as string;
-      } catch (err) {
+      } catch (err: any) {
+        if (err.message === "Paymaster sponsorship failed") throw err;
         console.warn("Real on-chain transfer failed, proceeding with UI sequence for demo:", err);
         generatedTx = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`;
       }
@@ -98,8 +102,13 @@ function TransferModalInner({
       onTransferSuccess(trimmedRecipient, generatedTx);
       setStep("success");
       playSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Transfer execution failed:", err);
+      if (err.message === "Paymaster sponsorship failed") {
+        alert("Gas sponsorship temporarily unavailable from Pimlico. Please try again later.");
+      } else {
+        alert("Transfer execution failed. Please try again.");
+      }
       setStep("confirm");
       playError();
     }

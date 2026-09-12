@@ -1,5 +1,5 @@
 import { toSafeSmartAccount } from "permissionless/accounts";
-import { createPublicClient, http, encodeFunctionData } from "viem";
+import { createPublicClient, http, fallback, encodeFunctionData } from "viem";
 import { baseSepolia } from "viem/chains";
 import { createPimlicoClient } from "permissionless/clients/pimlico";
 
@@ -33,7 +33,11 @@ const aquaAbi = [
 
 export const publicClient = createPublicClient({
   chain: baseSepolia,
-  transport: http(),
+  transport: fallback([
+    http(process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org"),
+    http("https://base-sepolia-rpc.publicnode.com"),
+    http()
+  ]),
 });
 
 import { logger } from "@/lib/telemetry";

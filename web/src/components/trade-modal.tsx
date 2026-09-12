@@ -53,6 +53,8 @@ function TradeModalInner({
   // Status: "idle" | "signing" | "bundling" | "settling" | "success"
   const [status, setStatus] = useState<"idle" | "signing" | "bundling" | "settling" | "success">("idle");
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [highSlippageAccepted, setHighSlippageAccepted] = useState(false);
   const [lastTradeSummary, setLastTradeSummary] = useState<{
     inAmount: string;
     inSymbol: TokenType;
@@ -90,6 +92,8 @@ function TradeModalInner({
     setFromToken(toToken);
     setToToken(fromToken);
     setAmountIn("");
+    setError(null);
+    setHighSlippageAccepted(false);
   };
 
   const inputNumber = parseFloat(amountIn) || 0;
@@ -177,20 +181,43 @@ function TradeModalInner({
   const handlePercentage = (pct: number) => {
     const calculated = (maxBalance * pct).toFixed(fromToken === "USDC" ? 2 : 4);
     setAmountIn(calculated);
+    setError(null);
+    setHighSlippageAccepted(false);
   };
 
   const handleExecuteSwap = async () => {
     if (!canSwap) return;
+    setError(null);
+
+    // Gotcha Fix: Prevent users from getting rekt by high slippage, but allow if confirmed
+    if (priceImpact > 2.0 && !highSlippageAccepted) {
+      const lossUSD = (inputNumber * (fromToken === "USDC" ? 1 : ETH_PRICE_USDC)) * (priceImpact / 100);
+      setError(`High Slippage Warning! You will lose approx $${lossUSD.toFixed(2)} on this trade. Normal trades usually experience < 0.5% slippage. Swipe again to confirm and proceed anyway.`);
+      setHighSlippageAccepted(true);
+      dragX.set(0); // Reset swipe visually
+      playError();
+      return;
+    }
 
     try {
       playSwipe();
-      // Step 1: UserOp Signing
+      // Step 1: UserOp Signing (Approval + Swap)
       setStatus("signing");
       await new Promise((resolve) => setTimeout(resolve, 800));
 
       // Step 2: Pimlico Bundler
       setStatus("bundling");
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve, reject) => {
+        // Mock 10% chance of paymaster failure for realism/gotcha demonstration
+        const isPaymasterEmpty = Math.random() < 0.1;
+        setTimeout(() => {
+          if (isPaymasterEmpty) {
+            reject(new Error("Paymaster sponsorship failed"));
+          } else {
+            resolve(true);
+          }
+        }, 1000);
+      });
 
       // Step 3: Aqua Settlement
       setStatus("settling");
@@ -241,9 +268,15 @@ function TradeModalInner({
         origin: { y: 0.6 },
         colors: ['#000000', '#ffffff', '#4f46e5'],
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Swap execution failed:", err);
       setStatus("idle");
+      // Gotcha Fix: Graceful paymaster error handling
+      if (err.message === "Paymaster sponsorship failed") {
+        setError("Gas sponsorship temporarily unavailable from Pimlico. Please try again later.");
+      } else {
+        setError("Swap execution failed. Please try again.");
+      }
       playError();
     }
   };
@@ -394,7 +427,7 @@ function TradeModalInner({
               {status === "settling" && "Settling on Aqua Reserve..."}
             </h3>
             <p className="text-sm text-neutral-500 font-medium max-w-xs">
-              {status === "signing" && "Generating EIP-712 execution signature for Safe Smart Account"}
+              {status === "signing" && "Bundling Token Approval + Swap into a single signed transaction"}
               {status === "bundling" && "Gas sponsored by Rock Paymaster. Zero user gas required."}
               {status === "settling" && "Executing atomic token swap against Rock liquidity curve"}
             </p>
@@ -422,7 +455,11 @@ function TradeModalInner({
                   type="number"
                   placeholder="0.0"
                   value={amountIn}
-                  onChange={(e) => setAmountIn(e.target.value)}
+                  onChange={(e) => {
+                    setAmountIn(e.target.value);
+                    setError(null);
+                    setHighSlippageAccepted(false);
+                  }}
                   className="bg-transparent text-3xl font-bold tracking-tight outline-none w-full text-black placeholder:text-neutral-300 font-mono"
                   min="0"
                   step="any"
@@ -568,6 +605,13 @@ function TradeModalInner({
               </div>
             )}
 
+            {error && (
+              <div className="flex items-center gap-2 text-xs font-medium text-red-600 bg-red-50 p-3 rounded-xl mb-4">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
             {/* Action Button / Swipe to Swap */}
             <div className="relative h-14 rounded-full overflow-hidden bg-black shadow-lg">
               <AnimatePresence mode="wait">
@@ -602,9 +646,13 @@ function TradeModalInner({
                   >
                     <motion.div 
                       style={{ opacity: swipeOpacity }}
-                      className="absolute inset-0 flex items-center justify-center text-white/50 font-bold pr-6 pointer-events-none"
+                      className="absolute inset-0 flex items-center justify-center text-white/50 font-bold pr-6 pointer-events-none text-sm"
                     >
-                      Swipe to Swap <ChevronRight className="w-4 h-4 ml-1 opacity-50" /><ChevronRight className="w-4 h-4 -ml-2 opacity-30" />
+                      {highSlippageAccepted ? (
+                        <span className="text-red-400">Swipe again to confirm high slippage <ChevronRight className="w-4 h-4 ml-1 opacity-50 inline" /></span>
+                      ) : (
+                        <>Swipe to Swap <ChevronRight className="w-4 h-4 ml-1 opacity-50" /><ChevronRight className="w-4 h-4 -ml-2 opacity-30" /></>
+                      )}
                     </motion.div>
                     <motion.div 
                       className="absolute left-0 h-full bg-blue-600 z-0 rounded-l-full"

@@ -9,7 +9,7 @@
  * - Tamper-proof log address & topic matching
  */
 
-import { createPublicClient, http, isAddress, getAddress, type Hash } from "viem";
+import { createPublicClient, http, fallback, isAddress, getAddress, type Hash } from "viem";
 import { baseSepolia } from "viem/chains";
 import { BANK_ROCK_REGISTRY_ADDRESS, BANK_ROCK_REGISTRY_ABI } from "@/lib/contracts";
 import { logger } from "@/lib/telemetry";
@@ -96,11 +96,18 @@ const MAX_BLOCK_RANGE = BigInt(50000);
 // Fallback secure public RPC client
 const indexerClient = createPublicClient({
   chain: baseSepolia,
-  transport: http(process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org", {
-    timeout: 10_000,
-    retryCount: 2,
-    retryDelay: 1000,
-  }),
+  transport: fallback([
+    http(process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org", {
+      timeout: 10_000,
+      retryCount: 2,
+      retryDelay: 1000,
+    }),
+    http("https://base-sepolia-rpc.publicnode.com", {
+      timeout: 10_000,
+      retryCount: 2,
+    }),
+    http()
+  ]),
 });
 
 /**
