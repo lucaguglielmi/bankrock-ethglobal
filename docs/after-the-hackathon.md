@@ -7,6 +7,7 @@ This document details the enterprise-grade production specifications, hardware c
 ## Table of Contents
 1. [Executive Summary & Security Philosophy](#1-executive-summary--security-philosophy)
 2. [NFC Key Security Specification: AWS KMS / GCP Cloud HSM](#2-nfc-key-security-specification-aws-kms--gcp-cloud-hsm)
+   > **Note:** Implementation of KMS integration and verification logic (including any "KMS Emulator") is strictly reserved for **after the hackathon / before mainnet launch**. We will not build a KMS emulator for the MVP.
    - [2.1 Core Architectural Principles](#21-core-architectural-principles)
    - [2.2 Envelope Encryption & Key Hierarchy](#22-envelope-encryption--key-hierarchy)
    - [2.3 AES-128 Key Diversification (NXP AN10922 / AN12196)](#23-aes-128-key-diversification-nxp-an10922--an12196)
@@ -61,6 +62,9 @@ In the MVP, tag verification proves that a physical tap took place using NXP NTA
 ---
 
 ## 2. NFC Key Security Specification: AWS KMS / GCP Cloud HSM
+
+> **CRITICAL MVP SCOPE NOTE:** 
+> Do not implement a KMS emulator or attempt to integrate AWS KMS/GCP Cloud HSM during the hackathon. This entire section is strictly earmarked for **after the hackathon / before mainnet launch**. The MVP will continue to use the simplified Edge environment variable approach.
 
 ### 2.1 Core Architectural Principles
 1. **Zero Plaintext Master Keys:** The Root Tag Master Key (TMK) is created directly within the Cloud HSM boundary (FIPS 140-2 Level 3 / FIPS 140-3 validated). Plaintext key material cannot be exported or viewed by human operators.
