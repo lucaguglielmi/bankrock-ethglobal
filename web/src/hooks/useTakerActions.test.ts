@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { decodeFunctionData, zeroAddress } from "viem";
+import { decodeFunctionData } from "viem";
 
 /**
  * The visitor's swap path.
@@ -15,6 +15,9 @@ const AQUA = `0x${"22".repeat(20)}` as const;
 const APP = `0x${"33".repeat(20)}` as const;
 const USDC = `0x${"44".repeat(20)}` as const;
 const WETH = `0x${"55".repeat(20)}` as const;
+/// The visitor receiving the output. Named explicitly: the periphery rejects a zero recipient
+/// since the 2026-09-12 re-review (N-2).
+const VISITOR = `0x${"99".repeat(20)}` as const;
 const MAKER = `0x${"11".repeat(20)}` as const;
 
 /** Built, never written out, so the "no template-literal hashes" check holds here too (D-014b). */
@@ -69,6 +72,7 @@ describe("the batch a visitor submits", () => {
       strategy: await strategyFor(),
       tokenIn: USDC,
       amountIn: BigInt(100_000_000),
+      to: VISITOR,
       minAmountOut: BigInt(1),
     });
     expect(plan.state).toBe("REAL");
@@ -105,7 +109,7 @@ describe("the batch a visitor submits", () => {
     expect(args[1]).toBe(true); // zeroForOne: selling token0 (USDC)
     expect(args[2]).toBe(BigInt(100_000_000));
     expect(args[3]).toBe(BigInt(1));
-    expect(String(args[4])).toBe(zeroAddress); // "pay the caller"
+    expect(String(args[4]).toLowerCase()).toBe(VISITOR); // an explicit recipient, no sentinel
     expect(args[5]).toBe(plan.value.deadline);
     expect(args[5]).toBeGreaterThan(BigInt(Math.floor(Date.now() / 1000)));
   });
@@ -118,6 +122,7 @@ describe("the batch a visitor submits", () => {
       strategy: await strategyFor(),
       tokenIn: USDC,
       amountIn: BigInt(50),
+      to: VISITOR,
       minAmountOut: BigInt(0),
     });
     if (plan.state !== "REAL") {
@@ -145,12 +150,14 @@ describe("the batch a visitor submits", () => {
       strategy,
       tokenIn: USDC,
       amountIn: BigInt(1),
+      to: VISITOR,
       minAmountOut: BigInt(0),
     });
     const selling1 = buildSwapCall({
       strategy,
       tokenIn: WETH,
       amountIn: BigInt(1),
+      to: VISITOR,
       minAmountOut: BigInt(0),
     });
 

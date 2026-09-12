@@ -255,16 +255,9 @@ export function useTakerActions(): UseTakerActions {
         const tokenIn = params.tokenIn === "USDC" ? usdc : weth;
         const tokenOut = params.tokenIn === "USDC" ? weth : usdc;
 
-        const plan = buildSwapCall({
-          strategy,
-          tokenIn,
-          amountIn: params.amountIn,
-          minAmountOut: params.minAmountOut,
-          taker: taker.value,
-          app,
-        });
-        if (plan.state === "UNAVAILABLE") return unavailable(plan.reason);
-
+        // The account is built first because the swap has to name it: the periphery rejects a
+        // zero recipient now, so `to` is the address the output is paid to, and for a smart
+        // account that is not the same thing as `msg.sender` being implied.
         const clientCapability = await buildTakerClient({
           provider: await wallet.getEthereumProvider(),
           ownerAddress: getAddress(wallet.address),
@@ -272,6 +265,17 @@ export function useTakerActions(): UseTakerActions {
         if (clientCapability.state === "UNAVAILABLE") return unavailable(clientCapability.reason);
         const client = clientCapability.value;
         const sender = getAddress(client.account.address);
+
+        const plan = buildSwapCall({
+          strategy,
+          tokenIn,
+          amountIn: params.amountIn,
+          minAmountOut: params.minAmountOut,
+          to: sender,
+          taker: taker.value,
+          app,
+        });
+        if (plan.state === "UNAVAILABLE") return unavailable(plan.reason);
 
         // USDC reverts on a non-zero to non-zero approve, so the allowance is read first and
         // reset when it has to be.

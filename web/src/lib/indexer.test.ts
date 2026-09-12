@@ -180,6 +180,9 @@ describe("decodeRegistryLog", () => {
         rockId: BigInt(12),
         previousOwner: PREVIOUS,
         newOwner: OWNER,
+        // `claimHandover` rebinds the rock's account to the claimant's, and the event now carries
+        // it — non-indexed, so it lands in `data` alongside the counter.
+        smartAccount: SAFE,
         counter: 9,
       }),
       TIMESTAMP,
@@ -190,6 +193,7 @@ describe("decodeRegistryLog", () => {
     expect(event!.payload).toMatchObject({
       previousOwner: PREVIOUS,
       newOwner: OWNER,
+      smartAccount: SAFE,
       counter: "9",
     });
     expect(event!.description).toContain("physical tap");
