@@ -1,26 +1,208 @@
-/**
- * BankRockRegistry ABI.
- *
- * Derived from contracts/BankRockRegistry.sol, with the arbitrary-call primitive removed per
- * D-020: `executeTrade`, `setRouterWhitelist`, `whitelistedRouters`, the
- * `RouterWhitelisted` and `TradeExecuted` events are gone. The registry is an identity
- * and lifecycle registry only — it never holds funds, never receives approvals and never
- * performs a call with caller-supplied calldata. Swaps execute from the Rock Account against
- * Aqua (spec 03).
- *
- * The registry is not deployed yet (C-1). Its address comes from NEXT_PUBLIC_REGISTRY_ADDRESS
- * via lib/chain; there is no literal here.
- */
-
+// Generated from contracts/abi/BankRockRegistry.json by scripts/sync-web-abi.mjs.
+// Do not edit by hand. Regenerate with "npm run compile" in contracts/, or by running
+// "node scripts/sync-web-abi.mjs" from the repository root.
+//
+// The registry address is not here and never will be: it comes from the environment
+// (NEXT_PUBLIC_REGISTRY_ADDRESS) via this directory's chain config module.
 export const BANK_ROCK_REGISTRY_ABI = [
   {
-    "inputs": [],
-    "name": "InvalidNFCSequence",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "initialOwner",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "initialAttester",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
+      }
+    ],
+    "name": "AttestationExpired",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "expected",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "provided",
+        "type": "uint256"
+      }
+    ],
+    "name": "AttestationRockMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "provided",
+        "type": "bytes32"
+      }
+    ],
+    "name": "AttestationUidMismatch",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "InvalidNewOwner",
+    "name": "AttesterNotSet",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "EnforcedPause",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ExpectedPause",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "expiresAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "HandoverExpired",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
+    "name": "HandoverNotPending",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidAttestationSignature",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidAttester",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidHandoverExpiry",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidRecipient",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidRockId",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidShortString",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidSmartAccount",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidSubject",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidUidHash",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "subject",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      }
+    ],
+    "name": "NotHandoverRecipient",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "caller",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "rockOwner",
+        "type": "address"
+      }
+    ],
+    "name": "NotRockOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableUnauthorizedAccount",
     "type": "error"
   },
   {
@@ -42,24 +224,87 @@ export const BANK_ROCK_REGISTRY_ABI = [
         "type": "uint256"
       }
     ],
+    "name": "RockIsArchived",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
     "name": "RockNotAwakened",
     "type": "error"
   },
   {
     "inputs": [
       {
+        "internalType": "uint32",
+        "name": "provided",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "lastSeen",
+        "type": "uint32"
+      }
+    ],
+    "name": "StaleAttestationCounter",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "str",
+        "type": "string"
+      }
+    ],
+    "name": "StringTooLong",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "uidHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "boundRockId",
+        "type": "uint256"
+      }
+    ],
+    "name": "UidBoundToDifferentRock",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
         "internalType": "address",
-        "name": "caller",
+        "name": "previousAttester",
         "type": "address"
       },
       {
+        "indexed": true,
         "internalType": "address",
-        "name": "expectedOwner",
+        "name": "newAttester",
         "type": "address"
       }
     ],
-    "name": "UnauthorizedTapper",
-    "type": "error"
+    "name": "AttesterUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [],
+    "name": "EIP712DomainChanged",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -73,17 +318,11 @@ export const BANK_ROCK_REGISTRY_ABI = [
       {
         "indexed": true,
         "internalType": "address",
-        "name": "owner",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "smartAccount",
+        "name": "by",
         "type": "address"
       }
     ],
-    "name": "RockAwakened",
+    "name": "HandoverCancelled",
     "type": "event"
   },
   {
@@ -106,9 +345,52 @@ export const BANK_ROCK_REGISTRY_ABI = [
         "internalType": "address",
         "name": "newOwner",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "counter",
+        "type": "uint32"
       }
     ],
-    "name": "RockOwnershipTransferred",
+    "name": "HandoverClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "expiresAt",
+        "type": "uint64"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "messageHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "HandoverInitiated",
     "type": "event"
   },
   {
@@ -117,18 +399,183 @@ export const BANK_ROCK_REGISTRY_ABI = [
       {
         "indexed": true,
         "internalType": "address",
-        "name": "poker",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "Paused",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "uidHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RockArchived",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "rockOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "uidHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "smartAccount",
         "type": "address"
       },
       {
         "indexed": false,
-        "internalType": "string",
-        "name": "message",
-        "type": "string"
+        "internalType": "uint32",
+        "name": "counter",
+        "type": "uint32"
       }
     ],
-    "name": "RockPoked",
+    "name": "RockAwakened",
     "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      }
+    ],
+    "name": "RockLostCleared",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      }
+    ],
+    "name": "RockMarkedLost",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "Unpaused",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "ATTESTATION_TYPEHASH",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
+    "name": "archiveRock",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "attester",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [
@@ -141,6 +588,43 @@ export const BANK_ROCK_REGISTRY_ABI = [
         "internalType": "address",
         "name": "smartAccount",
         "type": "address"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "rockId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "uidHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "counter",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint256",
+            "name": "deadline",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "subject",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct BankRockRegistry.Attestation",
+        "name": "att",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bytes",
+        "name": "sig",
+        "type": "bytes"
       }
     ],
     "name": "awakenRock",
@@ -154,16 +638,130 @@ export const BANK_ROCK_REGISTRY_ABI = [
         "internalType": "uint256",
         "name": "rockId",
         "type": "uint256"
+      }
+    ],
+    "name": "cancelHandover",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
       },
       {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "rockId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "uidHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "counter",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint256",
+            "name": "deadline",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "subject",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct BankRockRegistry.Attestation",
+        "name": "att",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bytes",
+        "name": "sig",
+        "type": "bytes"
+      }
+    ],
+    "name": "claimHandover",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
+    "name": "clearLost",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "domainSeparator",
+    "outputs": [
+      {
         "internalType": "bytes32",
-        "name": "nfcPubKey",
+        "name": "",
         "type": "bytes32"
       }
     ],
-    "name": "bindNFC",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "eip712Domain",
+    "outputs": [
+      {
+        "internalType": "bytes1",
+        "name": "fields",
+        "type": "bytes1"
+      },
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "version",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "chainId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "verifyingContract",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "salt",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "extensions",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -177,30 +775,60 @@ export const BANK_ROCK_REGISTRY_ABI = [
     "name": "getRock",
     "outputs": [
       {
+        "internalType": "address",
+        "name": "rockOwner",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "smartAccount",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "uidHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "enum BankRockRegistry.RockState",
+        "name": "state",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bool",
+        "name": "lost",
+        "type": "bool"
+      },
+      {
         "components": [
           {
             "internalType": "address",
-            "name": "smartAccount",
+            "name": "recipient",
             "type": "address"
+          },
+          {
+            "internalType": "uint64",
+            "name": "expiresAt",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "initiatedAt",
+            "type": "uint64"
           },
           {
             "internalType": "address",
-            "name": "currentOwner",
+            "name": "initiatedBy",
             "type": "address"
           },
           {
-            "internalType": "uint256",
-            "name": "awakenedAt",
-            "type": "uint256"
-          },
-          {
-            "internalType": "bool",
-            "name": "isAwake",
-            "type": "bool"
+            "internalType": "bytes32",
+            "name": "messageHash",
+            "type": "bytes32"
           }
         ],
-        "internalType": "struct BankRockRegistry.Rock",
-        "name": "",
+        "internalType": "struct BankRockRegistry.Handover",
+        "name": "handover",
         "type": "tuple"
       }
     ],
@@ -210,63 +838,39 @@ export const BANK_ROCK_REGISTRY_ABI = [
   {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "rockId",
-        "type": "uint256"
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "rockId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "uidHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "counter",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint256",
+            "name": "deadline",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "subject",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct BankRockRegistry.Attestation",
+        "name": "att",
+        "type": "tuple"
       }
     ],
-    "name": "getRockStatusJSON",
-    "outputs": [
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "rockId",
-        "type": "uint256"
-      }
-    ],
-    "name": "isAwakened",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "poke",
-    "outputs": [
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "rockToNfcPubKey",
+    "name": "hashAttestation",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -281,31 +885,44 @@ export const BANK_ROCK_REGISTRY_ABI = [
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "rockId",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "internalType": "uint64",
+        "name": "expiresAt",
+        "type": "uint64"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "messageHash",
+        "type": "bytes32"
       }
     ],
-    "name": "rocks",
+    "name": "initiateHandover",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "uidHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "lastCounter",
     "outputs": [
       {
-        "internalType": "address",
-        "name": "smartAccount",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "currentOwner",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "awakenedAt",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "isAwake",
-        "type": "bool"
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
       }
     ],
     "stateMutability": "view",
@@ -317,7 +934,87 @@ export const BANK_ROCK_REGISTRY_ABI = [
         "internalType": "uint256",
         "name": "rockId",
         "type": "uint256"
-      },
+      }
+    ],
+    "name": "markLost",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "pause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "paused",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "uidHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "rockIdForUid",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newAttester",
+        "type": "address"
+      }
+    ],
+    "name": "setAttester",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
       {
         "internalType": "address",
         "name": "newOwner",
@@ -325,6 +1022,13 @@ export const BANK_ROCK_REGISTRY_ABI = [
       }
     ],
     "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "unpause",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

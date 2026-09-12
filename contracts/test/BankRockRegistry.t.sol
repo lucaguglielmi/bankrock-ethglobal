@@ -26,6 +26,9 @@ contract BankRockRegistryTest {
     address constant BOB = address(0x2222222222222222222222222222222222222222);
     address constant CAROL = address(0x3333333333333333333333333333333333333333);
     address constant SAFE = address(0x4444444444444444444444444444444444444444);
+    /// @dev An unrelated address that pays the gas. It is never authorised by anything.
+    address constant RELAYER = address(0x5555555555555555555555555555555555555555);
+    address constant MALLORY = address(0x6666666666666666666666666666666666666666);
 
     uint256 constant ROCK = 42;
     // keccak256 of a raw 7-byte NTAG UID.
@@ -44,7 +47,7 @@ contract BankRockRegistryTest {
     // Helpers
     // -----------------------------------------------------------------
 
-    function _att(uint256 rockId, bytes32 uidHash, uint32 counter, uint256 deadline)
+    function _att(uint256 rockId, bytes32 uidHash, uint32 counter, uint256 deadline, address subject)
         internal
         pure
         returns (BankRockRegistry.Attestation memory)
@@ -53,7 +56,8 @@ contract BankRockRegistryTest {
             rockId: rockId,
             uidHash: uidHash,
             counter: counter,
-            deadline: deadline
+            deadline: deadline,
+            subject: subject
         });
     }
 
@@ -70,10 +74,13 @@ contract BankRockRegistryTest {
         }
     }
 
-    /// @dev Awakens ROCK bound to UID at counter 1, owned by this test contract.
+    /// @dev Awakens ROCK bound to UID at counter 1, owned by this test contract, relayed by an
+    ///      unrelated address so every downstream test also proves msg.sender did not matter.
     function _awaken() internal {
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300);
-        registry.awakenRock(ROCK, SAFE, att, _sign(ATTESTER_PK, att));
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300, address(this));
+        bytes memory sig = _sign(ATTESTER_PK, att);
+        vm.prank(RELAYER);
+        registry.awakenRock(ROCK, SAFE, att, sig);
     }
 
     // -----------------------------------------------------------------
@@ -103,7 +110,7 @@ contract BankRockRegistryTest {
     }
 
     function testAwakenRejectsNonAttesterSignature() public {
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300, address(this));
         bytes memory sig = _sign(IMPOSTOR_PK, att);
 
         bytes4 sel;
@@ -117,7 +124,7 @@ contract BankRockRegistryTest {
     }
 
     function testAwakenRejectsZeroCounter() public {
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 0, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 0, block.timestamp + 300, address(this));
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
@@ -131,7 +138,7 @@ contract BankRockRegistryTest {
 
     function testAwakenRejectedAfterDeadline() public {
         uint256 deadline = block.timestamp + 300;
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, deadline);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, deadline, address(this));
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         vm.warp(deadline + 1);
@@ -148,7 +155,7 @@ contract BankRockRegistryTest {
     function testCannotAwakenTwice() public {
         _awaken();
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, address(this));
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
@@ -164,7 +171,7 @@ contract BankRockRegistryTest {
     function testUidCannotAwakenASecondRock() public {
         _awaken();
 
-        BankRockRegistry.Attestation memory att = _att(ROCK + 1, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK + 1, UID, 2, block.timestamp + 300, address(this));
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
@@ -177,7 +184,7 @@ contract BankRockRegistryTest {
     }
 
     function testAwakenRejectsAttestationForAnotherRock() public {
-        BankRockRegistry.Attestation memory att = _att(ROCK + 7, UID, 1, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK + 7, UID, 1, block.timestamp + 300, address(this));
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
@@ -187,6 +194,167 @@ contract BankRockRegistryTest {
             sel = _selector(reason);
         }
         require(sel == BankRockRegistry.AttestationRockMismatch.selector, "wrong error");
+    }
+
+    // -----------------------------------------------------------------
+    // Relaying: msg.sender must not decide anything
+    // -----------------------------------------------------------------
+
+    function testRelayedAwakenGivesTheRockToTheSubjectNotTheSender() public {
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300, BOB);
+        bytes memory sig = _sign(ATTESTER_PK, att);
+
+        // A third party pays the gas. Nothing about it is authorised; it is only a courier.
+        vm.prank(RELAYER);
+        registry.awakenRock(ROCK, SAFE, att, sig);
+
+        (address rockOwner,,, BankRockRegistry.RockState state,,) = registry.getRock(ROCK);
+        require(rockOwner == BOB, "owner must be the attested subject");
+        require(rockOwner != RELAYER, "the relayer must never end up owning the rock");
+        require(state == BankRockRegistry.RockState.Awake, "rock should be awake");
+    }
+
+    function testAwakenRejectsZeroSubject() public {
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300, address(0));
+        bytes memory sig = _sign(ATTESTER_PK, att);
+
+        bytes4 sel;
+        vm.prank(RELAYER);
+        try registry.awakenRock(ROCK, SAFE, att, sig) {
+            require(false, "a zero subject must be rejected");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.InvalidSubject.selector, "wrong error");
+        require(registry.lastCounter(UID) == 0, "counter must not advance on failure");
+    }
+
+    function testRelayedClaimGivesTheRockToTheSubjectNotTheSender() public {
+        _awaken();
+        registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
+
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, BOB);
+        bytes memory sig = _sign(ATTESTER_PK, att);
+
+        vm.prank(RELAYER);
+        registry.claimHandover(ROCK, att, sig);
+
+        (address rockOwner,,,,,) = registry.getRock(ROCK);
+        require(rockOwner == BOB, "the named recipient receives the rock");
+        require(rockOwner != RELAYER, "the relayer must never end up owning the rock");
+    }
+
+    function testClaimRejectsASubjectOtherThanTheNamedRecipient() public {
+        _awaken();
+        registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
+
+        // Mallory relays a genuine attestation, but one issued for herself.
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, MALLORY);
+        bytes memory sig = _sign(ATTESTER_PK, att);
+
+        bytes4 sel;
+        vm.prank(MALLORY);
+        try registry.claimHandover(ROCK, att, sig) {
+            require(false, "a subject other than the named recipient must be rejected");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.NotHandoverRecipient.selector, "wrong error");
+
+        (address rockOwner,,,,,) = registry.getRock(ROCK);
+        require(rockOwner == address(this), "ownership must not have moved");
+        require(registry.lastCounter(UID) == 1, "counter must not advance on failure");
+    }
+
+    function testOpenHandoverAcceptsAnySubject() public {
+        _awaken();
+        registry.initiateHandover(ROCK, address(0), uint64(block.timestamp + 1 days), bytes32(0));
+
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, MALLORY);
+        bytes memory sig = _sign(ATTESTER_PK, att);
+
+        vm.prank(RELAYER);
+        registry.claimHandover(ROCK, att, sig);
+
+        (address rockOwner,,,,,) = registry.getRock(ROCK);
+        require(rockOwner == MALLORY, "an unnamed handover goes to whoever the attester names");
+    }
+
+    // -----------------------------------------------------------------
+    // The Safe may act for its owner (sponsored UserOps)
+    // -----------------------------------------------------------------
+
+    function testSmartAccountCanInitiateAndCancelHandover() public {
+        _awaken();
+
+        vm.prank(SAFE);
+        registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
+
+        (,,, BankRockRegistry.RockState pending,,) = registry.getRock(ROCK);
+        require(pending == BankRockRegistry.RockState.HandoverPending, "Safe should be able to give");
+
+        vm.prank(SAFE);
+        registry.cancelHandover(ROCK);
+
+        (,,, BankRockRegistry.RockState state,,) = registry.getRock(ROCK);
+        require(state == BankRockRegistry.RockState.Awake, "Safe should be able to cancel");
+    }
+
+    function testSmartAccountCanArchiveAndFlagLost() public {
+        _awaken();
+
+        vm.prank(SAFE);
+        registry.markLost(ROCK);
+        (,,,, bool lost,) = registry.getRock(ROCK);
+        require(lost, "Safe should be able to flag the tag lost");
+
+        vm.prank(SAFE);
+        registry.clearLost(ROCK);
+        (,,,, lost,) = registry.getRock(ROCK);
+        require(!lost, "Safe should be able to clear the flag");
+
+        vm.prank(SAFE);
+        registry.archiveRock(ROCK);
+        (,,, BankRockRegistry.RockState state,,) = registry.getRock(ROCK);
+        require(state == BankRockRegistry.RockState.Archived, "Safe should be able to archive");
+    }
+
+    function testAStrangerCannotActForTheRock() public {
+        _awaken();
+
+        bytes4 sel;
+        vm.prank(MALLORY);
+        try registry.initiateHandover(ROCK, MALLORY, uint64(block.timestamp + 1 days), bytes32(0)) {
+            require(false, "a stranger must not give the rock away");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.NotRockOwner.selector, "wrong error for initiate");
+
+        vm.prank(MALLORY);
+        try registry.markLost(ROCK) {
+            require(false, "a stranger must not flag the rock lost");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.NotRockOwner.selector, "wrong error for markLost");
+
+        vm.prank(MALLORY);
+        try registry.archiveRock(ROCK) {
+            require(false, "a stranger must not archive the rock");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.NotRockOwner.selector, "wrong error for archive");
+
+        // The relayer is only a courier; relaying an awaken earns it nothing either.
+        vm.prank(RELAYER);
+        try registry.archiveRock(ROCK) {
+            require(false, "the relayer must not be treated as an authority");
+        } catch (bytes memory reason) {
+            sel = _selector(reason);
+        }
+        require(sel == BankRockRegistry.NotRockOwner.selector, "wrong error for relayer");
     }
 
     // -----------------------------------------------------------------
@@ -207,10 +375,10 @@ contract BankRockRegistryTest {
         require(h.messageHash == messageHash, "message hash mismatch");
         require(h.initiatedBy == address(this), "initiator mismatch");
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, BOB);
         bytes memory sig = _sign(ATTESTER_PK, att);
 
-        vm.prank(BOB);
+        vm.prank(RELAYER);
         registry.claimHandover(ROCK, att, sig);
 
         (
@@ -233,10 +401,10 @@ contract BankRockRegistryTest {
 
         registry.initiateHandover(ROCK, address(0), uint64(block.timestamp + 1 days), bytes32(0));
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, CAROL);
         bytes memory sig = _sign(ATTESTER_PK, att);
 
-        vm.prank(CAROL);
+        vm.prank(RELAYER);
         registry.claimHandover(ROCK, att, sig);
 
         (address rockOwner,,,,,) = registry.getRock(ROCK);
@@ -248,11 +416,11 @@ contract BankRockRegistryTest {
         registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
 
         // Counter 1 was already consumed by the awakening: a captured URL cannot be replayed.
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300, BOB);
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
-        vm.prank(BOB);
+        vm.prank(RELAYER);
         try registry.claimHandover(ROCK, att, sig) {
             require(false, "stale counter must be rejected");
         } catch (bytes memory reason) {
@@ -268,11 +436,11 @@ contract BankRockRegistryTest {
         _awaken();
         registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, OTHER_UID, 9, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, OTHER_UID, 9, block.timestamp + 300, BOB);
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
-        vm.prank(BOB);
+        vm.prank(RELAYER);
         try registry.claimHandover(ROCK, att, sig) {
             require(false, "a different tag must not claim this rock");
         } catch (bytes memory reason) {
@@ -289,11 +457,11 @@ contract BankRockRegistryTest {
 
         vm.warp(uint256(expiresAt) + 1);
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, BOB);
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
-        vm.prank(BOB);
+        vm.prank(RELAYER);
         try registry.claimHandover(ROCK, att, sig) {
             require(false, "expired handover must not be claimable");
         } catch (bytes memory reason) {
@@ -310,13 +478,13 @@ contract BankRockRegistryTest {
         _awaken();
         registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, CAROL);
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
-        vm.prank(CAROL);
+        vm.prank(RELAYER);
         try registry.claimHandover(ROCK, att, sig) {
-            require(false, "only the named recipient may claim");
+            require(false, "only the named recipient may be the subject of a claim");
         } catch (bytes memory reason) {
             sel = _selector(reason);
         }
@@ -333,11 +501,11 @@ contract BankRockRegistryTest {
         require(state == BankRockRegistry.RockState.Awake, "state should be Awake after cancel");
         require(h.recipient == address(0) && h.expiresAt == 0, "handover should be cleared");
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, BOB);
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
-        vm.prank(BOB);
+        vm.prank(RELAYER);
         try registry.claimHandover(ROCK, att, sig) {
             require(false, "cancelled handover must not be claimable");
         } catch (bytes memory reason) {
@@ -411,11 +579,11 @@ contract BankRockRegistryTest {
         require(state == BankRockRegistry.RockState.Archived, "state should be Archived");
         require(h.recipient == address(0) && h.expiresAt == 0, "handover should be cleared");
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, BOB);
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
-        vm.prank(BOB);
+        vm.prank(RELAYER);
         try registry.claimHandover(ROCK, att, sig) {
             require(false, "a cancelled handover must not be claimable");
         } catch (bytes memory reason) {
@@ -444,7 +612,7 @@ contract BankRockRegistryTest {
         _awaken();
         registry.archiveRock(ROCK);
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, address(this));
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
@@ -501,14 +669,14 @@ contract BankRockRegistryTest {
         registry.archiveRock(ROCK);
 
         uint256 freshRock = ROCK + 1;
-        BankRockRegistry.Attestation memory att = _att(freshRock, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(freshRock, UID, 2, block.timestamp + 300, BOB);
         bytes memory sig = _sign(ATTESTER_PK, att);
 
-        vm.prank(BOB);
+        vm.prank(RELAYER);
         registry.awakenRock(freshRock, SAFE, att, sig);
 
         (address rockOwner,, bytes32 uidHash, BankRockRegistry.RockState state,,) = registry.getRock(freshRock);
-        require(rockOwner == BOB, "the new rock belongs to whoever awakened it");
+        require(rockOwner == BOB, "the new rock belongs to the attested subject");
         require(uidHash == UID, "the same tag now backs the new rock");
         require(state == BankRockRegistry.RockState.Awake, "new rock should be Awake");
         require(registry.rockIdForUid(UID) == freshRock, "tag should be rebound to the new rock");
@@ -525,11 +693,11 @@ contract BankRockRegistryTest {
         registry.archiveRock(ROCK);
 
         uint256 liveRock = ROCK + 1;
-        BankRockRegistry.Attestation memory first = _att(liveRock, OTHER_UID, 1, block.timestamp + 300);
+        BankRockRegistry.Attestation memory first = _att(liveRock, OTHER_UID, 1, block.timestamp + 300, address(this));
         registry.awakenRock(liveRock, SAFE, first, _sign(ATTESTER_PK, first));
 
         uint256 thirdRock = ROCK + 2;
-        BankRockRegistry.Attestation memory second = _att(thirdRock, OTHER_UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory second = _att(thirdRock, OTHER_UID, 2, block.timestamp + 300, address(this));
         bytes memory sig = _sign(ATTESTER_PK, second);
 
         bytes4 sel;
@@ -545,10 +713,10 @@ contract BankRockRegistryTest {
         // Burn counters 1 and 2 on the original rock: awaken, then hand over.
         _awaken();
         registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
-        BankRockRegistry.Attestation memory claim = _att(ROCK, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory claim = _att(ROCK, UID, 2, block.timestamp + 300, BOB);
         // Sign before pranking: hashAttestation is itself a call, and would consume the prank.
         bytes memory claimSig = _sign(ATTESTER_PK, claim);
-        vm.prank(BOB);
+        vm.prank(RELAYER);
         registry.claimHandover(ROCK, claim, claimSig);
         require(registry.lastCounter(UID) == 2, "counter should be 2 before archiving");
 
@@ -558,7 +726,7 @@ contract BankRockRegistryTest {
 
         // A tap captured before the archive — counter 2 — must not work on the new rock.
         uint256 freshRock = ROCK + 1;
-        BankRockRegistry.Attestation memory replay = _att(freshRock, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory replay = _att(freshRock, UID, 2, block.timestamp + 300, address(this));
         bytes memory replaySig = _sign(ATTESTER_PK, replay);
 
         bytes4 sel;
@@ -570,7 +738,7 @@ contract BankRockRegistryTest {
         require(sel == BankRockRegistry.StaleAttestationCounter.selector, "wrong error");
 
         // A genuinely newer tap does work.
-        BankRockRegistry.Attestation memory fresh = _att(freshRock, UID, 3, block.timestamp + 300);
+        BankRockRegistry.Attestation memory fresh = _att(freshRock, UID, 3, block.timestamp + 300, address(this));
         registry.awakenRock(freshRock, SAFE, fresh, _sign(ATTESTER_PK, fresh));
         require(registry.lastCounter(UID) == 3, "counter should advance to 3");
     }
@@ -624,7 +792,7 @@ contract BankRockRegistryTest {
     function testPauseBlocksAwaken() public {
         registry.pause();
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300, address(this));
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
@@ -659,11 +827,11 @@ contract BankRockRegistryTest {
         registry.initiateHandover(ROCK, BOB, uint64(block.timestamp + 1 days), bytes32(0));
         registry.pause();
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 2, block.timestamp + 300, BOB);
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
-        vm.prank(BOB);
+        vm.prank(RELAYER);
         try registry.claimHandover(ROCK, att, sig) {
             require(false, "paused registry must not settle handovers");
         } catch (bytes memory reason) {
@@ -701,7 +869,7 @@ contract BankRockRegistryTest {
     function testRotatedAttesterIsEnforced() public {
         registry.setAttester(CAROL);
 
-        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300);
+        BankRockRegistry.Attestation memory att = _att(ROCK, UID, 1, block.timestamp + 300, address(this));
         bytes memory sig = _sign(ATTESTER_PK, att);
 
         bytes4 sel;
@@ -716,7 +884,9 @@ contract BankRockRegistryTest {
     function testAttestationTypehashIsStable() public view {
         require(
             registry.ATTESTATION_TYPEHASH()
-                == keccak256("Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline)"),
+                == keccak256(
+                    "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)"
+                ),
             "EIP-712 type string changed"
         );
     }

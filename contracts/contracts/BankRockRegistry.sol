@@ -52,13 +52,30 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  *
  *  Awakening a rock and claiming a handover both require an EIP-712 attestation signed by
  *  the trusted attester — the server that performs NTAG 424 DNA SDM verification. The
- *  attestation binds the rock id, the tag UID, the tag's read counter and a deadline. The
- *  registry enforces replay resistance on-chain: the counter must be strictly greater than
- *  the highest counter ever recorded for that UID, so a URL captured from a genuine tap
- *  cannot be replayed against the chain after the tag has been read again.
+ *  attestation binds the rock id, the tag UID, the tag's read counter, a deadline, and the
+ *  `subject`: the wallet that the tap authorises. The registry enforces replay resistance
+ *  on-chain: the counter must be strictly greater than the highest counter ever recorded for
+ *  that UID, so a URL captured from a genuine tap cannot be replayed against the chain after
+ *  the tag has been read again.
+ *
+ *  `msg.sender` is not an input to either decision. Ownership comes from `att.subject`, which
+ *  means the transaction can be submitted by anybody: a gas-sponsored UserOp from the rock's
+ *  Safe, or an operator relayer. A user who has just tapped a rock owns no ETH and must not
+ *  need any. An attestation is therefore a bearer token, but a narrowly useful one: whoever
+ *  relays it, the only address it can ever enrich is the `subject` the attester named, and it
+ *  is spent the moment it lands, because the counter it carries is consumed.
  *
  *  Physical possession is never sufficient financial authorization. An attestation gates
  *  claiming the object; it authorizes no spending of any kind.
+ *
+ *  Known gap, recorded rather than silently accepted: `awakenRock` takes `smartAccount` as a
+ *  plain argument, and the attestation does not cover it. An observer who sees a pending
+ *  awakening can therefore re-submit the same attestation with a different `smartAccount`,
+ *  which would leave the rock owned by the right person but pointing at a Rock Account the
+ *  observer controls. Closing it needs either `smartAccount` added to the signed payload, or
+ *  `msg.sender == smartAccount` required on awaken (which keeps 4337 sponsorship working, but
+ *  rules out a plain operator relayer). The type string is fixed by agreement with the
+ *  attestation signer, so the choice is deferred rather than made here.
  */
 contract BankRockRegistry is Ownable, Pausable, EIP712 {
     // ---------------------------------------------------------------------
@@ -106,26 +123,33 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
 
     /**
      * @notice A server-signed statement that a genuine tap of the tag bound to `rockId` was
-     *         verified.
+     *         verified, and which wallet that tap authorises.
      * @dev EIP-712 type string, exactly:
-     *      `Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline)`
+     *      `Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)`
      * @param rockId   The public rock id the attestation is for.
      * @param uidHash  `keccak256(rawUid7Bytes)` — the raw 7-byte NTAG UID, hashed.
      * @param counter  The tag's `SDMReadCtr` for this read. Must strictly exceed the highest
      *                 counter this registry has recorded for `uidHash`, so the first accepted
      *                 attestation for a UID must carry a counter of at least 1.
      * @param deadline Unix timestamp after which the attestation is no longer accepted.
+     * @param subject  The wallet this tap authorises: the address that becomes the rock's owner.
+     *                 It is named in the signed payload rather than taken from `msg.sender`, so
+     *                 the transaction can be submitted by anyone — a sponsored UserOp from the
+     *                 rock's Safe, or an operator relayer — without the tapping user needing gas.
+     *                 Must not be the zero address.
      */
     struct Attestation {
         uint256 rockId;
         bytes32 uidHash;
         uint32 counter;
         uint256 deadline;
+        address subject;
     }
 
-    /// @notice `keccak256("Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline)")`
-    bytes32 public constant ATTESTATION_TYPEHASH =
-        keccak256("Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline)");
+    /// @notice `keccak256("Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)")`
+    bytes32 public constant ATTESTATION_TYPEHASH = keccak256(
+        "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject)"
+    );
 
     // ---------------------------------------------------------------------
     // Errors
@@ -135,6 +159,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     error InvalidSmartAccount();
     error InvalidUidHash();
     error InvalidRecipient();
+    error InvalidSubject();
     error InvalidHandoverExpiry();
     error InvalidAttester();
 
@@ -146,7 +171,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     error NotRockOwner(address caller, address rockOwner);
     error HandoverNotPending(uint256 rockId);
     error HandoverExpired(uint256 rockId, uint64 expiresAt);
-    error NotHandoverRecipient(address caller, address recipient);
+    error NotHandoverRecipient(address subject, address recipient);
 
     error AttesterNotSet();
     error AttestationRockMismatch(uint256 expected, uint256 provided);
@@ -253,14 +278,20 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     // ---------------------------------------------------------------------
 
     /**
-     * @notice Awakens a rock: binds it to a tag UID and a smart account, and records the caller
-     *         as its first owner.
+     * @notice Awakens a rock: binds it to a tag UID and a smart account, and records
+     *         `att.subject` as its first owner.
      * @dev Requires a valid, unexpired, non-replayed attestation signed by `attester`. A rock can
      *      be awakened exactly once, and a UID can be bound to exactly one rock.
+     *
+     *      `msg.sender` is deliberately irrelevant. Ownership is taken from the signed payload,
+     *      so the transaction can be relayed by anyone: a gas-sponsored UserOp from the rock's
+     *      Safe, or an operator relayer. The tapping user never needs a funded wallet, which is
+     *      the whole point of the sponsored-onboarding decision.
      * @param rockId The public rock id. Must be non-zero.
      * @param smartAccount The Rock Account (ERC-4337 smart account) that custodies this rock's
      *        assets. Recorded here; this registry never calls it.
-     * @param att The attestation. `att.rockId` must equal `rockId`.
+     * @param att The attestation. `att.rockId` must equal `rockId` and `att.subject` must be
+     *        non-zero; `att.subject` becomes the owner.
      * @param sig The attester's EIP-712 signature over `att`.
      */
     function awakenRock(uint256 rockId, address smartAccount, Attestation calldata att, bytes calldata sig)
@@ -283,12 +314,12 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         _consumeAttestation(rockId, att.uidHash, att, sig);
 
         _uidToRockId[att.uidHash] = rockId;
-        r.currentOwner = msg.sender;
+        r.currentOwner = att.subject;
         r.smartAccount = smartAccount;
         r.uidHash = att.uidHash;
         r.state = RockState.Awake;
 
-        emit RockAwakened(rockId, msg.sender, att.uidHash, smartAccount, att.counter);
+        emit RockAwakened(rockId, att.subject, att.uidHash, smartAccount, att.counter);
     }
 
     /**
@@ -321,7 +352,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         Rock storage r = _rocks[rockId];
         if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
         if (r.state == RockState.Archived) revert RockIsArchived(rockId);
-        if (msg.sender != r.currentOwner) revert NotRockOwner(msg.sender, r.currentOwner);
+        _requireRockController(r);
 
         if (r.state == RockState.HandoverPending) {
             delete r.handover;
@@ -357,7 +388,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         Rock storage r = _rocks[rockId];
         if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
         if (r.state == RockState.Archived) revert RockIsArchived(rockId);
-        if (msg.sender != r.currentOwner) revert NotRockOwner(msg.sender, r.currentOwner);
+        _requireRockController(r);
         if (expiresAt <= block.timestamp) revert InvalidHandoverExpiry();
         if (recipient == r.currentOwner) revert InvalidRecipient();
 
@@ -374,14 +405,19 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     }
 
     /**
-     * @notice Completes a pending handover. The caller becomes the rock's owner.
+     * @notice Completes a pending handover. `att.subject` becomes the rock's owner.
      * @dev Requires a fresh attestation for the UID this rock was bound to at awakening — proof
-     *      that the caller is holding the physical object. The smart account is deliberately
+     *      that `att.subject` is holding the physical object. The smart account is deliberately
      *      unchanged: the Rock Account address and its assets are stable across ownership
      *      changes, and swapping its signing key happens off-registry.
+     *
+     *      As with `awakenRock`, `msg.sender` is irrelevant and the transaction may be relayed.
+     *      A named recipient is matched against `att.subject`, not against the sender, so the
+     *      recipient claims their gift without holding any ETH.
      * @param rockId The rock being claimed.
-     * @param att The attestation. `att.rockId` must equal `rockId` and `att.uidHash` must equal
-     *        the UID hash bound to the rock.
+     * @param att The attestation. `att.rockId` must equal `rockId`, `att.uidHash` must equal the
+     *        UID hash bound to the rock, and `att.subject` must be the named recipient when the
+     *        handover named one.
      * @param sig The attester's EIP-712 signature over `att`.
      */
     function claimHandover(uint256 rockId, Attestation calldata att, bytes calldata sig)
@@ -393,18 +429,18 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
 
         Handover memory h = r.handover;
         if (block.timestamp > h.expiresAt) revert HandoverExpired(rockId, h.expiresAt);
-        if (h.recipient != address(0) && msg.sender != h.recipient) {
-            revert NotHandoverRecipient(msg.sender, h.recipient);
+        if (h.recipient != address(0) && att.subject != h.recipient) {
+            revert NotHandoverRecipient(att.subject, h.recipient);
         }
 
         _consumeAttestation(rockId, r.uidHash, att, sig);
 
         address previousOwner = r.currentOwner;
-        r.currentOwner = msg.sender;
+        r.currentOwner = att.subject;
         r.state = RockState.Awake;
         delete r.handover;
 
-        emit HandoverClaimed(rockId, previousOwner, msg.sender, att.counter);
+        emit HandoverClaimed(rockId, previousOwner, att.subject, att.counter);
     }
 
     /**
@@ -414,7 +450,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     function cancelHandover(uint256 rockId) external {
         Rock storage r = _rocks[rockId];
         if (r.state != RockState.HandoverPending) revert HandoverNotPending(rockId);
-        if (msg.sender != r.currentOwner) revert NotRockOwner(msg.sender, r.currentOwner);
+        _requireRockController(r);
 
         r.state = RockState.Awake;
         delete r.handover;
@@ -436,7 +472,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         Rock storage r = _rocks[rockId];
         if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
         if (r.state == RockState.Archived) revert RockIsArchived(rockId);
-        if (msg.sender != r.currentOwner) revert NotRockOwner(msg.sender, r.currentOwner);
+        _requireRockController(r);
 
         r.lost = true;
         emit RockMarkedLost(rockId, msg.sender);
@@ -447,7 +483,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         Rock storage r = _rocks[rockId];
         if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
         if (r.state == RockState.Archived) revert RockIsArchived(rockId);
-        if (msg.sender != r.currentOwner) revert NotRockOwner(msg.sender, r.currentOwner);
+        _requireRockController(r);
 
         r.lost = false;
         emit RockLostCleared(rockId, msg.sender);
@@ -524,8 +560,29 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
     // Internal
     // ---------------------------------------------------------------------
 
+    /**
+     * @dev Owner-gated actions accept either the human owner's wallet or the rock's own Safe.
+     *
+     *      Under gas sponsorship the call arrives as a UserOp executed *by* the Safe, so
+     *      `msg.sender` is the Rock Account rather than the person. Both are the same authority
+     *      — the Safe is controlled by the current owner's signing key — and accepting both is
+     *      what lets an owner give, cancel, archive or flag a rock without holding any ETH.
+     *
+     *      There is no zero-address hole here: `smartAccount` is required to be non-zero at
+     *      awakening, and every caller of this helper has already rejected the `Dormant` state.
+     */
+    function _requireRockController(Rock storage r) private view {
+        if (msg.sender != r.currentOwner && msg.sender != r.smartAccount) {
+            revert NotRockOwner(msg.sender, r.currentOwner);
+        }
+    }
+
     function _structHash(Attestation calldata att) private pure returns (bytes32) {
-        return keccak256(abi.encode(ATTESTATION_TYPEHASH, att.rockId, att.uidHash, att.counter, att.deadline));
+        return keccak256(
+            abi.encode(
+                ATTESTATION_TYPEHASH, att.rockId, att.uidHash, att.counter, att.deadline, att.subject
+            )
+        );
     }
 
     /**
@@ -543,6 +600,7 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         if (att.rockId != expectedRockId) revert AttestationRockMismatch(expectedRockId, att.rockId);
         if (att.uidHash != expectedUidHash) revert AttestationUidMismatch(expectedUidHash, att.uidHash);
         if (att.deadline < block.timestamp) revert AttestationExpired(att.deadline);
+        if (att.subject == address(0)) revert InvalidSubject();
 
         uint32 seen = _lastCounter[att.uidHash];
         if (att.counter <= seen) revert StaleAttestationCounter(att.counter, seen);

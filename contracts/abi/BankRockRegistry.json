@@ -139,6 +139,11 @@
     },
     {
       "inputs": [],
+      "name": "InvalidSubject",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "InvalidUidHash",
       "type": "error"
     },
@@ -146,7 +151,7 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "caller",
+          "name": "subject",
           "type": "address"
         },
         {
@@ -601,6 +606,11 @@
               "internalType": "uint256",
               "name": "deadline",
               "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "subject",
+              "type": "address"
             }
           ],
           "internalType": "struct BankRockRegistry.Attestation",
@@ -659,6 +669,11 @@
               "internalType": "uint256",
               "name": "deadline",
               "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "subject",
+              "type": "address"
             }
           ],
           "internalType": "struct BankRockRegistry.Attestation",
@@ -839,6 +854,11 @@
               "internalType": "uint256",
               "name": "deadline",
               "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "subject",
+              "type": "address"
             }
           ],
           "internalType": "struct BankRockRegistry.Attestation",

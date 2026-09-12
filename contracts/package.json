@@ -6,7 +6,7 @@
   "scripts": {
     "build": "npm run compile",
     "compile": "hardhat compile",
-    "postcompile": "node scripts/export-abi.js",
+    "postcompile": "node scripts/export-abi.js && node ../scripts/sync-web-abi.mjs",
     "pretest": "npm run compile",
     "test": "hardhat test",
     "deploy": "node scripts/deploy.js"
