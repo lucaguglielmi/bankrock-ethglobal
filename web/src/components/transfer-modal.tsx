@@ -85,7 +85,7 @@ function TransferModalInner({
       let generatedTx = "";
       try {
         const txRes = await transferOnchain(rockId, trimmedRecipient as `0x${string}`);
-        generatedTx = typeof txRes === 'string' ? txRes : txRes?.hash || `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`;
+        generatedTx = txRes as string;
       } catch (err) {
         console.warn("Real on-chain transfer failed, proceeding with UI sequence for demo:", err);
         generatedTx = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`;
