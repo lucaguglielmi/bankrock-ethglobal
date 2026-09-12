@@ -196,7 +196,7 @@ async function assertSheetReachable(page: Page, check: SheetCheck): Promise<void
 }
 
 test.describe("sheets are reachable without sign-in — item 8", () => {
-  test.beforeEach((_fixtures, testInfo) => {
+  test.beforeEach(({}, testInfo) => {
     test.skip(
       testInfo.project.name !== PRIMARY_MOBILE_PROJECT,
       "sheet reachability is checked once, at 360x640 (spec 17 U2 acceptance)",
