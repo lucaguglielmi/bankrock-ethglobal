@@ -174,6 +174,30 @@ changes. Full dependency verification is in [`16-environment-and-secrets.md`](./
 self-deploying both Aqua and SwapVM on Base Sepolia (two protocol deployments to own, and a
 weaker "real Aqua" story).
 
+### D-024 — One typeface, actually applied
+
+**Decision:** Inter (variable, self-hosted through `next/font`) for all text, mapped to
+`--font-sans`. Geist Mono only for hashes, addresses and code. Font sizes come from a named scale
+in `@theme`; arbitrary pixel sizes and `text-xs` are removed. Full specification in
+[`17-mobile-ui-and-typography.md`](./17-mobile-ui-and-typography.md).
+
+**Consequence:** the self-referential `--font-sans: var(--font-sans)` that left the site rendering
+in each device's OS font (and downloading Geist for nothing) is fixed at the source. Body text is
+16 px on every device; nothing a user reads is below 13 px; text colours are semantic tokens with
+verified AA contrast.
+
+### D-025 — Mobile layout contract
+
+**Decision:** 360 × 640 is the design viewport and 320 px the floor. No horizontal scroll on any
+route, 44 × 44 touch targets, 16 px inputs, one `Sheet` primitive for every overlay (a bottom
+sheet on phones), one `BottomDock` for all fixed bottom chrome, safe-area insets and `dvh`
+throughout, and a header that collapses below `md`. Enforced by static greps and a Playwright
+viewport matrix in CI ([`17-mobile-ui-and-typography.md`](./17-mobile-ui-and-typography.md) Part 7).
+
+**Consequence:** the swipe-to-swap gesture (unreachable on small phones), the Aqua explainer's
+background canvas and the hover-only 3D background are cut; the seven ad-hoc modals are replaced.
+The user tests the result on devices; CI catches regressions.
+
 ## Open product questions
 
 1. **Is the hackathon's main story gifting, a public micro-exchange, or both?** Gifting is the core product journey; public tap-to-trade is the primary demonstration of the liquidity.

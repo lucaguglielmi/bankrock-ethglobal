@@ -137,7 +137,7 @@ secret you create locally (`openssl rand -hex 32`). *Output* = produced by a dep
 
 | # | Variable (today → target) | Provider | Where used | Needed from | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `NEXT_PUBLIC_PRIVY_APP_ID` | You — dashboard.privy.io | `providers.tsx` | Phase 0 | Also configure in the dashboard: allowed origin `https://bank-rock.com`, login methods email / Google / Apple / wallet, and enable Sepolia. Without it the app boots with a fake app ID and every login fails. |
+| 1 | `NEXT_PUBLIC_PRIVY_APP_ID` | You — dashboard.privy.io | `providers.tsx` | Phase 0 | Also configure in the dashboard: allowed origin `https://bank-rock.com`, login methods email / Google / Apple / wallet, and enable Sepolia. Without it the app boots with a placeholder app ID and `login()` silently activates a **fabricated embedded wallet** (`0x71C8…1b47`, `collector@bankrock.eth`) — spec 15 A-1/A-2. Phase 1 replaces that with an `UNAVAILABLE` sign-in state. |
 | 2 | `NEXT_PUBLIC_APP_URL` | Fixed: `https://bank-rock.com` | CORS in `middleware.ts`; email CTAs; MCP base URL | Phase 0 | Replaces the `bankrock.xyz` / `pages.dev` literals (D-022). |
 | 3 | `NEXT_PUBLIC_CHAIN_ID` → read by the chain config module | Fixed: `11155111` | D-015 chain module | Phase 1 | Currently unread. |
 | 4 | `BASE_SEPOLIA_RPC_URL` + `RPC_URL` → `SEPOLIA_RPC_URL` | You — Alchemy or Infura Sepolia endpoint | `lib/aa.ts`, `lib/indexer.ts`, cron, faucet | Phase 1 | Public RPCs rate-limit and reject wide `eth_getLogs`; the indexer needs a real provider. |

@@ -30,6 +30,7 @@ Working line: **Liquidity you can hold.**
 | [14-progressive-web-app.md](./14-progressive-web-app.md) | PWA conversion, mobile standalone UX, and contextual notification policy | Active |
 | [15-exit-demo-mode.md](./15-exit-demo-mode.md) | Audit baseline, simulation ledger, and the phased plan to replace simulated behaviour with real behaviour | Active |
 | [16-environment-and-secrets.md](./16-environment-and-secrets.md) | Verified external dependencies on Ethereum Sepolia, every secret the code reads, who provides it, funding budget | Active |
+| [17-mobile-ui-and-typography.md](./17-mobile-ui-and-typography.md) | Phone-first layout contract, typeface and type scale, contrast tokens, sheet primitive, and the CI checks that enforce them | Active |
 
 ## Spec rules
 

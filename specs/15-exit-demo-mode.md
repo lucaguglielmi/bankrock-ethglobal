@@ -36,7 +36,7 @@ Per the spec rules in [`README.md`](./README.md), claims are tagged:
 | B-5 | `deploy.yml` runs `wrangler pages deploy .` from `web/`, publishing the entire source directory as static assets, with no `_worker.js`, targeting project `bankrock-web` while `package.json` targets `bankrock-ethglobal`. | `.github/workflows/deploy.yml` |
 | B-6 | Two lockfiles (`package-lock.json`, `pnpm-lock.yaml`) coexist; `packageManager` declares pnpm; CI uses npm. | `web/` |
 | B-7 | Contract tests exist but no workflow runs them. | `contracts/test/BankRockRegistry.t.sol`, `.github/workflows/ci.yml` |
-| B-9 | `mcp/node_modules` is tracked in git — 4,919 files, including the `@typescript/typescript-darwin-arm64` platform binary — despite `mcp/.gitignore` listing `node_modules`. Every `npm ci` on Linux shows hundreds of spurious deletions. | `git ls-files mcp/node_modules \| wc -l` → 4919 |
+| B-9 | `mcp/node_modules` is tracked in git — 4,919 files, including the `@typescript/typescript-darwin-arm64` platform binary — despite `mcp/.gitignore` listing `node_modules`. Every `npm ci` on Linux shows hundreds of spurious deletions. **Resolved on this branch** in `e574ad5`: `git ls-files mcp/node_modules` now returns nothing and the root `.gitignore` covers `node_modules/`. | `git ls-files mcp/node_modules \| wc -l` → 4919 before, 0 after |
 | B-8 | ~~`mcp/package.json` pins versions that do not exist.~~ **Withdrawn.** `typescript@7.0.2` and `cors@2.8.6` exist; `mcp/` installs and builds cleanly. `contracts/` installs and its 6 tests pass. | `npm ci && npm run build` in `mcp/` exit 0; `npx hardhat test` → 6 passing |
 
 ## 1.2 Runtime — live site
@@ -50,7 +50,7 @@ Per the spec rules in [`README.md`](./README.md), claims are tagged:
 | R-5 | `GET /api/events?rockId=1` returns `count: 0`. | The registry it queries has no code. |
 | R-6 | `/sw.js` returns `404` while `/alerts` instructs users to enable push notifications. | `curl -o /dev/null -w "%{http_code}" https://bank-rock.com/sw.js` |
 | R-7 | `/r/{id}` — the NFC tag payload path specified in [`06-nfc-security.md`](./06-nfc-security.md) — returns `404`. The app only serves `/rock/[id]`. | `curl https://bank-rock.com/r/1` |
-| R-8 | The string `bank-rock.com` appears nowhere in the codebase. CORS defaults to `https://bankrock.xyz`; email CTAs and the MCP server point at `bankrock-ethglobal.pages.dev`; the Gelato function calls `bankrock.xyz`. | `middleware.ts:79`, `lib/email-service.ts:63`, `mcp/index.ts:23`, `web3-functions/bankrock-keeper/index.ts:75` |
+| R-8 | The string `bank-rock.com` appears nowhere in the codebase. CORS defaults to `https://bankrock.xyz`; email CTAs and the MCP server point at `bankrock-ethglobal.pages.dev`; the Gelato function calls `bankrock.xyz`. | `middleware.ts:79`, `lib/email-service.ts:63`, `mcp/index.ts:23`, `web3-functions/bankrock-keeper/index.ts:75`, `components/providers.tsx:38` (the Privy modal logo) |
 | R-9 | [`12-deployment.md`](./12-deployment.md) specifies Vercel. The actual target is Cloudflare Pages via OpenNext. | `package.json` `deploy:pages`, `wrangler.jsonc` |
 
 ## 1.3 Simulation ledger
@@ -115,6 +115,19 @@ This is the authoritative list of what is faked, required by rule 1 of [`../STEE
 | F-4 | ~~`nodejs_compat` is absent.~~ **Withdrawn.** With `compatibility_date >= 2026-08-04` Cloudflare enables `nodejs_compat` by default; the repo's date is `2026-09-11`. `node:crypto` and `Buffer` work as-is. `node-aes-cmac` is dependency-free pure JS. | Cloudflare changelog 2026-08-04; `wrangler.jsonc` |
 | F-5 | `verifiedPubKey` is `0x${e}${c}` padded to 66 chars — not a key, not a signature, not derived from anything. | `app/api/nfc/verify/route.ts:105` |
 | F-6 | On-chain, `bindNFC` stores a `bytes32` that nothing ever verifies. The `InvalidNFCSequence` error is declared and never used. | `contracts/contracts/BankRockRegistry.sol` |
+
+### Identity, demo controls and forms
+
+Added on the second review (2026-09-12, this branch). None of these were in the first ledger.
+
+| # | Fact | Evidence |
+| --- | --- | --- |
+| A-1 | **Sign-in is simulated when Privy is not configured.** With no valid `NEXT_PUBLIC_PRIVY_APP_ID`, `login()` does not fail: it activates a fabricated embedded wallet (`DEMO_WALLET_ADDRESS` = `0x71C8…1b47`, user `collector@bankrock.eth`), persists the session in `localStorage`, and the header presents it as an `Embedded` Privy wallet. The console calls it a "high-fidelity Demo Embedded Wallet". Spec 16 #1 previously said "every login fails"; that was wrong. | `context/auth-context.tsx` (`DEMO_WALLET_ADDRESS`, `activateDemo`, `login`) |
+| A-2 | `PrivyProvider` is booted with the placeholder app ID `clp1234567890abcdef123456` when the real one is absent, so the SDK initialises and the fabricated session is indistinguishable from a real one in the UI. The `isDemoMode` it derives is a second, implicit demo flag unrelated to D-013. | `components/providers.tsx` (`Providers`) |
+| F-7 | The judge demo switcher is rendered on every rock page in every environment and sets `verificationResult = { isAuthentic: true }` on the client, which renders the green `Verified Physical` badge with no verifier involved. The `active_maker` scenario also sets the reserve to 1,250 USDC and fees to 12.4. | `components/demo-switcher.tsx`; `components/rock-interface.tsx` (`handleSelectScenario`, `handleResetDemo`) |
+| S-6 | The shop's "Claim an OG Rock" and "Become a Sponsor" forms submit nowhere: `handleSubmit` is two `setTimeout`s that show a success state and close the modal. | `components/contact-modal.tsx:45-56` |
+| S-7 | "Claim your vanity URL" saves nothing; the handler is an 800 ms `setTimeout` with a comment describing what a real app would do. | `components/social-bridge.tsx:16-24` |
+| N-11 | The rock page initialises `currentApy` to `18.4` before any fetch, so the figure renders even when the yield route fails. | `components/rock-interface.tsx:77` |
 
 ## 1.4 Security findings
 
@@ -222,6 +235,13 @@ not thirty separate ones.
 
 **Displaces:** nothing. This is a precondition for the rest.
 
+**Scope of the flag:** `isDemoMode` in `auth-context.tsx` (A-1, A-2) and the judge demo switcher
+(F-7) are the same concept and fold into `NEXT_PUBLIC_DEMO_MODE`. With the flag off, the
+fabricated wallet, the placeholder app ID and the switcher are not in the bundle, and sign-in
+without a configured Privy app renders `UNAVAILABLE`. With the flag on, the switcher may choose
+which *badged* scenario is displayed, but may never set the attestation state (D-018) or a
+balance.
+
 ### D-014 — No synthesized transaction identifiers, ever
 
 **Decision:** the codebase must contain no path that generates a hash-shaped string. A transaction
@@ -270,7 +290,8 @@ storage.
 
 **Consequence:** until that implementation passes against a physical tag, the UI must show
 `unverified`, never `Verified Physical`. The green badge is gated on a real CMAC match and nothing
-else. On-chain, `awakenRock` and the claim path require a server-signed EIP-712 attestation bound
+else. No client-side code path — the judge demo switcher included — may set the verified state
+(F-7). On-chain, `awakenRock` and the claim path require a server-signed EIP-712 attestation bound
 to `(rockId, uid, counter)`.
 
 **Threat model:** see Part 5.
@@ -350,6 +371,9 @@ Target state per capability at each phase:
 | Alerts delivery | DEMO | UNAVAILABLE | UNAVAILABLE | UNAVAILABLE | UNAVAILABLE |
 | Admin dashboard | DEMO | DEMO (badged) | REAL | REAL | REAL |
 | MCP tools | DEMO | UNAVAILABLE | REAL (partial) | REAL | REAL |
+| User identity (Privy sign-in) | DEMO (fabricated wallet when unconfigured) | UNAVAILABLE until the app ID is set, then REAL | REAL | REAL | REAL |
+| Judge scenario switcher | DEMO (always on, sets attestation) | DEMO (flag only; cannot set attestation or balances) | DEMO (badged) | DEMO (badged) | DEMO (badged) |
+| Shop contact / vanity forms | DEMO (fake success) | UNAVAILABLE or REAL (D1 write) | REAL | REAL | REAL |
 
 **Note:** APY is *removed*, not staged. It cannot be `REAL` — decision D-004 forbids the claim
 regardless of data quality.
@@ -371,7 +395,8 @@ Nothing else can be verified while the build is red.
 5. Delete one lockfile; align CI with the declared package manager (B-6).
 6. Rewrite `deploy.yml` to call `npm run deploy:pages` (B-5).
 7. Add a `contracts` job running `npm test` (B-7).
-8. Correct `mcp/package.json` version pins (B-8).
+8. ~~Correct `mcp/package.json` version pins (B-8).~~ Withdrawn. In its place: untrack
+   `mcp/node_modules` (B-9) — **done** in `e574ad5`.
 9. Fix the `www` redirect rule in the Cloudflare dashboard (R-1).
 
 **Acceptance:** `npm ci && npm run lint && npm run build` exits 0 from a clean checkout. CI is
@@ -389,9 +414,17 @@ Stop lying before starting to tell the truth. This phase adds no features.
 5. Remove APY from every surface (N-3, D-004).
 6. Centralise addresses (D-015); delete `d1/schema.sql` (X-6); one `NEXT_PUBLIC_APP_URL` (D-022).
 7. Make `sendAlertEmail` return `success: false` when it did not send (S-5).
+8. Delete the fabricated sign-in (A-1, A-2): with no valid `NEXT_PUBLIC_PRIVY_APP_ID` the auth
+   control renders `UNAVAILABLE` and no address is ever shown. Fold `isDemoMode` into the flag.
+9. Gate the demo switcher on the flag and remove its ability to set `verificationResult`,
+   `liquidity` or `earnedFees` (F-7, N-11).
+10. Contact and vanity forms (S-6, S-7): write to D1 through the Phase 1 adapter, or render
+    `UNAVAILABLE`. A success state may not be shown for a request that was not sent.
 
 **Acceptance:** with `NEXT_PUBLIC_DEMO_MODE=false`, a rock page shows no balance, no fee figure,
-no APY and no provenance entries — because none of it is real yet. `GET /api/rocks/1/yield`
+no APY and no provenance entries — because none of it is real yet. With no Privy app ID
+configured, sign-in shows `UNAVAILABLE` and no wallet address appears anywhere. No control on
+the page can produce the green `Verified Physical` badge. `GET /api/rocks/1/yield`
 returns 200 with an empty series rather than 500 or fiction. `grep -rE "Math\.random\(\).*16"`
 over `web/src` returns nothing.
 
@@ -431,14 +464,14 @@ This is the sponsor integration and the reason the project exists.
    fall back to the reference `XYCSwap` AquaApp per spec 04.
 3. Fix the ABI in `lib/aa.ts` (E-3) and implement `ship` via the atomic batch (D-012):
    `approve(Aqua, USDC)`, `approve(Aqua, WETH)`, `Aqua.ship(app, strategy, [USDC, WETH], [a, b])`.
-3. Implement the visitor swap path against the strategy — from the Rock Account, not the registry
+4. Implement the visitor swap path against the strategy — from the Rock Account, not the registry
    (SC-4, D-020).
-4. Read actual *and* virtual balances and display both, per spec 04's explicit requirement that
+5. Read actual *and* virtual balances and display both, per spec 04's explicit requirement that
    virtual allocations are not summed and presented as owned capital.
-5. Implement `dock` (Flow H).
-6. Delete `/api/quote` and `1INCH_API_KEY` (E-5). Quote from `SwapVMRouter.quote()` — the only
+6. Implement `dock` (Flow H).
+7. Delete `/api/quote` and `1INCH_API_KEY` (E-5). Quote from `SwapVMRouter.quote()` — the only
    source guaranteed to equal what `swap()` executes.
-7. Ship the second strategy sharing one reserve (spec 04).
+8. Ship the second strategy sharing one reserve (spec 04).
 
 **Acceptance:** a second Privy account executes a real swap against a rock's strategy; the rock's
 actual and virtual balances both change on-chain; the fee figure shown is read from Aqua, not
@@ -485,6 +518,10 @@ address, email, UID, or stack trace.
    implementation has started." — which is no longer true either — with the real state.
 4. Regenerate the simulation ledger (§1.3) as a living `DEMO-STATE.md`, per STEERING rule 1.
 5. Correct spec 12 (D-021); update spec 06 if the tag URL scheme changed.
+6. Every `SIMULATED` badge, the banner and every `UNAVAILABLE` empty state follow the type scale,
+   contrast tokens and 44 px targets of
+   [`17-mobile-ui-and-typography.md`](./17-mobile-ui-and-typography.md), which lands before this
+   phase.
 
 **Acceptance:** every simulated pixel is labelled. A judge shown the app with
 `NEXT_PUBLIC_DEMO_MODE=true` can identify what is real without asking.
@@ -561,10 +598,12 @@ cd contracts && npm test                          # exit 0
 ! grep -rP "(txHash|Hash)\s*=\s*\`0x\\\$\{(?!string\})" web/src   # excludes the `0x${string}` viem type
 
 # No address literals outside the config module (D-015)
-! grep -rE "0x[a-fA-F0-9]{40}" web/src --exclude-dir=lib/chain
+! grep -rE "0x[a-fA-F0-9]{40}" web/src --exclude-dir=chain      # --exclude-dir matches a basename, not a path
 
-# No demo fallback in production (D-013)
-grep -q "NEXT_PUBLIC_DEMO_MODE=false" .env.production
+# No demo fallback in production (D-013). Secrets live in the Cloudflare dashboard, not in files
+# (spec 16), so the assertion is on the deploy job, which must set the flag explicitly.
+grep -q 'NEXT_PUBLIC_DEMO_MODE: "false"' .github/workflows/deploy.yml
+! grep -rE "DEMO_WALLET_ADDRESS|clp1234567890abcdef123456|bankrock_auth_demo_session" web/src   # A-1, A-2
 
 # One adapter (D-016)
 ! grep -r "@cloudflare/next-on-pages" web/
@@ -618,3 +657,20 @@ Decisions D-013 through D-022 are added to [`09-decisions.md`](./09-decisions.md
 
 Open question 11 is added: **which network actually hosts a usable Aqua deployment?** C-4 exists
 because this was never verified. Phase 3 does not start until it is answered.
+
+## Relationship to spec 17
+
+[`17-mobile-ui-and-typography.md`](./17-mobile-ui-and-typography.md) is UI-only work with its
+own phases (U0–U4). It runs in parallel with Phases 1–5 above and must land before Phase 6: the
+`SIMULATED` badge, the demo banner and the `UNAVAILABLE` empty states introduced by D-013 are new
+surfaces and are built to that contract, not retrofitted. The two documents share one rule: a
+badge, banner or empty state is rendered into the layout, never overlaid, so it survives a
+screenshot.
+
+## Second-review changes (this branch)
+
+Ledger additions A-1, A-2, F-7, S-6, S-7, N-11; B-9 marked resolved; Phase 0 item 8 corrected
+(B-8 was withdrawn); Phase 1 items 8–10 and acceptance; Phase 3 renumbered (two items were
+numbered 3); Part 7 `--exclude-dir` fixed and the `.env.production` check replaced (no such file
+exists by design — spec 16 puts secrets in the dashboard); capability table rows for identity,
+the switcher and the forms.
