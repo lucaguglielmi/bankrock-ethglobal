@@ -204,21 +204,6 @@ const TOOLS = [
     },
   },
   {
-    name: "run_aqua_keeper",
-    description:
-      "Intended to evaluate and execute an autonomous rebalance. The keeper is a simulation " +
-      "that executes nothing on-chain, so this always returns 'unavailable' rather than " +
-      "reporting an execution that did not happen.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        rockId: { type: "string", description: "The rock id." },
-        execute: { type: "boolean", description: "Ignored." },
-      },
-      required: ["rockId"],
-    },
-  },
-  {
     name: "get_waitlist_stats",
     description:
       "Reads aggregate waitlist counts from the Bank Rock API. Returns the API's own response, " +
@@ -242,7 +227,6 @@ const TOOLS = [
             "loss_warning",
             "dangerous_trade",
             "profit_milestone",
-            "keeper_rebalance",
             "custody_transfer",
             "gas_depletion",
             "genesis_drop",
@@ -547,8 +531,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return unavailable(REASONS.noBridge);
       case "optimize_idle_yield":
         return unavailable(REASONS.noIdleYield);
-      case "run_aqua_keeper":
-        return unavailable(REASONS.noKeeper);
 
       default:
         return unavailable(`unknown tool: ${name}`);

@@ -1,7 +1,7 @@
 /**
  * The single source of truth for chain identity and contract addresses (D-015).
  *
- * No address literal may appear in a component, hook, API route, keeper function or MCP tool.
+ * No address literal may appear in a component, hook, API route or MCP tool.
  * Every address arrives here from an environment variable and is format-validated at module
  * load. A missing optional address yields `undefined`, and callers must render UNAVAILABLE
  * (D-013) rather than substitute anything.
@@ -10,7 +10,7 @@
  */
 
 import { createPublicClient, http, fallback, isAddress, getAddress, type Address } from "viem";
-import { sepolia, baseSepolia } from "viem/chains";
+import { sepolia } from "viem/chains";
 import { env, optionalEnv, unavailable, real, type Capability } from "@/lib/demo";
 import { publicReasonWith } from "@/lib/errors";
 
@@ -21,9 +21,9 @@ export function parseChainIdEnv(value: string | undefined): number {
   const trimmed = (value ?? "").trim();
   if (trimmed === "") return SEPOLIA_CHAIN_ID;
   const parsed = Number(trimmed);
-  if (!Number.isInteger(parsed)) {
+  if (!Number.isInteger(parsed) || parsed !== SEPOLIA_CHAIN_ID) {
     throw new Error(
-      `NEXT_PUBLIC_CHAIN_ID must be an integer; got "${trimmed}"`,
+      `NEXT_PUBLIC_CHAIN_ID must be ${SEPOLIA_CHAIN_ID} (Ethereum Sepolia); got "${trimmed}"`,
     );
   }
   return parsed;
@@ -33,7 +33,7 @@ export function parseChainIdEnv(value: string | undefined): number {
 export const chainId = parseChainIdEnv(env.chainId);
 
 /** The one chain this application targets. */
-export const chain = chainId === 84532 ? baseSepolia : sepolia;
+export const chain = sepolia;
 
 /**
  * Parses an address from configuration.

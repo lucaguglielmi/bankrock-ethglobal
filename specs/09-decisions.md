@@ -470,6 +470,46 @@ is a transfer of title, rotatable through `setAttester`.
 `web/src/lib/rock-account.server.ts` (`submitSignedUserOp`'s receipt check, `reserveRelayerSpend`);
 `web/src/lib/nfc/rock-resolution.ts` (`resolveSmartAccount`).
 
+### D-033 — Ethereum Sepolia is the only chain
+
+**Decision:** the chain module (`web/src/lib/chain/index.ts`) rejects any `NEXT_PUBLIC_CHAIN_ID`
+other than `11155111` at startup. `parseChainIdEnv` accepts only Sepolia's chain id or an unset
+value (which defaults to it); any other integer, including `84532` (Base Sepolia), throws the same
+explicit error it always has. `chain` is `sepolia`; there is no `baseSepolia` import anywhere in
+the module.
+
+**Why:** every contract this app talks to — the registry, the Aqua app, the taker periphery, the
+canonical Aqua deployment, Circle USDC and WETH — is deployed on Ethereum Sepolia only (D-023).
+Accepting another chain id would silently point the app at addresses that do not exist on it,
+which is exactly the failure mode D-015 exists to prevent.
+
+**Consequence:** a misconfigured `NEXT_PUBLIC_CHAIN_ID` fails the process at module load, loudly,
+rather than degrading into reads against the wrong network.
+
+### D-035 — The keeper is deleted rather than rewritten
+
+**Decision:** `web3-functions/bankrock-keeper` (the Gelato Web3 Function), `web/src/app/api/keeper`,
+`web/src/lib/aqua-keeper.ts`, the `keeper_rebalance` alert topic and the MCP `run_aqua_keeper` tool
+are removed outright. Nothing in their place attempts to rebalance anything.
+
+**Why:** the keeper targeted a contract interface that does not exist (spec 15 X-7) — it read Base
+mainnet USDC against a Sepolia registry and called a `rebalance` function absent from the 1inch
+router it pointed at. It was a badged `DEMO` beat with no demo value: it could not execute, could
+not be shown executing, and rewriting it against the current registry and Aqua path would still
+leave it with no authorization mechanism to move a Rock Account's funds (the ERC-7579 scoped
+session key module it would need is cut from MVP scope, spec 15 Part 6). A real rebalancer belongs
+after the hackathon, alongside the rest of spec 13's roadmap.
+
+**Consequence:** DEMO-STATE rows S-2 and W-3 are removed — their condition ("or deleted") is met.
+Spec 15 Part 8 marks X-7 closed by deletion rather than by a rewrite. `/api/alerts/gelato` is
+unaffected: it is a generic operational-alert delivery route, not the keeper, and stays.
+
+**Files:** `web3-functions/` (deleted); `web/src/app/api/keeper/` (deleted);
+`web/src/lib/aqua-keeper.ts` (deleted); `web/src/lib/alerts.ts` and
+`web/src/components/rock-alerts.tsx` (`keeper_rebalance` topic removed); `mcp/index.ts` and
+`mcp/config.ts` (`run_aqua_keeper` tool and its `noKeeper` reason removed);
+`scripts/spec-checks.sh` (D-022 check no longer walks `web3-functions/`).
+
 ## Open product questions
 
 1. **Is the hackathon's main story gifting, a public micro-exchange, or both?** Gifting is the core product journey; public tap-to-trade is the primary demonstration of the liquidity.

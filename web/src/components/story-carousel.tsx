@@ -98,12 +98,12 @@ export function StoryCarousel() {
     <text x="2.5" y="1.2" textAnchor="start" fontSize="2.5" className="fill-neutral-400 font-medium tracking-wide">nice wine</text>
   </g>
 
-  <!-- Florence flashing dot -->
+  {/* Florence flashing dot */}
   <g transform="translate(74.07, 50.19)">
     <circle cx="0" cy="0" r="8" className="fill-blue-500/30 animate-ping" />
     <circle cx="0" cy="0" r="4" className="fill-blue-500/50 animate-pulse" />
     <circle cx="0" cy="0" r="2" className="fill-blue-600 drop-shadow-[0_0_2px_rgba(37,99,235,0.8)]" />
-    <!-- Animated dashed ring -->
+    {/* Animated dashed ring */}
     <circle cx="0" cy="0" r="10" className="stroke-blue-400/60 fill-transparent stroke-[0.5] animate-[spin_4s_linear_infinite]" strokeDasharray="2 4" />
     <text x="5" y="1.5" fontSize="4" className="fill-blue-600 font-black tracking-widest uppercase font-mono drop-shadow-md">Florence</text>
   </g>

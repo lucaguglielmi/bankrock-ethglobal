@@ -47,7 +47,7 @@ export function HowItWorksBackground({ topic }: HowItWorksBackgroundProps) {
           <group>
             {/* Holographic HUD Elements (Minority Report style) */}
             <Html position={[-2, 1, 0]} transform className="pointer-events-none opacity-30 mix-blend-screen" distanceFactor={5}>
-              <div className="font-mono text-[10px] text-cyan-300 w-48 flex flex-col gap-1 border-l border-cyan-500/50 pl-2">
+              <div className="font-mono text-label text-cyan-300 w-48 flex flex-col gap-1 border-l border-cyan-500/50 pl-2">
                 <div className="flex justify-between"><span>SYS.MEM</span><span>0x4F8A</span></div>
                 <div className="flex justify-between"><span>NET.VOL</span><span className="text-emerald-400">▲ 14.2%</span></div>
                 <div className="h-4 w-full bg-cyan-900/20 mt-1 relative overflow-hidden">
@@ -60,7 +60,7 @@ export function HowItWorksBackground({ topic }: HowItWorksBackgroundProps) {
             </Html>
             
             <Html position={[2, -1, -1]} transform className="pointer-events-none opacity-20 mix-blend-screen" distanceFactor={5}>
-              <div className="font-mono text-[8px] text-cyan-300 w-32 flex flex-col gap-1 text-right border-r border-cyan-500/50 pr-2">
+              <div className="font-mono text-label text-cyan-300 w-32 flex flex-col gap-1 text-right border-r border-cyan-500/50 pr-2">
                 <div>HASH: a9f3...b4c2</div>
                 <div className="text-rose-400">▼ SLIPPAGE 0.1%</div>
                 <div className="flex gap-1 justify-end mt-1">

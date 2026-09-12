@@ -85,6 +85,5 @@ export const REASONS = {
   noAqua: "Aqua strategy not integrated (spec 15 Phase 3).",
   noBridge: "cross-chain bridging is not integrated; it remains a labelled simulation in the web app only (spec 15 Part 6).",
   noIdleYield: "idle-yield routing (Aave/Morpho) was cut from scope (spec 15 Part 6).",
-  noKeeper: "the keeper is a simulation and executes nothing on-chain (spec 15 Part 8).",
   noTokenConfig: "USDC_ADDRESS / WETH_ADDRESS are not configured, so no balance can be read.",
 } as const;

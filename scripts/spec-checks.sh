@@ -165,8 +165,10 @@ expect_absent "D-017" "no 'if (SECRET && mismatch)' authentication bypass in the
   -rE 'if \([A-Za-z_.]*[A-Z_]{4,}[A-Za-z_.]* && '
 
 # D-022 — one canonical origin, https://bank-rock.com.
+# web3-functions/ was dropped from this check when the Gelato keeper was deleted (D-035);
+# it no longer exists for grep to walk.
 expect_absent "D-022" "no bankrock.xyz or pages.dev origin literals" \
-  3 "web/src" "mcp" "web3-functions" \
+  2 "web/src" "mcp" \
   -rE 'bankrock\.xyz|pages\.dev'
 
 # D-004 — yield claims are not made at all.
