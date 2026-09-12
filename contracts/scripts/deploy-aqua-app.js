@@ -40,7 +40,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createPublicClient, createWalletClient, http, isAddress, getAddress } from "viem";
+import { createPublicClient, createWalletClient, http, isAddress, getAddress, zeroAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 
@@ -97,6 +97,80 @@ async function deploy({ publicClient, walletClient, artifact, args, confirmation
   };
 }
 
+/**
+ * Confirms that `aqua` answers the Aqua interface rather than merely having code (F-12).
+ *
+ * `rawBalances` and `safeBalances` are the two views the whole integration reads; an address that
+ * decodes both with the right return shapes is Aqua as far as this deployment is concerned. The
+ * arguments are all-zero on purpose: no strategy exists for them, so a genuine Aqua returns zeros
+ * rather than reverting, and anything that is not Aqua either reverts or fails to decode.
+ */
+async function assertLooksLikeAqua(publicClient, aqua) {
+  const probes = [
+    {
+      name: "rawBalances(address,address,bytes32,address)",
+      abi: [
+        {
+          type: "function",
+          name: "rawBalances",
+          stateMutability: "view",
+          inputs: [
+            { name: "maker", type: "address" },
+            { name: "app", type: "address" },
+            { name: "strategyHash", type: "bytes32" },
+            { name: "token", type: "address" },
+          ],
+          outputs: [
+            { name: "balance", type: "uint248" },
+            { name: "tokensCount", type: "uint8" },
+          ],
+        },
+      ],
+      args: [zeroAddress, zeroAddress, `0x${"0".repeat(64)}`, zeroAddress],
+    },
+    {
+      name: "safeBalances(address,address,bytes32,address,address)",
+      abi: [
+        {
+          type: "function",
+          name: "safeBalances",
+          stateMutability: "view",
+          inputs: [
+            { name: "maker", type: "address" },
+            { name: "app", type: "address" },
+            { name: "strategyHash", type: "bytes32" },
+            { name: "token0", type: "address" },
+            { name: "token1", type: "address" },
+          ],
+          outputs: [
+            { name: "balance0", type: "uint256" },
+            { name: "balance1", type: "uint256" },
+          ],
+        },
+      ],
+      args: [zeroAddress, zeroAddress, `0x${"0".repeat(64)}`, zeroAddress, zeroAddress],
+    },
+  ];
+
+  for (const probe of probes) {
+    try {
+      await publicClient.readContract({
+        address: aqua,
+        abi: probe.abi,
+        functionName: probe.abi[0].name,
+        args: probe.args,
+      });
+      console.log(`  probe     ${probe.name} -> ok`);
+    } catch (error) {
+      fail(
+        `${aqua} does not answer ${probe.name}, so it is not the Aqua deployment.\n` +
+          `  Expected 0x1111113ccf1426a8e30e2bff5e005d929bf6a90a on Sepolia (spec 16 §1.1).\n` +
+          `  Underlying error: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`,
+      );
+    }
+  }
+}
+
 async function main() {
   const rpcUrl = requireEnv("SEPOLIA_RPC_URL");
   const privateKey = requireEnv("DEPLOYER_PRIVATE_KEY");
@@ -121,12 +195,19 @@ async function main() {
     fail(`SEPOLIA_RPC_URL points at chain ${chainId}, expected ${CHAIN_ID} (Ethereum Sepolia).`);
   }
 
-  // The one input that must be real: an app bound to an address with no code would accept a
-  // `ship` that can never settle.
+  // The one input that must be real. Checking only that the address has code is not enough:
+  // Sepolia carries several Aqua-ish contracts and the project has already written two of them
+  // down the wrong way round on paper (contracts/aqua/NOTES.md §6), and both contracts deployed
+  // below hold an immutable pointer to whatever is passed here (audit finding F-12).
+  //
+  // So probe the interface instead: call the two views our integration actually depends on and
+  // require them to decode. A contract that answers both with the right shapes is Aqua for every
+  // purpose this deployment has.
   const aquaCode = await publicClient.getCode({ address: aqua });
   if (!aquaCode || aquaCode === "0x") {
     fail(`no contract code at ${aqua} on Sepolia — that is not the Aqua deployment.`);
   }
+  await assertLooksLikeAqua(publicClient, aqua);
 
   const balance = await publicClient.getBalance({ address: account.address });
   if (balance === 0n) {
@@ -151,11 +232,14 @@ async function main() {
     label: "XYCSwap     ",
   });
 
+  // The taker is bound to this app for the life of the deployment: since the F-6 fix the app is
+  // an immutable, not a parameter, so a caller can no longer point the periphery at a contract of
+  // their own. That is why the app is deployed first.
   const taker = await deploy({
     publicClient,
     walletClient,
     artifact: takerArtifact,
-    args: [aqua], // constructor(IAqua aqua_)
+    args: [aqua, app.address], // constructor(IAqua aqua_, XYCSwap app_)
     confirmations,
     label: "XYCSwapTaker",
   });
@@ -173,6 +257,16 @@ async function main() {
     if (getAddress(wired) !== aqua) {
       fail(`${label} at ${deployed.address} points at ${wired}, expected ${aqua}.`);
     }
+  }
+
+  // And the periphery must be bound to the app we just deployed, not to anything else.
+  const wiredApp = await publicClient.readContract({
+    address: taker.address,
+    abi: takerArtifact.abi,
+    functionName: "APP",
+  });
+  if (getAddress(wiredApp) !== getAddress(app.address)) {
+    fail(`XYCSwapTaker at ${taker.address} points at app ${wiredApp}, expected ${app.address}.`);
   }
 
   const record = {

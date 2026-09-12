@@ -2,197 +2,229 @@
 pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
+import {ISafeOwnerManager} from "./interfaces/ISafeOwnerManager.sol";
+
 /**
  * @title BankRockRegistry
- * @notice Identity and lifecycle registry for Bank Rock physical objects.
+ * @author Bank Rock
  *
- * @dev Scope, and what is deliberately absent.
+ * @notice The public record of who owns which Bank Rock. A rock is a physical object carrying an
+ *         NFC tag; this contract binds that tag to a rock id, records the wallet that owns the
+ *         object and the smart account ("Rock Account") that holds its money, and moves ownership
+ *         to the next person when they tap the rock and claim it.
+ * @notice This contract never holds tokens, never receives a token approval, and has no function
+ *         that can move money — not for its administrator, not for anyone. Losing every key in the
+ *         project cannot take a coin out of it, because none is ever in it.
+ * @notice Who may call what. Anyone may relay `awakenRock` and `claimHandover`: those are
+ *         authorised by the attester's signature, not by the sender, so a person who has just
+ *         tapped a rock needs no ETH. Only the rock's owner — or its Rock Account, for as long as
+ *         that account still answers to the owner — may give, cancel, retire or flag a rock. Only
+ *         the contract administrator may rotate the attester or pause.
  *
- *  This contract binds a public rock id to (a) the NTAG 424 DNA tag that proves physical
- *  possession of the object and (b) the smart account that actually custodies the rock's
- *  assets. It records who currently owns the object and moves that ownership through an
- *  explicit handover. That is all it does.
+ * @dev State machine. `getRock` reports the state as an integer, `describeRock` as a word.
  *
- *  It holds no tokens, receives no ERC-20 approvals, and never performs a `call` with
- *  caller-supplied calldata. The previous revision of this contract exposed `executeTrade`
- *  (an arbitrary-call proxy behind an unauthenticated router allowlist) and
- *  `setRouterWhitelist` with no access control. Both are removed rather than guarded:
- *  trading happens from the Rock Account against Aqua, which is where the system
- *  architecture always placed it. Nothing in this contract can move value, so there is
- *  nothing here to steal.
+ *      | From            | Call                                   | To                |
+ *      | --------------- | -------------------------------------- | ----------------- |
+ *      | Dormant         | `awakenRock`                           | Awake             |
+ *      | Awake           | `initiateHandover`                     | HandoverPending   |
+ *      | HandoverPending | `initiateHandover` (replaces the gift)  | HandoverPending   |
+ *      | HandoverPending | `claimHandover`                        | Awake, new owner  |
+ *      | HandoverPending | `cancelHandover`                       | Awake             |
+ *      | HandoverPending | expiry — no call, nothing written       | reported as Awake |
+ *      | Awake           | `archiveRock`                          | Archived          |
+ *      | HandoverPending | `archiveRock` (cancels the gift first)  | Archived          |
  *
- * @dev Why there is no immediate `transferOwnership(rockId, newOwner)`.
+ *      Every other transition reverts, and each has a test: `Dormant` accepts nothing but
+ *      `awakenRock`; `Archived` accepts nothing at all; a rock can be awakened once; one tag backs
+ *      one live rock; an expired gift is claimable by nobody; a gift named for someone else cannot
+ *      be claimed by a third party.
  *
- *  Every change of object ownership goes through `initiateHandover` -> `claimHandover`,
- *  including the case where the current owner already knows the recipient's address. An
- *  owner-initiated instant transfer would produce a second, shorter on-chain shape for the
- *  same real-world event: the provenance history would then contain some transfers that
- *  were proven by a physical tap and some that were not, and a reader could not tell them
- *  apart without inspecting which function was called. Forcing one path keeps the history
- *  uniform — a rock changes hands exactly when someone holding the physical object presents
- *  a fresh attestation for it — and it keeps the security properties uniform too: a
- *  compromised owner key cannot hand the object to an attacker who never held it.
+ * @dev Attestation. `awakenRock` and `claimHandover` require an EIP-712 attestation signed by
+ *      `attester()` — the server that performs NTAG 424 DNA SDM verification off-chain. It names
+ *      the rock, the tag, the tag's read counter, a deadline, the wallet the tap authorises
+ *      (`subject`) and, for an awakening, the Rock Account to bind.
  *
- *  Note that `transferOwnership(address)` inherited from `Ownable` is unrelated: it moves
- *  administration of this contract (pausing and the attester address), never a rock.
+ *      `msg.sender` is not an input to either decision, so the transaction can be relayed: as a
+ *      gas-sponsored UserOp from the rock's Safe, or by an operator relayer. An attestation is
+ *      therefore a bearer token, but a narrow one — whoever relays it, the only address it can
+ *      enrich is the `subject` the attester named, and the only Rock Account it can bind is the
+ *      one it names.
  *
- * @dev Archiving.
+ *      Replay resistance is enforced here, not merely off-chain: the counter must strictly exceed
+ *      the highest counter this contract has accepted for that tag. Note precisely what that does:
+ *      the on-chain counter advances when an attestation is *consumed*, not when the tag is read,
+ *      so an outstanding attestation is killed by the next successful call for that tag rather
+ *      than by the next tap. `MAX_ATTESTATION_LIFETIME` bounds how long one may sit unspent.
  *
- *  `archiveRock` is the one-way exit. It retires a rock and releases its tag so the same
- *  physical object can awaken a fresh rock id — the operator rehearsing the awakening beat with
- *  a single tag, without reprogramming it. The archived record stays readable, and the tag's
- *  read counter keeps climbing across the boundary, so nothing about reuse weakens replay
- *  resistance. See `archiveRock` and `lastCounter`.
+ * @dev Timestamps are unix seconds and every deadline is inclusive: a gift can be claimed in the
+ *      block whose timestamp equals `expiresAt`, and an attestation is valid in the block whose
+ *      timestamp equals its `deadline`. Every window here is minutes or days wide, so the ±15 s a
+ *      proposer can move `block.timestamp` changes no outcome.
  *
- * @dev Attestation.
+ * @dev Physical possession is never sufficient financial authorization. An attestation gates
+ *      claiming the object; it authorises no spending of any kind. Threat model: spec 15 Part 5,
+ *      and `specs/19-contract-review-and-hardening.md` Part 1.1.
  *
- *  Awakening a rock and claiming a handover both require an EIP-712 attestation signed by
- *  the trusted attester — the server that performs NTAG 424 DNA SDM verification. The
- *  attestation binds the rock id, the tag UID, the tag's read counter, a deadline, and the
- *  `subject`: the wallet that the tap authorises. The registry enforces replay resistance
- *  on-chain: the counter must be strictly greater than the highest counter ever recorded for
- *  that UID, so a URL captured from a genuine tap cannot be replayed against the chain after
- *  the tag has been read again.
- *
- *  `msg.sender` is not an input to either decision. Ownership comes from `att.subject`, which
- *  means the transaction can be submitted by anybody: a gas-sponsored UserOp from the rock's
- *  Safe, or an operator relayer. A user who has just tapped a rock owns no ETH and must not
- *  need any. An attestation is therefore a bearer token, but a narrowly useful one: whoever
- *  relays it, the only address it can ever enrich is the `subject` the attester named, and it
- *  is spent the moment it lands, because the counter it carries is consumed.
- *
- *  Physical possession is never sufficient financial authorization. An attestation gates
- *  claiming the object; it authorizes no spending of any kind.
- *
- *  Because neither call reads `msg.sender`, an attestation is relayable but not malleable: the
- *  signature covers every consequence the call can have. `awakenRock` binds a Rock Account, so
- *  `smartAccount` is part of the signed payload and must equal the argument; without that, an
- *  observer could take a captured attestation and re-submit it naming a Rock Account of their
- *  own, leaving the rock owned by the right person but custodied at an address the attacker
- *  controls — which is precisely the address the interface would then invite the owner to fund.
- *  `claimHandover` changes no smart account, so it ignores the field; the signer sets it to zero
- *  for claim attestations, and the registry does not care what it holds.
+ * @custom:security-contact security@bank-rock.com
  */
-contract BankRockRegistry is Ownable, Pausable, EIP712 {
-    // ---------------------------------------------------------------------
-    // Types
-    // ---------------------------------------------------------------------
+contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
+    /* --------------------------------------------------------------------- */
+    /*  Types                                                                 */
+    /* --------------------------------------------------------------------- */
 
-    /// @notice Lifecycle state of a rock.
+    /**
+     * @notice The lifecycle state of a rock. Etherscan shows the integer, so read it as:
+     *         `0 = Dormant`, `1 = Awake`, `2 = HandoverPending`, `3 = Archived`.
+     *         `describeRock` returns the same thing as a word.
+     */
     enum RockState {
-        /// @dev Never awakened. No owner, no smart account, no UID binding.
+        /// @notice `0` — never awakened: no owner, no Rock Account, no tag binding.
         Dormant,
-        /// @dev Awakened and owned. No handover outstanding.
+        /// @notice `1` — awakened and owned, with no gift outstanding.
         Awake,
-        /// @dev Awakened, owned, and a handover is outstanding and not yet expired.
+        /// @notice `2` — awakened and owned, with a gift outstanding that has not expired.
         HandoverPending,
-        /// @dev Retired by its owner. Terminal: it can never be awakened, given, or revived.
-        ///      Its owner, smart account and UID binding stay readable as history.
+        /// @notice `3` — retired by its owner. Terminal: never awakened, given or revived again.
         Archived
     }
 
-    /// @notice An outstanding gift handover (Flow E).
+    /// @notice An outstanding gift: the standing offer to hand a rock to its next owner.
     struct Handover {
-        /// @dev Named recipient, or `address(0)` for "whoever taps the rock and claims it".
+        /// @notice The named recipient, or the zero address for "whoever taps the rock next".
         address recipient;
-        /// @dev Unix timestamp after which the handover can no longer be claimed by anyone.
+        /// @notice Unix seconds. The last second at which the gift can be claimed, inclusive.
         uint64 expiresAt;
-        /// @dev Timestamp the handover was created.
+        /// @notice Unix seconds. When the gift was opened.
         uint64 initiatedAt;
-        /// @dev Owner who created the handover.
+        /// @notice The owner who opened the gift.
         address initiatedBy;
-        /// @dev Hash of the off-chain gift message. The message itself is never stored here.
+        /// @notice Hash of the off-chain gift message, or zero. The message is never stored here.
         bytes32 messageHash;
     }
 
-    /// @notice Full record for one rock.
+    /**
+     * @notice Everything this contract records about one rock.
+     * @dev Field order is chosen so that `currentOwner`, `state` and `lost` share one storage
+     *      slot. It is a private struct — `getRock` returns its fields individually — so the
+     *      order is not part of this contract's ABI and can change freely.
+     */
     struct Rock {
+        /// @notice The wallet that owns the physical object.
         address currentOwner;
-        address smartAccount;
-        /// @dev `keccak256(rawUid7Bytes)` of the NTAG 424 DNA tag bound at first awakening.
-        bytes32 uidHash;
+        /// @notice Lifecycle state; see `RockState`.
         RockState state;
-        /// @dev Informational only (Flow F). Freezes nothing.
+        /// @notice The owner's own "the tag is lost" flag. Informational: it freezes nothing.
         bool lost;
+        /// @notice The Rock Account holding this rock's tokens. Recorded, never called except to
+        ///         ask it `isOwner`.
+        address smartAccount;
+        /// @notice `keccak256(rawUid7Bytes)` of the NFC tag bound at the first awakening.
+        bytes32 uidHash;
+        /// @notice The outstanding gift, if any. Zeroed whenever no gift is outstanding.
         Handover handover;
     }
 
     /**
-     * @notice A server-signed statement that a genuine tap of the tag bound to `rockId` was
-     *         verified, and which wallet that tap authorises.
+     * @notice The attester's signed statement that a genuine tap of a rock's tag was verified,
+     *         and which wallet that tap authorises. Etherscan cannot produce one of these: it
+     *         comes from the Bank Rock verifier after a real tap. See `contracts/README.md`.
      * @dev EIP-712 type string, exactly:
      *      `Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)`
-     * @param rockId   The public rock id the attestation is for.
-     * @param uidHash  `keccak256(rawUid7Bytes)` — the raw 7-byte NTAG UID, hashed.
-     * @param counter  The tag's `SDMReadCtr` for this read. Must strictly exceed the highest
-     *                 counter this registry has recorded for `uidHash`, so the first accepted
-     *                 attestation for a UID must carry a counter of at least 1.
-     * @param deadline Unix timestamp after which the attestation is no longer accepted.
-     * @param subject  The wallet this tap authorises: the address that becomes the rock's owner.
-     *                 It is named in the signed payload rather than taken from `msg.sender`, so
-     *                 the transaction can be submitted by anyone — a sponsored UserOp from the
-     *                 rock's Safe, or an operator relayer — without the tapping user needing gas.
-     *                 Must not be the zero address.
-     * @param smartAccount The Rock Account this attestation authorises `awakenRock` to bind.
-     *                 Covering it in the signature is what stops a front-runner re-submitting a
-     *                 captured attestation with a Rock Account of their own. `claimHandover`
-     *                 ignores this field entirely — it changes no smart account — and the signer
-     *                 sets it to the zero address for claim attestations.
      */
     struct Attestation {
+        /// @notice The public rock id this attestation is for.
         uint256 rockId;
+        /// @notice `keccak256(rawUid7Bytes)` — the raw 7-byte NFC tag UID, hashed.
         bytes32 uidHash;
+        /// @notice The tag's `SDMReadCtr` for this read. Must strictly exceed the highest counter
+        ///         this registry has accepted for `uidHash`, so the first one must be at least 1.
+        ///         Monotonic per tag for the life of the registry; a `uint32` cannot be exhausted
+        ///         by a physical tag, which is read at most a few times a minute.
         uint32 counter;
+        /// @notice Unix seconds, inclusive. Must be in the future and at most
+        ///         `MAX_ATTESTATION_LIFETIME` ahead of the block that consumes it.
         uint256 deadline;
+        /// @notice The wallet this tap authorises: the address that becomes the rock's owner.
+        ///         Named in the signed payload rather than taken from `msg.sender`, so the call
+        ///         can be relayed. Must not be the zero address.
         address subject;
+        /// @notice The Rock Account `awakenRock` may bind. Covering it in the signature is what
+        ///         stops a front-runner re-submitting a captured attestation with an account of
+        ///         their own. `claimHandover` ignores this field — it binds no account — and the
+        ///         signer sets it to the zero address for claim attestations.
         address smartAccount;
     }
 
-    /// @notice `keccak256("Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)")`
+    /* --------------------------------------------------------------------- */
+    /*  Constants                                                             */
+    /* --------------------------------------------------------------------- */
+
+    /// @notice The EIP-712 type hash of `Attestation`. Useful for reproducing a digest by hand.
     bytes32 public constant ATTESTATION_TYPEHASH = keccak256(
-        "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)"
+        "Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,"
+        "address subject,address smartAccount)"
     );
 
-    // ---------------------------------------------------------------------
-    // Errors
-    // ---------------------------------------------------------------------
+    /**
+     * @notice The longest an attestation may stay valid: 15 minutes.
+     * @dev The off-chain signer already uses a short TTL, but a policy in TypeScript is not an
+     *      invariant. Enforcing the ceiling here means a signer bug — a millisecond clock, a hand
+     *      -signed payload, a second implementation — cannot mint a bearer token good for years.
+     *      The window has to cover a real tap-to-confirm: verify, build the UserOp, wait for a
+     *      bundler. Fifteen minutes is generous for that and short enough that a captured
+     *      attestation is worthless by the time anyone notices it.
+     */
+    uint256 public constant MAX_ATTESTATION_LIFETIME = 15 minutes;
 
-    error InvalidRockId();
-    error InvalidSmartAccount();
-    error InvalidUidHash();
-    error InvalidRecipient();
-    error InvalidSubject();
-    error InvalidHandoverExpiry();
-    error InvalidAttester();
+    /**
+     * @notice The longest a gift may stay claimable: 90 days.
+     * @dev An unbounded gift is a standing offer of the physical object to whoever next taps it,
+     *      years later, with the rock stuck in `HandoverPending` and the owner relying on memory
+     *      to cancel it. Ninety days covers posting a rock anywhere in the world and forgetting
+     *      about it twice; past that, the owner opens a new gift.
+     */
+    uint64 public constant MAX_HANDOVER_DURATION = 90 days;
 
-    error RockAlreadyAwakened(uint256 rockId);
-    error RockNotAwakened(uint256 rockId);
-    error RockIsArchived(uint256 rockId);
-    error UidBoundToDifferentRock(bytes32 uidHash, uint256 boundRockId);
+    /* --------------------------------------------------------------------- */
+    /*  Storage                                                               */
+    /* --------------------------------------------------------------------- */
 
-    error NotRockOwner(address caller, address rockOwner);
-    error HandoverNotPending(uint256 rockId);
-    error HandoverExpired(uint256 rockId, uint64 expiresAt);
-    error NotHandoverRecipient(address subject, address recipient);
+    /// @notice The address whose EIP-712 signature this registry accepts as a tag attestation.
+    address public attester;
 
-    error AttesterNotSet();
-    error AttestationRockMismatch(uint256 expected, uint256 provided);
-    error AttestationUidMismatch(bytes32 expected, bytes32 provided);
-    error AttestationSmartAccountMismatch(address expected, address provided);
-    error AttestationExpired(uint256 deadline);
-    error StaleAttestationCounter(uint32 provided, uint32 lastSeen);
-    error InvalidAttestationSignature();
+    /// @notice Every rock, by id. Read it through `getRock` or `describeRock`.
+    mapping(uint256 rockId => Rock rock) private _rocks;
 
-    // ---------------------------------------------------------------------
-    // Events
-    // ---------------------------------------------------------------------
+    /// @notice The highest tag read counter ever accepted for a tag, by `uidHash`.
+    mapping(bytes32 uidHash => uint32 counter) private _lastCounter;
 
+    /// @notice The rock a tag currently backs, by `uidHash`. Zero means unbound.
+    mapping(bytes32 uidHash => uint256 rockId) private _uidToRockId;
+
+    /* --------------------------------------------------------------------- */
+    /*  Events                                                                */
+    /* --------------------------------------------------------------------- */
+
+    /**
+     * @notice The attestation signer changed.
+     * @param previousAttester The signer that was trusted until this call. Zero at first setting.
+     * @param newAttester The signer trusted from now on.
+     */
     event AttesterUpdated(address indexed previousAttester, address indexed newAttester);
 
+    /**
+     * @notice A rock was awakened: a tag, an owner and a Rock Account are now bound to a rock id.
+     * @param rockId The rock that woke up.
+     * @param rockOwner The wallet that now owns it — the attestation's subject, not the sender.
+     * @param uidHash The tag bound to it, hashed.
+     * @param smartAccount The Rock Account that holds its tokens.
+     * @param counter The tag read counter consumed by this awakening.
+     */
     event RockAwakened(
         uint256 indexed rockId,
         address indexed rockOwner,
@@ -201,6 +233,14 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         uint32 counter
     );
 
+    /**
+     * @notice A gift was opened: the rock is now claimable by its recipient until `expiresAt`.
+     * @param rockId The rock being given away.
+     * @param from The owner opening the gift.
+     * @param recipient The named recipient, or the zero address for "whoever taps it next".
+     * @param expiresAt Unix seconds, inclusive: the last second at which it can be claimed.
+     * @param messageHash Hash of the off-chain gift message, or zero.
+     */
     event HandoverInitiated(
         uint256 indexed rockId,
         address indexed from,
@@ -209,321 +249,443 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         bytes32 messageHash
     );
 
+    /**
+     * @notice A gift was claimed: the rock changed hands.
+     * @param rockId The rock that changed hands.
+     * @param previousOwner Who owned it until this call.
+     * @param newOwner Who owns it now — the attestation's subject, not the sender.
+     * @param counter The tag read counter consumed by this claim.
+     */
     event HandoverClaimed(
-        uint256 indexed rockId,
-        address indexed previousOwner,
-        address indexed newOwner,
-        uint32 counter
+        uint256 indexed rockId, address indexed previousOwner, address indexed newOwner, uint32 counter
     );
 
+    /**
+     * @notice A gift was withdrawn and can no longer be claimed.
+     * @dev Also emitted, before the new gift, when `initiateHandover` replaces an outstanding one,
+     *      and before `RockArchived` when retiring a rock closes an outstanding gift — so the
+     *      event log alone always shows a claim path closing.
+     * @param rockId The rock whose gift was withdrawn.
+     * @param by The owner or Rock Account that withdrew it.
+     */
     event HandoverCancelled(uint256 indexed rockId, address indexed by);
 
+    /**
+     * @notice A rock was retired. Terminal, and its tag is released for a new rock id.
+     * @param rockId The rock that was retired.
+     * @param by The owner or Rock Account that retired it.
+     * @param uidHash The tag that is now free to back a different rock.
+     */
     event RockArchived(uint256 indexed rockId, address indexed by, bytes32 indexed uidHash);
 
+    /**
+     * @notice The owner flagged the physical tag as lost or copied. Informational only.
+     * @param rockId The rock flagged.
+     * @param by The owner or Rock Account that flagged it.
+     */
     event RockMarkedLost(uint256 indexed rockId, address indexed by);
-    event RockLostCleared(uint256 indexed rockId, address indexed by);
-
-    // ---------------------------------------------------------------------
-    // Storage
-    // ---------------------------------------------------------------------
-
-    /// @notice The address whose EIP-712 signature this registry accepts as a tag attestation.
-    address public attester;
-
-    mapping(uint256 rockId => Rock) private _rocks;
-
-    /// @dev Highest `SDMReadCtr` ever accepted for a given UID hash.
-    mapping(bytes32 uidHash => uint32) private _lastCounter;
-
-    /// @dev UID hash -> the rock id it was bound to at first awakening. 0 means unbound.
-    mapping(bytes32 uidHash => uint256) private _uidToRockId;
-
-    // ---------------------------------------------------------------------
-    // Construction
-    // ---------------------------------------------------------------------
 
     /**
-     * @param initialOwner Administrator of this contract: may pause, unpause and set the attester.
-     * @param initialAttester Address of the attestation signer. May be `address(0)` at deploy
-     *        time, in which case `awakenRock` and `claimHandover` revert until `setAttester`
-     *        is called.
+     * @notice The owner cleared the lost flag.
+     * @param rockId The rock whose flag was cleared.
+     * @param by The owner or Rock Account that cleared it.
      */
-    constructor(address initialOwner, address initialAttester)
-        Ownable(initialOwner)
-        EIP712("BankRockRegistry", "1")
-    {
+    event RockLostCleared(uint256 indexed rockId, address indexed by);
+
+    /* --------------------------------------------------------------------- */
+    /*  Errors                                                                */
+    /* --------------------------------------------------------------------- */
+
+    /// @notice Rock id `0` is reserved as "no rock" and can never be awakened.
+    error InvalidRockId();
+
+    /// @notice A Rock Account must be a real address.
+    /// @param smartAccount The address that was supplied.
+    error InvalidSmartAccount(address smartAccount);
+
+    /// @notice A tag hash must be a real hash.
+    /// @param uidHash The value that was supplied.
+    error InvalidUidHash(bytes32 uidHash);
+
+    /// @notice The attestation names nobody to give the rock to.
+    /// @param subject The address that was supplied.
+    error InvalidSubject(address subject);
+
+    /// @notice A gift to the current owner would change nothing.
+    /// @param recipient The address that was supplied, which already owns this rock.
+    error RecipientIsAlreadyTheOwner(address recipient);
+
+    /// @notice A gift must expire in the future.
+    /// @param expiresAt The expiry that was supplied, in unix seconds.
+    /// @param nowTimestamp The block timestamp it was compared against.
+    error InvalidHandoverExpiry(uint64 expiresAt, uint64 nowTimestamp);
+
+    /// @notice A gift may not stay claimable for longer than `MAX_HANDOVER_DURATION`.
+    /// @param expiresAt The expiry that was supplied, in unix seconds.
+    /// @param maxExpiresAt The latest expiry this block would accept.
+    error HandoverTooLong(uint64 expiresAt, uint64 maxExpiresAt);
+
+    /// @notice The registry must always have an attestation signer, so it cannot be set to zero.
+    error AttesterCannotBeZero();
+
+    /// @notice This rock has already been awakened.
+    /// @param rockId The rock in question.
+    error RockAlreadyAwakened(uint256 rockId);
+
+    /// @notice This rock has never been awakened, so there is nothing to act on.
+    /// @param rockId The rock in question.
+    error RockNotAwakened(uint256 rockId);
+
+    /// @notice This rock was retired. Retirement is permanent and nothing can be done to it.
+    /// @param rockId The rock in question.
+    error RockIsArchived(uint256 rockId);
+
+    /// @notice This tag already backs a different live rock. Retire that one first.
+    /// @param uidHash The tag in question.
+    /// @param boundRockId The rock it currently backs.
+    error UidBoundToDifferentRock(bytes32 uidHash, uint256 boundRockId);
+
+    /// @notice Only the rock's owner, or a Rock Account that still answers to the owner, may do
+    ///         this.
+    /// @param rockId The rock in question.
+    /// @param caller The address that tried.
+    /// @param rockOwner The rock's current owner.
+    /// @param smartAccount The rock's recorded Rock Account.
+    error NotRockOwner(uint256 rockId, address caller, address rockOwner, address smartAccount);
+
+    /// @notice There is no gift outstanding on this rock.
+    /// @param rockId The rock in question.
+    error HandoverNotPending(uint256 rockId);
+
+    /// @notice The gift's expiry has passed; it is claimable by nobody.
+    /// @param rockId The rock in question.
+    /// @param expiresAt The gift's expiry, in unix seconds.
+    /// @param nowTimestamp The block timestamp it was compared against.
+    error HandoverExpired(uint256 rockId, uint64 expiresAt, uint64 nowTimestamp);
+
+    /// @notice This gift is reserved for a named recipient, and the attestation names someone else.
+    /// @param subject The wallet the attestation authorised.
+    /// @param recipient The wallet the gift was reserved for.
+    error NotHandoverRecipient(address subject, address recipient);
+
+    /// @notice No attestation signer is configured, so no attested action can be verified.
+    error AttesterNotSet();
+
+    /// @notice The attestation was issued for a different rock.
+    /// @param expected The rock being acted on.
+    /// @param provided The rock the attestation names.
+    error AttestationRockMismatch(uint256 expected, uint256 provided);
+
+    /// @notice The attestation was issued for a different tag.
+    /// @param expected The tag bound to this rock.
+    /// @param provided The tag the attestation names.
+    error AttestationUidMismatch(bytes32 expected, bytes32 provided);
+
+    /// @notice The attestation authorises a different Rock Account from the one supplied.
+    /// @param expected The Rock Account the attestation names.
+    /// @param provided The Rock Account supplied to the call.
+    error AttestationSmartAccountMismatch(address expected, address provided);
+
+    /// @notice The attestation's deadline has passed. Tap the rock again for a fresh one.
+    /// @param deadline The attestation's deadline, in unix seconds.
+    /// @param nowTimestamp The block timestamp it was compared against.
+    error AttestationExpired(uint256 deadline, uint256 nowTimestamp);
+
+    /// @notice The attestation is valid for longer than `MAX_ATTESTATION_LIFETIME` allows.
+    /// @param deadline The attestation's deadline, in unix seconds.
+    /// @param maxDeadline The latest deadline this block would accept.
+    error AttestationLifetimeTooLong(uint256 deadline, uint256 maxDeadline);
+
+    /// @notice This tag read was already used, or is older than one that was. Tap again.
+    /// @param provided The counter the attestation carries.
+    /// @param lastSeen The highest counter already accepted for this tag.
+    error StaleAttestationCounter(uint32 provided, uint32 lastSeen);
+
+    /// @notice The signature does not come from the configured attestation signer.
+    error InvalidAttestationSignature();
+
+    /// @notice This registry must always have an administrator: the attester has to stay
+    ///         rotatable, or every future tap becomes unusable. Use `transferOwnership` and
+    ///         `acceptOwnership` instead.
+    error OwnershipCannotBeRenounced();
+
+    /* --------------------------------------------------------------------- */
+    /*  Constructor                                                           */
+    /* --------------------------------------------------------------------- */
+
+    /**
+     * @notice Deploys the registry.
+     * @param initialOwner The administrator: may rotate the attester, pause and unpause. Ownership
+     *        moves in two steps thereafter, and cannot be renounced.
+     * @param initialAttester The attestation signer. May be the zero address at deployment, in
+     *        which case every attested action reverts `AttesterNotSet` until `setAttester` is
+     *        called — a deploy script should never leave it that way.
+     */
+    constructor(address initialOwner, address initialAttester) Ownable(initialOwner) EIP712("BankRockRegistry", "1") {
         if (initialAttester != address(0)) {
             attester = initialAttester;
             emit AttesterUpdated(address(0), initialAttester);
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Administration
-    // ---------------------------------------------------------------------
-
-    /// @notice Sets the attestation signer. Only the contract administrator.
-    function setAttester(address newAttester) external onlyOwner {
-        if (newAttester == address(0)) revert InvalidAttester();
-        address previous = attester;
-        attester = newAttester;
-        emit AttesterUpdated(previous, newAttester);
-    }
-
-    /// @notice Halts awakening and handovers. Views, `cancelHandover` and the lost flag stay live.
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /// @notice Resumes awakening and handovers.
-    function unpause() external onlyOwner {
-        _unpause();
-    }
-
-    // ---------------------------------------------------------------------
-    // Lifecycle
-    // ---------------------------------------------------------------------
+    /* --------------------------------------------------------------------- */
+    /*  Attested actions — anyone may relay these                             */
+    /* --------------------------------------------------------------------- */
 
     /**
-     * @notice Awakens a rock: binds it to a tag UID and a smart account, and records
-     *         `att.subject` as its first owner.
-     * @dev Requires a valid, unexpired, non-replayed attestation signed by `attester`. A rock can
-     *      be awakened exactly once, and a UID can be bound to exactly one rock.
-     *
-     *      `msg.sender` is deliberately irrelevant. Both consequences of this call — who ends up
-     *      owning the rock, and which Rock Account it is bound to — come from the signed payload,
-     *      so the transaction can be submitted by anyone: a gas-sponsored UserOp from the rock's
-     *      Safe, or an operator relayer. The tapping user never needs a funded wallet, and a
-     *      third party who captures the attestation can do nothing with it except carry out the
-     *      awakening the attester already authorised.
-     * @param rockId The public rock id. Must be non-zero.
-     * @param smartAccount The Rock Account (ERC-4337 smart account) that custodies this rock's
-     *        assets. Must equal `att.smartAccount`. Recorded here; this registry never calls it.
-     * @param att The attestation. `att.rockId` must equal `rockId`, `att.subject` must be
-     *        non-zero and becomes the owner, and `att.smartAccount` must equal `smartAccount`.
-     * @param sig The attester's EIP-712 signature over `att`.
+     * @notice Wake a rock up: bind it to a tag and a Rock Account, and give it to the wallet the
+     *         attestation names. Anyone may send this transaction; only the attestation decides
+     *         who ends up owning the rock and which account holds its money. A rock can be
+     *         awakened once, and a tag backs one live rock at a time. Emits `RockAwakened`.
+     * @param rockId The public rock id. Must not be zero.
+     * @param smartAccount The Rock Account that will hold this rock's tokens. Must equal
+     *        `att.smartAccount`, and must not be zero.
+     * @param att The attestation from the Bank Rock verifier. Etherscan cannot produce one.
+     * @param sig The attester's EIP-712 signature over `att`, 65 bytes.
      */
     function awakenRock(uint256 rockId, address smartAccount, Attestation calldata att, bytes calldata sig)
         external
         whenNotPaused
     {
         if (rockId == 0) revert InvalidRockId();
-        if (smartAccount == address(0)) revert InvalidSmartAccount();
-        // The attester authorised this Rock Account and no other. See the contract-level note.
-        if (att.smartAccount != smartAccount) {
-            revert AttestationSmartAccountMismatch(att.smartAccount, smartAccount);
-        }
-        if (att.uidHash == bytes32(0)) revert InvalidUidHash();
+        if (smartAccount == address(0)) revert InvalidSmartAccount(smartAccount);
+        if (att.smartAccount != smartAccount) revert AttestationSmartAccountMismatch(att.smartAccount, smartAccount);
+        if (att.uidHash == bytes32(0)) revert InvalidUidHash(att.uidHash);
 
-        Rock storage r = _rocks[rockId];
-        if (r.state == RockState.Archived) revert RockIsArchived(rockId);
-        if (r.state != RockState.Dormant) revert RockAlreadyAwakened(rockId);
+        Rock storage rock = _rocks[rockId];
+        if (rock.state == RockState.Archived) revert RockIsArchived(rockId);
+        if (rock.state != RockState.Dormant) revert RockAlreadyAwakened(rockId);
 
         uint256 boundRockId = _uidToRockId[att.uidHash];
-        if (boundRockId != 0 && boundRockId != rockId) {
-            revert UidBoundToDifferentRock(att.uidHash, boundRockId);
-        }
+        if (boundRockId != 0 && boundRockId != rockId) revert UidBoundToDifferentRock(att.uidHash, boundRockId);
 
         _consumeAttestation(rockId, att.uidHash, att, sig);
 
         _uidToRockId[att.uidHash] = rockId;
-        r.currentOwner = att.subject;
-        r.smartAccount = smartAccount;
-        r.uidHash = att.uidHash;
-        r.state = RockState.Awake;
+        rock.currentOwner = att.subject;
+        rock.smartAccount = smartAccount;
+        rock.uidHash = att.uidHash;
+        rock.state = RockState.Awake;
 
         emit RockAwakened(rockId, att.subject, att.uidHash, smartAccount, att.counter);
     }
 
     /**
-     * @notice Retires a rock and releases its tag, so the same physical tag can awaken a new
-     *         rock id. Only the current owner.
-     *
-     * @dev Terminal and one-way. An archived rock can never be awakened, given, claimed,
-     *      flagged lost, or un-archived; there is deliberately no `unarchive`. Its owner, smart
-     *      account and UID binding stay readable through `getRock`, so the object's history does
-     *      not disappear when the tag is reused — the record becomes a closed chapter rather
-     *      than a blank.
-     *
-     *      What archiving actually releases is the tag: `rockIdForUid(uidHash)` returns to zero,
-     *      which is what lets the next `awakenRock` bind that UID to a *different* rock id. The
-     *      practical use is rehearsal — awakening the demo beat repeatedly with one physical tag
-     *      without reprogramming it between runs.
-     *
-     *      `lastCounter(uidHash)` is deliberately NOT reset. Replay protection follows the tag,
-     *      not the rock: the tag's read counter only ever goes up, so an attestation captured
-     *      before archiving cannot be replayed against the rock that comes after it.
-     *
-     *      An outstanding handover is cancelled as part of archiving, and emits
-     *      `HandoverCancelled` before `RockArchived`, so a reader of the event log sees the
-     *      claim path close explicitly rather than inferring it from the archive.
-     *
-     *      Not gated by `whenNotPaused`. Like `cancelHandover`, archiving only removes ways to
-     *      act on a rock; an emergency stop should not be able to trap a tag.
+     * @notice Collect a rock that was given to you: the wallet the attestation names becomes the
+     *         new owner. Anyone may send this transaction, so a recipient with no ETH can still
+     *         receive a rock. Requires a fresh tap of that rock's own tag, before the gift's
+     *         expiry, and — if the gift named a recipient — an attestation for that recipient.
+     *         The Rock Account is deliberately left unchanged. Emits `HandoverClaimed`.
+     * @param rockId The rock being claimed.
+     * @param att The attestation from the Bank Rock verifier. Its `smartAccount` field is ignored
+     *        here, because claiming binds no account; the signer sets it to zero.
+     * @param sig The attester's EIP-712 signature over `att`, 65 bytes.
      */
-    function archiveRock(uint256 rockId) external {
-        Rock storage r = _rocks[rockId];
-        if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
-        if (r.state == RockState.Archived) revert RockIsArchived(rockId);
-        _requireRockController(r);
+    function claimHandover(uint256 rockId, Attestation calldata att, bytes calldata sig) external whenNotPaused {
+        Rock storage rock = _rocks[rockId];
+        if (rock.state != RockState.HandoverPending) revert HandoverNotPending(rockId);
 
-        if (r.state == RockState.HandoverPending) {
-            delete r.handover;
-            emit HandoverCancelled(rockId, msg.sender);
+        Handover memory gift = rock.handover;
+        if (block.timestamp > gift.expiresAt) {
+            revert HandoverExpired(rockId, gift.expiresAt, uint64(block.timestamp));
+        }
+        if (gift.recipient != address(0) && att.subject != gift.recipient) {
+            revert NotHandoverRecipient(att.subject, gift.recipient);
         }
 
-        bytes32 uidHash = r.uidHash;
-        delete _uidToRockId[uidHash];
-        r.state = RockState.Archived;
+        _consumeAttestation(rockId, rock.uidHash, att, sig);
 
-        emit RockArchived(rockId, msg.sender, uidHash);
+        address previousOwner = rock.currentOwner;
+        rock.currentOwner = att.subject;
+        rock.state = RockState.Awake;
+        delete rock.handover;
+
+        emit HandoverClaimed(rockId, previousOwner, att.subject, att.counter);
     }
 
-    // ---------------------------------------------------------------------
-    // Handover (Flow E)
-    // ---------------------------------------------------------------------
+    /* --------------------------------------------------------------------- */
+    /*  Rock-owner actions                                                    */
+    /* --------------------------------------------------------------------- */
 
     /**
-     * @notice Opens a pending handover of the rock. The recipient completes it by tapping the
-     *         physical rock and calling `claimHandover`; the giver need not be online for that.
-     * @dev Replaces any handover already outstanding for this rock.
+     * @notice Give this rock away. The recipient collects it by tapping the physical rock and
+     *         calling `claimHandover`; you do not need to be online for that. Callable by the
+     *         rock's owner, or by its Rock Account while you are still an owner of that account.
+     *         Opening a gift while one is already outstanding replaces it, and emits
+     *         `HandoverCancelled` for the old one first. Emits `HandoverInitiated`.
      * @param rockId The rock to give away.
-     * @param recipient The intended recipient, or `address(0)` to let whoever taps the rock and
-     *        presents a fresh attestation claim it.
-     * @param expiresAt Unix timestamp after which the handover is dead. Must be in the future.
-     *        After it passes the handover is claimable by nobody, including the named recipient.
-     * @param messageHash Hash of the gift message shown off-chain, or `bytes32(0)` for none.
+     * @param recipient The wallet allowed to claim it, or the zero address to let whoever taps
+     *        the rock claim it. May not be the current owner.
+     * @param expiresAt Unix seconds, inclusive: the last second at which it can be claimed. Must
+     *        be in the future and at most `MAX_HANDOVER_DURATION` from now.
+     * @param messageHash Hash of your gift message, or zero. The message stays off-chain.
      */
     function initiateHandover(uint256 rockId, address recipient, uint64 expiresAt, bytes32 messageHash)
         external
         whenNotPaused
     {
-        Rock storage r = _rocks[rockId];
-        if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
-        if (r.state == RockState.Archived) revert RockIsArchived(rockId);
-        _requireRockController(r);
-        if (expiresAt <= block.timestamp) revert InvalidHandoverExpiry();
-        if (recipient == r.currentOwner) revert InvalidRecipient();
+        Rock storage rock = _rocks[rockId];
+        _requireLiveRock(rockId, rock);
+        _requireRockController(rockId, rock);
 
-        r.handover = Handover({
+        if (expiresAt <= block.timestamp) revert InvalidHandoverExpiry(expiresAt, uint64(block.timestamp));
+        uint64 maxExpiresAt = uint64(block.timestamp) + MAX_HANDOVER_DURATION;
+        if (expiresAt > maxExpiresAt) revert HandoverTooLong(expiresAt, maxExpiresAt);
+        if (recipient == rock.currentOwner) revert RecipientIsAlreadyTheOwner(recipient);
+
+        // Replacing a gift is a cancellation followed by a new gift, and the log says so.
+        if (rock.state == RockState.HandoverPending) emit HandoverCancelled(rockId, msg.sender);
+
+        rock.handover = Handover({
             recipient: recipient,
             expiresAt: expiresAt,
             initiatedAt: uint64(block.timestamp),
             initiatedBy: msg.sender,
             messageHash: messageHash
         });
-        r.state = RockState.HandoverPending;
+        rock.state = RockState.HandoverPending;
 
         emit HandoverInitiated(rockId, msg.sender, recipient, expiresAt, messageHash);
     }
 
     /**
-     * @notice Completes a pending handover. `att.subject` becomes the rock's owner.
-     * @dev Requires a fresh attestation for the UID this rock was bound to at awakening — proof
-     *      that `att.subject` is holding the physical object. The smart account is deliberately
-     *      unchanged: the Rock Account address and its assets are stable across ownership
-     *      changes, and swapping its signing key happens off-registry.
-     *
-     *      As with `awakenRock`, `msg.sender` is irrelevant and the transaction may be relayed.
-     *      A named recipient is matched against `att.subject`, not against the sender, so the
-     *      recipient claims their gift without holding any ETH.
-     * @param rockId The rock being claimed.
-     * @param att The attestation. `att.rockId` must equal `rockId`, `att.uidHash` must equal the
-     *        UID hash bound to the rock, and `att.subject` must be the named recipient when the
-     *        handover named one. `att.smartAccount` is ignored — this call binds no Rock Account
-     *        — and is neither required to be zero nor required to match anything.
-     * @param sig The attester's EIP-712 signature over `att`.
-     */
-    function claimHandover(uint256 rockId, Attestation calldata att, bytes calldata sig)
-        external
-        whenNotPaused
-    {
-        Rock storage r = _rocks[rockId];
-        if (r.state != RockState.HandoverPending) revert HandoverNotPending(rockId);
-
-        Handover memory h = r.handover;
-        if (block.timestamp > h.expiresAt) revert HandoverExpired(rockId, h.expiresAt);
-        if (h.recipient != address(0) && att.subject != h.recipient) {
-            revert NotHandoverRecipient(att.subject, h.recipient);
-        }
-
-        _consumeAttestation(rockId, r.uidHash, att, sig);
-
-        address previousOwner = r.currentOwner;
-        r.currentOwner = att.subject;
-        r.state = RockState.Awake;
-        delete r.handover;
-
-        emit HandoverClaimed(rockId, previousOwner, att.subject, att.counter);
-    }
-
-    /**
-     * @notice Withdraws a pending handover. Only the current owner.
-     * @dev Deliberately callable while paused: cancelling only removes a claim path.
+     * @notice Take back a gift you opened, so it can no longer be claimed. Callable by the rock's
+     *         owner, or by its Rock Account while you are still an owner of that account.
+     *         Deliberately still available while the registry is paused: cancelling only removes
+     *         a way to act on the rock. Emits `HandoverCancelled`.
+     * @param rockId The rock whose gift you are taking back.
      */
     function cancelHandover(uint256 rockId) external {
-        Rock storage r = _rocks[rockId];
-        if (r.state != RockState.HandoverPending) revert HandoverNotPending(rockId);
-        _requireRockController(r);
+        Rock storage rock = _rocks[rockId];
+        if (rock.state != RockState.HandoverPending) revert HandoverNotPending(rockId);
+        _requireRockController(rockId, rock);
 
-        r.state = RockState.Awake;
-        delete r.handover;
+        rock.state = RockState.Awake;
+        delete rock.handover;
 
         emit HandoverCancelled(rockId, msg.sender);
     }
 
-    // ---------------------------------------------------------------------
-    // Lost flag (Flow F)
-    // ---------------------------------------------------------------------
+    /**
+     * @notice Retire this rock permanently and free its tag, so the same physical rock can be
+     *         awakened again under a new rock id. Callable by the rock's owner, or by its Rock
+     *         Account while you are still an owner of that account. **There is no undo**: a
+     *         retired rock can never be awakened, given, claimed, flagged or revived. Any
+     *         outstanding gift is cancelled first. Available while paused, for the same reason as
+     *         `cancelHandover`. Emits `HandoverCancelled` (if a gift was open) then `RockArchived`.
+     * @dev The record stays readable through `getRock` as history — owner, Rock Account and tag
+     *      binding are preserved. What is released is `rockIdForUid`, so the tag may back a new
+     *      rock. `lastCounter` is deliberately *not* reset: replay protection follows the tag, not
+     *      the rock, so an attestation captured before retirement cannot be replayed against
+     *      whatever rock that tag awakens next.
+     * @param rockId The rock to retire.
+     */
+    function archiveRock(uint256 rockId) external {
+        Rock storage rock = _rocks[rockId];
+        _requireLiveRock(rockId, rock);
+        _requireRockController(rockId, rock);
+
+        if (rock.state == RockState.HandoverPending) {
+            delete rock.handover;
+            emit HandoverCancelled(rockId, msg.sender);
+        }
+
+        bytes32 uidHash = rock.uidHash;
+        delete _uidToRockId[uidHash];
+        rock.state = RockState.Archived;
+
+        emit RockArchived(rockId, msg.sender, uidHash);
+    }
 
     /**
-     * @notice Flags the rock's physical tag as lost or copied.
-     * @dev Informational only. It freezes no funds, blocks no handover and gates nothing on-chain;
-     *      it exists so that a reader of the registry can see the owner's own statement about the
-     *      object. Only the current owner may set it.
+     * @notice Flag this rock's physical tag as lost or copied, so anyone reading the registry sees
+     *         your statement about it. Callable by the rock's owner, or by its Rock Account while
+     *         you are still an owner of that account. Emits `RockMarkedLost`.
+     * @dev Informational only: it freezes no funds, blocks no gift and gates nothing on-chain.
+     * @param rockId The rock to flag.
      */
     function markLost(uint256 rockId) external {
-        Rock storage r = _rocks[rockId];
-        if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
-        if (r.state == RockState.Archived) revert RockIsArchived(rockId);
-        _requireRockController(r);
+        Rock storage rock = _rocks[rockId];
+        _requireLiveRock(rockId, rock);
+        _requireRockController(rockId, rock);
 
-        r.lost = true;
+        rock.lost = true;
         emit RockMarkedLost(rockId, msg.sender);
     }
 
-    /// @notice Clears the lost flag. Only the current owner.
+    /**
+     * @notice Clear the lost flag — you found the tag. Callable by the rock's owner, or by its
+     *         Rock Account while you are still an owner of that account. Emits `RockLostCleared`.
+     * @param rockId The rock to unflag.
+     */
     function clearLost(uint256 rockId) external {
-        Rock storage r = _rocks[rockId];
-        if (r.state == RockState.Dormant) revert RockNotAwakened(rockId);
-        if (r.state == RockState.Archived) revert RockIsArchived(rockId);
-        _requireRockController(r);
+        Rock storage rock = _rocks[rockId];
+        _requireLiveRock(rockId, rock);
+        _requireRockController(rockId, rock);
 
-        r.lost = false;
+        rock.lost = false;
         emit RockLostCleared(rockId, msg.sender);
     }
 
-    // ---------------------------------------------------------------------
-    // Views
-    // ---------------------------------------------------------------------
+    /* --------------------------------------------------------------------- */
+    /*  Administrator actions                                                 */
+    /* --------------------------------------------------------------------- */
 
     /**
-     * @notice Reads the full record for a rock.
+     * @notice Rotate the attestation signer. Administrator only. Every attestation signed by the
+     *         previous signer stops working immediately. Emits `AttesterUpdated`.
+     * @param newAttester The address whose signatures the registry will accept. Not zero.
+     */
+    function setAttester(address newAttester) external onlyOwner {
+        if (newAttester == address(0)) revert AttesterCannotBeZero();
+        address previous = attester;
+        attester = newAttester;
+        emit AttesterUpdated(previous, newAttester);
+    }
+
+    /**
+     * @notice Stop the registry accepting new rocks, new gifts and new claims. Administrator only.
+     * @dev Owners can still cancel a gift, retire a rock and clear a lost flag while paused: a
+     *      pause must never trap somebody in a state. It does **not** stop the clock — a gift whose
+     *      expiry passes during a pause is dead and must be opened again after unpausing.
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Resume normal operation. Administrator only.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /**
+     * @notice Disabled, and always reverts. Administration of this registry cannot be abandoned.
+     * @dev Without an administrator the attester could never be rotated, and every future tap
+     *      would be unusable. Ownership moves with `transferOwnership` then `acceptOwnership`.
+     */
+    function renounceOwnership() public pure override {
+        revert OwnershipCannotBeRenounced();
+    }
+
+    /* --------------------------------------------------------------------- */
+    /*  Views — per rock                                                      */
+    /* --------------------------------------------------------------------- */
+
+    /**
+     * @notice Everything the registry knows about a rock.
      * @dev `state` is the *effective* state: a rock whose stored state is `HandoverPending` but
-     *      whose handover deadline has passed is reported as `Awake`, because an expired handover
-     *      is claimable by nobody. The `handover` struct is returned as stored, so a caller can
-     *      still see the expired attempt. `Archived` is terminal and is reported as stored.
-     *
-     *      An archived rock keeps its owner, smart account and UID hash here as history, even
-     *      though its tag may since have awakened a different rock. To ask which rock a tag is
-     *      bound to *now*, use `rockIdForUid`.
-     * @return rockOwner The owner at the time of the last state change. For an archived rock,
-     *         the owner who archived it.
-     * @return smartAccount The Rock Account holding this rock's assets.
+     *      whose gift has expired is reported as `Awake`, because an expired gift is claimable by
+     *      nobody. The `handover` struct is returned as stored, so the expired attempt is still
+     *      visible. An archived rock keeps its owner, Rock Account and tag hash here as history
+     *      even after its tag has gone on to back a different rock; ask `rockIdForUid` which rock
+     *      a tag backs *now*.
+     * @param rockId The rock to read.
+     * @return rockOwner The wallet that owns the object; for a retired rock, who retired it.
+     * @return smartAccount The Rock Account that holds this rock's tokens.
      * @return uidHash `keccak256(rawUid7Bytes)` of the bound tag, or zero if never awakened.
-     * @return state Effective lifecycle state.
+     * @return state Effective lifecycle state: 0 Dormant, 1 Awake, 2 HandoverPending, 3 Archived.
      * @return lost The owner's informational lost flag.
-     * @return handover The stored handover record.
+     * @return handover The stored gift record; all-zero when no gift was ever opened.
      */
     function getRock(uint256 rockId)
         external
@@ -537,77 +699,180 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
             Handover memory handover
         )
     {
-        Rock storage r = _rocks[rockId];
-        state = r.state;
-        if (state == RockState.HandoverPending && block.timestamp > r.handover.expiresAt) {
+        Rock storage rock = _rocks[rockId];
+        state = rock.state;
+        if (state == RockState.HandoverPending && block.timestamp > rock.handover.expiresAt) {
             state = RockState.Awake;
         }
-        return (r.currentOwner, r.smartAccount, r.uidHash, state, r.lost, r.handover);
+        return (rock.currentOwner, rock.smartAccount, rock.uidHash, state, rock.lost, rock.handover);
     }
 
-    /// @notice The highest tag read counter this registry has accepted for a UID hash.
-    /// @dev Monotonic for the life of the tag, across archiving and across rocks: it is never
-    ///      reset, so an attestation captured before a rock was archived cannot be replayed
-    ///      against whatever rock that tag awakens next.
-    function lastCounter(bytes32 uidHash) external view returns (uint32) {
+    /**
+     * @notice The same thing as `getRock`, in words instead of numbers. Read this one first.
+     * @param rockId The rock to read.
+     * @return state One of `"Dormant"`, `"Awake"`, `"HandoverPending"`, `"Archived"`.
+     * @return owner The wallet that owns the object, or the zero address if it was never awakened.
+     * @return rockAccount The smart account that holds this rock's tokens.
+     * @return lost Whether the owner has flagged the tag as lost.
+     * @return handoverExpiresAt Unix seconds at which the outstanding gift stops being claimable,
+     *         or 0 when no gift is outstanding.
+     */
+    function describeRock(uint256 rockId)
+        external
+        view
+        returns (string memory state, address owner, address rockAccount, bool lost, uint64 handoverExpiresAt)
+    {
+        Rock storage rock = _rocks[rockId];
+        RockState stored = rock.state;
+        bool giftLive = stored == RockState.HandoverPending && block.timestamp <= rock.handover.expiresAt;
+
+        if (stored == RockState.Dormant) {
+            state = "Dormant";
+        } else if (stored == RockState.Archived) {
+            state = "Archived";
+        } else if (giftLive) {
+            state = "HandoverPending";
+        } else {
+            state = "Awake";
+        }
+
+        return (state, rock.currentOwner, rock.smartAccount, rock.lost, giftLive ? rock.handover.expiresAt : 0);
+    }
+
+    /* --------------------------------------------------------------------- */
+    /*  Views — per tag                                                       */
+    /* --------------------------------------------------------------------- */
+
+    /**
+     * @notice The highest tag read counter this registry has ever accepted for a tag.
+     * @dev Monotonic for the life of the tag, across retirement and across rocks: it is never
+     *      reset, so an attestation captured before a rock was retired cannot be replayed against
+     *      whatever rock that tag awakens next.
+     * @param uidHash `keccak256(rawUid7Bytes)` of the tag.
+     * @return counter The highest counter accepted so far; 0 if the tag is unknown here.
+     */
+    function lastCounter(bytes32 uidHash) external view returns (uint32 counter) {
         return _lastCounter[uidHash];
     }
 
-    /// @notice The rock id a UID hash is currently bound to, or 0 if the tag has never awakened a
-    ///         rock or its rock has since been archived. Archiving releases the tag; it does not
-    ///         erase the archived rock, which still reports the UID hash through `getRock`.
-    function rockIdForUid(bytes32 uidHash) external view returns (uint256) {
+    /**
+     * @notice The rock a tag currently backs.
+     * @param uidHash `keccak256(rawUid7Bytes)` of the tag.
+     * @return rockId The live rock it backs, or 0 if the tag has never awakened a rock or its rock
+     *         has since been retired. Retiring releases the tag; it does not erase the retired
+     *         rock, which still reports the tag through `getRock`.
+     */
+    function rockIdForUid(bytes32 uidHash) external view returns (uint256 rockId) {
         return _uidToRockId[uidHash];
     }
 
-    /// @notice The EIP-712 domain separator for this deployment.
-    function domainSeparator() external view returns (bytes32) {
-        return _domainSeparatorV4();
-    }
+    /* --------------------------------------------------------------------- */
+    /*  Views — attestation helpers                                           */
+    /* --------------------------------------------------------------------- */
 
-    /// @notice The EIP-712 digest an attester must sign for `att`.
-    function hashAttestation(Attestation calldata att) external view returns (bytes32) {
+    /**
+     * @notice The EIP-712 digest the attester must sign for a given attestation.
+     * @param att The attestation to hash.
+     * @return digest The 32-byte digest, ready to be signed or verified.
+     */
+    function hashAttestation(Attestation calldata att) external view returns (bytes32 digest) {
         return _hashTypedDataV4(_structHash(att));
     }
 
-    // ---------------------------------------------------------------------
-    // Internal
-    // ---------------------------------------------------------------------
+    /**
+     * @notice The EIP-712 domain separator of this deployment.
+     * @dev Includes this chain id and this contract address, so a signature made for another
+     *      deployment or another chain cannot be replayed here.
+     * @return separator The domain separator.
+     */
+    function domainSeparator() external view returns (bytes32 separator) {
+        return _domainSeparatorV4();
+    }
+
+    /* --------------------------------------------------------------------- */
+    /*  Views — metadata                                                      */
+    /* --------------------------------------------------------------------- */
 
     /**
-     * @dev Owner-gated actions accept either the human owner's wallet or the rock's own Safe.
-     *
-     *      Under gas sponsorship the call arrives as a UserOp executed *by* the Safe, so
-     *      `msg.sender` is the Rock Account rather than the person. Both are the same authority
-     *      — the Safe is controlled by the current owner's signing key — and accepting both is
-     *      what lets an owner give, cancel, archive or flag a rock without holding any ETH.
-     *
-     *      There is no zero-address hole here: `smartAccount` is required to be non-zero at
-     *      awakening, and every caller of this helper has already rejected the `Dormant` state.
+     * @notice The version of this contract's interface and behaviour.
+     * @return semver A semantic version string.
      */
-    function _requireRockController(Rock storage r) private view {
-        if (msg.sender != r.currentOwner && msg.sender != r.smartAccount) {
-            revert NotRockOwner(msg.sender, r.currentOwner);
+    function version() external pure returns (string memory semver) {
+        return "1.0.0";
+    }
+
+    /* --------------------------------------------------------------------- */
+    /*  Internal                                                              */
+    /* --------------------------------------------------------------------- */
+
+    /// @dev Reverts unless the rock has been awakened and has not been retired.
+    function _requireLiveRock(uint256 rockId, Rock storage rock) private view {
+        if (rock.state == RockState.Dormant) revert RockNotAwakened(rockId);
+        if (rock.state == RockState.Archived) revert RockIsArchived(rockId);
+    }
+
+    /**
+     * @dev The authority check behind every owner action.
+     *
+     *      Two addresses may act: the owner's own wallet, and the rock's Rock Account — but the
+     *      second only while the owner is still a signing owner of that account. Admitting the
+     *      account at all is what makes the gasless flows work: under sponsorship the call arrives
+     *      as a UserOp executed *by* the Safe, so `msg.sender` is the account rather than the
+     *      person.
+     *
+     *      The `isOwner` check is the part that must not be dropped. `claimHandover` changes the
+     *      owner and deliberately leaves `smartAccount` alone, and for an *open* gift the
+     *      off-chain swap of the Safe's signing owner cannot be pre-signed and does not happen at
+     *      all. Without this check the giver's Safe would keep passing the gate for a rock it no
+     *      longer owns, and one call to `archiveRock` would destroy the recipient's rock
+     *      permanently. Asking the account who its owners are converts a sentence of prose into
+     *      the invariant it always claimed to be.
+     *
+     *      `isOwner` is called inside a try/catch and anything other than a clean `true` — a
+     *      revert, a missing function, an address with no code — counts as false. That fails
+     *      closed: the owner's own wallet always works, so a rock is never stranded.
+     */
+    function _requireRockController(uint256 rockId, Rock storage rock) private view {
+        address rockOwner = rock.currentOwner;
+        if (msg.sender == rockOwner) return;
+
+        address smartAccount = rock.smartAccount;
+        if (msg.sender == smartAccount && _accountAnswersTo(smartAccount, rockOwner)) return;
+
+        revert NotRockOwner(rockId, msg.sender, rockOwner, smartAccount);
+    }
+
+    /**
+     * @dev True only when `account` cleanly reports `rockOwner` as one of its signing owners.
+     *
+     *      The `code.length` test is not redundant with the try/catch. Solidity checks that a
+     *      call target has code *in the calling frame*, before the call, and a revert raised
+     *      there is not catchable — so without this line an owner action sent from a codeless
+     *      Rock Account would abort with empty revert data instead of a readable `NotRockOwner`.
+     */
+    function _accountAnswersTo(address account, address rockOwner) private view returns (bool) {
+        if (account.code.length == 0) return false;
+
+        try ISafeOwnerManager(account).isOwner(rockOwner) returns (bool isAnOwner) {
+            return isAnOwner;
+        } catch {
+            return false;
         }
     }
 
+    /// @dev The EIP-712 struct hash of an attestation.
     function _structHash(Attestation calldata att) private pure returns (bytes32) {
         return keccak256(
             abi.encode(
-                ATTESTATION_TYPEHASH,
-                att.rockId,
-                att.uidHash,
-                att.counter,
-                att.deadline,
-                att.subject,
-                att.smartAccount
+                ATTESTATION_TYPEHASH, att.rockId, att.uidHash, att.counter, att.deadline, att.subject, att.smartAccount
             )
         );
     }
 
     /**
      * @dev Validates an attestation against `expectedRockId` / `expectedUidHash` and records its
-     *      counter, so the same tag read can never be used twice.
+     *      counter, so one tag read can never be used twice. Reverts on anything unexpected and
+     *      writes nothing in that case.
      */
     function _consumeAttestation(
         uint256 expectedRockId,
@@ -619,8 +884,11 @@ contract BankRockRegistry is Ownable, Pausable, EIP712 {
         if (signer == address(0)) revert AttesterNotSet();
         if (att.rockId != expectedRockId) revert AttestationRockMismatch(expectedRockId, att.rockId);
         if (att.uidHash != expectedUidHash) revert AttestationUidMismatch(expectedUidHash, att.uidHash);
-        if (att.deadline < block.timestamp) revert AttestationExpired(att.deadline);
-        if (att.subject == address(0)) revert InvalidSubject();
+        if (att.subject == address(0)) revert InvalidSubject(att.subject);
+
+        if (att.deadline < block.timestamp) revert AttestationExpired(att.deadline, block.timestamp);
+        uint256 maxDeadline = block.timestamp + MAX_ATTESTATION_LIFETIME;
+        if (att.deadline > maxDeadline) revert AttestationLifetimeTooLong(att.deadline, maxDeadline);
 
         uint32 seen = _lastCounter[att.uidHash];
         if (att.counter <= seen) revert StaleAttestationCounter(att.counter, seen);

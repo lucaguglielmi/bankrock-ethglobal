@@ -37,7 +37,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createPublicClient, createWalletClient, http, isAddress, getAddress } from "viem";
+import { createPublicClient, createWalletClient, http, isAddress, getAddress, zeroAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 
@@ -74,6 +74,17 @@ async function main() {
   }
   const attester = getAddress(attesterRaw);
 
+  // `isAddress` is true for the zero address, and the constructor treats zero as "not set", so
+  // without this the script would deploy a registry in which every awaken and claim reverts
+  // `AttesterNotSet` — and the read-back check below would compare zero with zero and pass
+  // (audit finding F-11).
+  if (attester === getAddress(zeroAddress)) {
+    fail(
+      "ATTESTATION_SIGNER_ADDRESS is the zero address. A registry deployed with no attester " +
+        "cannot awaken or claim any rock until setAttester is called.",
+    );
+  }
+
   const artifactPath = path.join(root, "artifacts", "contracts", `${CONTRACT}.sol`, `${CONTRACT}.json`);
   if (!fs.existsSync(artifactPath)) {
     fail(`artifact not found at ${path.relative(root, artifactPath)} — run "npm run compile" first.`);
@@ -102,6 +113,15 @@ async function main() {
   console.log(`  attester  ${attester}`);
   console.log(`  owner     ${account.address} (constructor argument)`);
 
+  // The attester signs; it never transacts and never holds funds. Sharing the deployer key for
+  // it collapses two roles spec 16 deliberately separates (#10 and #17).
+  if (getAddress(attester) === getAddress(account.address)) {
+    console.log(
+      `\n  WARNING: the attester is the deployer key. That key is funded and administers the\n` +
+        `           registry; the attester should be a separate, unfunded wallet (spec 16 #17).\n`,
+    );
+  }
+
   const hash = await walletClient.deployContract({
     abi: artifact.abi,
     bytecode: artifact.bytecode,
@@ -118,14 +138,24 @@ async function main() {
   const address = getAddress(receipt.contractAddress);
   const deployBlock = Number(receipt.blockNumber);
 
-  // Read the state back rather than trusting the constructor argument.
+  // Read the state back rather than trusting the constructor argument. Both halves matter: the
+  // stored attester must equal the one we asked for, *and* it must not be zero — a check that
+  // compares zero with zero proves nothing (audit finding F-11).
   const onChainAttester = await publicClient.readContract({
     address,
     abi: artifact.abi,
     functionName: "attester",
   });
+  if (getAddress(onChainAttester) === getAddress(zeroAddress)) {
+    fail(`the deployed registry has no attester set. Do not use this deployment.`);
+  }
   if (getAddress(onChainAttester) !== attester) {
     fail(`attester on-chain is ${onChainAttester}, expected ${attester}.`);
+  }
+
+  const onChainOwner = await publicClient.readContract({ address, abi: artifact.abi, functionName: "owner" });
+  if (getAddress(onChainOwner) !== getAddress(account.address)) {
+    fail(`owner on-chain is ${onChainOwner}, expected ${account.address}.`);
   }
 
   const record = {

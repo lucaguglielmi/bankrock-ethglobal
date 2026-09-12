@@ -15,6 +15,7 @@ interface Vm {
     function prank(address sender) external;
     function startPrank(address sender) external;
     function stopPrank() external;
+    function warp(uint256 timestamp) external;
 }
 
 /**
@@ -55,7 +56,7 @@ abstract contract BankRockAquaBase {
     function _deploy(uint256 makerUsdc, uint256 makerWeth, uint256 takerUsdc, uint256 takerWeth) internal {
         aqua = new Aqua();
         app = new XYCSwap(IAqua(address(aqua)));
-        taker = new XYCSwapTaker(IAqua(address(aqua)));
+        taker = new XYCSwapTaker(IAqua(address(aqua)), app);
 
         usdc = new MockERC20("USD Coin", "USDC", 6);
         weth = new MockERC20("Wrapped Ether", "WETH", 18);
@@ -143,6 +144,11 @@ abstract contract BankRockAquaBase {
     /// @dev Virtual balances, straight from Aqua. Reverts if the strategy is not active.
     function _virtual(bytes32 strategyHash) internal view returns (uint256 vUsdc, uint256 vWeth) {
         return aqua.safeBalances(MAKER, address(app), strategyHash, address(usdc), address(weth));
+    }
+
+    /// @dev A generous swap deadline for tests that are not about deadlines (XYCSwapTaker F-8).
+    function _deadline() internal view returns (uint256) {
+        return block.timestamp + 300;
     }
 
     function _selector(bytes memory reason) internal pure returns (bytes4 sel) {

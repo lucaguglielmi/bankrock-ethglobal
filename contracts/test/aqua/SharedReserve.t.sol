@@ -82,7 +82,7 @@ contract SharedReserveTest is BankRockAquaBase {
         require(tightWethBefore > availableBefore, "virtual exceeds what the wallet can settle");
 
         // A visitor sells 1,000 USDC into the wide stream and takes WETH out of the wallet.
-        uint256 amountOut = taker.swapExactIn(app, wide, true, 1_000 * ONE_USDC, 0, address(this));
+        uint256 amountOut = taker.swapExactIn(wide, true, 1_000 * ONE_USDC, 0, address(this), _deadline());
         require(amountOut > 0, "swap produced nothing");
 
         (, uint256 tightWethAfter) = _virtual(tightHash);
@@ -101,7 +101,7 @@ contract SharedReserveTest is BankRockAquaBase {
     function testTheSecondStreamCannotOverdrawTheEmptiedWallet() public {
         // Take most of the WETH out through the wide stream. 3,000 USDC against a 2,000/1 curve
         // buys ~0.6 WETH, which is as much as the 0.8 WETH wallet can settle in one go.
-        taker.swapExactIn(app, wide, true, 3_000 * ONE_USDC, 0, address(this));
+        taker.swapExactIn(wide, true, 3_000 * ONE_USDC, 0, address(this), _deadline());
         uint256 walletWeth = weth.balanceOf(MAKER);
         require(walletWeth < STREAM_WETH / 2, "wallet should be largely drained");
 
@@ -121,7 +121,7 @@ contract SharedReserveTest is BankRockAquaBase {
     }
 
     function swapTight(uint256 amountIn) external returns (uint256) {
-        return taker.swapExactIn(app, tight, true, amountIn, 0, address(this));
+        return taker.swapExactIn(tight, true, amountIn, 0, address(this), _deadline());
     }
 
     /// The two streams price differently on the same reserve — the second curve of spec 04.
@@ -139,7 +139,7 @@ contract SharedReserveTest is BankRockAquaBase {
         (uint256 tightUsdc, uint256 tightWeth) = _virtual(tightHash);
         require(tightUsdc == STREAM_USDC && tightWeth == STREAM_WETH, "the live stream must survive");
 
-        uint256 out = taker.swapExactIn(app, tight, true, 100 * ONE_USDC, 0, address(this));
+        uint256 out = taker.swapExactIn(tight, true, 100 * ONE_USDC, 0, address(this), _deadline());
         require(out > 0, "the live stream must still trade");
 
         try this.readVirtual(wideHash) {

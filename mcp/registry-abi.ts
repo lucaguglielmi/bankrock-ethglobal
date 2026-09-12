@@ -23,9 +23,30 @@ export const registryAbi = [
         "internalType": "uint256",
         "name": "deadline",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "nowTimestamp",
+        "type": "uint256"
       }
     ],
     "name": "AttestationExpired",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxDeadline",
+        "type": "uint256"
+      }
+    ],
+    "name": "AttestationLifetimeTooLong",
     "type": "error"
   },
   {
@@ -78,6 +99,11 @@ export const registryAbi = [
   },
   {
     "inputs": [],
+    "name": "AttesterCannotBeZero",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "AttesterNotSet",
     "type": "error"
   },
@@ -102,6 +128,11 @@ export const registryAbi = [
         "internalType": "uint64",
         "name": "expiresAt",
         "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "nowTimestamp",
+        "type": "uint64"
       }
     ],
     "name": "HandoverExpired",
@@ -119,23 +150,40 @@ export const registryAbi = [
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "expiresAt",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "maxExpiresAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "HandoverTooLong",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "InvalidAttestationSignature",
     "type": "error"
   },
   {
-    "inputs": [],
-    "name": "InvalidAttester",
-    "type": "error"
-  },
-  {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "expiresAt",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "nowTimestamp",
+        "type": "uint64"
+      }
+    ],
     "name": "InvalidHandoverExpiry",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidRecipient",
     "type": "error"
   },
   {
@@ -149,17 +197,35 @@ export const registryAbi = [
     "type": "error"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "smartAccount",
+        "type": "address"
+      }
+    ],
     "name": "InvalidSmartAccount",
     "type": "error"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "subject",
+        "type": "address"
+      }
+    ],
     "name": "InvalidSubject",
     "type": "error"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "uidHash",
+        "type": "bytes32"
+      }
+    ],
     "name": "InvalidUidHash",
     "type": "error"
   },
@@ -182,6 +248,11 @@ export const registryAbi = [
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      },
+      {
         "internalType": "address",
         "name": "caller",
         "type": "address"
@@ -189,6 +260,11 @@ export const registryAbi = [
       {
         "internalType": "address",
         "name": "rockOwner",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "smartAccount",
         "type": "address"
       }
     ],
@@ -215,6 +291,22 @@ export const registryAbi = [
       }
     ],
     "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "OwnershipCannotBeRenounced",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      }
+    ],
+    "name": "RecipientIsAlreadyTheOwner",
     "type": "error"
   },
   {
@@ -421,6 +513,25 @@ export const registryAbi = [
         "type": "address"
       }
     ],
+    "name": "OwnershipTransferStarted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
     "name": "OwnershipTransferred",
     "type": "event"
   },
@@ -561,6 +672,39 @@ export const registryAbi = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_ATTESTATION_LIFETIME",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_HANDOVER_DURATION",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "acceptOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -731,12 +875,51 @@ export const registryAbi = [
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rockId",
+        "type": "uint256"
+      }
+    ],
+    "name": "describeRock",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "state",
+        "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "rockAccount",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "lost",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint64",
+        "name": "handoverExpiresAt",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "domainSeparator",
     "outputs": [
       {
         "internalType": "bytes32",
-        "name": "",
+        "name": "separator",
         "type": "bytes32"
       }
     ],
@@ -901,7 +1084,7 @@ export const registryAbi = [
     "outputs": [
       {
         "internalType": "bytes32",
-        "name": "",
+        "name": "digest",
         "type": "bytes32"
       }
     ],
@@ -948,7 +1131,7 @@ export const registryAbi = [
     "outputs": [
       {
         "internalType": "uint32",
-        "name": "",
+        "name": "counter",
         "type": "uint32"
       }
     ],
@@ -1003,9 +1186,22 @@ export const registryAbi = [
   },
   {
     "inputs": [],
+    "name": "pendingOwner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "renounceOwnership",
     "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "pure",
     "type": "function"
   },
   {
@@ -1020,7 +1216,7 @@ export const registryAbi = [
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "rockId",
         "type": "uint256"
       }
     ],
@@ -1058,6 +1254,19 @@ export const registryAbi = [
     "name": "unpause",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "version",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "semver",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "pure",
     "type": "function"
   }
 ] as const;

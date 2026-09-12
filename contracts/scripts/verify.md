@@ -76,31 +76,102 @@ forge verify-contract "$ADDRESS" \
   --watch
 ```
 
-## Option C — the Etherscan UI
+## Option C — the Etherscan UI (standard JSON input)
 
-Use the standard-JSON-input route rather than flattening; the contract imports OpenZeppelin and a
-flattened file will drift from the compiled input. The exact input Hardhat used is in
-`contracts/artifacts/build-info/*.json` under the `input` key:
+Use the standard-JSON-input route rather than flattening: every one of these contracts imports
+something (OpenZeppelin for the registry, the vendored Aqua sources for the app and the taker) and
+a flattened file drifts from the compiled input.
+
+**Select the build-info by contract, never by position.** The project compiles with two compilers
+— 0.8.24 for the registry, 0.8.30 + viaIR for the Aqua pair — so `artifacts/build-info/` holds
+several files and directory order is undefined. Taking the first one hands Etherscan the wrong
+compiler's input and produces a confusing failure at the worst moment.
 
 ```sh
 cd contracts
-node -e "
+# One of:
+#   contracts/BankRockRegistry.sol
+#   contracts/aqua/examples/apps/XYCSwap.sol
+#   contracts/aqua/XYCSwapTaker.sol
+TARGET=contracts/BankRockRegistry.sol
+
+TARGET="$TARGET" node -e "
   const fs = require('node:fs'), path = require('node:path');
   const dir = 'artifacts/build-info';
-  const file = fs.readdirSync(dir).filter(f => f.endsWith('.json'))[0];
-  const input = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')).input;
+  const target = process.env.TARGET;
+  const match = fs.readdirSync(dir)
+    .filter(f => f.endsWith('.json'))
+    .map(f => ({ f, bi: JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) }))
+    .find(({ bi }) => bi.input && bi.input.sources && bi.input.sources[target] !== undefined);
+  if (!match) {
+    console.error('no build-info contains ' + target + ' — run \'npm run compile\' first.');
+    process.exit(1);
+  }
+  const { input, solcLongVersion } = match.bi;
   fs.writeFileSync('standard-input.json', JSON.stringify(input));
-  console.log('wrote contracts/standard-input.json');
+  console.log('wrote contracts/standard-input.json from ' + match.f);
+  console.log('compiler: v' + solcLongVersion);
+  console.log('sources : ' + Object.keys(input.sources).length + ' files (vendored dependencies included)');
 "
 ```
 
 Upload `standard-input.json` at *Contract → Verify and Publish → Solidity (Standard-Json-Input)*,
-select compiler `v0.8.24`, and paste the ABI-encoded constructor arguments.
-`standard-input.json` is a scratch file — delete it afterwards, it is not meant to be committed.
+select the compiler version the command printed, and paste the ABI-encoded constructor arguments
+from the table below. The vendored Aqua sources are part of the same standard-JSON input and are
+verified together with the contract that imports them — there is nothing separate to do for them.
+
+`standard-input.json` is a scratch file. Delete it afterwards; it is not meant to be committed.
+
+---
+
+## The Aqua pair — `XYCSwap` and `XYCSwapTaker`
+
+Both come from `scripts/deploy-aqua-app.js` and are recorded in
+`contracts/deployments/sepolia-aqua-app.json`. Their compiler settings differ from the registry's
+and are pinned in `hardhat.config.js`:
+
+- solc `0.8.30`
+- optimizer enabled, `runs: 10000000`
+- `viaIR: true`
+- `evmVersion: "cancun"`
+
+| Contract | Source path | Constructor |
+| --- | --- | --- |
+| `XYCSwap` | `contracts/aqua/examples/apps/XYCSwap.sol` | `constructor(IAqua aqua)` |
+| `XYCSwapTaker` | `contracts/aqua/XYCSwapTaker.sol` | `constructor(IAqua aqua, XYCSwap app)` |
+
+`XYCSwapTaker` takes **two** arguments. The app address is the `XYCSwap` deployed in the same run:
+since the hardening pass the periphery is bound to one app for life, so the pair must be verified
+with the app address that `deployments/sepolia-aqua-app.json` records, not with any other.
+
+```sh
+cd contracts
+AQUA=$(node -p "require('./deployments/sepolia-aqua-app.json').aqua")
+APP=$(node -p "require('./deployments/sepolia-aqua-app.json').app.address")
+TAKER=$(node -p "require('./deployments/sepolia-aqua-app.json').taker.address")
+
+# Constructor arguments, ABI-encoded (Foundry):
+cast abi-encode 'constructor(address)' "$AQUA"                 # XYCSwap
+cast abi-encode 'constructor(address,address)' "$AQUA" "$APP"  # XYCSwapTaker
+```
+
+With the Hardhat plugin, the same two deployments:
+
+```sh
+ETHERSCAN_API_KEY=... npx hardhat verify --network sepolia \
+  --contract contracts/aqua/examples/apps/XYCSwap.sol:XYCSwap "$APP" "$AQUA"
+
+ETHERSCAN_API_KEY=... npx hardhat verify --network sepolia \
+  --contract contracts/aqua/XYCSwapTaker.sol:XYCSwapTaker "$TAKER" "$AQUA" "$APP"
+```
+
+`--contract` matters here: two compilers produce two build-infos, and without it the plugin has to
+guess which artifact a given address corresponds to.
 
 ## Confirming it worked
 
 ```sh
+cd contracts
 ADDRESS=$(node -p "require('./deployments/sepolia.json').address")
 curl -s "https://sepolia.etherscan.io/address/$ADDRESS" -o /dev/null -w '%{http_code}\n'
 cast code "$ADDRESS" --rpc-url "$SEPOLIA_RPC_URL" | head -c 20   # must not be 0x
@@ -108,3 +179,7 @@ cast code "$ADDRESS" --rpc-url "$SEPOLIA_RPC_URL" | head -c 20   # must not be 0
 
 The definition-of-done check in spec 15 Part 7 is the `cast code` line: it must return non-empty
 bytecode at the address the app is configured with.
+
+After verification, the manual check spec 19 Part 2 asks for: open the registry on Etherscan, read
+`describeRock(1)` and `version()`, and confirm every Write-tab field is self-explanatory. The
+walkthrough is in `contracts/README.md`.

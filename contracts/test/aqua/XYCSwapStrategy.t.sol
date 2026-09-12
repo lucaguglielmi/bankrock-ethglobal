@@ -131,7 +131,7 @@ contract XYCSwapStrategyTest is BankRockAquaBase {
         uint256 makerUsdcBefore = usdc.balanceOf(MAKER);
         uint256 makerWethBefore = weth.balanceOf(MAKER);
 
-        uint256 amountOut = taker.swapExactIn(app, strategy, true, amountIn, expectedOut, address(this));
+        uint256 amountOut = taker.swapExactIn(strategy, true, amountIn, expectedOut, address(this), _deadline());
         require(amountOut == expectedOut, "amountOut != quote");
 
         // Actual balances — real ERC-20 transfers out of and into the maker's own wallet.
@@ -153,7 +153,7 @@ contract XYCSwapStrategyTest is BankRockAquaBase {
         require(expectedOut == 181_322_178, "0.1 WETH in at 30 bps on 2000/1"); // also in quote.test.ts
 
         uint256 takerUsdcBefore = usdc.balanceOf(address(this));
-        uint256 amountOut = taker.swapExactIn(app, strategy, false, amountIn, expectedOut, address(this));
+        uint256 amountOut = taker.swapExactIn(strategy, false, amountIn, expectedOut, address(this), _deadline());
 
         require(amountOut == expectedOut, "amountOut != quote");
         require(usdc.balanceOf(address(this)) == takerUsdcBefore + amountOut, "taker did not receive USDC");
@@ -175,7 +175,7 @@ contract XYCSwapStrategyTest is BankRockAquaBase {
         uint256 amountIn = 100 * ONE_USDC;
         uint256 kBefore = SHIP_USDC * SHIP_WETH;
 
-        uint256 amountOut = taker.swapExactIn(app, strategy, true, amountIn, 0, address(this));
+        uint256 amountOut = taker.swapExactIn(strategy, true, amountIn, 0, address(this), _deadline());
 
         (uint256 vUsdc, uint256 vWeth) = _virtual(strategyHash);
         require(vUsdc * vWeth > kBefore, "fee must grow the invariant");
@@ -256,7 +256,7 @@ contract XYCSwapStrategyTest is BankRockAquaBase {
         external
         returns (uint256)
     {
-        return taker.swapExactIn(app, s, zeroForOne, amountIn, 0, address(this));
+        return taker.swapExactIn(s, zeroForOne, amountIn, 0, address(this), _deadline());
     }
 
     function testSlippageBoundIsEnforced() public {
@@ -273,7 +273,7 @@ contract XYCSwapStrategyTest is BankRockAquaBase {
     }
 
     function swapWithMinOut(uint256 amountIn, uint256 minOut) external returns (uint256) {
-        return taker.swapExactIn(app, strategy, true, amountIn, minOut, address(this));
+        return taker.swapExactIn(strategy, true, amountIn, minOut, address(this), _deadline());
     }
 
     /* ------------------------------------------------------------------ */
@@ -319,7 +319,7 @@ contract XYCSwapStrategyTest is BankRockAquaBase {
      * "withdrawal" is simply the fact that its wallet balance was always its own (Flow H).
      */
     function testDockEndsTheStrategyAndLeavesTheWalletIntact() public {
-        taker.swapExactIn(app, strategy, true, 100 * ONE_USDC, 0, address(this));
+        taker.swapExactIn(strategy, true, 100 * ONE_USDC, 0, address(this), _deadline());
 
         uint256 usdcBefore = usdc.balanceOf(MAKER);
         uint256 wethBefore = weth.balanceOf(MAKER);
