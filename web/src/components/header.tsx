@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { ArrowRight, Menu, Volume2, VolumeX } from "lucide-react";
 import { useAudio } from "@/context/audio-context";
@@ -38,9 +39,17 @@ export function Header() {
       className="fixed inset-x-0 top-0 border-b border-black/5 bg-white/70 pt-[var(--safe-top)] backdrop-blur-md"
       style={{ height: "var(--header-h)", zIndex: "var(--z-header)" }}
     >
-      <nav className="flex h-[calc(var(--header-h)-var(--safe-top))] items-center justify-between px-[var(--gutter)]">
-        <Link href="/" className="text-h3 font-bold text-ink hover:opacity-70 motion-safe:transition-opacity">
-          Bank Rock
+      <nav aria-label="Main navigation" className="flex h-[calc(var(--header-h)-var(--safe-top))] items-center justify-between px-[var(--gutter)]">
+        <Link href="/" aria-label="Bank Rock home" className="min-w-0 shrink hover:opacity-70 motion-safe:transition-opacity">
+          <Image
+            src="/brand/logo-animated.svg"
+            alt="Bank Rock"
+            width={951}
+            height={226}
+            unoptimized
+            loading="eager"
+            className="block h-auto w-28 sm:w-36 lg:w-48"
+          />
         </Link>
 
         {/* >= md: inline links, sound, auth */}
