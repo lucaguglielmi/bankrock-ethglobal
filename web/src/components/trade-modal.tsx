@@ -1,5 +1,5 @@
-import { useHaptics } from "@/hooks/useHaptics";
 "use client";
+import { useHaptics } from "@/hooks/useHaptics";
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";

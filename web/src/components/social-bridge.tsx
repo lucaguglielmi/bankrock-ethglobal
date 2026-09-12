@@ -1,14 +1,16 @@
+"use client";
+
 import React, { useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { Mail, Twitter, ChevronRight, Check } from "lucide-react";
+import { Mail, Link, ChevronRight, Check } from "lucide-react";
 
 export function SocialBridge({ rockId }: { rockId: string }) {
-  const { user, linkEmail, linkTwitter } = usePrivy();
+  const { user, linkEmail, linkLink } = usePrivy();
   const [vanityName, setVanityName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const hasTwitter = !!user?.twitter;
+  const hasLink = !!user?.twitter;
   const hasEmail = !!user?.email;
 
   const handleSaveVanity = async () => {
@@ -24,7 +26,7 @@ export function SocialBridge({ rockId }: { rockId: string }) {
   return (
     <div className="bg-white rounded-3xl p-6 shadow-sm border border-neutral-100 mt-6 relative overflow-hidden">
       <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-        <Twitter className="w-32 h-32" />
+        <Link className="w-32 h-32" />
       </div>
       
       <h3 className="text-lg font-bold tracking-tight mb-1 relative z-10">Web2.5 Social Bridge</h3>
@@ -37,24 +39,24 @@ export function SocialBridge({ rockId }: { rockId: string }) {
           <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Identity Providers</h4>
           
           <button
-            onClick={() => { if (!hasTwitter) linkTwitter(); }}
-            disabled={hasTwitter}
+            onClick={() => { if (!hasLink) linkLink(); }}
+            disabled={hasLink}
             className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
-              hasTwitter 
+              hasLink 
                 ? "bg-neutral-50 border-neutral-100 text-neutral-500" 
                 : "bg-white border-neutral-200 hover:border-[#1DA1F2] hover:shadow-md cursor-pointer group"
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasTwitter ? "bg-neutral-200" : "bg-[#1DA1F2]/10 text-[#1DA1F2] group-hover:bg-[#1DA1F2] group-hover:text-white transition-colors"}`}>
-                <Twitter className="w-5 h-5" />
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasLink ? "bg-neutral-200" : "bg-[#1DA1F2]/10 text-[#1DA1F2] group-hover:bg-[#1DA1F2] group-hover:text-white transition-colors"}`}>
+                <Link className="w-5 h-5" />
               </div>
               <div className="text-left">
-                <div className="text-sm font-bold text-neutral-900">{hasTwitter ? (user?.twitter?.username || "Linked") : "Link Twitter / X"}</div>
-                <div className="text-xs text-neutral-500">{hasTwitter ? "Verified Identity" : "Connect your social profile"}</div>
+                <div className="text-sm font-bold text-neutral-900">{hasLink ? (user?.twitter?.username || "Linked") : "Link Link / X"}</div>
+                <div className="text-xs text-neutral-500">{hasLink ? "Verified Identity" : "Connect your social profile"}</div>
               </div>
             </div>
-            {hasTwitter ? <Check className="w-5 h-5 text-green-500" /> : <ChevronRight className="w-5 h-5 text-neutral-300 group-hover:text-[#1DA1F2]" />}
+            {hasLink ? <Check className="w-5 h-5 text-green-500" /> : <ChevronRight className="w-5 h-5 text-neutral-300 group-hover:text-[#1DA1F2]" />}
           </button>
 
           <button

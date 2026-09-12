@@ -1,6 +1,6 @@
+"use client";
 import { SocialBridge } from "@/components/social-bridge";
 import { useHaptics } from "@/hooks/useHaptics";
-"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/auth-context";

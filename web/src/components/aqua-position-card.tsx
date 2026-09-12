@@ -1,5 +1,5 @@
-import { AnalyticsDashboard, YieldDataPoint } from "./analytics-dashboard";
 "use client";
+import { AnalyticsDashboard, YieldDataPoint } from "./analytics-dashboard";
 
 import { useState } from "react";
 import { ExternalLink, Sparkles, SlidersHorizontal, ArrowUpRight, Check, RefreshCw, Info } from "lucide-react";
