@@ -97,28 +97,52 @@ function TradeModalInner({
 
   // Calculate rate and outputs
   const fetch1inchQuote = async (amount: number, from: TokenType, to: TokenType) => {
-    return new Promise<{ output: number, fee: number, impact: number }>((resolve) => {
-      setTimeout(() => {
-        let outputAmount = 0;
-        let feeInUSDC = 0;
-        let priceImpact = 0.01;
+    let outputAmount = 0;
+    let feeInUSDC = 0;
+    let priceImpact = 0.01;
 
-        if (amount > 0) {
-          if (from === "USDC") {
-            feeInUSDC = amount * MAKER_FEE_RATE;
-            const netUSDC = amount - feeInUSDC;
-            priceImpact = Math.min(2.5, Math.max(0.01, (amount / (currentReserve || 1250)) * 0.8));
-            outputAmount = (netUSDC / ETH_PRICE_USDC) * (1 - priceImpact / 100);
-          } else {
-            const grossUSDC = amount * ETH_PRICE_USDC;
-            feeInUSDC = grossUSDC * MAKER_FEE_RATE;
-            priceImpact = Math.min(2.5, Math.max(0.01, (grossUSDC / (currentReserve || 1250)) * 0.8));
-            outputAmount = (grossUSDC - feeInUSDC) * (1 - priceImpact / 100);
-          }
+    if (amount > 0) {
+      try {
+        // Prepare Real 1inch API Request (Base chain id: 8453)
+        const srcToken = from === "USDC" ? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" : "0x4200000000000000000000000000000000000006";
+        const dstToken = to === "USDC" ? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" : "0x4200000000000000000000000000000000000006";
+        const decimals = from === "USDC" ? 6 : 18;
+        const amountWei = BigInt(Math.floor(amount * (10 ** decimals))).toString();
+        
+        const response = await fetch(`https://api.1inch.dev/swap/v6.0/8453/quote?src=${srcToken}&dst=${dstToken}&amount=${amountWei}`, {
+          headers: {
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_1INCH_API_KEY || ''}`,
+          },
+        });
+
+        if (!response.ok) throw new Error("1inch API failed or missing key");
+        
+        const data = await response.json();
+        const outDecimals = to === "USDC" ? 6 : 18;
+        const rawOutput = Number(data.toAmount) / (10 ** outDecimals);
+        
+        // 1inch successfully quoted, calculate maker fee (0.05%)
+        feeInUSDC = (from === "USDC" ? amount : rawOutput) * MAKER_FEE_RATE;
+        outputAmount = rawOutput;
+        // Approximation of price impact from quote vs spot price could be calculated here, but we will mock impact for now
+        priceImpact = Math.min(2.5, Math.max(0.01, ((from === "USDC" ? amount : rawOutput) / (currentReserve || 1250)) * 0.8));
+      } catch (error) {
+        // Fallback to local simulation if 1inch API key is missing or fails (e.g. testnet)
+        await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
+        if (from === "USDC") {
+          feeInUSDC = amount * MAKER_FEE_RATE;
+          const netUSDC = amount - feeInUSDC;
+          priceImpact = Math.min(2.5, Math.max(0.01, (amount / (currentReserve || 1250)) * 0.8));
+          outputAmount = (netUSDC / ETH_PRICE_USDC) * (1 - priceImpact / 100);
+        } else {
+          const grossUSDC = amount * ETH_PRICE_USDC;
+          feeInUSDC = grossUSDC * MAKER_FEE_RATE;
+          priceImpact = Math.min(2.5, Math.max(0.01, (grossUSDC / (currentReserve || 1250)) * 0.8));
+          outputAmount = (grossUSDC - feeInUSDC) * (1 - priceImpact / 100);
         }
-        resolve({ output: outputAmount, fee: feeInUSDC, impact: priceImpact });
-      }, 500);
-    });
+      }
+    }
+    return { output: outputAmount, fee: feeInUSDC, impact: priceImpact };
   };
 
   useEffect(() => {

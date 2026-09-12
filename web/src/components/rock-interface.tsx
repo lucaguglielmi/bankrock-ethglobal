@@ -68,12 +68,53 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
   const [, setError] = useState<string | null>(null);
   const [onboardingAction, setOnboardingAction] = useState<"awaken" | "transfer" | null>(null);
 
-  // Core Product State
-  const [liquidity, setLiquidity] = useState<number>(1250.0);
-  const [earnedFees, setEarnedFees] = useState<number>(12.4);
+  const [liquidity, setLiquidity] = useState<number>(0);
+  const [earnedFees, setEarnedFees] = useState<number>(0);
   const [customOwnerAddress, setCustomOwnerAddress] = useState<string | null>(null);
-  const [events, setEvents] = useState<ActivityEvent[]>(INITIAL_EVENTS);
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [currentScenario, setCurrentScenario] = useState<DemoScenario>("active_maker");
+
+  // Fetch initial data from Cloudflare D1 via our API
+  useEffect(() => {
+    const fetchD1Data = async () => {
+      try {
+        const yieldRes = await fetch(`/api/rocks/${rockId}/yield`);
+        if (yieldRes.ok) {
+          const yieldData = await yieldRes.json();
+          // Fallback to demo values if DB is empty
+          setLiquidity(yieldData.tvl || 1250.0);
+          setEarnedFees(yieldData.currentAPY ? (yieldData.tvl * yieldData.currentAPY) / 100 / 365 : 12.4);
+        }
+
+        const activityRes = await fetch(`/api/rocks/${rockId}/activity`);
+        if (activityRes.ok) {
+          const activityData = await activityRes.json();
+          if (activityData.events && activityData.events.length > 0) {
+             // Map D1 rows to the UI Event shape
+             setEvents(activityData.events.map((e: any) => ({
+               id: e.id,
+               type: e.type,
+               title: e.title,
+               description: e.description || "",
+               timestamp: e.timestamp,
+               txHash: e.txHash,
+             })));
+          } else {
+             // Fallback to static if no events found yet
+             setEvents(INITIAL_EVENTS);
+          }
+        } else {
+          setEvents(INITIAL_EVENTS);
+        }
+      } catch (err) {
+        console.error("Failed to fetch D1 indexing data", err);
+        setEvents(INITIAL_EVENTS);
+        setLiquidity(1250.0);
+        setEarnedFees(12.4);
+      }
+    };
+    fetchD1Data();
+  }, [rockId]);
 
   // Derive current owner address reactively without setState in an effect
   const ownerAddress = customOwnerAddress || user?.wallet?.address || address || "0x71C8564e688172f6E1a90C0071C8097b6De81b47";
@@ -147,8 +188,15 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
     try {
       // Stage 1: Call BankRockRegistry
       setAwakeningStage("Awakening rock on Base Sepolia (awakenOnchain)...");
+      
+      // Derive the NFC physical key from the NTAG 424 DNA URL params (e and c)
+      // In a real NXP SDK setup, this is derived cryptographically. We construct a placeholder byte32 here.
+      const rawNfcPubKey = (urlParams.e && urlParams.c) 
+        ? `0x${urlParams.e}${urlParams.c}`.padEnd(66, '0').slice(0, 66)
+        : undefined;
+
       try {
-        await awakenOnchain(rockId, smartAccountAddress as `0x${string}`);
+        await awakenOnchain(rockId, smartAccountAddress as `0x${string}`, rawNfcPubKey);
       } catch (err) {
         console.warn("Real on-chain awaken failed, proceeding with UI sequence for demo purposes:", err);
       }
