@@ -100,10 +100,12 @@ async function deploy({ publicClient, walletClient, artifact, args, confirmation
 /**
  * Confirms that `aqua` answers the Aqua interface rather than merely having code (F-12).
  *
- * `rawBalances` and `safeBalances` are the two views the whole integration reads; an address that
- * decodes both with the right return shapes is Aqua as far as this deployment is concerned. The
- * arguments are all-zero on purpose: no strategy exists for them, so a genuine Aqua returns zeros
- * rather than reverting, and anything that is not Aqua either reverts or fails to decode.
+ * `rawBalances` and `safeBalances` are the two views the whole integration reads. The arguments
+ * are all-zero on purpose: no strategy exists for them, and the two views answer that differently
+ * (contracts/aqua/src/Aqua.sol): `rawBalances` returns zeros, while `safeBalances` reverts with
+ * the custom error `SafeBalancesForTokenNotInActiveStrategy(address,address,bytes32,address)`.
+ * A contract that does both is Aqua for every purpose this deployment has; one that returns zeros
+ * from `safeBalances`, reverts differently, or fails to decode is not.
  */
 async function assertLooksLikeAqua(publicClient, aqua) {
   const probes = [
@@ -149,6 +151,8 @@ async function assertLooksLikeAqua(publicClient, aqua) {
         },
       ],
       args: [zeroAddress, zeroAddress, `0x${"0".repeat(64)}`, zeroAddress, zeroAddress],
+      // keccak256("SafeBalancesForTokenNotInActiveStrategy(address,address,bytes32,address)")[:4]
+      expectRevertSelector: "0xb63386a6",
     },
   ];
 
@@ -160,8 +164,21 @@ async function assertLooksLikeAqua(publicClient, aqua) {
         functionName: probe.abi[0].name,
         args: probe.args,
       });
+      if (probe.expectRevertSelector) {
+        throw new Error(`returned a value where Aqua reverts with ${probe.expectRevertSelector}`);
+      }
       console.log(`  probe     ${probe.name} -> ok`);
     } catch (error) {
+      // viem wraps the revert several layers deep; the selector is on ContractFunctionRevertedError.
+      let selector;
+      for (let cause = error; cause && !selector; cause = cause.cause) {
+        if (typeof cause.signature === "string") selector = cause.signature.slice(0, 10);
+        else if (typeof cause.data === "string" && cause.data.startsWith("0x")) selector = cause.data.slice(0, 10);
+      }
+      if (probe.expectRevertSelector && selector === probe.expectRevertSelector) {
+        console.log(`  probe     ${probe.name} -> ok (reverts ${selector}, as Aqua does)`);
+        continue;
+      }
       fail(
         `${aqua} does not answer ${probe.name}, so it is not the Aqua deployment.\n` +
           `  Expected 0x1111113ccf1426a8e30e2bff5e005d929bf6a90a on Sepolia (spec 16 §1.1).\n` +
