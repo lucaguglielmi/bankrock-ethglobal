@@ -43,7 +43,8 @@ jobs:
     # Only the two Cloudflare credentials are needed to publish.
     env:
       NEXT_PUBLIC_DEMO_MODE: "false"
-      NEXT_PUBLIC_PIMLICO_API_KEY: ${{ secrets.NEXT_PUBLIC_PIMLICO_API_KEY }}
+      # Either name works; the browser-visible key and the server key are the same Pimlico key.
+      NEXT_PUBLIC_PIMLICO_API_KEY: ${{ secrets.NEXT_PUBLIC_PIMLICO_API_KEY || secrets.PIMLICO_API_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -87,6 +88,13 @@ jobs:
             exit 1
           fi
           cat "${RUNNER_TEMP}/public-vars.env" >> "$GITHUB_ENV"
+          # Not fatal — the site is honest without sponsorship (every UserOperation surface reports
+          # UNAVAILABLE) — but loud, because a green deploy with an empty key looks configured.
+          if [ -z "${NEXT_PUBLIC_PIMLICO_API_KEY}" ]; then
+            echo "::warning::NEXT_PUBLIC_PIMLICO_API_KEY is empty: add the Pimlico key as a repository secret named NEXT_PUBLIC_PIMLICO_API_KEY (or PIMLICO_API_KEY). Gas sponsorship will be UNAVAILABLE in this build."
+          else
+            echo "Pimlico key: present (${#NEXT_PUBLIC_PIMLICO_API_KEY} characters)"
+          fi
 
       # Migrations are additive (create table / add column) and the Worker's routes need the
       # tables to exist, so they are applied before the new code goes live. `bankrock-db` and
