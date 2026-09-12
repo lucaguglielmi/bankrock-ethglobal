@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { TooltipLink } from "@/components/ui/tooltip-link";
 import { Header } from "@/components/header";
 

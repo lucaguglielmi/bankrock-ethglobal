@@ -28,7 +28,7 @@ export default function SecurityPage() {
         <section className="flex flex-col gap-8">
           <h2 className="text-2xl font-bold">How we protect you</h2>
           
-          <Accordion type="single" collapsible className="w-full">
+          <Accordion className="w-full">
             <AccordionItem value="item-1">
               <AccordionTrigger className="text-lg font-semibold">1. Hardware Independence (No private keys on NFC)</AccordionTrigger>
               <AccordionContent className="text-ink-2 text-base leading-relaxed">
