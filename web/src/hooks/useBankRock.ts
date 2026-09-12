@@ -83,12 +83,13 @@ export function useRockReserves(smartAccount: `0x${string}` | undefined) {
 export function useRockActions() {
   const { writeContractAsync, isPending } = useWriteContract();
 
-  const awakenOnchain = async (rockId: number | string, smartAccount: `0x${string}`) => {
+  const awakenOnchain = async (rockId: number | string, smartAccount: `0x${string}`, nfcPubKey?: string) => {
+    const args = nfcPubKey ? [BigInt(rockId), smartAccount, nfcPubKey] : [BigInt(rockId), smartAccount];
     return await writeContractAsync({
       address: BANK_ROCK_REGISTRY_ADDRESS,
       abi: BANK_ROCK_REGISTRY_ABI,
       functionName: "awakenRock",
-      args: [BigInt(rockId), smartAccount],
+      args,
       chainId: baseSepolia.id,
     });
   };
@@ -103,7 +104,17 @@ export function useRockActions() {
     });
   };
 
-  return { awakenOnchain, transferOnchain, isPending, contractAddresses: AQUA_ADDRESSES };
+  const tradeOnchain = async (rockId: number | string, amountIn: bigint, amountOutMin: bigint, tokenIn: `0x${string}`) => {
+    return await writeContractAsync({
+      address: BANK_ROCK_REGISTRY_ADDRESS,
+      abi: BANK_ROCK_REGISTRY_ABI,
+      functionName: "executeTrade",
+      args: [BigInt(rockId), amountIn, amountOutMin, tokenIn],
+      chainId: baseSepolia.id,
+    });
+  };
+
+  return { awakenOnchain, transferOnchain, tradeOnchain, isPending, contractAddresses: AQUA_ADDRESSES };
 }
 
 export interface OnchainIndexedEvent {

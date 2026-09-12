@@ -60,6 +60,9 @@ function TradeModalInner({
     feeEarnedUSDC: number;
   } | null>(null);
 
+  const [isQuoting, setIsQuoting] = useState(false);
+  const [quoteData, setQuoteData] = useState({ output: 0, fee: 0, impact: 0.01 });
+
   // Balances state for the active trader
   const [userBalances, setUserBalances] = useState<Record<TokenType, number>>({
     USDC: 500.0,
@@ -92,27 +95,59 @@ function TradeModalInner({
   const maxBalance = userBalances[fromToken];
 
   // Calculate rate and outputs
-  let outputAmount = 0;
-  let feeInUSDC = 0;
-  let priceImpact = 0.01;
+  const fetch1inchQuote = async (amount: number, from: TokenType, to: TokenType) => {
+    return new Promise<{ output: number, fee: number, impact: number }>((resolve) => {
+      setTimeout(() => {
+        let outputAmount = 0;
+        let feeInUSDC = 0;
+        let priceImpact = 0.01;
 
-  if (inputNumber > 0) {
-    if (fromToken === "USDC") {
-      feeInUSDC = inputNumber * MAKER_FEE_RATE;
-      const netUSDC = inputNumber - feeInUSDC;
-      priceImpact = Math.min(2.5, Math.max(0.01, (inputNumber / (currentReserve || 1250)) * 0.8));
-      outputAmount = (netUSDC / ETH_PRICE_USDC) * (1 - priceImpact / 100);
-    } else {
-      const grossUSDC = inputNumber * ETH_PRICE_USDC;
-      feeInUSDC = grossUSDC * MAKER_FEE_RATE;
-      priceImpact = Math.min(2.5, Math.max(0.01, (grossUSDC / (currentReserve || 1250)) * 0.8));
-      outputAmount = (grossUSDC - feeInUSDC) * (1 - priceImpact / 100);
+        if (amount > 0) {
+          if (from === "USDC") {
+            feeInUSDC = amount * MAKER_FEE_RATE;
+            const netUSDC = amount - feeInUSDC;
+            priceImpact = Math.min(2.5, Math.max(0.01, (amount / (currentReserve || 1250)) * 0.8));
+            outputAmount = (netUSDC / ETH_PRICE_USDC) * (1 - priceImpact / 100);
+          } else {
+            const grossUSDC = amount * ETH_PRICE_USDC;
+            feeInUSDC = grossUSDC * MAKER_FEE_RATE;
+            priceImpact = Math.min(2.5, Math.max(0.01, (grossUSDC / (currentReserve || 1250)) * 0.8));
+            outputAmount = (grossUSDC - feeInUSDC) * (1 - priceImpact / 100);
+          }
+        }
+        resolve({ output: outputAmount, fee: feeInUSDC, impact: priceImpact });
+      }, 500);
+    });
+  };
+
+  useEffect(() => {
+    const amount = parseFloat(amountIn) || 0;
+    if (amount <= 0) {
+      setQuoteData({ output: 0, fee: 0, impact: 0.01 });
+      setIsQuoting(false);
+      return;
     }
-  }
+
+    let isMounted = true;
+    setIsQuoting(true);
+
+    fetch1inchQuote(amount, fromToken, toToken).then((data) => {
+      if (isMounted) {
+        setQuoteData(data);
+        setIsQuoting(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [amountIn, fromToken, toToken, currentReserve]);
+
+  const { output: outputAmount, fee: feeInUSDC, impact: priceImpact } = quoteData;
 
   const isInsufficientBalance = inputNumber > maxBalance;
   const isInsufficientReserve = toToken === "USDC" && outputAmount > currentReserve;
-  const canSwap = inputNumber > 0 && !isInsufficientBalance && !isInsufficientReserve && status === "idle";
+  const canSwap = inputNumber > 0 && !isInsufficientBalance && !isInsufficientReserve && status === "idle" && !isQuoting;
 
   const handlePercentage = (pct: number) => {
     const calculated = (maxBalance * pct).toFixed(fromToken === "USDC" ? 2 : 4);
@@ -407,11 +442,15 @@ function TradeModalInner({
 
               <div className="flex items-center justify-between gap-3">
                 <div className="text-3xl font-bold tracking-tight text-black font-mono truncate">
-                  {outputAmount > 0
-                    ? outputAmount.toLocaleString("en-US", {
-                        maximumFractionDigits: toToken === "USDC" ? 2 : 5,
-                      })
-                    : "0.0"}
+                  {isQuoting ? (
+                    <Loader2 className="w-6 h-6 animate-spin text-neutral-400 my-1" />
+                  ) : outputAmount > 0 ? (
+                    outputAmount.toLocaleString("en-US", {
+                      maximumFractionDigits: toToken === "USDC" ? 2 : 5,
+                    })
+                  ) : (
+                    "0.0"
+                  )}
                 </div>
 
                 {/* Token Pill */}
@@ -436,7 +475,11 @@ function TradeModalInner({
                   Aqua Maker Fee (0.05%)
                 </span>
                 <span className="font-mono text-green-600 font-semibold">
-                  +{feeInUSDC > 0 ? feeInUSDC.toFixed(4) : "0.0000"} USDC to Rock
+                  {isQuoting ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-neutral-400 inline-block" />
+                  ) : (
+                    `+${feeInUSDC > 0 ? feeInUSDC.toFixed(4) : "0.0000"} USDC to Rock`
+                  )}
                 </span>
               </div>
 
@@ -445,7 +488,9 @@ function TradeModalInner({
                   Deal Quality (Price Impact)
                 </span>
                 <div className="flex items-center gap-2">
-                  {inputNumber > 0 ? (
+                  {isQuoting ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                  ) : inputNumber > 0 ? (
                     <div className="flex items-center gap-1.5">
                       <div className="w-16 h-1.5 rounded-full bg-neutral-200 overflow-hidden flex">
                         <div 
