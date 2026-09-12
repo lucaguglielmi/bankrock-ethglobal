@@ -12,7 +12,7 @@ Target integrations are Aqua and Privy. Exact sponsor prize eligibility and requ
 2. Public rock metadata and onchain state.
 3. Privy login and embedded wallet creation or restoration.
 4. A dedicated Rock Account or documented isolation mechanism.
-5. Testnet funding with two supported tokens.
+5. Testnet funding with two supported tokens — Circle USDC and WETH on Ethereum Sepolia (D-023).
 6. Aqua approval and one working strategy.
 7. One real swap against that rock's strategy.
 8. Updated balances and fee information after confirmation.

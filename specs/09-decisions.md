@@ -159,11 +159,26 @@ tag path is `/r/{publicRockId}` as specified in spec 06.
 **Consequence:** no physical tag may be encoded until `/r/` returns 200 and the `www` redirect is
 fixed.
 
+### D-023 — Target network is Ethereum Sepolia
+
+**Decision:** the MVP runs on Ethereum Sepolia (chain ID 11155111). Base Sepolia is abandoned.
+
+**Consequence:** Aqua is present at its canonical address (`0x1111113ccf1426a8e30e2bff5e005d929bf6a90a`,
+bytecode identical to mainnet), Circle USDC (`0x1c7D…7238`), WETH (`0xfFf9…6B14`), the full Safe
+1.4.1 + EntryPoint 0.7 stack, Pimlico and Privy are all available. The SwapVM router is **not**
+deployed there and is self-deployed by us from `github.com/1inch/swap-vm` at a non-canonical
+address. Every `baseSepolia` import, explorer link, RPC URL, Pimlico endpoint and token address
+changes. Full dependency verification is in [`16-environment-and-secrets.md`](./16-environment-and-secrets.md).
+
+**Rejected alternatives:** Base mainnet with dust (would override spec 08's "no mainnet funds");
+self-deploying both Aqua and SwapVM on Base Sepolia (two protocol deployments to own, and a
+weaker "real Aqua" story).
+
 ## Open product questions
 
 1. **Is the hackathon's main story gifting, a public micro-exchange, or both?** Gifting is the core product journey; public tap-to-trade is the primary demonstration of the liquidity.
 2. **Should a dormant gift earn fees before the recipient claims it?** Yes, the rock is active and controlled by the giver until the handover is complete.
-3. **Which two testnet tokens and which supported network provide the most reliable Aqua demo?** Base Sepolia or Arbitrum Sepolia, using test USDC and test WETH.
+3. **Which two testnet tokens and which supported network provide the most reliable Aqua demo?** Resolved by D-023: Ethereum Sepolia, Circle USDC and WETH.
 4. **Should anyone be allowed to trade with a rock, or only invited visitors?** Anyone who scans the rock can trade with it to maximize demo interactivity.
 5. **Are rock names globally unique, edition-local or cosmetic?** Cosmetic. The public rock ID is the only globally unique identifier.
 6. **What information remains after an owner requests privacy?** The public rock ID, active strategies, and total balances (as they are onchain). Only presentation metadata (name, photo) is hidden.
@@ -171,7 +186,7 @@ fixed.
 8. **Is the initial custom strategy AMM-like, fixed-price or time-limited?** Constant-product (AMM-like).
 9. **Does ownership transfer preserve the maker address in the selected account architecture?** Yes, the ERC-4337 smart account architecture explicitly guarantees this.
 10. **Which sponsor-specific requirements must be reflected in the final demo?** The demo must clearly highlight Privy onboarding and 1inch/Aqua liquidity provision.
-11. **Which network actually hosts a usable Aqua deployment, and at what address?** Verified 2026-09-12 — see [`15-exit-demo-mode.md`](./15-exit-demo-mode.md) §1.3 C-4. Canonical deterministic addresses from the official READMEs are Aqua `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` and SwapVM router `0x111111338c5091e8440b67b168bae16a668ac0de`. **Neither exists on Base Sepolia**, nor on Arbitrum, OP or Unichain Sepolia. Both exist on Base mainnet. Aqua alone exists on Ethereum Sepolia; the SwapVM router does not, but the swap-vm repo ships Sepolia ignition parameters for self-deploying it. **The target network must change or the protocol must be self-deployed.** Options, in recommended order: (a) Ethereum Sepolia, self-deploying only `SwapVMRouter` against the existing Aqua; (b) Base mainnet with dust amounts, which requires a decision overriding spec 08's "no mainnet funds"; (c) self-deploy both on Base Sepolia at non-canonical addresses. Phase 3 does not start until one is chosen.
+11. **Which network actually hosts a usable Aqua deployment, and at what address?** Verified 2026-09-12 — see [`15-exit-demo-mode.md`](./15-exit-demo-mode.md) §1.3 C-4. Canonical deterministic addresses from the official READMEs are Aqua `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` and SwapVM router `0x111111338c5091e8440b67b168bae16a668ac0de`. **Neither exists on Base Sepolia**, nor on Arbitrum, OP or Unichain Sepolia. Both exist on Base mainnet. Aqua alone exists on Ethereum Sepolia; the SwapVM router does not, but the swap-vm repo ships Sepolia ignition parameters for self-deploying it. **Resolved by D-023:** Ethereum Sepolia, self-deploying only `SwapVMRouter` against the existing Aqua.
 
 ## Implementation spikes
 

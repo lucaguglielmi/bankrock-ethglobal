@@ -10,6 +10,31 @@ Official references:
 - [1inch Aqua overview](https://1inch.com/aqua)
 - [SwapVM repository](https://github.com/1inch/swap-vm)
 
+## Deployment (D-023, verified 2026-09-12)
+
+| Contract | Address on Ethereum Sepolia | Status |
+| --- | --- | --- |
+| Aqua | `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` | Canonical; bytecode identical to mainnet |
+| SwapVM router | — | Not deployed by 1inch on any testnet; **we deploy it** (see spec 16 §1.2) |
+| USDC | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` | Circle testnet USDC, 6 decimals |
+| WETH | `0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14` | |
+
+## Interface (Fact — from `src/Aqua.sol`)
+
+```solidity
+function ship(address app, bytes calldata strategy, address[] calldata tokens, uint256[] calldata amounts) external returns (bytes32 strategyHash);
+function dock(address app, bytes32 strategyHash, address[] calldata tokens) external;
+function safeBalances(address maker, address app, bytes32 strategyHash, address token0, address token1) external view returns (uint256, uint256);
+```
+
+- The maker approves tokens **to Aqua**, once. Not to the app.
+- `app` is an `AquaApp` implementation — our SwapVM router in Aqua mode, or the reference
+  `examples/apps/XYCSwap.sol` constant-product app.
+- `strategyHash = keccak256(strategy)`. The public rock ID is embedded in `strategy`, which is
+  how "rock identity as strategy salt" below is realised.
+- There is no JavaScript SDK for building SwapVM programs; strategy bytes are produced by a
+  Solidity script or a TypeScript port of `ProgramBuilder`.
+
 ## Bank Rock mapping
 
 | Bank Rock concept | Aqua concept |
@@ -80,6 +105,16 @@ Advantages:
 - Immediate compatibility with standard Aqua interactions.
 
 A Custom Bank Rock Aqua App is explicitly deferred to post-hackathon development.
+
+**Amendment (D-023):** because no SwapVM router exists on any testnet, "existing SwapVM program"
+means a router we deploy ourselves from the unmodified 1inch source. If building SwapVM program
+bytes without an SDK proves too slow, the fallback is the reference `XYCSwap` AquaApp from the
+Aqua repo — still zero custom contract logic, and a closer match to "constant-product".
+
+## Quoting
+
+The 1inch Swap API does not serve testnets. Quotes come from the router's own `quote()` view,
+which is guaranteed to return exactly what `swap()` will execute. No external price API.
 
 ## Financial correctness and Idle Yield
 

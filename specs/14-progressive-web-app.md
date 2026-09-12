@@ -64,7 +64,7 @@ Notification prompts must **never** appear on initial page load, landing page vi
 #### Intent-Driven Permission Flow
 Notification access is requested **only** when a user explicitly initiates an action on the rock dashboard that requires asynchronous confirmation, such as:
 1. **Trade Execution & Yield Accrual**: Alerting when an Aqua maker trade occurs against their rock's reserve and fees are deposited.
-2. **Zero-Gas Ownership Transfer**: Alerting both the sender and recipient once the Safe UserOp is settled on Base Sepolia.
+2. **Zero-Gas Ownership Transfer**: Alerting both the sender and recipient once the Safe UserOp is settled on Ethereum Sepolia.
 3. **Rebalancing Alerts**: Alerting when token inventory ratio crosses a user-defined threshold.
 4. **Physical Drop Alerts**: Informing subscribers when a physical batch of Bank Rocks is ready to claim at global events.
 

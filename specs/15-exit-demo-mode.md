@@ -36,7 +36,7 @@ Per the spec rules in [`README.md`](./README.md), claims are tagged:
 | B-5 | `deploy.yml` runs `wrangler pages deploy .` from `web/`, publishing the entire source directory as static assets, with no `_worker.js`, targeting project `bankrock-web` while `package.json` targets `bankrock-ethglobal`. | `.github/workflows/deploy.yml` |
 | B-6 | Two lockfiles (`package-lock.json`, `pnpm-lock.yaml`) coexist; `packageManager` declares pnpm; CI uses npm. | `web/` |
 | B-7 | Contract tests exist but no workflow runs them. | `contracts/test/BankRockRegistry.t.sol`, `.github/workflows/ci.yml` |
-| B-8 | `mcp/package.json` pins `typescript: ^7.0.2` and `cors: ^2.8.6` — versions that do not exist. | `mcp/package.json` |
+| B-8 | ~~`mcp/package.json` pins versions that do not exist.~~ **Withdrawn.** `typescript@7.0.2` and `cors@2.8.6` exist; `mcp/` installs and builds cleanly. `contracts/` installs and its 6 tests pass. | `npm ci && npm run build` in `mcp/` exit 0; `npx hardhat test` → 6 passing |
 
 ## 1.2 Runtime — live site
 
@@ -111,7 +111,7 @@ This is the authoritative list of what is faked, required by rule 1 of [`../STEE
 | F-1 | Two verifiers exist. The one the UI calls is a stub: `await sleep(400)` then `isValid = params.c !== "invalid_signature"`. **Any `?c=` value that is not that literal string renders a green "Verified Physical" badge.** | `actions/verify-ntag.ts:52-55`, `components/rock-interface.tsx` |
 | F-2 | This inverts the central promise of [`06-nfc-security.md`](./06-nfc-security.md) and decision D-002: a copied URL is presented to the user as cryptographically proven physical possession. | — |
 | F-3 | The second verifier, `/api/nfc/verify`, attempts real AES-CMAC but cannot validate a real NTAG 424: it reads the UID at offset 0 instead of 1 (skipping the PICC tag byte), reads the 3-byte `SDMReadCtr` with `readUInt32LE`, and performs no NXP session-key derivation (SV1/SV2). | `app/api/nfc/verify/route.ts:44-46,88-97` |
-| F-4 | It also requires `node:crypto` and `Buffer`, but `nodejs_compat` is absent from `compatibility_flags`. | `wrangler.jsonc` |
+| F-4 | ~~`nodejs_compat` is absent.~~ **Withdrawn.** With `compatibility_date >= 2026-08-04` Cloudflare enables `nodejs_compat` by default; the repo's date is `2026-09-11`. `node:crypto` and `Buffer` work as-is. `node-aes-cmac` is dependency-free pure JS. | Cloudflare changelog 2026-08-04; `wrangler.jsonc` |
 | F-5 | `verifiedPubKey` is `0x${e}${c}` padded to 66 chars — not a key, not a signature, not derived from anything. | `app/api/nfc/verify/route.ts:105` |
 | F-6 | On-chain, `bindNFC` stores a `bytes32` that nothing ever verifies. The `InvalidNFCSequence` error is declared and never used. | `contracts/contracts/BankRockRegistry.sol` |
 
@@ -166,7 +166,23 @@ work recorded in commit `10b2cbc`.
 | X-7 | The Gelato function reads Base **mainnet** USDC against a Sepolia registry, treats the native ETH balance as WETH, and calls `rebalance(address,bytes32)` on the 1inch router — a function that does not exist there. | `web3-functions/bankrock-keeper/index.ts` |
 | X-8 | Faucet rate limiting is per-address only (trivially defeated with fresh addresses) and sits behind the broken D1 path. | `app/api/faucet/route.ts` |
 
-## 1.6 Spec coverage
+## 1.6 External dependencies (verified against Ethereum Sepolia)
+
+Full tables are in [`16-environment-and-secrets.md`](./16-environment-and-secrets.md). The facts
+that change the plan:
+
+| # | Fact | Evidence |
+| --- | --- | --- |
+| E-1 | Aqua is on Sepolia at its canonical address with bytecode identical to mainnet. USDC, WETH, EntryPoint 0.7 and the full Safe 1.4.1 stack are present. Privy and Pimlico support Sepolia. | spec 16 §1.1, §1.4 |
+| E-2 | The SwapVM router is on no testnet. We deploy it (plain Ignition deploy, non-canonical address). | spec 16 §1.2 |
+| E-3 | **The Aqua ABI in `lib/aa.ts` is wrong.** Real: `ship(address app, bytes strategy, address[] tokens, uint256[] amounts)`. Makers approve **Aqua**, not the app. | `src/interfaces/IAqua.sol` |
+| E-4 | No JavaScript SDK exists for SwapVM programs. `@1inch/swap-vm` is not on npm. Strategy bytes must come from a Solidity script or a TS port. | npm registry 404; repo `package.json` has no `main`/`exports` |
+| E-5 | The 1inch Swap API serves mainnets only. `/api/quote` cannot work on any testnet and is deleted. | 1inch Business portal, Classic Swap chains list |
+| E-6 | Resend's sandbox sender delivers only to the account owner's inbox until `bank-rock.com` is DNS-verified. | Resend docs |
+| E-7 | `.env.example` names `NTAG_MASTER_KEY`; the code reads `NXP_MASTER_KEY`. Fourteen variables the code reads are absent from the example file. | spec 16 §2.1 |
+| E-8 | Removing `@cloudflare/next-on-pages` and adding `sonner` makes strict `npm ci` succeed with no further peer conflicts. | `npm install --package-lock-only` on a patched `package.json`, exit 0 |
+
+## 1.7 Spec coverage
 
 Specified and **not implemented at all**:
 
@@ -383,8 +399,10 @@ over `web/src` returns nothing.
 1. Rewrite `BankRockRegistry.sol` per D-020 and D-018: remove `executeTrade` and
    `setRouterWhitelist`; add `Ownable`; gate `awakenRock` on a server-signed EIP-712 attestation;
    add pending-handover state with expiry for Flow E (SC-5).
-2. Write a real deploy script (C-3) and deploy to Base Sepolia. Record the address in env, verify
-   on BaseScan.
+2. Write a real deploy script (C-3) and deploy to **Ethereum Sepolia** (D-023). Record the address
+   in env, verify on Sepolia Etherscan. Before this: switch every `baseSepolia` import to
+   `sepolia`, `providers.tsx` chain list, the Pimlico URL (`/v2/sepolia/rpc`), explorer links
+   (`sepolia.etherscan.io`), token addresses (spec 16 §1.1), and `hardhat.config.js`.
 3. Wire `lib/aa.ts` into the awaken path: deploy a Safe per rock via Pimlico, sponsored (C-6).
 4. Read lifecycle, owner and Rock Account address from the registry (C-7, C-8, C-9).
 5. Fix the indexer: query from the real deploy block in chunks, read block timestamps (X-5).
@@ -400,19 +418,25 @@ Two browsers show the same state for the same rock.
 
 This is the sponsor integration and the reason the project exists.
 
-1. **Decide the network first.** The spike is done (C-4a): Aqua and SwapVM are **not** on Base
-   Sepolia. The hypothesis that they were is disproven. Choose one of the three options recorded
-   under open question 11 in [`09-decisions.md`](./09-decisions.md) — Ethereum Sepolia with a
-   self-deployed `SwapVMRouter`, Base mainnet with dust, or self-deploying both on Base Sepolia —
-   and record it as D-023. Every subsequent step in this phase depends on that choice.
-2. Implement `ship` via the atomic batch already written in `lib/aa.ts` (D-012).
+1. **Network decided: Ethereum Sepolia (D-023).** Deploy `SwapVMRouter` from an unmodified
+   checkout of `github.com/1inch/swap-vm`: add a `sepolia` network to its `hardhat.config.ts`, set
+   `aqua` in `ignition/parameters/chain-11155111.json` to `0x1111113ccf…6a90a`, run
+   `npx hardhat ignition deploy ignition/modules/SwapVMRouter.ts --network sepolia --parameters …`.
+   Record the address as `NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS`.
+2. **Resolve the strategy encoding** (E-4). Read `test/solidity/helpers/AquaStrategyBuilders.sol`
+   in the swap-vm repo to confirm what `ship()` receives as `strategy` for an Aqua-mode order
+   *(hypothesis: the ABI-encoded order, with `strategyHash == swapVM.hash(order)`)*. Produce the
+   constant-product program bytes with a committed Foundry script. If this takes more than a day,
+   fall back to the reference `XYCSwap` AquaApp per spec 04.
+3. Fix the ABI in `lib/aa.ts` (E-3) and implement `ship` via the atomic batch (D-012):
+   `approve(Aqua, USDC)`, `approve(Aqua, WETH)`, `Aqua.ship(app, strategy, [USDC, WETH], [a, b])`.
 3. Implement the visitor swap path against the strategy — from the Rock Account, not the registry
    (SC-4, D-020).
 4. Read actual *and* virtual balances and display both, per spec 04's explicit requirement that
    virtual allocations are not summed and presented as owned capital.
 5. Implement `dock` (Flow H).
-6. Replace `/api/quote` with a testnet-correct price source (N-5), or price from the strategy's own
-   curve.
+6. Delete `/api/quote` and `1INCH_API_KEY` (E-5). Quote from `SwapVMRouter.quote()` — the only
+   source guaranteed to equal what `swap()` executes.
 7. Ship the second strategy sharing one reserve (spec 04).
 
 **Acceptance:** a second Privy account executes a real swap against a rock's strategy; the rock's
@@ -424,7 +448,7 @@ computed client-side. Two strategies share one reserve and the UI shows availabi
 1. Delete `actions/verify-ntag.ts` (D-018, F-1).
 2. Implement correct SDM verification (F-3): PICC offsets, SV1/SV2 session key derivation, CMAC,
    truncation.
-3. Add `nodejs_compat` to `compatibility_flags`, or reimplement on WebCrypto (F-4).
+3. ~~Add `nodejs_compat`.~~ Not needed (F-4 withdrawn). Keep `compatibility_date >= 2026-08-04`.
 4. Move the counter store to D1 with a conditional update; it must be durable and atomic (R-4).
 5. Provision real tag keys; store the master key in Cloudflare secrets, never in `.env.example`.
 6. Implement `/r/{publicRockId}` (R-7, D-022).
