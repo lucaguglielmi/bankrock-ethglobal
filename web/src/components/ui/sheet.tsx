@@ -5,6 +5,7 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/ui/cn";
 import { IconButton } from "@/components/ui/icon-button";
+import { useFeedback } from "@/components/sheets/use-feedback";
 
 /**
  * The one overlay primitive (spec 17 §4.4). Below `sm` it is a full-width
@@ -18,6 +19,12 @@ export interface SheetProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  /**
+   * Rendered in the sticky header, beside the title: a `SimulatedBadge` on a `DEMO` surface, a
+   * state chip, a count. It stays put while the body scrolls, which is what a badge that must
+   * survive a screenshot needs (spec 15 D-013).
+   */
+  headerAccessory?: React.ReactNode;
   footer?: React.ReactNode;
   /** `md` -> `max-w-md` above `sm`; `lg` -> `max-w-2xl`. @default "md" */
   size?: "md" | "lg";
@@ -29,11 +36,22 @@ function Sheet({
   onOpenChange,
   title,
   description,
+  headerAccessory,
   footer,
   size = "md",
   children,
 }: SheetProps) {
   const descriptionId = React.useId();
+  const { tap } = useFeedback();
+  const wasOpen = React.useRef(open);
+
+  // One sound when the sheet arrives (STEERING.md), fired from the primitive so no surface has
+  // to remember to. Nothing is set here, so this never cascades a render.
+  React.useEffect(() => {
+    const justOpened = open && !wasOpen.current;
+    wasOpen.current = open;
+    if (justOpened) tap();
+  }, [open, tap]);
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -71,9 +89,12 @@ function Sheet({
           />
           <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-4 pt-2 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
             <div className="min-w-0 flex-1">
-              <DialogPrimitive.Title className="text-h2 font-bold text-ink">
-                {title}
-              </DialogPrimitive.Title>
+              <div className="flex flex-wrap items-center gap-2">
+                <DialogPrimitive.Title className="text-h2 font-bold text-ink">
+                  {title}
+                </DialogPrimitive.Title>
+                {headerAccessory}
+              </div>
               {description ? (
                 <DialogPrimitive.Description
                   id={descriptionId}

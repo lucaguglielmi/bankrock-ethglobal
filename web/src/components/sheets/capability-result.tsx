@@ -20,9 +20,14 @@ export interface CapabilityResultProps {
   title: string;
   /** One sentence saying what changed. */
   description: string;
+  /**
+   * Extra `<dt>`/`<dd>` pairs for this particular write — the amount received from a swap, say —
+   * rendered above the transaction row. Only ever values read back from the result.
+   */
+  rows?: React.ReactNode;
 }
 
-function CapabilityResult({ result, title, description }: CapabilityResultProps) {
+function CapabilityResult({ result, title, description, rows }: CapabilityResultProps) {
   if (result.state === "UNAVAILABLE") {
     return <UnavailableState reason={result.reason} />;
   }
@@ -35,6 +40,7 @@ function CapabilityResult({ result, title, description }: CapabilityResultProps)
       </div>
       <p className="max-w-prose text-base text-ink-2">{description}</p>
       <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 text-sm">
+        {rows}
         <dt className="text-ink-3">Transaction</dt>
         <dd className="justify-self-end">
           {result.state === "REAL" ? (

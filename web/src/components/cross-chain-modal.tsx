@@ -134,14 +134,10 @@ export function CrossChainModal({
       }}
       title="Top up from another chain"
       description={`Money you hold elsewhere, moved into rock #${rockId}'s account.`}
+      headerAccessory={<SimulatedBadge />}
       footer={footer}
     >
       <SheetBody className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <SimulatedBadge />
-          <span className="text-sm text-ink-2">Nothing here moves real money.</span>
-        </div>
-
         {!simulated ? (
           <UnavailableState reason={NO_BRIDGE_REASON} />
         ) : done ? (
