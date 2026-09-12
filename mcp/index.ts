@@ -142,6 +142,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["rockId"],
         },
       },
+      {
+        name: "get_newsletter_subscribers",
+        description: "Queries subscriber counts and waitlist details for the Genesis Batch OG Bank Rock release.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            admin: { type: "boolean", description: "Whether to return unmasked email addresses (for authorized operators)" },
+          },
+          required: [],
+        },
+      },
     ],
   };
 });
@@ -412,6 +423,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             evaluation: evalData,
           }, null, 2)
         }],
+      };
+    }
+
+    if (name === "get_newsletter_subscribers") {
+      const isAdmin = Boolean(args?.admin);
+      const res = await fetch(`${LIVE_API_URL}/api/newsletter?admin=${isAdmin}`);
+      const data = await res.json();
+      return {
+        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
       };
     }
 

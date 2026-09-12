@@ -20,8 +20,17 @@ export function NewsletterSignup() {
     setErrorMessage("");
 
     try {
-      // Simulate newsletter registration (can connect to Mailchimp, ConvertKit, or Cloudflare D1)
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, source: "landing_page" }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to join newsletter.");
+      }
 
       // Save locally to prevent re-prompting
       if (typeof window !== "undefined") {
@@ -35,9 +44,9 @@ export function NewsletterSignup() {
       }
 
       setStatus("success");
-    } catch {
+    } catch (err: unknown) {
       setStatus("error");
-      setErrorMessage("Something went wrong. Please try again.");
+      setErrorMessage(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     }
   };
 
