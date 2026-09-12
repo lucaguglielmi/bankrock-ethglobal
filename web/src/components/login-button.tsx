@@ -8,6 +8,8 @@ import { Address } from "@/components/ui/address";
 import { HelpTerm } from "@/components/ui/popover";
 import { truncateMiddle } from "@/lib/ui/format";
 import { explorer } from "@/lib/chain";
+import { MyAddressQr } from "@/components/my-address-qr";
+import { QrCode } from "lucide-react";
 
 /**
  * The header auth control (spec 17 §4.3). Signed out: a `Connect` button.
@@ -30,6 +32,9 @@ export function LoginButton() {
   } = useAuth();
   const [accountOpen, setAccountOpen] = React.useState(false);
   const [loggingOut, setLoggingOut] = React.useState(false);
+  // "My address" (B1): collapsed by default so the account sheet stays one screen, and reset
+  // whenever the sheet closes so it never reopens showing a code nobody asked for.
+  const [showCode, setShowCode] = React.useState(false);
 
   if (!ready) {
     return (
@@ -76,7 +81,10 @@ export function LoginButton() {
 
         <Sheet
           open={accountOpen}
-          onOpenChange={setAccountOpen}
+          onOpenChange={(open) => {
+            setAccountOpen(open);
+            if (!open) setShowCode(false);
+          }}
           title="Account"
           footer={
             <Button
@@ -94,6 +102,26 @@ export function LoginButton() {
             <div>
               <p className="text-label uppercase text-ink-3">Address</p>
               <Address value={address} explorerHref={explorer.address(address)} className="mt-1" />
+            </div>
+
+            {/*
+              Receiving a rock (Flow E): show a code the giver's own camera can read, instead of
+              getting 42 characters from this phone into theirs. `MyAddressQr` builds the link
+              from the page it is opened on, so from a rock page it points back at that rock.
+            */}
+            <div>
+              <Button
+                type="button"
+                size="default"
+                variant={showCode ? "default" : "outline"}
+                className="w-full"
+                aria-expanded={showCode}
+                onClick={() => setShowCode((open) => !open)}
+              >
+                <QrCode aria-hidden />
+                {showCode ? "Hide my code" : "Show my code to receive a rock"}
+              </Button>
+              {showCode ? <MyAddressQr address={address} className="mt-4" /> : null}
             </div>
             <div>
               <p className="text-label uppercase text-ink-3">Network</p>

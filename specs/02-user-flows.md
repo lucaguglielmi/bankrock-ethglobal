@@ -123,6 +123,16 @@ otherwise. **A recipient must be named** — the app issues no open gifts.
    `recipient == address(0)` and still documents it. **No app path issues one**, and the claim
    route refuses to relay one, because a recipient who is unknown when the gift is opened cannot
    have an owner swap pre-signed for them.*
+   - **Naming that recipient is a two-phone move, not a clipboard one (B1).** On the recipient's
+     phone, **Show my code** in the account sheet renders a QR of
+     `https://bank-rock.com/rock/<id>?give=<their address>` (or `…/?give=<address>` away from a
+     rock page) together with the address in text and a copy button; the giver points their own
+     phone's stock camera at it, the link opens, and the give sheet comes up with the recipient
+     already filled in. Pasting remains the fallback and nothing else changes: the parameter is
+     accepted only as a lowercase or correctly checksummed 20-byte address and ignored otherwise,
+     it is stripped from the URL as soon as it is read so a reload cannot re-prefill it, and it
+     opens the sheet by itself only for the rock's current owner — to anyone else the link is an
+     ordinary rock page.
 2. `initiateHandover(rockId, recipient, expiresAt, messageHash)` goes out as a sponsored
    UserOperation from the Rock Account. Only the message *hash* is on chain; the text is stored
    off-chain and is shown **to the named recipient, on the rock page, from the moment they are

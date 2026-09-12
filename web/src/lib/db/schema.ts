@@ -35,6 +35,30 @@ export const rockEvents = sqliteTable(
   (table) => [index('rock_events_rock_id_idx').on(table.rockId, table.timestamp)],
 );
 
+/**
+ * How far the registry indexer has already scanned (B7).
+ *
+ * `lib/indexer.ts` mirrors every decoded registry event into `rock_events`, but before this
+ * table it never read that mirror back: each poll re-scanned from `REGISTRY_DEPLOY_BLOCK` to the
+ * head, in 2,000-block chunks, every fifteen seconds, for every rock anyone was looking at. The
+ * cursor makes the scan resumable — after the first pass a poll asks only for the blocks that
+ * are new.
+ *
+ * `id` is the scope, `chain:<chainId>:registry:<address>`, so a redeployed registry or a
+ * different chain starts its own cursor instead of inheriting a stranger's progress. `last_block`
+ * is TEXT holding a decimal integer, the same shape `rock_events.block_number` uses, and the
+ * conditional UPDATE casts it so the cursor can only ever move forward.
+ *
+ * The indexer owns the read/write path and uses raw D1 statements for that one conditional
+ * update; the table is declared here so it is created by a migration and has one owner for its
+ * shape (the `nfc_counters` precedent).
+ */
+export const indexerCursors = sqliteTable('indexer_cursors', {
+  id: text('id').primaryKey(),
+  lastBlock: text('last_block').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
 export const rocks = sqliteTable('rocks', {
   id: text('id').primaryKey(),
   ownerAddress: text('owner_address'),
