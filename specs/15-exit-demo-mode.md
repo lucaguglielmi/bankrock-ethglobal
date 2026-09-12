@@ -1,0 +1,593 @@
+# Exiting demo mode
+
+## Purpose
+
+The implementation in `web/`, `contracts/`, `mcp/` and `web3-functions/` presents itself as a
+working product. Most of it is a simulation: hardcoded balances, synthesized transaction
+hashes, an undeployed registry, an Aqua integration pointed at the wrong contract, and an NFC
+verifier that accepts any input.
+
+This document defines what "demo mode" is, makes it an explicit and visible runtime state
+rather than an implicit default, and specifies the work required to leave it.
+
+It is written to be checkable. Every fact below was verified on 2026-09-12 and carries its
+evidence. Every exit criterion is mechanically testable.
+
+## Status vocabulary
+
+Per the spec rules in [`README.md`](./README.md), claims are tagged:
+
+- **Fact** — verified by execution, an RPC call, or an HTTP response on this date.
+- **Decision** — a choice this document makes and the codebase must follow.
+- **Hypothesis** — believed but not proven; must be proven before it is relied on.
+
+---
+
+# Part 1 — Audit baseline
+
+## 1.1 Build and pipeline
+
+| # | Fact | Evidence |
+| --- | --- | --- |
+| B-1 | `npm run build` fails. `sonner` is imported but absent from `package.json`. | `Module not found: Can't resolve 'sonner'` from `components/transfer-modal.tsx:2`, `components/rock-alerts.tsx:2`. Build succeeds once the dependency is added. |
+| B-2 | `npm ci` fails. `@cloudflare/next-on-pages@1.13.16` peers `next <=15.5.2`; project is on `next@16.3.5`. | `ERESOLVE` on clean install. Both CI workflows begin with `npm ci`, so every Actions run is red. |
+| B-3 | `npm run lint` reports 48 errors, 31 warnings. | `ci.yml` runs lint immediately after install. |
+| B-4 | `npx tsc --noEmit` is clean. | No output. |
+| B-5 | `deploy.yml` runs `wrangler pages deploy .` from `web/`, publishing the entire source directory as static assets, with no `_worker.js`, targeting project `bankrock-web` while `package.json` targets `bankrock-ethglobal`. | `.github/workflows/deploy.yml` |
+| B-6 | Two lockfiles (`package-lock.json`, `pnpm-lock.yaml`) coexist; `packageManager` declares pnpm; CI uses npm. | `web/` |
+| B-7 | Contract tests exist but no workflow runs them. | `contracts/test/BankRockRegistry.t.sol`, `.github/workflows/ci.yml` |
+| B-8 | `mcp/package.json` pins `typescript: ^7.0.2` and `cors: ^2.8.6` — versions that do not exist. | `mcp/package.json` |
+
+## 1.2 Runtime — live site
+
+| # | Fact | Evidence |
+| --- | --- | --- |
+| R-1 | `https://www.bank-rock.com` returns `308` to the literal string `https://bank-rock.com/:path*`, which is a `404`. A Cloudflare redirect rule contains an unsubstituted placeholder. | `curl -I https://www.bank-rock.com` |
+| R-2 | `GET /api/rocks/{id}/yield` and `GET /api/rocks/{id}/activity` return `500` in production. These feed liquidity, fees, APY and the provenance timeline on every rock page. | `curl https://bank-rock.com/api/rocks/1/yield` → `Internal Server Error` |
+| R-3 | Every D1 access calls `getRequestContext()` from `@cloudflare/next-on-pages`, but deployment uses `@opennextjs/cloudflare`. The adapters are not interchangeable. D1 is unreachable everywhere in the app. | 9 call sites; `open-next.config.ts`; `wrangler.jsonc` `main: .open-next/worker.js` |
+| R-4 | All persistence therefore falls back to per-isolate in-memory `Map`s that reset continuously. | `GET /api/telemetry` returns `count: 1` on every call — a cold buffer each time. |
+| R-5 | `GET /api/events?rockId=1` returns `count: 0`. | The registry it queries has no code. |
+| R-6 | `/sw.js` returns `404` while `/alerts` instructs users to enable push notifications. | `curl -o /dev/null -w "%{http_code}" https://bank-rock.com/sw.js` |
+| R-7 | `/r/{id}` — the NFC tag payload path specified in [`06-nfc-security.md`](./06-nfc-security.md) — returns `404`. The app only serves `/rock/[id]`. | `curl https://bank-rock.com/r/1` |
+| R-8 | The string `bank-rock.com` appears nowhere in the codebase. CORS defaults to `https://bankrock.xyz`; email CTAs and the MCP server point at `bankrock-ethglobal.pages.dev`; the Gelato function calls `bankrock.xyz`. | `middleware.ts:79`, `lib/email-service.ts:63`, `mcp/index.ts:23`, `web3-functions/bankrock-keeper/index.ts:75` |
+| R-9 | [`12-deployment.md`](./12-deployment.md) specifies Vercel. The actual target is Cloudflare Pages via OpenNext. | `package.json` `deploy:pages`, `wrangler.jsonc` |
+
+## 1.3 Simulation ledger
+
+This is the authoritative list of what is faked, required by rule 1 of [`../STEERING.md`](../STEERING.md).
+
+### On-chain
+
+| # | Fact | Evidence |
+| --- | --- | --- |
+| C-1 | **The registry is not deployed.** `eth_getCode` on Base Sepolia returns `0x` for both addresses present in the repo. | `0x89f735f4c74f878d3aac6e60b134d115e5e29631` (`lib/contracts.ts:1`) and `0x83B1A8a09f87258385698b9C433e143FDF2A9F52` (`.env.example`, `mcp/index.ts:20`, `contracts/scripts/deploy.js:26`) |
+| C-2 | The two addresses disagree with each other, and no build step reconciles them. | as above |
+| C-3 | `contracts/scripts/deploy.js` deploys nothing. It reads the artifact and prints a hardcoded address. | `contracts/scripts/deploy.js` |
+| C-4 | **Aqua is not integrated.** `AQUA_ADDRESSES.aquaContract` is `0x111111125421cA6dc452d289314280a0f8842A65` — the 1inch Aggregation Router V6, which has no `ship`/`dock`. `swapVmContract` `0x2222…842a65` has no code on Base Sepolia. | `lib/contracts.ts`; `eth_getCode` returns 23942 bytes and `0x` respectively |
+| C-5 | No strategy is ever shipped, docked, or read. No virtual balances exist. Spec 04's requirement of two strategies sharing one reserve is absent. | no `ship`/`dock` call sites outside dead code |
+| C-6 | **ERC-4337 is not wired.** `lib/aa.ts` — Safe accounts, dual Pimlico paymaster, atomic `executeBatch` — is dead code. Nothing imports it. | `grep "@/lib/aa"` → no results |
+| C-7 | `smartAccountAddress` is a hardcoded literal, identical for every rock, and equal to the non-existent registry address. | `components/rock-interface.tsx:133` |
+| C-8 | Owner address falls back to a hardcoded literal when unauthenticated. | `components/rock-interface.tsx:132` |
+| C-9 | Rock lifecycle state is `rockId === "1" \|\| rockId === "new" ? unactivated : active`. It is never read from a registry or database. | `components/rock-interface.tsx` |
+| C-10 | `tradeOnchain` hardcodes router `0x1111111254EEB25477B68fb85Ed929f73A960582` (1inch v5, mainnet) labelled "v6 on Base Sepolia", and defaults `routerPayload` to `"0x"`. | `hooks/useBankRock.ts` |
+
+### Synthesized evidence
+
+| # | Fact | Evidence |
+| --- | --- | --- |
+| S-1 | When the faucet fails, a random 64-hex string is generated and rendered as "Seed Faucet Broadcasted" with a clickable BaseScan link. | `components/rock-interface.tsx:257-261` |
+| S-2 | Same pattern in the Aqua position card and the cross-chain modal. | `components/aqua-position-card.tsx:56`, `components/cross-chain-modal.tsx:248,263` |
+| S-3 | `executeAquaRebalance` returns a random hash from an "execution" that only mutates an in-memory `Map`. `POST /api/keeper` returns it as `success: true`. | `lib/aqua-keeper.ts:132` |
+| S-4 | `INITIAL_EVENTS` ships three hardcoded transaction hashes as provenance history. | `components/rock-interface.tsx:34-60` |
+| S-5 | `sendAlertEmail` returns `success: true` when nothing was sent (sandbox preview). MCP reports `DISPATCHED`. | `lib/email-service.ts:170-182` |
+
+### Fabricated numbers
+
+| # | Fact | Evidence |
+| --- | --- | --- |
+| N-1 | The keeper's entire position — reserves, price (2850), fee accrual — is an in-memory fiction. | `lib/aqua-keeper.ts` |
+| N-2 | The yield endpoint returns hardcoded `currentAPY: 18.5` and a three-point history, both when D1 is absent *and* when D1 returns no rows. | `app/api/rocks/[id]/yield/route.ts` |
+| N-3 | Displaying APY contradicts principle 5 of [`01-product.md`](./01-product.md) and decision D-004. | `components/rock-interface.tsx`, `components/aqua-position-card.tsx` |
+| N-4 | Trader balances are hardcoded `USDC: 500, WETH: 0.25`. | `components/trade-modal.tsx:73` |
+| N-5 | `/api/quote` queries 1inch on chain `8453` (Base **mainnet**) with mainnet USDC, while execution targets Sepolia. It requires `1INCH_API_KEY`, absent from `.env.example`, so it returns `500` — quote is `0`, and the swap button can never enable. | `app/api/quote/route.ts` |
+| N-6 | Price impact is an invented formula, not an AMM calculation. | `components/trade-modal.tsx` |
+| N-7 | The admin dashboard is a `setTimeout` returning $1,254,300 TVL, 42 rocks, 8 Gelato tasks. | `app/admin/page.tsx` |
+| N-8 | Cron snapshot mocks fees as `tvl * 0.01` and prices ETH at 2500, while the keeper uses 2850. | `app/api/cron/snapshot/route.ts` |
+| N-9 | Alerts have a settings UI and a manual test button but **no event-to-delivery pipeline**. No alert can ever fire on its own. | `lib/alerts.ts`, `app/api/alerts/*` |
+| N-10 | `/api/newsletter` POST writes to D1 but GET reads an in-memory map seeded with a fake subscriber. | `app/api/newsletter/route.ts:21` |
+
+### MCP server
+
+| # | Fact | Evidence |
+| --- | --- | --- |
+| M-1 | 8 of 11 tools return hardcoded fiction with no chain read. `get_rock_status` returns `isAwake: true` for any ID. `trace_transaction` returns `status: "SUCCESS"` for any hash. `analyze_strategy_yield` returns 18.4% APR and $8,450 24h volume as fact. | `mcp/index.ts` |
+| M-2 | This directly violates the trust boundary in [`03-system-architecture.md`](./03-system-architecture.md), which states MCP is *not trusted for* "hallucinated financial claims". The server does not hallucinate them — it hardcodes them, which is worse, because the numbers are stable and therefore credible. | `03-system-architecture.md` |
+
+### NFC
+
+| # | Fact | Evidence |
+| --- | --- | --- |
+| F-1 | Two verifiers exist. The one the UI calls is a stub: `await sleep(400)` then `isValid = params.c !== "invalid_signature"`. **Any `?c=` value that is not that literal string renders a green "Verified Physical" badge.** | `actions/verify-ntag.ts:52-55`, `components/rock-interface.tsx` |
+| F-2 | This inverts the central promise of [`06-nfc-security.md`](./06-nfc-security.md) and decision D-002: a copied URL is presented to the user as cryptographically proven physical possession. | — |
+| F-3 | The second verifier, `/api/nfc/verify`, attempts real AES-CMAC but cannot validate a real NTAG 424: it reads the UID at offset 0 instead of 1 (skipping the PICC tag byte), reads the 3-byte `SDMReadCtr` with `readUInt32LE`, and performs no NXP session-key derivation (SV1/SV2). | `app/api/nfc/verify/route.ts:44-46,88-97` |
+| F-4 | It also requires `node:crypto` and `Buffer`, but `nodejs_compat` is absent from `compatibility_flags`. | `wrangler.jsonc` |
+| F-5 | `verifiedPubKey` is `0x${e}${c}` padded to 66 chars — not a key, not a signature, not derived from anything. | `app/api/nfc/verify/route.ts:105` |
+| F-6 | On-chain, `bindNFC` stores a `bytes32` that nothing ever verifies. The `InvalidNFCSequence` error is declared and never used. | `contracts/contracts/BankRockRegistry.sol` |
+
+## 1.4 Security findings
+
+### Contract — `BankRockRegistry.sol`
+
+Not yet deployed, which is the only reason these are not live. **Do not deploy this contract as written.**
+
+| # | Severity | Fact |
+| --- | --- | --- |
+| SC-1 | Critical | `setRouterWhitelist` has no access control — the source comment admits it. Combined with `executeTrade` performing `router.call(routerPayload)` with **caller-supplied calldata**, any address can whitelist a token as a "router" and use the registry as an arbitrary-call proxy. Any token the registry holds or is approved for is drainable. |
+| SC-2 | Critical | `awakenRock` has no access control and no NFC proof. Anyone can awaken any unclaimed `rockId`, becoming `currentOwner` with an arbitrary `smartAccount`. Front-runnable in the mempool. |
+| SC-3 | High | `minAmountOut` is caller-chosen, so `balanceAfter >= balanceBefore + minAmountOut` is trivially satisfied with `0`. The slippage guard is decorative. |
+| SC-4 | High | `executeTrade` requires `msg.sender` to be the owner or the smart account. **A visitor can never trade against a rock** — MVP requirement 7 and Flow D are unimplementable against this contract. |
+| SC-5 | Medium | `transferOwnership` is immediate and unconditional. Flow E's pending handover, expiry, message and tap-to-claim do not exist on-chain. |
+| SC-6 | Low | No ownership, no pause, no upgrade path. |
+
+### Live API — all unauthenticated, all verified against production
+
+| # | Severity | Fact | Evidence |
+| --- | --- | --- | --- |
+| SA-1 | High | `POST /api/alerts/test` is an **open email relay**. Any party can make the Resend sending domain deliver Bank Rock–branded mail to any address. The only validation is `to.includes("@")`. | `HTTP 400` on a deliberately invalid address confirms anonymous requests are accepted and processed. |
+| SA-2 | High | `GET /api/telemetry` publicly serves server logs including wallet addresses, NFC UIDs, full recipient email addresses and error stacks. `POST` accepts arbitrary log injection from anyone. | `curl` returns log entries; `POST` returns `{"success":true}`. `lib/email-service.ts:172` logs `recipient` unredacted. |
+| SA-3 | High | The MCP server reads those logs and presents them to an AI agent. Combined with SA-2's open `POST`, this is a prompt-injection path into the user's agent. | `mcp/index.ts` `query_logs` |
+| SA-4 | High | `FAUCET_PRIVATE_KEY` defaults to the Anvil/Hardhat account #0 key, which every Ethereum developer possesses. That address currently holds ~0.001 ETH on Base Sepolia and is sweepable by anyone. | `app/api/faucet/route.ts:7`; `eth_getBalance(0xf39Fd6…92266)` = `0x38cc945131f04` |
+| SA-5 | Medium | `GET\|POST /api/alerts` allows anyone to read or overwrite alert preferences — including the owner's stored email — for any `rockId`. | `POST` with an arbitrary `rockId` returns `200` and echoes the stored email. |
+| SA-6 | Medium | `POST /api/keeper` triggers a rebalance with no authentication. | `200` |
+| SA-7 | Medium | `POST /api/alerts/gelato` authenticates on `body.source === 'gelato_keeper'` — a value the caller supplies. `message` is interpolated raw into email HTML. | Currently `500`s outright. |
+| SA-8 | Medium | `ADMIN_JWT_SECRET` and `NXP_MASTER_KEY` have insecure defaults (`'fallback-secret-do-not-use-in-prod'`, 32 zeros). If unset in production, admin sessions are forgeable. | `lib/auth.ts:4`, `middleware.ts:10`, `app/api/nfc/verify/route.ts:14` |
+| SA-9 | Medium | Webhook and cron secrets use `if (SECRET && mismatch) reject` — an **unset secret means no authentication**. | `app/api/webhooks/alchemy/route.ts:14`, `app/api/cron/snapshot/route.ts:26` |
+| SA-10 | Low | `verifyAdminSession()` ignores the `uah` claim it sets; only the middleware checks it. Alchemy signature comparison is non-constant-time. | `lib/auth.ts:33`, `app/api/webhooks/alchemy/route.ts:17` |
+| SA-11 | Low | Middleware rate limiting is an in-memory `Map` on Workers — ineffective across isolates. | `middleware.ts:5` |
+| SA-12 | Low | The cron secret travels as a query parameter, and therefore into access logs. | `app/api/cron/snapshot/route.ts` |
+
+### Privacy
+
+**Fact:** SA-2 and SA-5 together mean a visitor's email address, entered into the alerts panel, is
+retrievable by any anonymous party. This is inconsistent with `/privacy` and with the PII-stripping
+work recorded in commit `10b2cbc`.
+
+## 1.5 Correctness bugs
+
+| # | Fact | Evidence |
+| --- | --- | --- |
+| X-1 | `privy-onboarding-modal.tsx` calls `useEffect` **after** `if (!isOpen) return null`. Hook count changes 1→2 when the modal opens; React throws *"Rendered more hooks than during the previous render."* This is the primary login path. | `components/privy-onboarding-modal.tsx:17,31`; `react-hooks/rules-of-hooks` error |
+| X-2 | No `<Toaster />` is mounted, so every `toast.error(...)` in transfer and alerts is silent. Transfer failures show the user nothing. | `app/layout.tsx` |
+| X-3 | `transfer-modal.tsx` accepts `.eth` names as valid recipients, then passes the raw string as `0x${string}`. viem throws on encoding. | `components/transfer-modal.tsx:57` |
+| X-4 | `lib/utils.ts` re-exports `cn` from the npm `cn` package, not `clsx` + `tailwind-merge`. shadcn components do not resolve Tailwind class conflicts. | `lib/utils.ts` |
+| X-5 | The indexer scans a fixed `currentBlock - 50000` window (≈27h at 2s blocks), so provenance silently ages out. `REGISTRY_DEPLOY_BLOCK` is unreachable. Timestamps are fabricated (`now - 3600000`) rather than read from blocks. `formatTimestamp` is unused. A 50k-block `eth_getLogs` will likely be rejected by the public RPC regardless. | `lib/indexer.ts` |
+| X-6 | `d1/schema.sql` defines `Events` / `DailyYield`, which nothing uses, competing with the Drizzle schema's `rock_events` / `yield_snapshots`. | `web/d1/schema.sql` vs `web/src/lib/db/schema.ts` |
+| X-7 | The Gelato function reads Base **mainnet** USDC against a Sepolia registry, treats the native ETH balance as WETH, and calls `rebalance(address,bytes32)` on the 1inch router — a function that does not exist there. | `web3-functions/bankrock-keeper/index.ts` |
+| X-8 | Faucet rate limiting is per-address only (trivially defeated with fresh addresses) and sits behind the broken D1 path. | `app/api/faucet/route.ts` |
+
+## 1.6 Spec coverage
+
+Specified and **not implemented at all**:
+
+| Spec | Item |
+| --- | --- |
+| 08 MVP must-have 12 | WebXR / AR visualisation — zero code. Also the opening beat of the demo script. |
+| 03, 05, D-010 | ERC-7579 scoped session keys for the MCP runtime. |
+| 02 Flow E | Gift handover: pending state, expiry, message, pre-signed asynchronous claim. Transfer is immediate and unconditional. |
+| 02 Flow F | Lost tag / replacement tag. *(Explicitly cuttable per spec 08.)* |
+| 02 Flow H | Cash In — `dock` is never called anywhere. |
+| 02 Flow A | Creator registration UI. *(Explicitly cuttable.)* |
+| 04 | Two strategies sharing one Rock Account reserve. |
+| 04 | Idle yield deployment into Aave v3 / Morpho. |
+| 03, 04 | Cross-chain intent bridging — the modal is a `setTimeout`. |
+| 05, D-009, D-011 | Both paymaster modes. |
+| 05, D-012 | Atomic UserOp batching — written in `lib/aa.ts`, never called. |
+| 14 | Service worker and push delivery. |
+
+---
+
+# Part 2 — Decisions
+
+### D-013 — Demo mode becomes explicit, labelled and opt-in
+
+**Decision:** simulation stops being the silent fallback. A single build-time flag,
+`NEXT_PUBLIC_DEMO_MODE`, gates every simulated capability. It defaults to `false`.
+
+**Consequence:** when `false`, a capability that cannot reach its real backing service returns
+`UNAVAILABLE` and the UI renders an honest empty or error state. Simulated values are never
+produced. When `true`, every simulated surface carries a persistent, non-dismissible `SIMULATED`
+badge, and the page header carries a banner.
+
+**Rationale:** the current architecture fails *open* into fiction. Every `catch` block substitutes
+plausible data. This is the root cause of C-7 through N-10 and is a single architectural defect,
+not thirty separate ones.
+
+**Displaces:** nothing. This is a precondition for the rest.
+
+### D-014 — No synthesized transaction identifiers, ever
+
+**Decision:** the codebase must contain no path that generates a hash-shaped string. A transaction
+hash may only originate from a signed, broadcast transaction.
+
+**Consequence:** S-1 through S-4 are deleted rather than relabelled. Where a tx hash is absent, the
+UI shows no hash and no explorer link. A `SIMULATED` action in demo mode shows the literal text
+`no transaction — simulated`, never a hex string.
+
+**Rationale:** a fabricated BaseScan link is the single most damaging artefact in the repository.
+It survives screenshots, and it is indistinguishable from fraud to anyone who clicks it.
+
+**Enforcement:** CI grep for hash-generation patterns (Part 7).
+
+### D-015 — One source of truth for every address
+
+**Decision:** contract addresses and chain IDs live in exactly one module, populated from
+environment variables, validated at startup. No address literal may appear in a component, hook,
+API route, MCP tool, or keeper function.
+
+**Consequence:** C-1, C-2, C-7, C-8, C-10, N-5 and X-7 collapse into one configuration surface.
+Startup fails loudly if a required address is unset or has no code on the target chain.
+
+### D-016 — One Cloudflare adapter
+
+**Decision:** `@opennextjs/cloudflare` is the deployment adapter. `@cloudflare/next-on-pages` is
+removed from dependencies and from all imports. Context is obtained via `getCloudflareContext()`.
+
+**Consequence:** fixes R-2, R-3, R-4 and B-2 together. Also removes `export const runtime = "edge"`
+where it conflicts with the OpenNext worker runtime.
+
+### D-017 — Fail closed
+
+**Decision:** every authentication check is mandatory. The pattern `if (SECRET && mismatch) reject`
+is prohibited. A missing secret is a startup failure, not a bypass.
+
+**Consequence:** SA-8, SA-9 and SA-12 are resolved structurally. A `requireEnv()` helper throws at
+module load for any endpoint whose secret is unset.
+
+### D-018 — NFC attestation is server-side, single-implementation, and bound on-chain
+
+**Decision:** one verifier. `actions/verify-ntag.ts` is deleted. The remaining implementation must
+perform real NTAG 424 DNA SDM verification: PICC decryption with the correct offsets, NXP session
+key derivation, CMAC over the SDM message, and a strictly-monotonic counter check in durable
+storage.
+
+**Consequence:** until that implementation passes against a physical tag, the UI must show
+`unverified`, never `Verified Physical`. The green badge is gated on a real CMAC match and nothing
+else. On-chain, `awakenRock` and the claim path require a server-signed EIP-712 attestation bound
+to `(rockId, uid, counter)`.
+
+**Threat model:** see Part 5.
+
+**Rationale:** F-1 defeats decision D-002, which is the product's central security claim.
+
+### D-019 — MCP returns `unavailable`, never invents
+
+**Decision:** every MCP tool either reads a real source or returns
+`{ "status": "unavailable", "reason": "<why>" }`. No tool may return a literal balance, APR,
+volume, or execution status.
+
+**Consequence:** M-1 and M-2 resolved. `trace_transaction` must perform an actual
+`eth_getTransactionReceipt`. `get_rock_status` must read the registry. `analyze_strategy_yield`
+returns `unavailable` until Aqua is real.
+
+**Rationale:** an agent relays these values to a human as fact. A stable fabrication is more
+dangerous than an obvious one.
+
+### D-020 — The registry loses the arbitrary-call primitive
+
+**Decision:** `executeTrade` is removed in its current form. The registry is an identity and
+lifecycle registry only; it never holds funds, never receives approvals, and never performs
+`call` with caller-supplied calldata. `setRouterWhitelist` becomes `onlyOwner` or is deleted
+with the trade path.
+
+**Consequence:** SC-1 and SC-3 are eliminated by removal rather than mitigation. Swaps execute
+from the Rock Account against Aqua, which is where spec 03 always placed them.
+
+**Displaces:** the current (non-functional) trade path must be rebuilt on Aqua. See Phase 3.
+
+### D-021 — Deployment target is Cloudflare, and spec 12 is wrong
+
+**Decision:** [`12-deployment.md`](./12-deployment.md) is corrected to describe Cloudflare Pages +
+OpenNext + D1. Vercel is not used.
+
+**Consequence:** R-9 resolved. `deploy.yml` is rewritten to call `npm run deploy:pages`.
+
+### D-022 — The canonical origin is `bank-rock.com`
+
+**Decision:** one `NEXT_PUBLIC_APP_URL`, defaulting to `https://bank-rock.com`. No `bankrock.xyz`
+or `pages.dev` literal may remain. The NFC tag path is `/r/{publicRockId}` as specified in spec 06,
+implemented as a route that resolves to the rock page.
+
+**Consequence:** R-1, R-7, R-8 resolved. **No physical tag may be encoded until `/r/` returns 200
+and the `www` redirect is fixed.**
+
+---
+
+# Part 3 — Capability states
+
+This is the mechanism D-013 introduces. Every user-visible capability is in exactly one state at
+runtime, and the state is computed, not assumed.
+
+| State | Meaning | UI contract |
+| --- | --- | --- |
+| `REAL` | Backed by a live contract, RPC, or database read. | Render normally. Explorer links permitted. |
+| `DEMO` | Simulated, and `NEXT_PUBLIC_DEMO_MODE=true`. | Persistent `SIMULATED` badge on the surface. No tx hashes. No explorer links. Page-level banner. |
+| `UNAVAILABLE` | Real backing unreachable and demo mode off. | Honest empty state naming what is missing. No substituted values. |
+
+Target state per capability at each phase:
+
+| Capability | Now | After P1 | After P2 | After P3 | After P4 |
+| --- | --- | --- | --- | --- | --- |
+| Rock lifecycle state | DEMO (hardcoded) | UNAVAILABLE | REAL | REAL | REAL |
+| Rock Account address | DEMO (literal) | UNAVAILABLE | REAL | REAL | REAL |
+| Token reserves | DEMO | UNAVAILABLE | REAL | REAL | REAL |
+| Provenance timeline | DEMO | UNAVAILABLE | REAL | REAL | REAL |
+| Aqua strategy | DEMO | UNAVAILABLE | UNAVAILABLE | REAL | REAL |
+| Visitor swap | DEMO | UNAVAILABLE | UNAVAILABLE | REAL | REAL |
+| Earned fees | DEMO | UNAVAILABLE | UNAVAILABLE | REAL | REAL |
+| APY display | DEMO | **removed** | removed | removed | removed |
+| NFC attestation | DEMO (accepts all) | UNAVAILABLE | UNAVAILABLE | UNAVAILABLE | REAL |
+| Ownership transfer | DEMO | UNAVAILABLE | REAL | REAL | REAL |
+| Cross-chain deposit | DEMO | DEMO (badged) | DEMO (badged) | DEMO (badged) | DEMO (badged) |
+| Keeper rebalance | DEMO | DEMO (badged) | DEMO (badged) | DEMO (badged) | DEMO (badged) |
+| Alerts delivery | DEMO | UNAVAILABLE | UNAVAILABLE | UNAVAILABLE | UNAVAILABLE |
+| Admin dashboard | DEMO | DEMO (badged) | REAL | REAL | REAL |
+| MCP tools | DEMO | UNAVAILABLE | REAL (partial) | REAL | REAL |
+
+**Note:** APY is *removed*, not staged. It cannot be `REAL` — decision D-004 forbids the claim
+regardless of data quality.
+
+---
+
+# Part 4 — Exit phases
+
+Each phase is independently shippable and has a binary acceptance test.
+
+## Phase 0 — Restore the pipeline
+
+Nothing else can be verified while the build is red.
+
+1. Add `sonner` to `package.json`; mount `<Toaster />` in `app/layout.tsx` (B-1, X-2).
+2. Remove `@cloudflare/next-on-pages` (D-016) — this also clears the `npm ci` peer conflict (B-2).
+3. Fix the `useEffect`-after-early-return in `privy-onboarding-modal.tsx` (X-1).
+4. Clear the 48 lint errors (B-3).
+5. Delete one lockfile; align CI with the declared package manager (B-6).
+6. Rewrite `deploy.yml` to call `npm run deploy:pages` (B-5).
+7. Add a `contracts` job running `npm test` (B-7).
+8. Correct `mcp/package.json` version pins (B-8).
+9. Fix the `www` redirect rule in the Cloudflare dashboard (R-1).
+
+**Acceptance:** `npm ci && npm run lint && npm run build` exits 0 from a clean checkout. CI is
+green. `curl -sL -o /dev/null -w "%{http_code}" https://www.bank-rock.com` returns 200.
+
+## Phase 1 — Honest data plane
+
+Stop lying before starting to tell the truth. This phase adds no features.
+
+1. Introduce `NEXT_PUBLIC_DEMO_MODE` and the three capability states (D-013).
+2. Switch all 9 D1 call sites to `getCloudflareContext()` (D-016, R-2, R-3).
+3. Delete every synthesized hash (D-014): `rock-interface.tsx:257`, `aqua-position-card.tsx:56`,
+   `cross-chain-modal.tsx:248,263`, `aqua-keeper.ts:132`.
+4. Delete `INITIAL_EVENTS` and the mock fallbacks in the yield and activity routes.
+5. Remove APY from every surface (N-3, D-004).
+6. Centralise addresses (D-015); delete `d1/schema.sql` (X-6); one `NEXT_PUBLIC_APP_URL` (D-022).
+7. Make `sendAlertEmail` return `success: false` when it did not send (S-5).
+
+**Acceptance:** with `NEXT_PUBLIC_DEMO_MODE=false`, a rock page shows no balance, no fee figure,
+no APY and no provenance entries — because none of it is real yet. `GET /api/rocks/1/yield`
+returns 200 with an empty series rather than 500 or fiction. `grep -rE "Math\.random\(\).*16"`
+over `web/src` returns nothing.
+
+## Phase 2 — Real chain
+
+1. Rewrite `BankRockRegistry.sol` per D-020 and D-018: remove `executeTrade` and
+   `setRouterWhitelist`; add `Ownable`; gate `awakenRock` on a server-signed EIP-712 attestation;
+   add pending-handover state with expiry for Flow E (SC-5).
+2. Write a real deploy script (C-3) and deploy to Base Sepolia. Record the address in env, verify
+   on BaseScan.
+3. Wire `lib/aa.ts` into the awaken path: deploy a Safe per rock via Pimlico, sponsored (C-6).
+4. Read lifecycle, owner and Rock Account address from the registry (C-7, C-8, C-9).
+5. Fix the indexer: query from the real deploy block in chunks, read block timestamps (X-5).
+6. Replace the admin dashboard mock with D1 reads (N-7).
+7. Fix the faucet: remove the default key (SA-4), add per-IP limiting (X-8).
+
+**Acceptance:** `eth_getCode` at the configured registry returns non-empty. Awakening a rock from a
+fresh Privy account produces a real, explorer-verifiable transaction and a Safe whose address the
+UI displays. `GET /api/events?rockId=N` returns that awakening with the block's own timestamp.
+Two browsers show the same state for the same rock.
+
+## Phase 3 — Real Aqua
+
+This is the sponsor integration and the reason the project exists.
+
+1. **Spike first.** Resolve the actual Aqua and SwapVM deployment addresses on the target testnet
+   and confirm the `ship`/`dock` interface. C-4 exists because an address was assumed rather than
+   verified. *(Hypothesis: Aqua is deployed on Base Sepolia. If it is not, the target network
+   changes — decide before building.)*
+2. Implement `ship` via the atomic batch already written in `lib/aa.ts` (D-012).
+3. Implement the visitor swap path against the strategy — from the Rock Account, not the registry
+   (SC-4, D-020).
+4. Read actual *and* virtual balances and display both, per spec 04's explicit requirement that
+   virtual allocations are not summed and presented as owned capital.
+5. Implement `dock` (Flow H).
+6. Replace `/api/quote` with a testnet-correct price source (N-5), or price from the strategy's own
+   curve.
+7. Ship the second strategy sharing one reserve (spec 04).
+
+**Acceptance:** a second Privy account executes a real swap against a rock's strategy; the rock's
+actual and virtual balances both change on-chain; the fee figure shown is read from Aqua, not
+computed client-side. Two strategies share one reserve and the UI shows availability correctly.
+
+## Phase 4 — Real NFC
+
+1. Delete `actions/verify-ntag.ts` (D-018, F-1).
+2. Implement correct SDM verification (F-3): PICC offsets, SV1/SV2 session key derivation, CMAC,
+   truncation.
+3. Add `nodejs_compat` to `compatibility_flags`, or reimplement on WebCrypto (F-4).
+4. Move the counter store to D1 with a conditional update; it must be durable and atomic (R-4).
+5. Provision real tag keys; store the master key in Cloudflare secrets, never in `.env.example`.
+6. Implement `/r/{publicRockId}` (R-7, D-022).
+7. Bind attestation to the on-chain claim path (F-5, F-6).
+8. Gate the `Verified Physical` badge on a real CMAC match only.
+
+**Acceptance:** a physical tap shows `Verified Physical`. Replaying that exact URL a second time is
+rejected as a stale counter. A hand-edited `?c=` value shows `unverified`. **A copied URL never
+displays a green badge.** *This is the acceptance test for decision D-002 and cannot be waived.*
+
+## Phase 5 — Close the perimeter
+
+Can run in parallel with Phases 2–4.
+
+1. Authenticate or delete `/api/alerts/test` (SA-1), `/api/telemetry` (SA-2), `/api/alerts`
+   (SA-5), `/api/keeper` (SA-6), `/api/alerts/gelato` (SA-7).
+2. Apply D-017 to every secret check (SA-8, SA-9).
+3. Redact PII before it reaches the log buffer (SA-2, privacy).
+4. Move rate limiting to D1 or Durable Objects (SA-11).
+5. Cron secret moves to a header (SA-12).
+6. Constant-time signature comparison; `verifyAdminSession` checks `uah` (SA-10).
+7. Escape interpolated values in email HTML (SA-7).
+
+**Acceptance:** every endpoint under `/api/` either requires a credential, is intentionally public
+and read-only with no PII, or is deleted. An unauthenticated sweep of all routes returns no
+address, email, UID, or stack trace.
+
+## Phase 6 — Honesty pass
+
+1. Audit every remaining `DEMO` surface for its badge.
+2. Write the demo-mode banner.
+3. Update `README.md`: replace "Specification and technical validation only. No product
+   implementation has started." — which is no longer true either — with the real state.
+4. Regenerate the simulation ledger (§1.3) as a living `DEMO-STATE.md`, per STEERING rule 1.
+5. Correct spec 12 (D-021); update spec 06 if the tag URL scheme changed.
+
+**Acceptance:** every simulated pixel is labelled. A judge shown the app with
+`NEXT_PUBLIC_DEMO_MODE=true` can identify what is real without asking.
+
+---
+
+# Part 5 — Threat model for the exit work
+
+Required by the spec rules for security-sensitive behaviour.
+
+## NFC attestation (D-018)
+
+| Threat | Mitigation | Residual |
+| --- | --- | --- |
+| URL copied from a genuine tap and replayed | Strictly monotonic `SDMReadCtr` in durable storage; counter must exceed the last recorded value for that UID | A copy replayed *before* the genuine user's next tap still presents a fresh counter. Accepted: it requires observing the tap. |
+| Tag cloned bit-for-bit | AES-128 master key is never on the tag in readable form; CMAC requires the diversified key | Physical key extraction from the chip. Out of scope; NTAG 424 DNA is the stated boundary (spec 06). |
+| Forged `c` parameter | CMAC verified server-side against the derived session key | None if the master key stays secret. |
+| Master key disclosure | Cloudflare secret; never in `.env.example`; rotate per batch | Full compromise of all tags in a batch. Accepted for the hackathon; per-tag diversification is the post-hackathon fix. |
+| Attestation replayed against the chain | EIP-712 payload binds `(rockId, uid, counter, deadline)`; registry rejects a reused counter | Requires the attestation signer key to stay secret. |
+
+**Non-goal, restated from spec 06:** physical possession is never sufficient financial
+authorization. Attestation gates *claiming*, never *spending*.
+
+## Registry (D-020)
+
+| Threat | Mitigation |
+| --- | --- |
+| Arbitrary call from the registry (SC-1) | The primitive is removed, not guarded. |
+| Rock squatting / front-running `awakenRock` (SC-2) | Requires a server-signed attestation bound to a verified tap. |
+| Ownership seized mid-handover (SC-5) | Pending handover with expiry; only the named recipient can complete it. |
+| Registry holding value | It never holds tokens and never receives approvals. Assets live in the Rock Account. |
+
+## Demo mode itself
+
+| Threat | Mitigation |
+| --- | --- |
+| Demo mode enabled in production by accident | Defaults to `false`; the banner is non-dismissible; a CI check asserts the production build has it off. |
+| A `DEMO` value read by the MCP server and relayed to a user as fact | D-019: tools return `unavailable` rather than demo values. Demo mode is a UI concept and never crosses the MCP boundary. |
+| Screenshot of demo mode mistaken for real | Badges are rendered, not overlaid — they survive screenshots. |
+
+---
+
+# Part 6 — Scope displacement
+
+Spec rule: *scope additions must identify what they displace.* This work displaces the following,
+which are hereby cut from MVP scope:
+
+| Cut | Was specified in | Rationale |
+| --- | --- | --- |
+| WebXR / AR view | 08 must-have 12 | Zero implementation exists. It is a presentation flourish; Phases 2–4 are the submission. |
+| ERC-7579 session keys | 03, 05, D-010 | Depends on a working Rock Account and a working Aqua integration, neither of which exists. Post-hackathon. |
+| Cross-chain intent bridging | 03, 04 | Remains `DEMO` with a badge. Honest simulation is acceptable here; it is explicitly a "platform potential" beat, not a must-have. |
+| ERC-20 token paymaster | 05, D-011 | The verifying paymaster alone satisfies the zero-gas demo beat. |
+| Idle yield (Aave/Morpho) | 04 | Not a must-have; adds a second protocol integration during a phase that has none working. |
+| Alerts delivery pipeline | — | The settings UI stays, marked `UNAVAILABLE`. Building delivery before any real event exists is premature. |
+| Replacement tags, creator registration UI | 02 Flows A, F | Already listed as first to cut in spec 08's fallback order. |
+
+This ordering is consistent with spec 08: *"Never cut the real NFC interaction, Privy onboarding,
+working Aqua transaction or security model."* Phases 2, 3 and 4 are precisely those four items.
+
+---
+
+# Part 7 — Definition of done
+
+Mechanically checkable. Add each as a CI step.
+
+```
+# Build integrity
+npm ci && npm run lint && npm run build          # exit 0, clean checkout
+cd contracts && npm test                          # exit 0
+
+# No synthesized evidence (D-014)
+! grep -rE "Math\.random\(\)[^;]*16\)\.toString\(16\)" web/src
+! grep -rP "(txHash|Hash)\s*=\s*\`0x\\\$\{(?!string\})" web/src   # excludes the `0x${string}` viem type
+
+# No address literals outside the config module (D-015)
+! grep -rE "0x[a-fA-F0-9]{40}" web/src --exclude-dir=lib/chain
+
+# No demo fallback in production (D-013)
+grep -q "NEXT_PUBLIC_DEMO_MODE=false" .env.production
+
+# One adapter (D-016)
+! grep -r "@cloudflare/next-on-pages" web/
+
+# Fail closed (D-017) — catches both the inline and the assigned-to-const form
+! grep -rE "if \([A-Za-z_.]*[A-Z_]{4,}[A-Za-z_.]* && " web/src/app/api
+
+# One origin (D-022)
+! grep -rE "bankrock\.xyz|pages\.dev" web/src mcp web3-functions
+
+# APY removed (D-004)
+! grep -riE "\bAPY\b|\bAPR\b" web/src/components
+```
+
+Live assertions:
+
+```
+curl -sL -o /dev/null -w "%{http_code}" https://www.bank-rock.com          # 200
+curl -s -o /dev/null -w "%{http_code}" https://bank-rock.com/r/1           # 200
+curl -s -o /dev/null -w "%{http_code}" https://bank-rock.com/api/rocks/1/yield  # 200
+curl -s https://bank-rock.com/api/telemetry                                # 401 or 404
+curl -s -X POST https://bank-rock.com/api/alerts/test -d '{"to":"x@y.z"}'  # 401
+cast code $REGISTRY_ADDRESS --rpc-url $RPC_URL                             # non-empty
+```
+
+And the one test that cannot be automated:
+
+> Open a rock page. Copy the URL from the address bar. Paste it into a different browser.
+> **The badge must read `unverified`.**
+
+---
+
+# Part 8 — What remains simulated after exit
+
+Stated plainly so it can be stated plainly to judges:
+
+- Cross-chain deposit — `DEMO`, badged. No bridge is integrated.
+- Keeper rebalancing — `DEMO`, badged. The Gelato function is written but points at a
+  non-existent interface (X-7).
+- Alert delivery — `UNAVAILABLE`. Preferences persist; nothing dispatches.
+- Fiat on-ramp / off-ramp (Flows G, H fiat legs) — out of scope per spec 08, unchanged.
+- AR view — cut (Part 6).
+
+Everything else is either real or shows an honest empty state. That is the exit condition.
+
+---
+
+## Amendments to the decision log
+
+Decisions D-013 through D-022 are added to [`09-decisions.md`](./09-decisions.md).
+
+Open question 11 is added: **which network actually hosts a usable Aqua deployment?** C-4 exists
+because this was never verified. Phase 3 does not start until it is answered.

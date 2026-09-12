@@ -76,6 +76,89 @@
 
 **Consequence:** Eliminates the multi-step approval fatigue typical of DeFi, allowing new users to awaken and fund an Aqua liquidity stream with a single signature.
 
+## Exit-from-demo-mode decisions
+
+Full context, evidence and acceptance criteria for D-013 through D-022 are in
+[`15-exit-demo-mode.md`](./15-exit-demo-mode.md).
+
+### D-013 — Demo mode is explicit, labelled and opt-in
+
+**Decision:** simulation is gated behind `NEXT_PUBLIC_DEMO_MODE`, defaulting to `false`. Every
+capability resolves to `REAL`, `DEMO` or `UNAVAILABLE` at runtime.
+
+**Consequence:** a capability that cannot reach its real backing service renders an honest empty
+state instead of substituting plausible data. Simulated surfaces carry a persistent `SIMULATED`
+badge. The current architecture fails open into fiction; this reverses that.
+
+### D-014 — No synthesized transaction identifiers
+
+**Decision:** no code path may generate a hash-shaped string. A transaction hash may only originate
+from a signed, broadcast transaction.
+
+**Consequence:** fabricated BaseScan links are deleted rather than relabelled. Where no hash exists,
+no hash and no explorer link are shown.
+
+### D-015 — One source of truth for every address
+
+**Decision:** contract addresses and chain IDs live in a single module populated from environment
+variables and validated at startup. No address literal in components, hooks, routes, MCP tools or
+keeper functions.
+
+**Consequence:** startup fails loudly if a required address is unset or has no code on the target
+chain.
+
+### D-016 — One Cloudflare adapter
+
+**Decision:** `@opennextjs/cloudflare` is the deployment adapter; `@cloudflare/next-on-pages` is
+removed entirely. Context comes from `getCloudflareContext()`.
+
+**Consequence:** D1 becomes reachable, the two 500-ing API routes recover, and the `npm ci` peer
+conflict clears.
+
+### D-017 — Fail closed
+
+**Decision:** the pattern `if (SECRET && mismatch) reject` is prohibited. A missing secret is a
+startup failure, not an authentication bypass.
+
+### D-018 — NFC attestation is server-side, single-implementation, and bound on-chain
+
+**Decision:** one verifier performing real NTAG 424 DNA SDM verification — correct PICC offsets,
+NXP session key derivation, CMAC, and a strictly monotonic counter in durable storage. The
+`Verified Physical` badge is gated on a real CMAC match and nothing else.
+
+**Consequence:** until that passes against a physical tag, the UI shows `unverified`. This restores
+D-002, which the current stub verifier inverts.
+
+### D-019 — MCP returns `unavailable`, never invents
+
+**Decision:** every MCP tool either reads a real source or returns
+`{ "status": "unavailable", "reason": "..." }`. No tool may return a literal balance, APR, volume
+or execution status.
+
+**Consequence:** an agent relaying tool output to a human never relays a fabrication. A stable
+fabrication is more dangerous than an obvious one.
+
+### D-020 — The registry loses the arbitrary-call primitive
+
+**Decision:** `executeTrade` in its current form and the unguarded `setRouterWhitelist` are removed.
+The registry is an identity and lifecycle registry only: it never holds funds, never receives
+approvals, and never performs `call` with caller-supplied calldata.
+
+**Consequence:** swaps execute from the Rock Account against Aqua, where spec 03 always placed them.
+
+### D-021 — Deployment target is Cloudflare, not Vercel
+
+**Decision:** [`12-deployment.md`](./12-deployment.md) is corrected to describe Cloudflare Pages +
+OpenNext + D1.
+
+### D-022 — The canonical origin is `bank-rock.com`
+
+**Decision:** one `NEXT_PUBLIC_APP_URL`. No `bankrock.xyz` or `pages.dev` literal remains. The NFC
+tag path is `/r/{publicRockId}` as specified in spec 06.
+
+**Consequence:** no physical tag may be encoded until `/r/` returns 200 and the `www` redirect is
+fixed.
+
 ## Open product questions
 
 1. **Is the hackathon's main story gifting, a public micro-exchange, or both?** Gifting is the core product journey; public tap-to-trade is the primary demonstration of the liquidity.
@@ -88,6 +171,7 @@
 8. **Is the initial custom strategy AMM-like, fixed-price or time-limited?** Constant-product (AMM-like).
 9. **Does ownership transfer preserve the maker address in the selected account architecture?** Yes, the ERC-4337 smart account architecture explicitly guarantees this.
 10. **Which sponsor-specific requirements must be reflected in the final demo?** The demo must clearly highlight Privy onboarding and 1inch/Aqua liquidity provision.
+11. **Which network actually hosts a usable Aqua deployment, and at what address?** Unanswered. The address currently in `lib/contracts.ts` is the 1inch Aggregation Router V6, not Aqua, and the SwapVM address has no code on Base Sepolia. Phase 3 of [`15-exit-demo-mode.md`](./15-exit-demo-mode.md) does not start until this is verified against a live chain. If Aqua is not on Base Sepolia, the target network changes.
 
 ## Implementation spikes
 
