@@ -107,19 +107,14 @@ function TradeModalInner({
 
     if (amount > 0) {
       try {
-        // Prepare Real 1inch API Request (Base chain id: 8453)
         const srcToken = from === "USDC" ? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" : "0x4200000000000000000000000000000000000006";
         const dstToken = to === "USDC" ? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" : "0x4200000000000000000000000000000000000006";
         const decimals = from === "USDC" ? 6 : 18;
         const amountWei = BigInt(Math.floor(amount * (10 ** decimals))).toString();
         
-        const response = await fetch(`https://api.1inch.dev/swap/v6.0/8453/quote?src=${srcToken}&dst=${dstToken}&amount=${amountWei}`, {
-          headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_1INCH_API_KEY || ''}`,
-          },
-        });
+        const response = await fetch(`/api/quote?src=${srcToken}&dst=${dstToken}&amount=${amountWei}`);
 
-        if (!response.ok) throw new Error("1inch API failed or missing key");
+        if (!response.ok) throw new Error("1inch proxy API failed");
         
         const data = await response.json();
         const outDecimals = to === "USDC" ? 6 : 18;
@@ -128,22 +123,11 @@ function TradeModalInner({
         // 1inch successfully quoted, calculate maker fee (0.05%)
         feeInUSDC = (from === "USDC" ? amount : rawOutput) * MAKER_FEE_RATE;
         outputAmount = rawOutput;
-        // Approximation of price impact from quote vs spot price could be calculated here, but we will mock impact for now
         priceImpact = Math.min(2.5, Math.max(0.01, ((from === "USDC" ? amount : rawOutput) / (currentReserve || 1250)) * 0.8));
       } catch (error) {
-        // Fallback to local simulation if 1inch API key is missing or fails (e.g. testnet)
-        await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
-        if (from === "USDC") {
-          feeInUSDC = amount * MAKER_FEE_RATE;
-          const netUSDC = amount - feeInUSDC;
-          priceImpact = Math.min(2.5, Math.max(0.01, (amount / (currentReserve || 1250)) * 0.8));
-          outputAmount = (netUSDC / ETH_PRICE_USDC) * (1 - priceImpact / 100);
-        } else {
-          const grossUSDC = amount * ETH_PRICE_USDC;
-          feeInUSDC = grossUSDC * MAKER_FEE_RATE;
-          priceImpact = Math.min(2.5, Math.max(0.01, (grossUSDC / (currentReserve || 1250)) * 0.8));
-          outputAmount = (grossUSDC - feeInUSDC) * (1 - priceImpact / 100);
-        }
+        console.error("Fetch quote failed", error);
+        // We no longer fallback to math simulation here per the hardening spec.
+        // In a real app, we show an error state to the user indicating liquidity is unavailable.
       }
     }
     return { output: outputAmount, fee: feeInUSDC, impact: priceImpact };

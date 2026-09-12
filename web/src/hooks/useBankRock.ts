@@ -104,15 +104,16 @@ export function useRockActions() {
     });
   };
 
-  const tradeOnchain = async (rockId: number | string, amountIn: bigint, amountOutMin: bigint, tokenIn: `0x${string}`) => {
+  const tradeOnchain = async (rockId: number | string, amountIn: bigint, amountOutMin: bigint, tokenIn: `0x${string}`, routerPayload: `0x${string}` = "0x") => {
     // Determine tokenOut (if USDC is tokenIn, WETH is out, else USDC)
     const tokenOut = tokenIn === AQUA_ADDRESSES.testUSDC ? AQUA_ADDRESSES.testWETH : AQUA_ADDRESSES.testUSDC;
+    const routerAddress = "0x1111111254EEB25477B68fb85Ed929f73A960582"; // 1inch v6 Aggregation Router on Base Sepolia
     
     return await writeContractAsync({
       address: BANK_ROCK_REGISTRY_ADDRESS,
       abi: BANK_ROCK_REGISTRY_ABI,
       functionName: "executeTrade",
-      args: [BigInt(rockId), tokenIn, tokenOut, amountIn, "0x" as `0x${string}`],
+      args: [BigInt(rockId), routerAddress, tokenIn, tokenOut, amountIn, amountOutMin, routerPayload],
       chainId: baseSepolia.id,
     });
   };

@@ -1,0 +1,16 @@
+{
+  "name": "bankrock-keeper",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@gelatonetwork/web3-functions-sdk": "^2.4.4",
+    "viem": "^2.56.3"
+  }
+}

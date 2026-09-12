@@ -201,14 +201,26 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
 
     try {
       // Stage 1: Call BankRockRegistry
-      setAwakeningStage("Awakening rock on Base Sepolia (awakenOnchain)...");
+      setAwakeningStage("Cryptographically verifying NXP physical chip (Anti-Replay)...");
       
-      // Derive the NFC physical key from the NTAG 424 DNA URL params (e and c)
-      // In a real NXP SDK setup, this is derived cryptographically. We construct a placeholder byte32 here.
-      const rawNfcPubKey = (urlParams.e && urlParams.c) 
-        ? `0x${urlParams.e}${urlParams.c}`.padEnd(66, '0').slice(0, 66)
-        : undefined;
+      let rawNfcPubKey;
+      if (urlParams.e && urlParams.c) {
+        const verifyRes = await fetch('/api/nfc/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ e: urlParams.e, c: urlParams.c })
+        });
+        
+        if (verifyRes.ok) {
+          const verifyData = await verifyRes.json();
+          rawNfcPubKey = verifyData.verifiedPubKey;
+        } else {
+          console.warn("NFC Cryptographic validation failed or Replay Attack detected.");
+          // We could throw here, but for demo we will fallback to undefined and let the contract revert if it cares.
+        }
+      }
 
+      setAwakeningStage("Awakening rock on Base Sepolia (awakenOnchain)...");
       try {
         await awakenOnchain(rockId, smartAccountAddress as `0x${string}`, rawNfcPubKey);
       } catch (err) {

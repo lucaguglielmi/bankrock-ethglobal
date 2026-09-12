@@ -1,7 +1,6 @@
-export const BANK_ROCK_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || '0x83B1A8a09f87258385698b9C433e143FDF2A9F52') as `0x${string}`;
+export const BANK_ROCK_REGISTRY_ADDRESS = "0x89f735f4c74f878d3aac6e60b134d115e5e29631";
 
-export const BANK_ROCK_REGISTRY_ABI = 
-[
+export const BANK_ROCK_REGISTRY_ABI = [
   {
     "inputs": [],
     "name": "InvalidNFCSequence",
@@ -124,6 +123,25 @@ export const BANK_ROCK_REGISTRY_ABI =
     "inputs": [
       {
         "indexed": true,
+        "internalType": "address",
+        "name": "router",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "status",
+        "type": "bool"
+      }
+    ],
+    "name": "RouterWhitelisted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
         "internalType": "uint256",
         "name": "rockId",
         "type": "uint256"
@@ -195,6 +213,11 @@ export const BANK_ROCK_REGISTRY_ABI =
       },
       {
         "internalType": "address",
+        "name": "router",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
         "name": "tokenIn",
         "type": "address"
       },
@@ -206,6 +229,11 @@ export const BANK_ROCK_REGISTRY_ABI =
       {
         "internalType": "uint256",
         "name": "amountIn",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "minAmountOut",
         "type": "uint256"
       },
       {
@@ -367,6 +395,24 @@ export const BANK_ROCK_REGISTRY_ABI =
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "router",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "status",
+        "type": "bool"
+      }
+    ],
+    "name": "setRouterWhitelist",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "rockId",
         "type": "uint256"
@@ -380,6 +426,25 @@ export const BANK_ROCK_REGISTRY_ABI =
     "name": "transferOwnership",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "whitelistedRouters",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ] as const;
