@@ -21,7 +21,7 @@ export default function Home() {
           <AnimatedText text="Tangible DeFi." className="mb-8 text-display font-extrabold text-ink" />
 
           <p className="mb-12 max-w-prose text-lead text-ink-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-1000 motion-safe:delay-500 motion-safe:fill-mode-forwards">
-            Not a Bank, just a rock.
+            A rock with an NFC chip that holds a yield-bearing liquidity position with automatic rebalancing.
           </p>
 
           <div className="flex w-full flex-col gap-4 pointer-events-auto motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-1000 motion-safe:delay-700 motion-safe:fill-mode-forwards sm:w-auto sm:flex-row">
