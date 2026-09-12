@@ -18,6 +18,7 @@
 
 import { getAddress, type Address, type Hex } from "viem";
 import { getPublicClient } from "@/lib/chain";
+import { buildBlockRanges } from "@/lib/block-range";
 import { AQUA_ABI } from "@/lib/chain/abi/aqua";
 import { ERC20_ABI } from "@/lib/chain/abi/erc20";
 import { real, unavailable, type Capability } from "@/lib/demo";
@@ -276,6 +277,77 @@ export interface ReadAccruedFeesParams extends ReadStrategyParams {
 const DEFAULT_LOOKBACK_BLOCKS = BigInt(50_000);
 
 /**
+ * What has already been scanned for one strategy, so a poll only asks for new blocks.
+ *
+ * The fee figure is a running total over a block range, which makes it resumable: the same
+ * `Pushed` log never needs reading twice. Before this cache the strategy route issued two
+ * `eth_getLogs` per stream, each spanning deploy-block-to-head, every fifteen seconds — one
+ * unchunked range that grows all demo long and that a public RPC eventually refuses outright
+ * (D-036 proved 2,000-block chunks, not a 500,000-block sweep).
+ *
+ * Module scope, so it is per isolate and empty after a cold start. That is the right trade here:
+ * losing it costs one full rescan, never a wrong number, because every entry records the exact
+ * range it covers and that range is what the UI reports.
+ */
+interface FeeScanState {
+  /** The first block this total covers. */
+  fromBlock: bigint;
+  /** The last block this total covers, inclusive. */
+  scannedTo: bigint;
+  earned: TokenPairAmounts;
+  swapCount: number;
+  /** True when the scan started at the app's deploy block, i.e. the figure is complete. */
+  complete: boolean;
+}
+
+const feeScanCache = new Map<string, FeeScanState>();
+
+/**
+ * Keyed by everything the total depends on. `feeBps` is part of it: a different fee is a
+ * different strategy and a different number, and `maker` because a strategy hash is only unique
+ * with it.
+ */
+function feeScanKey(params: {
+  maker: Address;
+  app: Address;
+  strategyHash: Hex;
+  feeBps: bigint;
+}): string {
+  return [
+    params.app.toLowerCase(),
+    params.strategyHash.toLowerCase(),
+    params.maker.toLowerCase(),
+    params.feeBps.toString(),
+  ].join(":");
+}
+
+/** Drops every cached scan. Tests use it; nothing in the request path does. */
+export function resetFeeScanCache(): void {
+  feeScanCache.clear();
+}
+
+/**
+ * The blocks a poll still has to fetch, given what is already cached.
+ *
+ * Pure, and the part worth testing: a cached scan that already reaches the head asks for
+ * nothing, a cached scan behind the head asks only for the gap, and a cached scan that starts
+ * later than the caller wants is discarded rather than silently narrowing the reported range.
+ */
+export function planFeeScan(
+  cached: { fromBlock: bigint; scannedTo: bigint } | undefined,
+  desiredFrom: bigint,
+): { reuse: boolean; fromBlock: bigint; scanFrom: bigint } {
+  if (cached && cached.fromBlock <= desiredFrom && cached.scannedTo >= cached.fromBlock) {
+    return {
+      reuse: true,
+      fromBlock: cached.fromBlock,
+      scanFrom: cached.scannedTo + BigInt(1),
+    };
+  }
+  return { reuse: false, fromBlock: desiredFrom, scanFrom: desiredFrom };
+}
+
+/**
  * Cumulative fees earned by one strategy, read from Aqua's own events.
  *
  * XYCSwap keeps no fee accumulator. The taker's whole `amountIn` is pushed into the maker's
@@ -284,9 +356,17 @@ const DEFAULT_LOOKBACK_BLOCKS = BigInt(50_000);
  * (`contracts/aqua/NOTES.md` §6). Each swap's `amountIn` is one `Pushed` event, and the `Pushed`
  * events `ship` emits at launch are excluded by the transaction they share with `Shipped`.
  *
- * When the RPC cannot serve the range this returns UNAVAILABLE. It never falls back to
- * `virtual - shipped`: that difference is inventory P&L, not fees, and showing it as fees would
- * be exactly the kind of confident wrong number spec 15 exists to remove.
+ * The scan is chunked at 2,000 blocks (`lib/block-range`, D-036) and resumed from the last block
+ * already scanned for this (app, strategy) pair, so a fifteen-second poll fetches the handful of
+ * blocks that are new instead of the whole history twice per stream. `Shipped` and `Pushed` are
+ * fetched over the same chunk, which is what keeps the launch-push exclusion sound: `ship` emits
+ * both in one transaction, therefore in one block, therefore never split across two chunks.
+ *
+ * When any chunk fails this returns UNAVAILABLE. A short scan is never reported as a total: the
+ * whole chunks that did land are kept for the next poll to build on, and the caller is told the
+ * figure could not be read. It never falls back to `virtual - shipped` either — that difference
+ * is inventory P&L, not fees, and showing it as fees would be exactly the kind of confident wrong
+ * number spec 15 exists to remove.
  */
 export async function readAccruedFees(
   params: ReadAccruedFeesParams,
@@ -299,64 +379,104 @@ export async function readAccruedFees(
 
   const client = getPublicClient();
 
+  let head: bigint;
   try {
-    const toBlock = await client.getBlockNumber();
-    const deployBlock = params.fromBlock ?? getAppDeployBlock();
-    const lookback = params.lookbackBlocks ?? DEFAULT_LOOKBACK_BLOCKS;
-    const fromBlock =
-      deployBlock ?? (toBlock > lookback ? toBlock - lookback : BigInt(0));
-
-    const filter = { maker, app, strategyHash: params.strategyHash };
-
-    const [pushed, shipped] = await Promise.all([
-      client.getLogs({
-        address: aqua,
-        event: AQUA_EVENTS_ABI[3],
-        fromBlock,
-        toBlock,
-      }),
-      client.getLogs({
-        address: aqua,
-        event: AQUA_EVENTS_ABI[0],
-        fromBlock,
-        toBlock,
-      }),
-    ]);
-
-    // `ship` emits one Pushed per token in the same transaction as Shipped. Those are the initial
-    // reserve, not a trade, and must not be charged a fee.
-    const shipTxs = new Set(
-      shipped
-        .filter((log) => matchesStrategy(log.args, filter))
-        .map((log) => log.transactionHash?.toLowerCase() ?? ""),
-    );
-
-    const earned: TokenPairAmounts = { usdc: BigInt(0), weth: BigInt(0) };
-    let swapCount = 0;
-
-    for (const log of pushed) {
-      if (!matchesStrategy(log.args, filter)) continue;
-      if (shipTxs.has(log.transactionHash?.toLowerCase() ?? "")) continue;
-      const token = (log.args.token ?? "").toLowerCase();
-      const amount = log.args.amount ?? BigInt(0);
-      const fee = (amount * feeBps) / BPS_BASE;
-      if (token === usdc.toLowerCase()) earned.usdc += fee;
-      else if (token === weth.toLowerCase()) earned.weth += fee;
-      else continue;
-      swapCount += 1;
-    }
-
-    return real({
-      earned,
-      swapCount,
-      fromBlock,
-      toBlock,
-      complete: deployBlock !== undefined,
-    });
+    head = await client.getBlockNumber();
   } catch (err) {
-    return unavailable(
-      `Fee history could not be read from Aqua's events: ${reason(err)}. ` +
-        "Set AQUA_APP_DEPLOY_BLOCK and a provider RPC (SEPOLIA_RPC_URL) to enable it.",
-    );
+    return unavailable(feeFailureReason(err));
   }
+
+  const deployBlock = params.fromBlock ?? getAppDeployBlock();
+  const lookback = params.lookbackBlocks ?? DEFAULT_LOOKBACK_BLOCKS;
+  const desiredFrom = deployBlock ?? (head > lookback ? head - lookback : BigInt(0));
+
+  const key = feeScanKey({ maker, app, strategyHash: params.strategyHash, feeBps });
+  const cached = feeScanCache.get(key);
+  const plan = planFeeScan(cached, desiredFrom);
+
+  const state: FeeScanState =
+    plan.reuse && cached
+      ? { ...cached, earned: { ...cached.earned } }
+      : {
+          fromBlock: plan.fromBlock,
+          // Nothing scanned yet: one block before the start, so the first chunk begins at it.
+          scannedTo: plan.scanFrom - BigInt(1),
+          earned: { usdc: BigInt(0), weth: BigInt(0) },
+          swapCount: 0,
+          complete: deployBlock !== undefined,
+        };
+
+  const filter = { maker, app, strategyHash: params.strategyHash };
+
+  for (const range of buildBlockRanges(plan.scanFrom, head)) {
+    try {
+      const [pushed, shipped] = await Promise.all([
+        client.getLogs({
+          address: aqua,
+          event: AQUA_EVENTS_ABI[3],
+          fromBlock: range.fromBlock,
+          toBlock: range.toBlock,
+        }),
+        client.getLogs({
+          address: aqua,
+          event: AQUA_EVENTS_ABI[0],
+          fromBlock: range.fromBlock,
+          toBlock: range.toBlock,
+        }),
+      ]);
+
+      const shipTxs = new Set(
+        shipped
+          .filter((log) => matchesStrategy(log.args, filter))
+          .map((log) => log.transactionHash?.toLowerCase() ?? ""),
+      );
+
+      // Counted per chunk and merged only once the chunk is whole, so a failure halfway through
+      // can never leave a half-counted chunk behind a cursor that says it was scanned.
+      const chunkEarned: TokenPairAmounts = { usdc: BigInt(0), weth: BigInt(0) };
+      let chunkSwaps = 0;
+
+      for (const log of pushed) {
+        if (!matchesStrategy(log.args, filter)) continue;
+        if (shipTxs.has(log.transactionHash?.toLowerCase() ?? "")) continue;
+        const token = (log.args.token ?? "").toLowerCase();
+        const amount = log.args.amount ?? BigInt(0);
+        const fee = (amount * feeBps) / BPS_BASE;
+        if (token === usdc.toLowerCase()) chunkEarned.usdc += fee;
+        else if (token === weth.toLowerCase()) chunkEarned.weth += fee;
+        else continue;
+        chunkSwaps += 1;
+      }
+
+      state.earned.usdc += chunkEarned.usdc;
+      state.earned.weth += chunkEarned.weth;
+      state.swapCount += chunkSwaps;
+      state.scannedTo = range.toBlock;
+    } catch (err) {
+      // Keep the whole chunks that did land — the next poll resumes from there — and refuse to
+      // present a short scan as the total.
+      if (state.scannedTo >= state.fromBlock) feeScanCache.set(key, state);
+      return unavailable(feeFailureReason(err));
+    }
+  }
+
+  // A head that has not moved since the last poll leaves the loop empty; the recorded range is
+  // then still exactly what was scanned.
+  if (state.scannedTo < state.fromBlock) state.scannedTo = state.fromBlock;
+  feeScanCache.set(key, state);
+
+  return real({
+    earned: { ...state.earned },
+    swapCount: state.swapCount,
+    fromBlock: state.fromBlock,
+    toBlock: state.scannedTo,
+    complete: state.complete,
+  });
+}
+
+function feeFailureReason(err: unknown): string {
+  return (
+    `Fee history could not be read from Aqua's events: ${reason(err)}. ` +
+    "Set AQUA_APP_DEPLOY_BLOCK and a provider RPC (SEPOLIA_RPC_URL) to enable it."
+  );
 }

@@ -60,6 +60,8 @@ export {
   readStrategy,
   readRockStreams,
   readAccruedFees,
+  planFeeScan,
+  resetFeeScanCache,
   type StrategyReading,
   type RockStrategyView,
   type StrategyBalances,

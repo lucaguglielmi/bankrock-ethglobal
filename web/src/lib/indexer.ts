@@ -11,10 +11,16 @@
  *    owner in the history is always backed by a physical tap;
  *  - decoded events are mirrored into D1 so `/api/rocks/next-id` and the admin figures have
  *    something to count. The chain remains the source of truth; the table is a cache;
+ *  - the mirror is now also *read back*. A per-registry cursor (`lib/indexer-cursor.ts`, B7)
+ *    records how far the scan has got, so a fifteen-second poll asks for the blocks that are new
+ *    instead of re-walking the whole chain from the deploy block every time. The cursor advances
+ *    only after the events in that range are stored, and with no D1 binding the indexer does
+ *    exactly what it did before: a full, chunked scan from `REGISTRY_DEPLOY_BLOCK`;
  *  - with no registry address, no deploy block or an unreachable RPC, the result is UNAVAILABLE
  *    with the reason. An empty list only ever means the chain holds no events.
  */
 
+import { eq } from "drizzle-orm";
 import {
   decodeEventLog,
   isAddress,
@@ -25,12 +31,24 @@ import {
   type Hex,
 } from "viem";
 import { BANK_ROCK_REGISTRY_ABI } from "@/lib/chain/abi/registry";
-import { addresses, chain, getPublicClient } from "@/lib/chain";
-import { getDb } from "@/lib/db";
+import { MAX_BLOCK_CHUNK, buildBlockRanges, type BlockRange } from "@/lib/block-range";
+import { addresses, chain, chainId, getPublicClient } from "@/lib/chain";
+import { getD1, getDb } from "@/lib/db";
 import { rockEvents } from "@/lib/db/schema";
+import {
+  advanceIndexerCursor,
+  indexerCursorId,
+  readIndexerCursor,
+  resumeFromBlock,
+  type D1DatabaseLike,
+} from "@/lib/indexer-cursor";
 import { optionalEnv, real, unavailable, type Capability } from "@/lib/demo";
 import { publicReasonWith } from "@/lib/errors";
 import { logger } from "@/lib/telemetry";
+
+/** Chunking lives in `lib/block-range` now that the Aqua fee scan needs it too. */
+export { MAX_BLOCK_CHUNK, buildBlockRanges };
+export type { BlockRange };
 
 /** The provenance vocabulary. One value per registry event that concerns a rock. */
 export type IndexerEventType =
@@ -62,9 +80,6 @@ export interface IndexerEvent {
 
 const TX_HASH_REGEX = /^0x[0-9a-fA-F]{64}$/;
 const NUMERIC_REGEX = /^\d+$/;
-
-/** Maximum span of a single `eth_getLogs` call. */
-export const MAX_BLOCK_CHUNK = BigInt(2000);
 
 /** Registry event name -> provenance type. Events not listed here are not about a rock. */
 export const EVENT_TYPE_BY_NAME: Record<string, IndexerEventType> = {
@@ -111,30 +126,6 @@ export function sanitizeAddress(addr: unknown): string | null {
   } catch {
     return null;
   }
-}
-
-export interface BlockRange {
-  fromBlock: bigint;
-  toBlock: bigint;
-}
-
-/** Splits [fromBlock, toBlock] into inclusive chunks of at most `chunkSize` blocks. */
-export function buildBlockRanges(
-  fromBlock: bigint,
-  toBlock: bigint,
-  chunkSize: bigint = MAX_BLOCK_CHUNK,
-): BlockRange[] {
-  if (chunkSize <= BigInt(0)) throw new Error("chunkSize must be positive");
-  if (toBlock < fromBlock) return [];
-
-  const ranges: BlockRange[] = [];
-  let cursor = fromBlock;
-  while (cursor <= toBlock) {
-    const end = cursor + chunkSize - BigInt(1);
-    ranges.push({ fromBlock: cursor, toBlock: end > toBlock ? toBlock : end });
-    cursor = end + BigInt(1);
-  }
-  return ranges;
 }
 
 /** The block the registry was deployed in. Unset means the indexer has no starting point. */
@@ -279,8 +270,86 @@ interface CacheEntry {
 const eventCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 15_000;
 
+/** Drops the in-process event cache. Tests use it; nothing in the request path does. */
+export function resetIndexerCache(): void {
+  eventCache.clear();
+}
+
+/** The event name a stored row came from, so a mirrored row can be described like a fresh log. */
+const EVENT_NAME_BY_TYPE: Record<IndexerEventType, string> = Object.fromEntries(
+  Object.entries(EVENT_TYPE_BY_NAME).map(([name, type]) => [type, name]),
+) as Record<IndexerEventType, string>;
+
+/** One mirrored row, rebuilt into the event the chain produced. */
+export function rowToIndexerEvent(row: {
+  id: string;
+  rockId: string;
+  eventType: string;
+  txHash: string;
+  logIndex: number | null;
+  blockNumber: string | null;
+  payload: Record<string, string> | null;
+  timestamp: number;
+}): IndexerEvent | null {
+  const type = row.eventType as IndexerEventType;
+  const eventName = EVENT_NAME_BY_TYPE[type];
+  if (!eventName) return null;
+  const txHash = sanitizeTxHash(row.txHash);
+  if (!txHash || row.blockNumber === null) return null;
+
+  const payload = row.payload ?? {};
+  const { title, description } = describe(type, payload);
+
+  return {
+    id: row.id,
+    rockId: row.rockId,
+    type,
+    title,
+    description,
+    detail: `BankRockRegistry :: ${eventName}`,
+    txHash,
+    blockNumber: row.blockNumber,
+    logIndex: row.logIndex ?? 0,
+    timestamp: new Date(row.timestamp).toISOString(),
+    timestampEpoch: row.timestamp,
+    payload,
+  };
+}
+
+/** Newest first, by block then log index — the order the activity list renders in. */
+export function sortEventsNewestFirst(events: IndexerEvent[]): IndexerEvent[] {
+  return [...events].sort((a, b) => {
+    const blockDiff = BigInt(b.blockNumber) - BigInt(a.blockNumber);
+    if (blockDiff !== BigInt(0)) return blockDiff > BigInt(0) ? 1 : -1;
+    return b.logIndex - a.logIndex;
+  });
+}
+
+/**
+ * Merges the mirrored history with what this scan just read from the chain.
+ *
+ * Pure, and deliberately chain-last: the log id is `${txHash}-${logIndex}`, so a freshly decoded
+ * event replaces the stored copy of the same log rather than appearing twice. The chain stays the
+ * source of truth; D1 only supplies the blocks this scan did not have to ask for.
+ */
+export function mergeEvents(
+  stored: IndexerEvent[],
+  fresh: IndexerEvent[],
+): IndexerEvent[] {
+  const byId = new Map<string, IndexerEvent>();
+  for (const event of stored) byId.set(event.id, event);
+  for (const event of fresh) byId.set(event.id, event);
+  return sortEventsNewestFirst([...byId.values()]);
+}
+
 /**
  * Indexes a rock's registry events.
+ *
+ * The scan resumes from the D1 cursor (B7, `lib/indexer-cursor.ts`) and only ever moves forward:
+ * every decoded event in the new range is mirrored, the cursor is advanced **after** that write
+ * succeeds, and the rock's older history is read back out of the mirror. With no D1 binding, a
+ * failed mirror or an unreadable cursor, the behaviour is exactly what it was before — a full
+ * scan from `REGISTRY_DEPLOY_BLOCK`, chunked at 2,000 blocks.
  *
  * @returns REAL with the (possibly empty) event list, or UNAVAILABLE naming what is missing.
  */
@@ -314,16 +383,27 @@ export async function getRockOnchainEvents(
   const start = Date.now();
   const client = getPublicClient();
 
+  // The cursor is per (chain, registry): a redeployed registry starts its own.
+  //
+  // `lib/db` types the binding as the narrowest thing it uses (`prepare(): unknown`), because
+  // `@cloudflare/workers-types` is not a dependency here. The cursor store needs the statement
+  // surface, so it is widened once, in one place, exactly as the Drizzle driver is.
+  const d1 = getD1() as D1DatabaseLike | null;
+  const cursorId = indexerCursorId(chainId, registry);
+  const cursor = d1 ? await readIndexerCursor(d1, cursorId) : null;
+  const fromBlock = resumeFromBlock(deployBlock, cursor);
+
   try {
     const currentBlock = await client.getBlockNumber();
-    const ranges = buildBlockRanges(deployBlock, currentBlock);
+    const ranges = buildBlockRanges(fromBlock, currentBlock);
 
     logger.info("Indexing registry events", {
       action: "INDEXER_FETCH_START",
       rockId: cacheKey,
-      fromBlock: deployBlock.toString(),
+      fromBlock: fromBlock.toString(),
       toBlock: currentBlock.toString(),
       chunks: ranges.length,
+      resumed: cursor !== null,
     });
 
     const blockTimestamps = new Map<string, number>();
@@ -337,7 +417,9 @@ export async function getRockOnchainEvents(
       return epochMs;
     };
 
-    const events: IndexerEvent[] = [];
+    // Every rock's events, not just this one's: the cursor is shared, so a range scanned for one
+    // rock must be mirrored in full or another rock's history would be skipped for good.
+    const scanned: IndexerEvent[] = [];
 
     for (const range of ranges) {
       // One address-filtered query per chunk, then decode. The registry emits few logs, and
@@ -352,23 +434,42 @@ export async function getRockOnchainEvents(
         if (log.blockNumber === null) continue;
         const epochMs = await readBlockTimestamp(log.blockNumber);
         const event = decodeRegistryLog(log, epochMs);
-        if (event && event.rockId === cacheKey) events.push(event);
+        if (event) scanned.push(event);
       }
     }
 
-    events.sort((a, b) => {
-      const blockDiff = BigInt(b.blockNumber) - BigInt(a.blockNumber);
-      if (blockDiff !== BigInt(0)) return blockDiff > BigInt(0) ? 1 : -1;
-      return b.logIndex - a.logIndex;
-    });
+    const fresh = scanned.filter((event) => event.rockId === cacheKey);
+    let events = sortEventsNewestFirst(fresh);
+
+    if (d1) {
+      const mirrored = await mirrorToDatabase(scanned);
+      // Only ever advance the cursor over blocks whose events are durably stored. A cursor ahead
+      // of the mirror skips history permanently, which is the one failure this cache must not have.
+      if (mirrored) {
+        await advanceIndexerCursor(d1, cursorId, currentBlock);
+      }
+
+      const stored = await readStoredEvents(cacheKey);
+      if (stored === null) {
+        if (cursor !== null) {
+          // This scan started after the deploy block, so what it holds is a window, not a
+          // history. Saying so is the only honest answer (D-013).
+          return unavailable(
+            "The indexed history could not be read from the database, and this scan covered only the most recent blocks",
+          );
+        }
+      } else {
+        events = mergeEvents(stored, fresh);
+      }
+    }
 
     eventCache.set(cacheKey, { events, cachedAt: now });
-    await mirrorToDatabase(events);
 
     logger.info("Registry indexing completed", {
       action: "INDEXER_FETCH_SUCCESS",
       rockId: cacheKey,
       eventsFound: events.length,
+      eventsScanned: scanned.length,
       latencyMs: Date.now() - start,
     });
 
@@ -387,16 +488,53 @@ export async function getRockOnchainEvents(
 }
 
 /**
+ * The rock's mirrored history, or null when it could not be read.
+ *
+ * Null is not "no events": an empty list is a real answer and null is a failure, and the caller
+ * treats them differently — see `getRockOnchainEvents`.
+ */
+async function readStoredEvents(rockId: string): Promise<IndexerEvent[] | null> {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    const rows = await db.select().from(rockEvents).where(eq(rockEvents.rockId, rockId));
+    const events: IndexerEvent[] = [];
+    for (const row of rows) {
+      const event = rowToIndexerEvent({
+        id: row.id,
+        rockId: row.rockId,
+        eventType: row.eventType,
+        txHash: row.txHash,
+        logIndex: row.logIndex,
+        blockNumber: row.blockNumber,
+        payload: row.payload ?? null,
+        timestamp: row.timestamp,
+      });
+      if (event) events.push(event);
+    }
+    return events;
+  } catch (err) {
+    logger.warn("Could not read the indexed events back from the database", {
+      action: "INDEXER_READ_FAILED",
+      reason: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+/**
  * Mirrors decoded events into D1.
  *
- * Best effort and never fatal: the chain is the source of truth, and a failed cache write must
- * not turn a successful read into an error. The row id is `${txHash}-${logIndex}`, so
- * re-indexing the same range is idempotent.
+ * The row id is `${txHash}-${logIndex}`, so re-indexing the same range is idempotent.
+ *
+ * The return value matters now: the cursor may only advance over blocks whose events are in the
+ * table. A failed write is still not fatal to the read — the chain remains the source of truth,
+ * and the next poll simply re-scans the same range.
  */
-async function mirrorToDatabase(events: IndexerEvent[]): Promise<void> {
-  if (events.length === 0) return;
+async function mirrorToDatabase(events: IndexerEvent[]): Promise<boolean> {
   const db = getDb();
-  if (!db) return;
+  if (!db) return false;
+  if (events.length === 0) return true;
 
   try {
     for (const event of events) {
@@ -416,10 +554,12 @@ async function mirrorToDatabase(events: IndexerEvent[]): Promise<void> {
         })
         .onConflictDoNothing();
     }
+    return true;
   } catch (err) {
     logger.warn("Could not mirror indexed events into the database", {
       action: "INDEXER_MIRROR_FAILED",
       reason: err instanceof Error ? err.message : String(err),
     });
+    return false;
   }
 }

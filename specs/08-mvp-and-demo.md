@@ -81,9 +81,15 @@ Use a second account to execute a small testnet swap against the selected rock. 
 
 ### 2:10–2:30 — Gift or transfer (Zero Gas)
 
-Open the gift, name the second Privy account, and sign once. That single signature does two
-things: it opens the pending handover on chain, and it pre-signs the Safe owner swap that the
-recipient cannot produce for themselves (D-027).
+Name the recipient with two phones and no clipboard: on the second phone, **Show my code** in the
+account sheet puts up a QR of `bank-rock.com/rock/<id>?give=<that account's address>`, and the
+giver's own camera app opens it, which brings up the give sheet with the address already in the
+field. Then open the gift and sign once — that single signature does two things: it opens the
+pending handover on chain, and it pre-signs the Safe owner swap that the recipient cannot produce
+for themselves (D-027).
+
+*(If a camera misbehaves on the day, paste the address as before; the link is the fast path, not
+the only one.)*
 
 Then hand over the rock. The recipient taps it, signs in on a fresh account with no ETH, and the
 claim is relayed: the registry credits the subject named inside the attestation, and the stored

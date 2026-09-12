@@ -18,6 +18,20 @@
  * contract audit the giver's Safe loses authority the moment the rock changes owner. Whoever
  * claimed such a gift would own a rock whose account nobody could drive under sponsorship. So
  * the address is asked for up front, where the mistake is still cheap.
+ *
+ * Naming that recipient used to mean one thing: pasting 42 characters out of the giver's own
+ * clipboard, which on stage means a chat app and twenty seconds nobody has (B1). So the sheet
+ * also reads `?give=<address>` from the URL. The recipient shows a QR of that link from their own
+ * phone (`MyAddressQr`), the giver's stock camera opens it, and the sheet comes up with the
+ * address already in the field. Paste is untouched and still the fallback.
+ *
+ * Three rules about that parameter:
+ *  - it is validated as a lowercase or correctly checksummed 20-byte address and otherwise
+ *    ignored entirely (`lib/give-link.ts`). A scanned link is untrusted input;
+ *  - it is stripped from the URL the moment it is read, so a reload does not silently re-prefill
+ *    a recipient the giver has since thought better of;
+ *  - it opens the sheet by itself **only for the rock's own owner**. To anyone else the link is
+ *    an ordinary rock page, which is what it is.
  */
 
 import * as React from "react";
@@ -31,6 +45,8 @@ import { SimulatedBadge } from "@/components/ui/simulated-badge";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { cn } from "@/lib/ui/cn";
 import { explorer } from "@/lib/chain";
+import { useGiveParam } from "@/hooks/useGiveParam";
+import { useAuth } from "@/context/auth-context";
 import type { Capability } from "@/lib/demo";
 import { useRockActions } from "@/hooks/useBankRock";
 
@@ -97,14 +113,37 @@ export function TransferModal({
   onHandoverInitiated,
 }: TransferModalProps) {
   const { initiateHandover, isPending } = useRockActions();
+  const { address: signedInAddress } = useAuth();
 
   const [step, setStep] = React.useState<Step>("form");
-  const [recipient, setRecipient] = React.useState("");
+  /** What the giver has typed. Null means "untouched", which is what lets the link fill it in. */
+  const [typedRecipient, setTypedRecipient] = React.useState<string | null>(null);
+  /** Set once the giver closes a sheet the link opened, so it does not reopen behind them. */
+  const [linkDismissed, setLinkDismissed] = React.useState(false);
   const [expiryDays, setExpiryDays] = React.useState<number>(7);
   const [message, setMessage] = React.useState("");
   const [acknowledged, setAcknowledged] = React.useState(false);
   const [result, setResult] = React.useState<HandoverResult | null>(null);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+
+  // The address a scanned link named, read and stripped from the URL exactly once.
+  const scannedRecipient = useGiveParam();
+
+  // The field shows what the giver typed; until they touch it, it shows what the link named.
+  const recipient = typedRecipient ?? scannedRecipient ?? "";
+
+  // A scanned link opens the sheet by itself, but only for the rock's own owner: to anyone else
+  // the link is an ordinary rock page. Derived, not stored, so there is no effect to get wrong.
+  const viewerIsOwner =
+    Boolean(signedInAddress) &&
+    Boolean(currentOwner) &&
+    signedInAddress?.toLowerCase() === currentOwner.toLowerCase();
+  const openedByLink = scannedRecipient !== null && viewerIsOwner && !linkDismissed;
+
+  const handleClose = React.useCallback(() => {
+    setLinkDismissed(true);
+    onClose();
+  }, [onClose]);
 
   const trimmedRecipient = recipient.trim();
   const isEmpty = trimmedRecipient === "";
@@ -129,7 +168,7 @@ export function TransferModal({
   const handlePaste = React.useCallback(async () => {
     try {
       const text = await navigator.clipboard.readText();
-      if (text) setRecipient(text.trim());
+      if (text) setTypedRecipient(text.trim());
     } catch {
       // Clipboard access denied or unavailable — the field is still typable.
     }
@@ -222,7 +261,7 @@ export function TransferModal({
     );
   } else {
     footer = (
-      <Button type="button" size="lg" className="w-full" onClick={onClose}>
+      <Button type="button" size="lg" className="w-full" onClick={handleClose}>
         Done
       </Button>
     );
@@ -230,9 +269,9 @@ export function TransferModal({
 
   return (
     <Sheet
-      open={isOpen}
+      open={isOpen || openedByLink}
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open) handleClose();
       }}
       title="Give this rock"
       description={`Rock #${rockId} stays yours until the person you give it to taps it and claims it.`}
@@ -260,7 +299,7 @@ export function TransferModal({
                   placeholder="0x…"
                   required
                   value={recipient}
-                  onChange={(event) => setRecipient(event.target.value)}
+                  onChange={(event) => setTypedRecipient(event.target.value)}
                   aria-describedby="give-recipient-hint"
                   aria-invalid={recipientError !== null}
                   className="h-11 min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-4"
@@ -281,8 +320,10 @@ export function TransferModal({
                 </p>
               ) : (
                 <p id="give-recipient-hint" className="text-sm text-ink-2">
-                  The person you name will be able to claim the rock and its account when they
-                  tap it.
+                  {scannedRecipient !== null &&
+                  trimmedRecipient.toLowerCase() === scannedRecipient.toLowerCase()
+                    ? "Filled in from the code you scanned. Check it against their screen before you confirm."
+                    : "The person you name will be able to claim the rock and its account when they tap it."}
                 </p>
               )}
             </div>
