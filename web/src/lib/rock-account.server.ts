@@ -37,7 +37,7 @@ import {
 } from "@/lib/chain";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { optionalEnv, real, unavailable, type Capability } from "@/lib/demo";
+import { env, optionalEnv, real, unavailable, type Capability } from "@/lib/demo";
 import {
   encodeClaimHandover,
   encodeSwapOwner,
@@ -552,7 +552,8 @@ export function buildSwapOwnerUserOpCall(params: {
 }
 
 function pimlicoUrl(): Capability<string> {
-  const key = optionalEnv("PIMLICO_API_KEY") ?? optionalEnv("NEXT_PUBLIC_PIMLICO_API_KEY");
+  // See pimlicoRpcUrl in lib/aa.ts: the public key is inlined at build time, never a runtime name.
+  const key = optionalEnv("PIMLICO_API_KEY") ?? (env.pimlicoApiKeyPublic.trim() || undefined);
   if (!key) return unavailable("PIMLICO_API_KEY is not configured");
   return real(`https://api.pimlico.io/v2/sepolia/rpc?apikey=${key}`);
 }

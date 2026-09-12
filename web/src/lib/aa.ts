@@ -24,7 +24,7 @@ import { encodeFunctionData, http, type Address, type Hex } from "viem";
 import { AQUA_ABI } from "@/lib/chain/abi/aqua";
 import { ERC20_ABI } from "@/lib/chain/abi/erc20";
 import { addresses, chain, getPublicClient } from "@/lib/chain";
-import { optionalEnv, real, unavailable, type Capability } from "@/lib/demo";
+import { env, optionalEnv, real, unavailable, type Capability } from "@/lib/demo";
 import { logger } from "@/lib/telemetry";
 
 /** The public client this module transacts against. Sepolia only. */
@@ -38,7 +38,11 @@ export interface Call {
 
 /** Sepolia bundler + verifying paymaster endpoint. Chain is named, never a numeric literal. */
 export function pimlicoRpcUrl(): Capability<string> {
-  const apiKey = optionalEnv("PIMLICO_API_KEY") ?? optionalEnv("NEXT_PUBLIC_PIMLICO_API_KEY");
+  // Server side, `process.env` at runtime holds only the Worker's own vars and secrets; the
+  // public key is a BUILD-time value, and Next inlines it into `env` (a literal read in lib/demo.ts)
+  // for the server bundle as well as the browser's. So the order is: an explicit Worker secret,
+  // else the inlined public key. A name lookup of NEXT_PUBLIC_PIMLICO_API_KEY would always miss here.
+  const apiKey = optionalEnv("PIMLICO_API_KEY") ?? (env.pimlicoApiKeyPublic.trim() || undefined);
   if (!apiKey) {
     return unavailable("PIMLICO_API_KEY is not configured");
   }
