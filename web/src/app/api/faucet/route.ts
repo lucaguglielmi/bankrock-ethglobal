@@ -54,6 +54,12 @@ export async function POST(req: Request) {
       chain: "Base Sepolia (84532)",
     });
 
+    const faucetBalance = await publicClient.getBalance({ address: account.address });
+    if (faucetBalance < parseEther("0.01")) {
+      logger.error("Faucet out of funds", new Error("Insufficient faucet balance"), { action: "FAUCET_EMPTY", balance: faucetBalance.toString() });
+      return NextResponse.json({ error: "Faucet is temporarily out of funds" }, { status: 503 });
+    }
+
     // Funds testnet ETH to the user or newly deployed Safe account
     const hash = await walletClient.sendTransaction({
       to: address as `0x${string}`,

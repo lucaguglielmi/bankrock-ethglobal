@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import confetti from "canvas-confetti";
 import { 
   X, 
   ArrowUpDown, 
@@ -210,6 +211,12 @@ function TradeModalInner({
 
       setStatus("success");
       playSuccess();
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#000000', '#ffffff', '#4f46e5'],
+      });
     } catch (err) {
       console.error("Swap execution failed:", err);
       setStatus("idle");
