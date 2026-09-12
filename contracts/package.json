@@ -9,7 +9,9 @@
     "postcompile": "node scripts/export-abi.js && node ../scripts/sync-web-abi.mjs",
     "pretest": "npm run compile",
     "test": "hardhat test",
-    "deploy": "node scripts/deploy.js"
+    "deploy": "node scripts/deploy.js",
+    "deploy:aqua-app": "node scripts/deploy-aqua-app.js",
+    "verify:sepolia": "node scripts/verify-sepolia.mjs"
   },
   "keywords": [],
   "author": "",

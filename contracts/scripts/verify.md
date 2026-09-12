@@ -1,8 +1,33 @@
-# Verifying `BankRockRegistry` on Sepolia Etherscan
+# Verifying the contracts on Sepolia Etherscan
 
-Verification is a separate step from deployment on purpose: `scripts/deploy.js` must not depend on
+Verification is a separate step from deployment on purpose: the deploy scripts must not depend on
 an Etherscan API key, and a failed verification must not leave you unsure whether the contract is
-deployed. Deploy first, confirm `deployments/sepolia.json` exists, then verify.
+deployed. Deploy first, confirm `deployments/*.json` exist, then verify.
+
+## The one command (Fact, 2026-09-12)
+
+```sh
+cd contracts
+ETHERSCAN_API_KEY=... npm run verify:sepolia
+```
+
+`scripts/verify-sepolia.mjs` verifies all three contracts — `BankRockRegistry`, `XYCSwap` and
+`XYCSwapTaker` — from `deployments/sepolia.json` and `deployments/sepolia-aqua-app.json`. It sends
+Etherscan the exact standard-JSON compiler input Hardhat used (`artifacts/build-info/<id>.json`,
+the id named in each artifact), so no compiler setting is restated anywhere and what is verified
+is what was deployed. It checks that the on-chain code length equals the artifact's, skips a
+contract Etherscan already shows verified, and polls until Etherscan answers. The registry's
+`initialOwner` argument is read from the deploy transaction's sender.
+
+On 2026-09-12 it verified all three at the first attempt:
+
+| Contract | Address |
+| --- | --- |
+| `BankRockRegistry` | [`0x2A3101Fc525C6DBEc39bef45034E23b13f28F757`](https://sepolia.etherscan.io/address/0x2A3101Fc525C6DBEc39bef45034E23b13f28F757#code) |
+| `XYCSwap` | [`0x8a293F43Eb0DBaA834b40b2eC4E0751e3ce6316B`](https://sepolia.etherscan.io/address/0x8a293F43Eb0DBaA834b40b2eC4E0751e3ce6316B#code) |
+| `XYCSwapTaker` | [`0xCd7899E37D50B226E882e79572AB189080fD0016`](https://sepolia.etherscan.io/address/0xCd7899E37D50B226E882e79572AB189080fD0016#code) |
+
+The rest of this file is the manual playbook, kept for the case where the script cannot be used.
 
 ## What you need
 
