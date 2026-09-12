@@ -235,11 +235,11 @@ function RockMesh({ isHovered }: { isHovered: boolean }) {
             <Sparkles count={40} scale={0.9} size={2.5} speed={0.4} opacity={1} color="#ffffff" />
             <Sparkles count={20} scale={1.2} size={3.5} speed={0.8} opacity={0.8} color="#aaddff" />
             
-            <Html position={[0.2, 0.2, 0]}>
+            <Html position={[0.5, 0.5, 0.1]}>
               <div className={`transition-all duration-1000 flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#001144] whitespace-nowrap ${isHovered ? 'opacity-100 translate-y-0 pointer-events-none delay-700' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#001144]" />
-                <div className="w-40 h-[1px] bg-[#001144]/80 mr-4" />
-                a sparkly silicon protective layer
+                <div className="w-32 h-[1px] bg-[#001144]/80 mr-4" />
+                a sparkly silicon
               </div>
             </Html>
           </mesh>
