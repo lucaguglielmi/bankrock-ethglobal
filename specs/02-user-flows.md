@@ -141,7 +141,11 @@ otherwise. **A recipient must be named** — the app issues no open gifts.
    is what makes step 7's ordering an invariant for every caller, not a convention of this route.
    **Gas is sponsored end to end**: the recipient pays nothing and needs no native tokens.
 9. The account address, its assets and its Aqua maker identity remain completely stable. The
-   strategies stay shipped; nothing is docked and re-shipped.
+   strategies stay shipped; nothing is docked and re-shipped. **The recipient's owner actions —
+   give, retire, ship, cash in, mark lost — work from the app straight away and stay sponsored,
+   because the app takes the rock's account from the registry and asks that account whether it
+   answers to her wallet, instead of re-deriving an address her wallet would compute differently
+   (D-037).**
 10. Both parties receive a receipt. Provenance shows `HandoverInitiated` then `HandoverClaimed`,
     both backed by a tap.
 
@@ -207,7 +211,9 @@ is rehearsal: awakening the demo beat again and again with a single tag, without
 2. `archiveRock(rockId)` goes out as a sponsored UserOperation from the Rock Account. The
    registry accepts either the owner's wallet or the rock's Safe as the caller (D-026), so this
    costs the owner nothing. It is deliberately callable while the contract is paused: archiving
-   only removes ways to act on a rock, and an emergency stop must not trap a tag.
+   only removes ways to act on a rock, and an emergency stop must not trap a tag. **A recipient who
+   was given the rock retires it the same way, from that same account, with an empty wallet: the
+   account the registry holds is the one whose owner the gift swapped to her (D-037).**
 3. Any outstanding handover is cancelled first, emitting `HandoverCancelled` before
    `RockArchived`, so a reader of the log sees the claim path close explicitly.
 4. The rock's state becomes `Archived`, and the **tag binding is released**:
@@ -222,6 +228,10 @@ is rehearsal: awakening the demo beat again and again with a single tag, without
    so an attestation captured before the archive cannot be replayed against the rock that follows.
 8. Awakening the next rock id reuses the **same Rock Account address** for the same owner, because
    the account is salted by the tag rather than by the rock id (D-029). Any balance left in it is
-   still there.
+   still there. **This holds only while that owner is the one who derived the account: a rock that
+   was gifted and then retired by its recipient leaves its reserve behind, because the next
+   awakening must name a counterfactual account and the only one it can name is the one the new
+   owner's own wallet derives — the retired rock's account stays hers as a Safe, but no rock record
+   names it any more (D-037).**
 
 **Not a recovery tool for a lost tag.** That is Flow F, and it changes nothing on chain.

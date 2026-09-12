@@ -1351,16 +1351,29 @@ async function stepGift(run: Run, awoken: AwakenResult): Promise<void> {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Flow K after a gift, and the one place the app cannot follow its own path.
+ * Flow K after a gift — and, since D-037, the app's own path rather than a detour around it.
  *
- * `useBankRock` sends every owner action from the Rock Account, and it refuses to act unless the
- * Safe it derives from (signed-in wallet, tag) is the account the registry holds. After a gift
- * that is false by construction: the account belongs to the *giver's* derivation and the new owner
- * derives a different address (D-029 — the mapping is (tag, owner) → account). The registry itself
- * accepts the owner's own wallet as `msg.sender`, so that is what this step uses, and it says so.
+ * What this step used to report as a FINDING: `useBankRock` derived the Rock Account from
+ * (signed-in wallet, tag) and refused to act on any other address, so after a gift every owner
+ * action was unreachable in the app for the new owner. The account is the *giver's* derivation
+ * (D-029), the recipient derives a different and empty one, and the mismatch was treated as "this
+ * wallet does not control this rock". The rehearsal worked around it by funding C and sending
+ * `archiveRock` from her own wallet, which the registry accepts but no phone ever would.
+ *
+ * D-037 replaced the derivation with a read. For an awakened rock the Rock Account is whatever the
+ * registry reports, and authority is that account's own answer to `isOwner` — the same staticcall
+ * `_accountAnswersTo` makes on chain. So C retires the rock exactly as the app does it: a
+ * sponsored UserOperation from the rock's own account, signed by a wallet that has never held gas.
+ *
+ * What still does not follow the money, stated rather than implied: the *next* rock. Archiving
+ * releases the tag, so the following tap is an awakening, and an awakening has no account to read
+ * — `awakenRock` requires the attestation to name the account it binds, and for a tag the registry
+ * no longer maps that can only be the counterfactual one (C, this tag) derives. The retired rock's
+ * reserve therefore stays in the account C still owns as a Safe, which no rock record names any
+ * more. D-037 records that consequence; this step measures it rather than hiding it.
  */
 async function stepArchiveAndRestart(run: Run, awoken: AwakenResult): Promise<void> {
-  heading("Step 5 — C retires the rock, and the same tag awakens the next one");
+  heading("Step 5 — C retires the rock from its own account, and the same tag awakens the next one");
   const startedAt = Date.now();
 
   const derivedForC = await run.app.rockAccount.computeRockAccountAddress({
@@ -1370,48 +1383,130 @@ async function stepArchiveAndRestart(run: Run, awoken: AwakenResult): Promise<vo
   if (derivedForC.state === "UNAVAILABLE") {
     throw new RehearsalError(`C's Rock Account could not be derived: ${derivedForC.reason}`);
   }
-  if (derivedForC.value !== awoken.smartAccount) {
-    finding(
-      `after a gift the app's own owner actions are unreachable for the new owner: the rock's account is ${awoken.smartAccount} (derived for A) while the app derives ${derivedForC.value} for C, and \`useBankRock\` refuses the mismatch. The registry accepts C's own wallet, which is what this step uses.`,
-    );
-  }
+  assert(
+    derivedForC.value !== awoken.smartAccount,
+    `C's own derivation for this tag (${derivedForC.value}) is not this rock's account (${awoken.smartAccount}) — which is why the app reads the account instead of deriving it (D-037)`,
+  );
 
   const archiveData = run.app.rockAccount.encodeArchiveRock(BigInt(awoken.rockId));
 
   if (run.dryRun || !run.bundlerUrl) {
-    note(`dry run: archiveRock calldata ${archiveData.length / 2 - 1} bytes, sent from C's own wallet`);
+    // Nothing was gifted in a dry run, so the record to reason about is the one step 4 *would*
+    // have left: same rock, same account, owner C. It is built here, and labelled as built; the
+    // only thing asserted about it is the app's own rule, which is pure.
+    const current = await readRockOrFail(run, awoken.rockId);
+    const asGifted = {
+      ...current,
+      owner: run.recipientC.address,
+      smartAccount: awoken.smartAccount,
+      uidHash: run.uidHash,
+      state: "awake" as const,
+      handover: null,
+    };
+
+    const plan = expectReal(
+      run.app.rockAccount.planRockAccount({ record: asGifted, derived: derivedForC.value }),
+      "after a gift the app plans owner actions against the registry's account",
+    );
+    assert(
+      getAddress(plan.smartAccount) === awoken.smartAccount && plan.source === "registry",
+      "the planned account is the registry's, not the new owner's derivation",
+    );
+
+    const authorised = run.app.rockAccount.ownerActionAuthority({
+      record: asGifted,
+      wallet: run.recipientC.address,
+      answer: { answers: true },
+    });
+    assert(
+      authorised.state === "REAL" && getAddress(authorised.value) === awoken.smartAccount,
+      "an account that answers to C authorises C's owner actions from that same account",
+    );
+
+    const refused = run.app.rockAccount.ownerActionAuthority({
+      record: asGifted,
+      wallet: run.ownerA.address,
+      answer: { answers: true },
+    });
+    assert(
+      refused.state === "UNAVAILABLE",
+      `the giver is refused afterwards, with a reason rather than a fabricated state: "${refused.state === "UNAVAILABLE" ? refused.reason : ""}"`,
+    );
+
+    // A real read, of a real address: the counterfactual account has no code, so it answers to
+    // nobody. That is the same fact that makes a claim unable to bind an unexecuted account
+    // (D-032), and it is why the app's authority check is a read and not a derivation.
+    const answer = expectReal(
+      await run.app.rockAccount.readAccountAnswersTo(awoken.smartAccount, run.ownerA.address),
+      "the Rock Account can be asked, on chain, whose wallet it answers to",
+    );
+    assert(
+      answer.answers === false,
+      `dry run: nothing was deployed, so the account answers to nobody — "${answer.answers === false ? answer.reason : ""}"`,
+    );
+
+    note(`dry run: archiveRock calldata ${archiveData.length / 2 - 1} bytes, sent from ${awoken.smartAccount} as a sponsored UserOp signed by C`);
     const nextId = await findDormantRockId(run, Number(awoken.rockId) + 1);
-    note(`the next dormant rock id is ${nextId}; it would awaken into ${derivedForC.value}`);
-    record("5 archive and re-awaken", "(dry run)", "Pimlico paymaster + funder", startedAt);
+    note(`the next dormant rock id is ${nextId}; it would awaken into ${derivedForC.value}, which is a new account — the retired rock's reserve stays where it is, in an account C owns`);
+    record("5 archive and re-awaken", "(dry run)", "Pimlico paymaster", startedAt);
     return;
   }
 
-  // C has never held gas — the recipient of a gift never does. The rehearsal funder tops them up
-  // for this one transaction, because the app has no path for it (see the FINDING above).
-  const funderWallet = createWalletClient({
-    account: run.funder,
-    chain: sepolia,
-    transport: http(process.env.SEPOLIA_RPC_URL || undefined),
-  });
-  const topUp = await funderWallet.sendTransaction({
-    to: run.recipientC.address,
-    value: parseUnits("0.002", 18),
-  });
-  say(`  tx      ${topUp}  (gas for C)`);
-  await waitForTx(run, topUp, "the top-up for C");
+  const gifted = await readRockOrFail(run, awoken.rockId);
+  assert(
+    getAddress(gifted.owner) === getAddress(run.recipientC.address),
+    "the registry still records C as the owner going into the retirement",
+  );
 
-  const cWallet = createWalletClient({
-    account: run.recipientC,
-    chain: sepolia,
-    transport: http(process.env.SEPOLIA_RPC_URL || undefined),
+  // The app's own two checks, run in the app's own order (`useBankRock.ownerClientFor`).
+  const plan = expectReal(
+    run.app.rockAccount.planRockAccount({ record: gifted }),
+    "the app takes the Rock Account from the registry record",
+  );
+  assert(
+    getAddress(plan.smartAccount) === awoken.smartAccount && plan.source === "registry",
+    "it is the account the rock has had since it was awakened, unchanged by the gift",
+  );
+
+  const answer = expectReal(
+    await run.app.rockAccount.readAccountAnswersTo(plan.smartAccount, run.recipientC.address),
+    "the account itself is asked whether it answers to C",
+  );
+  assert(answer.answers === true, "it does — the pre-signed owner swap of step 4 is what made it so");
+
+  const authority = expectReal(
+    run.app.rockAccount.ownerActionAuthority({
+      record: gifted,
+      wallet: run.recipientC.address,
+      answer,
+    }),
+    "so the app authorises C's owner actions",
+  );
+  assert(
+    getAddress(authority) === awoken.smartAccount,
+    "and it sends them from the rock's own account, which is what the registry's owner gate admits",
+  );
+
+  const client = await buildSafeClient({
+    app: run.app,
+    publicClient: run.publicClient,
+    bundlerUrl: run.bundlerUrl,
+    owner: run.recipientC,
+    saltNonce: run.saltNonce,
+    address: authority,
   });
-  const archiveHash = await cWallet.sendTransaction({
-    to: run.deployment.registry,
-    data: archiveData,
-    value: BigInt(0),
-  });
-  say(`  tx      ${archiveHash}  (archiveRock, from C's own wallet)`);
-  await waitForTx(run, archiveHash, "archiveRock");
+  assert(
+    getAddress(client.account.address) === awoken.smartAccount,
+    "the bundler will send from the rock's account, not from anything C derives",
+  );
+
+  const retired = await sendSponsored(
+    run,
+    client,
+    [{ to: run.deployment.registry, data: archiveData, value: BigInt(0) }],
+    `archiveRock ${awoken.rockId}`,
+  );
+  note("C never held a wei of gas: the retirement was sponsored, exactly as it is in the app");
 
   const archived = await readRockOrFail(run, awoken.rockId);
   assert(archived.state === "archived", `rock ${awoken.rockId} is archived`);
@@ -1426,8 +1521,19 @@ async function stepArchiveAndRestart(run: Run, awoken: AwakenResult): Promise<vo
     `the retired rock's account still holds ${usdc(reserves.value.usdc)} and ${weth(reserves.value.weth)}, and C owns it`,
   );
 
-  // The verifier's own resolution for the next tap: an archived record is not a claim, so the
-  // account is derived from (subject, tag) again.
+  const afterArchive = run.app.rockAccount.ownerActionAuthority({
+    record: archived,
+    wallet: run.recipientC.address,
+    answer,
+  });
+  assert(
+    afterArchive.state === "UNAVAILABLE",
+    `a retired rock offers no further owner action, and the app says why: "${afterArchive.state === "UNAVAILABLE" ? afterArchive.reason : ""}"`,
+  );
+
+  // The verifier's own resolution for the next tap: the tag is unbound and the archived record is
+  // not a claim, so the account is derived from (subject, tag) again — there is no bound account
+  // left to read (D-037, rule 3).
   const resolved = await run.app.resolution.resolveSmartAccount({
     subject: run.recipientC.address,
     uidHash: run.uidHash,
@@ -1445,7 +1551,7 @@ async function stepArchiveAndRestart(run: Run, awoken: AwakenResult): Promise<vo
     smartAccount: derivedForC.value,
   });
 
-  const client = await buildSafeClient({
+  const nextClient = await buildSafeClient({
     app: run.app,
     publicClient: run.publicClient,
     bundlerUrl: run.bundlerUrl,
@@ -1453,13 +1559,13 @@ async function stepArchiveAndRestart(run: Run, awoken: AwakenResult): Promise<vo
     saltNonce: run.saltNonce,
   });
   assert(
-    getAddress(client.account.address) === derivedForC.value,
+    getAddress(nextClient.account.address) === derivedForC.value,
     "the new Rock Account is the counterfactual address the attestation names",
   );
 
   const sent = await sendSponsored(
     run,
-    client,
+    nextClient,
     [
       {
         to: run.deployment.registry,
@@ -1477,11 +1583,15 @@ async function stepArchiveAndRestart(run: Run, awoken: AwakenResult): Promise<vo
     "the same tag awakened a new rock id into the Rock Account its owner derives",
   );
   assert(
+    getAddress(reborn.smartAccount) !== awoken.smartAccount,
+    "which is a different account from the retired rock's: a gifted rock's reserve does not follow the tag into the next rock",
+  );
+  assert(
     reborn.uidHash.toLowerCase() === run.uidHash.toLowerCase(),
     "the new rock carries the same tag",
   );
 
-  record("5 archive and re-awaken", `${archiveHash} → ${sent.txHash}`, "Pimlico paymaster + funder", startedAt);
+  record("5 archive and re-awaken", `${retired.txHash} → ${sent.txHash}`, "Pimlico paymaster", startedAt);
 }
 
 /* -------------------------------------------------------------------------- */

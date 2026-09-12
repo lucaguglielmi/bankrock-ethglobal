@@ -33,6 +33,12 @@ export interface AwakeRockProps {
   strategy: Capability<StrategyView>;
   isStrategyLoading?: boolean;
   isOwner: boolean;
+  /**
+   * Whether this wallet may act from the rock's account (D-037, `useRockAccount`). "Give this
+   * rock" and "Start earning" are both UserOperations from it, so an UNAVAILABLE answer disables
+   * them and is shown as the reason — never as a missing button with no explanation.
+   */
+  ownerActions?: Capability<string>;
   onTrade: () => void;
   onGive: () => void;
   onCrossChain: () => void;
@@ -47,6 +53,7 @@ export function AwakeRock({
   strategy,
   isStrategyLoading = false,
   isOwner,
+  ownerActions,
   onTrade,
   onGive,
   onCrossChain,
@@ -55,6 +62,8 @@ export function AwakeRock({
 }: AwakeRockProps) {
   const isTrading = strategy.state !== "UNAVAILABLE" && strategy.value.streams.length > 0;
   const canTrade = isTrading || isStrategyLoading;
+  const ownerBlockedReason =
+    ownerActions && ownerActions.state === "UNAVAILABLE" ? ownerActions.reason : null;
 
   return (
     <>
@@ -70,12 +79,21 @@ export function AwakeRock({
             Trade with this rock
           </Button>
           {isOwner ? (
-            <Button size="lg" variant="outline" className="w-full sm:flex-1" onClick={onGive}>
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full sm:flex-1"
+              onClick={onGive}
+              disabled={ownerBlockedReason !== null}
+            >
               Give this rock
             </Button>
           ) : null}
         </div>
         {!canTrade ? <p className="text-sm text-ink-3">Not trading yet</p> : null}
+        {isOwner && ownerBlockedReason ? (
+          <p className="max-w-prose text-sm text-ink-3">{ownerBlockedReason}</p>
+        ) : null}
       </div>
 
       <Button
@@ -97,6 +115,7 @@ export function AwakeRock({
         strategy={strategy}
         isStrategyLoading={isStrategyLoading}
         isOwner={isOwner}
+        ownerActions={ownerActions}
         onSync={onRefresh}
         isSyncing={isRefreshing}
       />

@@ -313,7 +313,9 @@ visitor's taker account is a *personal* Safe with `saltNonce = 0`, not tied to a
 The mapping is (tag, owner) → account, not rock id → account. Two rocks held by the same person
 have two accounts whose balances never pool; the same tag under two owners yields two addresses;
 and a tag whose rock was archived awakens the *next* rock id into the *same* account for the same
-owner, which is what D-028's rehearsal loop needs. The address is counterfactual, so the verifier
+owner, which is what D-028's rehearsal loop needs — **narrowed by D-037**: that last clause holds
+only while the owner archiving is the one whose wallet derived the account, which a gift makes
+false. The address is counterfactual, so the verifier
 can quote it inside the signed attestation before any transaction exists. The rock id is
 deliberately not in the salt: it is not settled at the moment of the tap.
 
@@ -583,6 +585,70 @@ same variable (spec 11) and was proven against the deployed registry with it.
 
 **Files:** `specs/16-environment-and-secrets.md` (#4); `specs/18-demo-readiness.md` (Part 2.2, "RPC");
 `DEMO-STATE.md` (K-7).
+
+### D-037 — For an awakened rock, the Rock Account is the registry's, and authority is the Safe's answer
+
+**Decision:** once a rock has been awakened, its Rock Account is whatever
+`getRock(rockId).smartAccount` reports. The app reads that address and never re-derives one for a
+rock that exists. Whether the signed-in wallet may act from it is established by asking that
+account — `isOwner(wallet)`, the same `ISafeOwnerManager` staticcall the registry's
+`_accountAnswersTo` makes — rather than by recomputing a salt and comparing addresses. Derivation
+survives in exactly two places, both of which are "there is no account to read yet": the
+counterfactual address the NFC verifier signs into an **awakening** attestation (D-029), and a
+visitor's personal taker Safe (`PERSONAL_ACCOUNT_SALT`).
+
+**Why:** the live Sepolia rehearsal's dry run (spec 20 WP-2) walked into it at step 5. D-029 salts
+the Rock Account by the tag, so the address is a function of (owner wallet, tag); D-032 makes a
+claim swap the Safe's single owner to the recipient and rebind `rock.smartAccount` to that *same*
+Safe, so after a gift the rock's account is still the address the **giver** derived. The recipient
+derives a different, empty address, and `useBankRock` refused the mismatch with "This wallet does
+not control this rock's Rock Account". The registry accepted her all along — its owner gate admits
+the owner's own wallet, or the rock's account while that account answers to the owner — so the
+refusal was the app's alone: **every owner action (retire, give, ship, dock, cash in) was
+unreachable in the app for the new owner of every gifted rock.**
+
+**Consequence:**
+
+1. **Owner actions survive a gift, gaslessly.** The recipient's actions are sponsored
+   UserOperations from the rock's own account, which is what the registry's gate admits and what
+   Pimlico sponsors. She never needs a funded wallet — the rehearsal's step 5 no longer tops up
+   the recipient's EOA to send `archiveRock` from it, and no longer carries a FINDING.
+2. **Two conditions, both stated before a transaction is built.** `ownerActionAuthority` refuses
+   with `This rock is owned by a different wallet` when the wallet is not the registry's owner, and
+   with `This account answers to a different wallet` when the account's own answer is no. A
+   retired rock refuses with `This rock is retired, so it has no owner actions left`, and an
+   account with no code with `This rock's account has not executed anything yet, so it answers to
+   nobody` — the `code.length` half of the on-chain gate, and the same fact that stops a claim
+   binding an unexecuted account (D-032 consequence 1). No branch fabricates a state (D-013).
+3. **The address is knowable while signed out.** It comes from the registry, not from a wallet, so
+   balances, the Aqua reserve and the position card read the same account for every visitor. Only
+   *authority* depends on who is signed in.
+4. **The server side was already consistent, and stays.** `resolveSmartAccount` names the
+   registry's account for a rock that is `awake` or `handover_pending` (`mode: "claim"`) and
+   derives only when there is no such record (`mode: "awaken"`). Nothing there changed.
+5. **What a gift does not carry into the next rock, stated rather than papered over.** Archiving
+   releases the tag (D-028), so the following tap is an awakening — and `awakenRock` requires the
+   attestation to name the account it binds, for a tag the registry no longer maps. The only
+   account the verifier can name there is the counterfactual one (new owner, tag) derives, so
+   **a rock that was gifted and then retired leaves its reserve in the old account**: the
+   recipient still owns that Safe and can move its tokens with its own owner key, but no rock
+   record names it any more and the app offers no screen for it. D-029's line "a tag whose rock
+   was archived awakens the next rock id into the *same* account for the same owner" is true only
+   while the account was derived by that owner — that is, for the rehearsal loop without a gift in
+   it. Making the reserve follow would mean naming an archived rock's account in a new rock's
+   attestation, which the contract would accept (`awakenRock` runs no `isOwner` check) but which
+   would blur one account across two provenance histories; it is not done, and no contract change
+   is proposed for it.
+
+**Files:** `web/src/lib/rock-account.ts` (`planRockAccount`, `ownerActionAuthority`,
+`readAccountAnswersTo`, `interpretAccountAnswer`, the reason constants);
+`web/src/lib/chain/abi/safe.ts` (the read-only `isOwner` / `getOwners` ABI);
+`web/src/hooks/useBankRock.ts` (`ownerClientFor` reads the account and asks it; `derivedAccountFor`
+is the awakening path and is named for it; `buildSmartAccountClient` takes an explicit `address`);
+`web/src/hooks/useRockAccount.ts` (one hook for "which account" and "may this wallet act");
+`web/src/components/rock-interface.tsx`, `rock/owner-menu.tsx`, `rock/rock-awake.tsx`,
+`aqua-position-card.tsx` (owner buttons disabled with the reason, never silently absent);
+`web/src/lib/rock-account.authority.test.ts`; `web/scripts/rehearse-sepolia.ts` (step 5).
 
 ## Open product questions
 

@@ -104,16 +104,21 @@ Two deviations the script states in its own output rather than hiding:
   spend cap. The script calls the same functions the route calls, in the same order — owner swap
   first, then `claimHandover` (D-032). The route's own guards (rate limits, cap reservation, the
   refusal of open gifts) stay unit-tested only, and DEMO-STATE P-10 stays open;
-- **step 5 is Flow K after a gift, and the app cannot follow it.** `useBankRock` sends owner
-  actions from the Rock Account and refuses to act when the account it derives from (wallet, tag)
-  is not the one the registry holds. After a gift that is false by construction: the account was
-  derived for the giver, and the new owner derives a different address (D-029). The script
-  archives from C's own wallet — which the registry accepts — prints the mismatch as a FINDING, and
-  asserts what the code actually guarantees: the Rock Account is a deterministic function of (tag,
-  owner), so the tag awakens rock N+1 into the account its owner derives, unchanged for that owner.
+- **step 5 is Flow K after a gift, and it now follows the app exactly.** It used to be the one
+  place the app could not be followed: `useBankRock` derived the Rock Account from (wallet, tag)
+  and refused any other address, which after a gift is the giver's account and not the new owner's
+  derivation (D-029), so the script archived from C's own funded wallet and printed the mismatch
+  as a FINDING. **D-037 removed the FINDING by fixing the app**: for an awakened rock the account
+  is the registry's and authority is that account's own answer to `isOwner`, so step 5 runs the
+  same two checks `ownerClientFor` runs and sends `archiveRock` as a sponsored UserOperation from
+  the rock's own account, signed by a recipient who has never held gas. What it still asserts
+  rather than wishes away is the boundary: the *next* awakening has no account to read, so the tag
+  awakens rock N+1 into the account its new owner derives, and the retired rock's reserve stays in
+  the account she still owns (D-037 consequence 5).
 
 **Acceptance (unchanged):** one green run on Sepolia; its report committed under
-`contracts/deployments/rehearsal-<date>.md`; DEMO-STATE P-2…P-5 deleted. Not met yet — this
+`contracts/deployments/rehearsal-<date>.md`; DEMO-STATE P-2…P-5 deleted, and P-11 with them —
+step 5's sponsored retirement by the recipient is exactly its condition. Not met yet — this
 sandbox has no funded keys and no Pimlico key, so only the dry run has been executed.
 
 ### WP-3 · The physical rock (operator) — DEMO-STATE P-1, W-1

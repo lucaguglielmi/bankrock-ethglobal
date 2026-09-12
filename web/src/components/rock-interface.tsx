@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { useRock } from "@/hooks/useRock";
+import { useRockAccount } from "@/hooks/useRockAccount";
 import { useAquaStrategy } from "@/hooks/useAquaStrategy";
 import { isDemoMode } from "@/lib/demo";
 import { tokens } from "@/lib/chain";
@@ -63,6 +64,17 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
   const { rock, reserves, isLoading, refresh } = useRock(rockId);
 
   const record = rock.state === "UNAVAILABLE" ? null : rock.value;
+
+  /*
+   * Who may act from this rock's account, asked of the account itself (D-037).
+   *
+   * `isOwner` below is object ownership — what the registry says about the rock. This is the other
+   * half: whether the Rock Account the registry names still answers to the signed-in wallet. After
+   * a gift the two move together, and they are the two conditions the registry's own owner gate
+   * applies, so asking both here means the owner's buttons are never offered when the transaction
+   * behind them would revert.
+   */
+  const { authority } = useRockAccount({ record });
 
   // One strategy read for the whole page: the reserve caption, the trade button, the position
   // card and the owner's Cash in all describe the same streams and must not disagree.
@@ -199,6 +211,7 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         strategy={strategy}
         isStrategyLoading={isStrategyLoading}
         isOwner={isOwner}
+        ownerActions={authority}
         onTrade={handleTrade}
         onGive={handleGive}
         onCrossChain={() => setCrossChainOpen(true)}
@@ -228,6 +241,7 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
             {isOwner && record && record.state !== "archived" ? (
               <OwnerMenu
                 rockId={rockId}
+                ownerActions={authority}
                 handoverPending={record.state === "handover_pending"}
                 lost={record.lost}
                 streamIndex={liveStreamIndex}

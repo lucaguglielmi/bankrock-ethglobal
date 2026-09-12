@@ -47,6 +47,11 @@ export interface AquaPositionCardProps {
   isStrategyLoading?: boolean;
   /** Only the owner may start or stop a stream. */
   isOwner?: boolean;
+  /**
+   * Whether the owner's wallet may still act from the rock's account (D-037). Shipping a strategy
+   * is a batch from that account, so an UNAVAILABLE answer replaces the button with its reason.
+   */
+  ownerActions?: Capability<string>;
   /** Recorded history, when there is any. */
   history?: YieldDataPoint[];
   /** Re-reads the chain. Wired to the page's `refresh()`. */
@@ -61,11 +66,14 @@ export function AquaPositionCard({
   strategy,
   isStrategyLoading = false,
   isOwner = false,
+  ownerActions,
   history,
   onSync,
   isSyncing = false,
 }: AquaPositionCardProps) {
   const [isShipOpen, setShipOpen] = useState(false);
+  const ownerBlockedReason =
+    ownerActions && ownerActions.state === "UNAVAILABLE" ? ownerActions.reason : null;
 
   const streams = strategy.state === "UNAVAILABLE" ? [] : strategy.value.streams;
   const hasStreams = streams.length > 0;
@@ -122,9 +130,17 @@ export function AquaPositionCard({
               This rock is not trading yet. Make part of its reserve available and it starts
               earning a fee on every trade.
             </p>
-            <Button size="lg" className="w-full" onClick={() => setShipOpen(true)}>
+            <Button
+              size="lg"
+              className="w-full"
+              onClick={() => setShipOpen(true)}
+              disabled={ownerBlockedReason !== null}
+            >
               Start earning
             </Button>
+            {ownerBlockedReason ? (
+              <p className="max-w-prose text-sm text-ink-3">{ownerBlockedReason}</p>
+            ) : null}
           </div>
         ) : (
           <p className="max-w-prose text-base text-ink-2">

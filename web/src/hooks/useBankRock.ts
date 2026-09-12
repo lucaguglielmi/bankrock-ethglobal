@@ -46,13 +46,17 @@ import {
   encodeInitiateHandover,
   encodeSwapOwner,
   messageHashFor,
+  ownerActionAuthority,
   parseRockId,
   pimlicoApiKey,
   pimlicoRpcUrl,
+  planRockAccount,
+  readAccountAnswersTo,
   readAllowance,
   readRock,
   registryAddress,
   rockAccountSaltFor,
+  SIGNED_OUT_REASON,
   type Call,
   type SignedAttestation,
 } from "@/lib/rock-account";
@@ -100,8 +104,6 @@ export interface UseRockActions {
   availability: RockActionsAvailability;
 }
 
-const SIGNED_OUT_REASON = "Sign in to act on this rock";
-
 /* -------------------------------------------------------------------------- */
 /* Smart account plumbing                                                      */
 /* -------------------------------------------------------------------------- */
@@ -134,6 +136,15 @@ async function buildSmartAccountClient(params: {
   ownerAddress: Address;
   /** `rockAccountSaltFor(uidHash)`: one account per physical rock, per owner. */
   saltNonce: bigint;
+  /**
+   * The account's address when it is already known — the registry's, for a rock that has been
+   * awakened (D-037). Given it, `toSafeSmartAccount` stops predicting an address from the salt and
+   * uses this one, which is the whole point: after a gift the Safe is the giver's derivation and
+   * the recipient's wallet would predict a different, empty address. The factory arguments it
+   * still computes are never used, because viem omits them for an account that has code — and an
+   * awakened rock's account has executed at least its own awakening.
+   */
+  address?: Address;
 }): Promise<Capability<RockAccountClient>> {
   const key = pimlicoApiKey();
   if (key.state === "UNAVAILABLE") return unavailable(key.reason);
@@ -159,6 +170,7 @@ async function buildSmartAccountClient(params: {
       version: "1.4.1",
       entryPoint: { address: ENTRY_POINT_07_ADDRESS, version: "0.7" },
       saltNonce: params.saltNonce,
+      ...(params.address ? { address: params.address } : {}),
     });
 
     const paymaster = createPimlicoClient({
@@ -242,12 +254,15 @@ export function useRockActions(): UseRockActions {
   }, [wallets, authenticated, address]);
 
   /**
-   * Builds the Rock Account client for one tag.
+   * Builds the Rock Account client for one tag, by **derivation**.
    *
-   * The salt is the tag's own hash, so the client is bound to a physical rock rather than to the
-   * user in general (spec 03, D-005).
+   * The salt is the tag's own hash, so the address is bound to a physical rock rather than to the
+   * user in general (spec 03, D-005, D-029). This is the awakening path and only the awakening
+   * path: it predicts an account that does not exist yet, which is exactly what the attestation
+   * names. For a rock that is already on chain the account is read from the registry instead
+   * (D-037) — see `ownerClientFor`.
    */
-  const smartAccountFor = useCallback(
+  const derivedAccountFor = useCallback(
     async (uidHash: `0x${string}`): Promise<Capability<SmartAccountClient>> => {
       if (!authenticated || !activeWallet) return unavailable(SIGNED_OUT_REASON);
 
@@ -269,35 +284,70 @@ export function useRockActions(): UseRockActions {
   );
 
   /**
-   * Builds the client for a rock that already exists on chain, and refuses if the address it
-   * derives is not the account the registry records.
+   * Builds the client for a rock that already exists on chain (D-037).
    *
-   * A mismatch means this wallet is not the account's owner, or the tag hash has changed: sending
-   * anyway would either revert or act from the wrong account. Saying so is the only honest answer.
+   * The account is the registry's `rock.smartAccount`, taken as read. It is never re-derived,
+   * because after a gift a derivation is wrong by construction: `claimHandover` rebinds the rock
+   * to the Safe the giver derived and swaps its owner to the recipient (D-032), so the recipient's
+   * own derivation is a different, empty address. An app that insisted on the derived address made
+   * every owner action unreachable for the new owner of every gifted rock.
+   *
+   * Authority is established by asking that account whether this wallet is one of its owners —
+   * the same `isOwner` staticcall the registry's `_accountAnswersTo` makes — and by checking the
+   * wallet against the owner the registry records. Both refusals carry the reason; neither
+   * invents a state.
    */
   const ownerClientFor = useCallback(
     async (
       rockId: string,
     ): Promise<Capability<{ client: SmartAccountClient; smartAccount: Address }>> => {
+      if (!authenticated || !activeWallet) return unavailable(SIGNED_OUT_REASON);
+
       const rock = await readRock(rockId);
       if (rock.state === "UNAVAILABLE") return unavailable(rock.reason);
-      if (rock.value.state === "dormant") {
-        return unavailable("This rock has not been awakened yet");
+
+      const plan = planRockAccount({ record: rock.value });
+      if (plan.state === "UNAVAILABLE") return unavailable(plan.reason);
+
+      const answer = await readAccountAnswersTo(plan.value.smartAccount, activeWallet.address);
+      if (answer.state === "UNAVAILABLE") return unavailable(answer.reason);
+
+      const authority = ownerActionAuthority({
+        record: rock.value,
+        wallet: activeWallet.address,
+        answer: answer.value,
+      });
+      if (authority.state === "UNAVAILABLE") return unavailable(authority.reason);
+
+      // The salt still travels: it is what the factory arguments would use if this account somehow
+      // had no code, and a wrong salt there would deploy a stranger at a different address. The
+      // explicit address is what the client actually sends from.
+      let saltNonce: bigint;
+      try {
+        saltNonce = rockAccountSaltFor(rock.value.uidHash);
+      } catch (err) {
+        return unavailable(err instanceof Error ? err.message : String(err));
       }
 
-      const clientCapability = await smartAccountFor(rock.value.uidHash);
+      const provider = await activeWallet.getEthereumProvider();
+      const clientCapability = await buildSmartAccountClient({
+        provider,
+        ownerAddress: getAddress(activeWallet.address),
+        saltNonce,
+        address: authority.value,
+      });
       if (clientCapability.state === "UNAVAILABLE") return unavailable(clientCapability.reason);
 
-      const derived = getAddress(clientCapability.value.account.address);
-      if (derived !== getAddress(rock.value.smartAccount)) {
+      const built = getAddress(clientCapability.value.account.address);
+      if (built !== authority.value) {
         return unavailable(
-          "This wallet does not control this rock's Rock Account — sign in with the owner's account",
+          "The Rock Account client was built for a different address than the registry holds",
         );
       }
 
-      return real({ client: clientCapability.value, smartAccount: derived });
+      return real({ client: clientCapability.value, smartAccount: authority.value });
     },
-    [smartAccountFor],
+    [authenticated, activeWallet],
   );
 
   /** Runs one registry call as a sponsored UserOperation from the Rock Account. */
@@ -354,7 +404,7 @@ export function useRockActions(): UseRockActions {
         // send a transaction whose outcome contradicts what the user was shown.
         // The salt is the tag, so the account this builds is the one that tag maps to for this
         // owner — the same derivation the verifier ran when it signed `att.smartAccount`.
-        const clientCapability = await smartAccountFor(attestation.message.uidHash);
+        const clientCapability = await derivedAccountFor(attestation.message.uidHash);
         if (clientCapability.state === "UNAVAILABLE") return unavailable(clientCapability.reason);
         const client = clientCapability.value;
         const smartAccount = getAddress(client.account.address);
@@ -396,7 +446,7 @@ export function useRockActions(): UseRockActions {
           );
         }
       }),
-    [withPending, authenticated, activeWallet, smartAccountFor, registry, getAccessToken],
+    [withPending, authenticated, activeWallet, derivedAccountFor, registry, getAccessToken],
   );
 
   const initiateHandover = useCallback(
