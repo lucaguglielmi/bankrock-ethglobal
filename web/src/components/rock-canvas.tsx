@@ -116,10 +116,10 @@ const RESTING_FORMS: RockFormParams[] = [
 /** The calmer, more upright pose the rock settles into on hover or tap. */
 const STANDING_FORM: RockFormParams = {
   rockDistort: 0.18,
-  rockScale: [1.65, 0.95, 1.3],
+  rockScale: [1.05, 1.75, 1.2],
   liquidDistort: 0.15,
   liquidScale: [0.6, 0.6, 0.15],
-  liquidPosition: [-0.65, 0.75, 1.05],
+  liquidPosition: [-0.7, 1.4, 1.05],
   liquidColor: new THREE.Color("#0055ff"),
 };
 
@@ -212,7 +212,7 @@ function RockMesh({ isHovered, isCompact }: RockMeshProps) {
               className={`${labelClass} flex-row-reverse -translate-x-full ${isHovered ? "translate-y-0 opacity-100 delay-300" : "translate-y-2 opacity-0"}`}
             >
               <div className="size-1.5 rounded-full bg-[#001144]" />
-              <div className="ml-2 h-px w-10 bg-[#001144]/80 md:ml-4 md:w-24" />
+              <div className="ml-2 h-px w-20 bg-[#001144]/80 md:ml-4 md:w-48" />
               a normal rock
             </div>
           </Html>
@@ -245,7 +245,7 @@ function RockMesh({ isHovered, isCompact }: RockMeshProps) {
             <Html position={[0.1, -0.1, 0]}>
               <div className={`${labelClass} ${isHovered ? "translate-y-0 opacity-100 delay-500" : "translate-y-2 opacity-0"}`}>
                 <div className="size-1.5 rounded-full bg-[#001144]" />
-                <div className="mr-2 h-px w-12 bg-[#001144]/80 md:mr-4 md:w-32" />
+                <div className="mr-2 h-px w-24 bg-[#001144]/80 md:mr-4 md:w-48" />
                 a tiny NFC sensor
               </div>
             </Html>
@@ -271,7 +271,7 @@ function RockMesh({ isHovered, isCompact }: RockMeshProps) {
             <Html position={[0.5, 0.5, 0.1]}>
               <div className={`${labelClass} ${isHovered ? "translate-y-0 opacity-100 delay-700" : "translate-y-2 opacity-0"}`}>
                 <div className="size-1.5 rounded-full bg-[#001144]" />
-                <div className="mr-2 h-px w-12 bg-[#001144]/80 md:mr-4 md:w-32" />
+                <div className="mr-2 h-px w-24 bg-[#001144]/80 md:mr-4 md:w-48" />
                 a sparkly silicon
               </div>
             </Html>
