@@ -16,7 +16,7 @@
 import { PrivyProvider } from "@privy-io/react-auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, createConfig } from "@privy-io/wagmi";
-import { sepolia, base, mainnet, optimism, arbitrum, polygon } from "viem/chains";
+import { sepolia } from "viem/chains";
 import {
   http,
   WagmiProvider as WagmiReadOnlyProvider,
@@ -34,16 +34,11 @@ import { appPath } from "@/lib/chain";
 
 const queryClient = new QueryClient();
 
-/** Sepolia first: it is the chain this application transacts on. The rest are read-only sources. */
+/** Ethereum Sepolia only (D-033): the one chain this application reads from and transacts on. */
 export const wagmiConfig = createConfig({
-  chains: [sepolia, base, arbitrum, optimism, polygon, mainnet],
+  chains: [sepolia],
   transports: {
     [sepolia.id]: http(),
-    [base.id]: http(),
-    [arbitrum.id]: http(),
-    [optimism.id]: http(),
-    [polygon.id]: http(),
-    [mainnet.id]: http(),
   },
 });
 
@@ -53,15 +48,10 @@ export const wagmiConfig = createConfig({
  * signed through it: there is no connector and no account.
  */
 const readOnlyWagmiConfig = createReadOnlyConfig({
-  chains: [sepolia, base, arbitrum, optimism, polygon, mainnet],
+  chains: [sepolia],
   connectors: [],
   transports: {
     [sepolia.id]: http(),
-    [base.id]: http(),
-    [arbitrum.id]: http(),
-    [optimism.id]: http(),
-    [polygon.id]: http(),
-    [mainnet.id]: http(),
   },
 });
 
@@ -93,9 +83,14 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={appId as string}
       config={{
+        // D-033: Ethereum Sepolia is the only chain. Listing mainnet or an L2 here would let an
+        // embedded wallet switch to a network where funds are real, for an app whose every
+        // contract lives on Sepolia. Login methods must also be enabled in the Privy dashboard
+        // (User management → Authentication); Apple is not listed because it needs an Apple
+        // developer configuration the project does not have.
         defaultChain: sepolia,
-        supportedChains: [sepolia, base, arbitrum, optimism, polygon, mainnet],
-        loginMethods: ["email", "wallet", "google", "apple"],
+        supportedChains: [sepolia],
+        loginMethods: ["email", "google", "wallet"],
         appearance: {
           theme: "light",
           accentColor: "#000000",
