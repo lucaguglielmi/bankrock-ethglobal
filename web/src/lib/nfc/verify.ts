@@ -35,6 +35,10 @@ export type VerifyFailureReason =
   | "counter_store_unavailable"
   /** The counter did not exceed the last accepted value for this UID — a replay. */
   | "stale_counter"
+  /** Over the per-IP limit. HTTP 429. */
+  | "rate_limited"
+  /** The rate-limit store could not be reached, so no limit could be enforced. HTTP 503. */
+  | "rate_limit_unavailable"
   /** Unexpected server-side failure. */
   | "verifier_error";
 

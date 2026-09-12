@@ -14,6 +14,7 @@
 import { Resend } from "resend";
 import { appPath, explorer } from "@/lib/chain";
 import { optionalEnv } from "@/lib/demo";
+import { publicReason } from "@/lib/errors";
 import { escapeHtml, escapeHtmlAttributeUrl } from "@/lib/html";
 import { logger } from "@/lib/telemetry";
 
@@ -230,7 +231,9 @@ export async function sendAlertEmail(payload: AlertEmailPayload): Promise<EmailD
         : "Accepted by the provider for delivery.",
     };
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
+    // The provider's own rejection message is reported above; a thrown exception can carry a URL
+    // or a key, so it is mapped to a fixed reason instead (audit P-2).
+    const reason = publicReason(err);
     logger.error("Alert email dispatch failed", err, {
       action: "EMAIL_ALERT_FAILED",
       rockId: payload.rockId,

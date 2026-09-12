@@ -6,7 +6,8 @@
  *  - PII is redacted **before** an entry reaches the buffer or stdout, so there is no window in
  *    which an unredacted value exists in the ring buffer;
  *  - email addresses become `a***@domain`, EVM addresses become `0x1234…abcd`, NFC tag UIDs keep
- *    only their last two bytes;
+ *    only their last two bytes, and any URL keeps only its origin — a provider URL carries its API
+ *    key in the path or the query, and viem puts that URL into its error text (audit P-15);
  *  - stack traces are dropped in production — they reach an operator through the platform's own
  *    logs, never through an HTTP-readable buffer;
  *  - the buffer is readable only by an operator holding ADMIN_API_KEY (see /api/telemetry), and
@@ -58,9 +59,42 @@ let logSequence = 0;
 /* -------------------------------------------------------------------------- */
 
 const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+/**
+ * URLs that carry a credential (audit P-15).
+ *
+ * viem puts the RPC URL into its error text, and `SEPOLIA_RPC_URL` carries the provider's API key
+ * in its path (`…/v2/<key>`); Pimlico carries it in a query string (`?apikey=…`). Both reach this
+ * buffer through a caught error, and the buffer is served — to an operator, but served. So a URL
+ * is reduced to its origin plus a marker before it is stored, whatever else redaction does.
+ *
+ * Matched before emails, because `https://user:pass@host` contains no `@`-delimited address but
+ * would otherwise survive.
+ */
+const URL_PATTERN = /\b(?:https?|wss?):\/\/[^\s"'<>)\]]+/gi;
 // An EVM address is exactly 40 hex digits. The trailing boundary keeps a 64-hex transaction
 // hash — which is not PII — from being mangled into address form.
 const EVM_ADDRESS_PATTERN = /0x[a-fA-F0-9]{40}(?![a-fA-F0-9])/g;
+
+/**
+ * `https://eth.example.com/v2/SECRET?apikey=SECRET` -> `https://eth.example.com/[redacted]`.
+ *
+ * Keeps the origin, which is the part an operator needs to tell one provider from another, and
+ * drops everything after it — path, query and userinfo — because any of the three can be the
+ * credential.
+ */
+export function redactUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    const hasCredential =
+      url.username !== "" ||
+      url.password !== "" ||
+      url.search !== "" ||
+      url.pathname.replace(/\/+$/, "") !== "";
+    return hasCredential ? `${url.protocol}//${url.hostname}/[redacted]` : `${url.protocol}//${url.hostname}`;
+  } catch {
+    return "[redacted url]";
+  }
+}
 
 /** `alice@example.com` -> `a***@example.com`. */
 export function redactEmail(value: string): string {
@@ -88,6 +122,7 @@ export function redactUid(value: string): string {
 /** Redacts every email address and EVM address inside a free-text string. */
 export function redactText(value: string): string {
   return value
+    .replace(URL_PATTERN, (match) => redactUrl(match))
     .replace(EMAIL_PATTERN, (match) => redactEmail(match))
     .replace(EVM_ADDRESS_PATTERN, (match) => redactAddress(match));
 }

@@ -16,6 +16,16 @@ import { timingSafeEqualString } from "@/lib/secure";
 
 export const ADMIN_SESSION_COOKIE = "bankrock_sentinel_session";
 
+/**
+ * How long an admin session lives (audit P-14).
+ *
+ * Twelve hours, not thirty days. There is no revocation list — a session is a signed cookie and
+ * nothing server-side can retire one early — so the lifetime *is* the revocation mechanism, and a
+ * month of it was the whole exposure of one stolen laptop. Twelve hours covers a working day and
+ * expires overnight.
+ */
+export const ADMIN_SESSION_SECONDS = 12 * 60 * 60;
+
 function secretKey(): Uint8Array {
   return new TextEncoder().encode(requireEnv("ADMIN_JWT_SECRET"));
 }
@@ -33,7 +43,7 @@ export async function createAdminSession(userAgent: string) {
   const token = await new SignJWT({ role: "admin", uah })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("30d")
+    .setExpirationTime(`${ADMIN_SESSION_SECONDS}s`)
     .sign(secretKey());
 
   const cookieStore = await cookies();
@@ -41,7 +51,7 @@ export async function createAdminSession(userAgent: string) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 30 * 24 * 60 * 60,
+    maxAge: ADMIN_SESSION_SECONDS,
     path: "/",
   });
 }
@@ -84,7 +94,9 @@ export async function verifyAdminSession(
   }
 
   try {
-    const { payload } = await jwtVerify(token, key);
+    // Pinned (audit P-8): jose already rejects `alg: none` and a key-type mismatch, but pinning
+    // makes that a property of this call rather than of jose's defaults.
+    const { payload } = await jwtVerify(token, key, { algorithms: ["HS256"] });
     if (payload.role !== "admin") {
       return { ok: false, status: 401, reason: "Not an admin session" };
     }

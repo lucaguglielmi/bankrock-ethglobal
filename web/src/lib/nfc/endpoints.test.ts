@@ -72,6 +72,28 @@ vi.mock("@/lib/rock-account", () => {
 
 vi.mock("@/lib/db", () => ({ getDb: () => null, getD1: () => null }));
 
+/**
+ * The route refuses when the limiter cannot enforce, so the limiter is stubbed
+ * and every branch of that decision is exercised explicitly below. The default
+ * is an enforced allow, which is what the rest of these tests assume.
+ */
+const rateLimit = vi.hoisted(() => ({
+  decision: { allowed: true, enforced: true, remaining: 29 } as {
+    allowed: boolean;
+    enforced: boolean;
+    remaining: number;
+    reason?: string;
+  },
+  calls: [] as Array<{ scope: string; limit: number; windowMs: number }>,
+}));
+
+vi.mock("@/lib/rate-limit", () => ({
+  consumeIpRateLimit: async (_req: Request, scope: string, limit: number, windowMs: number) => {
+    rateLimit.calls.push({ scope, limit, windowMs });
+    return rateLimit.decision;
+  },
+}));
+
 /** SELF-GENERATED, test-only: the (e, c) a provisioned tag would emit. */
 function tap(counter: number): { e: string; c: string } {
   const counterBytes = Buffer.from([counter & 0xff, (counter >> 8) & 0xff, (counter >> 16) & 0xff]);
@@ -111,6 +133,8 @@ beforeEach(() => {
   registry.rocks.clear();
   registry.derived = null;
   registry.saltNonces = [];
+  rateLimit.decision = { allowed: true, enforced: true, remaining: 29 };
+  rateLimit.calls = [];
 });
 
 afterEach(() => {
@@ -265,6 +289,81 @@ describe("GET /api/nfc/verify", () => {
     const { e, c } = tap(7);
     const response = await GET(new Request(url({ rockId: "1", e, c })));
     await expect(response.json()).resolves.toEqual({ verified: false, reason: "unconfigured" });
+  });
+});
+
+describe("rate limiting (P-4)", () => {
+  it("consumes one unit per request: 30 per minute, per IP, under its own scope", async () => {
+    const { e, c } = tap(7);
+    await GET(new Request(url({ rockId: "1", e, c })));
+    expect(rateLimit.calls).toEqual([{ scope: "nfc-verify", limit: 30, windowMs: 60_000 }]);
+  });
+
+  it("429s when the caller is over the limit", async () => {
+    rateLimit.decision = { allowed: false, enforced: true, remaining: 0 };
+    const { e, c } = tap(7);
+    const response = await GET(new Request(url({ rockId: "1", e, c })));
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    await expect(response.json()).resolves.toEqual({ verified: false, reason: "rate_limited" });
+  });
+
+  it("503s when the limiter store is unreachable — fail closed", async () => {
+    rateLimit.decision = {
+      allowed: true,
+      enforced: false,
+      remaining: 30,
+      reason: "no database",
+    };
+    const { e, c } = tap(7);
+    const response = await GET(new Request(url({ rockId: "1", e, c })));
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      state: "UNAVAILABLE",
+      verified: false,
+      reason: "rate_limit_unavailable",
+    });
+  });
+
+  it("does no crypto work when refused — a refusal never advances the counter", async () => {
+    const { e, c } = tap(7);
+
+    rateLimit.decision = { allowed: false, enforced: true, remaining: 0 };
+    expect((await GET(new Request(url({ rockId: "1", e, c })))).status).toBe(429);
+
+    rateLimit.decision = { allowed: true, enforced: true, remaining: 29 };
+    // The same URL still verifies, so the refused request consumed nothing.
+    await expect(
+      (await GET(new Request(url({ rockId: "1", e, c })))).json(),
+    ).resolves.toMatchObject({ verified: true, counter: 7 });
+  });
+
+  it("refuses POST before the body is read", async () => {
+    rateLimit.decision = { allowed: true, enforced: false, remaining: 30 };
+    const response = await POST(
+      new Request("https://bank-rock.com/api/nfc/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rockId: "1", ...tap(7) }),
+      }),
+    );
+    expect(response.status).toBe(503);
+  });
+
+  it("is applied to both methods", async () => {
+    rateLimit.decision = { allowed: false, enforced: true, remaining: 0 };
+    const { e, c } = tap(7);
+    expect((await GET(new Request(url({ rockId: "1", e, c })))).status).toBe(429);
+    expect(
+      (
+        await POST(
+          new Request("https://bank-rock.com/api/nfc/verify", {
+            method: "POST",
+            body: JSON.stringify({ rockId: "1", e, c }),
+          }),
+        )
+      ).status,
+    ).toBe(429);
   });
 });
 

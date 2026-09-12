@@ -29,6 +29,7 @@ import { addresses, chain, getPublicClient } from "@/lib/chain";
 import { getDb } from "@/lib/db";
 import { rockEvents } from "@/lib/db/schema";
 import { optionalEnv, real, unavailable, type Capability } from "@/lib/demo";
+import { publicReasonWith } from "@/lib/errors";
 import { logger } from "@/lib/telemetry";
 
 /** The provenance vocabulary. One value per registry event that concerns a rock. */
@@ -380,7 +381,7 @@ export async function getRockOnchainEvents(
     });
     // A failed scan is not "no events". Say so.
     return unavailable(
-      `Could not read registry events from ${chain.name}: ${err instanceof Error ? err.message : String(err)}`,
+      publicReasonWith(`Could not read registry events from ${chain.name}`, err),
     );
   }
 }

@@ -36,6 +36,20 @@
       "when": 1789210326239,
       "tag": "0004_rainy_mentor",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789214859015,
+      "tag": "0005_heavy_celestials",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789215735167,
+      "tag": "0006_low_omega_sentinel",
+      "breakpoints": true
     }
   ]
 }

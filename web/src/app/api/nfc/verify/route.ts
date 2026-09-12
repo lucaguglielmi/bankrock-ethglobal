@@ -27,6 +27,13 @@
  * `resolution`, resolved from the registry, and the page navigates to those.
  * The attestation is signed for the effective id, never for the URL id.
  *
+ * Rate limited per IP, and fail closed (P-4, D-017). This is the most expensive
+ * unauthenticated endpoint in the app — after a CMAC match it reads the
+ * registry, the indexed events and D1, and derives a Safe address — so a
+ * request that the limiter could not account for is refused rather than served.
+ * That is the same stance the verifier already takes on the counter store: a
+ * tap that cannot be checked for replay is not a tap that passed.
+ *
  * No `export const runtime`: OpenNext runs route handlers on the Worker and the
  * declaration only confuses the adapter (D-016).
  */
@@ -34,15 +41,66 @@
 import { NextResponse } from "next/server";
 
 import { verifyTap, type VerifyTapInput, type VerifyTapResponse } from "@/lib/nfc/verify";
+import { consumeIpRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/telemetry";
 
 export const dynamic = "force-dynamic";
+
+/** Per-IP budget. A genuine tap is one request; a scanner is thousands. */
+const RATE_LIMIT = 30;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 function respond(status: number, body: VerifyTapResponse): NextResponse {
   return NextResponse.json(body, {
     status,
     headers: { "Cache-Control": "no-store" },
   });
+}
+
+/**
+ * Returns a refusal, or `null` to proceed.
+ *
+ * `consumeIpRateLimit` fails *open* by design — it reports `enforced: false`
+ * when there is no D1 binding and when the request carries no client IP header
+ * — and leaves the stance to the caller. This caller refuses, because an
+ * unlimited path to the crypto and the RPC is exactly what P-4 describes.
+ */
+async function refuseIfRateLimited(request: Request): Promise<NextResponse | null> {
+  const decision = await consumeIpRateLimit(
+    request,
+    "nfc-verify",
+    RATE_LIMIT,
+    RATE_LIMIT_WINDOW_MS,
+  );
+
+  if (!decision.enforced) {
+    logger.warn("NFC verifier refusing: no enforceable rate limit", {
+      action: "NFC_VERIFY_RATE_LIMIT_UNAVAILABLE",
+      reason: decision.reason,
+    });
+    return NextResponse.json(
+      { state: "UNAVAILABLE", verified: false, reason: "rate_limit_unavailable" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  if (!decision.allowed) {
+    logger.warn("NFC verifier rate limit exceeded", {
+      action: "NFC_VERIFY_RATE_LIMITED",
+    });
+    return NextResponse.json(
+      { verified: false, reason: "rate_limited" },
+      {
+        status: 429,
+        headers: {
+          "Cache-Control": "no-store",
+          "Retry-After": String(Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)),
+        },
+      },
+    );
+  }
+
+  return null;
 }
 
 function readParams(url: URL): VerifyTapInput {
@@ -95,10 +153,17 @@ async function handle(input: VerifyTapInput): Promise<NextResponse> {
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
+  const refusal = await refuseIfRateLimited(request);
+  if (refusal) return refusal;
+
   return handle(readParams(new URL(request.url)));
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  // Before the body is read, so an oversized body is not a way to spend work.
+  const refusal = await refuseIfRateLimited(request);
+  if (refusal) return refusal;
+
   const url = new URL(request.url);
   let body: Record<string, unknown> = {};
   try {

@@ -31,6 +31,7 @@ import {
   type AccruedFeesJson,
 } from "@/lib/aqua";
 import { getAppDeployBlock } from "@/lib/aqua/config";
+import { consumeIpRateLimit } from "@/lib/rate-limit";
 import { parseRockId, readRock } from "@/lib/rock-account";
 import { logger } from "@/lib/telemetry";
 import type { Hex } from "viem";
@@ -42,6 +43,14 @@ function unavailable(rockId: string, reason: string) {
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const url = new URL(req.url);
+
+  // This route drives `eth_call` and, with `fees=1`, `eth_getLogs` against the operator's paid
+  // RPC, so it is metered like the other public reads (audit P-10). A read route fails open: if
+  // the ledger is unreachable the page still renders (P-11, documented in lib/rate-limit.ts).
+  const limit = await consumeIpRateLimit(req, "rock-read", 60, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
+  }
 
   if (parseRockId(id) === null) {
     return unavailable(id, `"${id}" is not a rock id: it must be a positive integer`);

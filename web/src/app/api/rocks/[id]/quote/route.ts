@@ -36,6 +36,7 @@ import { getPublicClient, isTokenSymbol, tokens, type TokenSymbol } from "@/lib/
 import { XYC_SWAP_ABI } from "@/lib/chain/abi/aqua-app";
 import { consumeIpRateLimit } from "@/lib/rate-limit";
 import { parseRockId } from "@/lib/rock-account";
+import { publicReasonWith } from "@/lib/errors";
 import { logger } from "@/lib/telemetry";
 
 function unavailableBody(reason: string) {
@@ -120,7 +121,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   } catch (err) {
     return NextResponse.json(
       unavailableBody(
-        `This trade cannot be priced against the strategy's balances: ${err instanceof Error ? err.message : String(err)}`,
+        publicReasonWith("This trade cannot be priced against the strategy’s balances", err),
       ),
     );
   }

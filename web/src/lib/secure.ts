@@ -9,6 +9,15 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { MissingEnvError, requireEnv } from "@/lib/demo";
+import { INTERNAL_ERROR_REASON, publicReason, publicReasonWith } from "@/lib/errors";
+
+/**
+ * Error text that is safe to return to a client (audit P-2).
+ *
+ * Re-exported from `lib/errors.ts`, which is pure and client-safe; this module is not, because it
+ * reaches for `node:crypto`. Server code should import it from here.
+ */
+export { publicReason, publicReasonWith, INTERNAL_ERROR_REASON };
 
 /** Constant-time string comparison. Returns false for unequal lengths without leaking more. */
 export function timingSafeEqualString(a: string, b: string): boolean {

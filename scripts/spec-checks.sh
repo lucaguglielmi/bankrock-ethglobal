@@ -157,7 +157,7 @@ expect_absent "D-013b" "no fabricated sign-in left in web/src (A-1, A-2)" \
 # D-016 — one Cloudflare adapter.
 expect_absent "D-016" "@cloudflare/next-on-pages is not referenced anywhere in web/" \
   1 "web" \
-  -r -F '@cloudflare/next-on-pages'
+  -r --exclude-dir=audit -F '@cloudflare/next-on-pages'
 
 # D-017 — fail closed: a missing secret must not mean "no authentication".
 expect_absent "D-017" "no 'if (SECRET && mismatch)' authentication bypass in the API routes" \

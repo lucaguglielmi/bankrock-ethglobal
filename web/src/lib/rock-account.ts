@@ -36,6 +36,7 @@ import {
 import { BANK_ROCK_REGISTRY_ABI } from "@/lib/chain/abi/registry";
 import { ERC20_ABI } from "@/lib/chain/abi/erc20";
 import { env, optionalEnv, real, unavailable, type Capability } from "@/lib/demo";
+import { publicReasonWith } from "@/lib/errors";
 
 /* -------------------------------------------------------------------------- */
 /* Attestation                                                                 */
@@ -301,7 +302,7 @@ export async function readRock(rockId: string): Promise<Capability<RockRecord>> 
     return real(mapRockRecord(id.toString(), result));
   } catch (err) {
     return unavailable(
-      `The registry could not be read on ${chain.name}: ${err instanceof Error ? err.message : String(err)}`,
+      publicReasonWith(`The registry could not be read on ${chain.name}`, err),
     );
   }
 }
@@ -343,7 +344,7 @@ export async function readReserves(
     return real({ usdc: usdcBalance as bigint, weth: wethBalance as bigint });
   } catch (err) {
     return unavailable(
-      `Token balances could not be read: ${err instanceof Error ? err.message : String(err)}`,
+      publicReasonWith("Token balances could not be read", err),
     );
   }
 }
@@ -376,7 +377,7 @@ export async function resolveRockForTag(
     return real({ rockId: bound === BigInt(0) ? null : bound.toString() });
   } catch (err) {
     return unavailable(
-      `The tag binding could not be read: ${err instanceof Error ? err.message : String(err)}`,
+      publicReasonWith("The tag binding could not be read", err),
     );
   }
 }
@@ -587,7 +588,7 @@ export async function readAllowance(
     return real(allowance);
   } catch (err) {
     return unavailable(
-      `The current allowance could not be read: ${err instanceof Error ? err.message : String(err)}`,
+      publicReasonWith("The current allowance could not be read", err),
     );
   }
 }
@@ -694,7 +695,7 @@ export async function computeRockAccountAddress(params: {
     return real(derived);
   } catch (err) {
     return unavailable(
-      `The Rock Account address could not be derived: ${err instanceof Error ? err.message : String(err)}`,
+      publicReasonWith("The Rock Account address could not be derived", err),
     );
   }
 }

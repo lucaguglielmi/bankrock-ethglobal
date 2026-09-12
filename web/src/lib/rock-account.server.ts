@@ -33,6 +33,8 @@ import {
   ENTRY_POINT_07_ADDRESS,
   getPublicClient,
 } from "@/lib/chain";
+import { sql } from "drizzle-orm";
+import { getDb } from "@/lib/db";
 import { optionalEnv, real, unavailable, type Capability } from "@/lib/demo";
 import {
   encodeClaimHandover,
@@ -41,6 +43,7 @@ import {
   registryAddress,
   type SignedAttestation,
 } from "@/lib/rock-account";
+import { publicReasonWith } from "@/lib/errors";
 import { logger } from "@/lib/telemetry";
 
 const PRIVATE_KEY_PATTERN = /^0x[0-9a-fA-F]{64}$/;
@@ -158,6 +161,126 @@ export async function verifyAttestation(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Daily spend cap                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What one relayed claim is assumed to cost, reserved before the transaction is sent.
+ *
+ * A cap can only be enforced ahead of the spend, and the real cost is not known until the receipt
+ * — so a conservative constant is reserved up front. On Sepolia a `claimHandover` is well under
+ * this; over-reserving means the cap binds earlier than strictly necessary, which is the safe
+ * direction to be wrong in.
+ */
+export const RELAYED_CLAIM_COST_ESTIMATE_WEI = BigInt(2_000_000_000_000_000); // 0.002 ETH
+
+/** Largest cap the SQL accumulator can hold: SQLite's INTEGER is signed 64-bit. */
+const MAX_REPRESENTABLE_CAP_WEI = BigInt("9223372036854775807");
+
+/**
+ * The configured daily relayer cap.
+ *
+ * **Unset or zero disables relaying** rather than disabling the cap (audit P-1). An uncapped key
+ * that anyone with a valid attestation can spend from is the finding, so "no cap configured" must
+ * not be the permissive branch.
+ */
+export function relayerDailyCapWei(): Capability<bigint> {
+  const raw = optionalEnv("RELAYER_DAILY_CAP_WEI");
+  if (!raw) {
+    return unavailable("relayer cap unset");
+  }
+  if (!/^\d+$/.test(raw)) {
+    return unavailable("RELAYER_DAILY_CAP_WEI is not a whole number of wei");
+  }
+  const cap = BigInt(raw);
+  if (cap === BigInt(0)) {
+    return unavailable("relayer cap unset");
+  }
+  if (cap > MAX_REPRESENTABLE_CAP_WEI) {
+    return unavailable("RELAYER_DAILY_CAP_WEI is larger than the spend ledger can track");
+  }
+  return real(cap);
+}
+
+/** The UTC day key the ledger accumulates under. */
+export function spendDayKey(now: number = Date.now()): string {
+  return new Date(now).toISOString().slice(0, 10);
+}
+
+/**
+ * Reserves `amountWei` against today's cap, atomically.
+ *
+ * The check and the increment are one statement: the `WHERE` on the conflict branch only applies
+ * the update when the new total still fits, and `RETURNING` tells us whether it did. Two
+ * concurrent claims therefore cannot both pass a cap that only one of them fits under.
+ *
+ * Fails closed on every uncertainty — no cap, no database, a failed statement — because the thing
+ * being bounded is real money leaving a key.
+ */
+export async function reserveRelayerSpend(
+  amountWei: bigint = RELAYED_CLAIM_COST_ESTIMATE_WEI,
+): Promise<Capability<{ day: string; reservedWei: bigint }>> {
+  const cap = relayerDailyCapWei();
+  if (cap.state === "UNAVAILABLE") return unavailable(cap.reason);
+
+  if (amountWei <= BigInt(0)) return unavailable("A spend reservation must be positive");
+  if (amountWei > cap.value) {
+    return unavailable("The relayer's daily cap is smaller than one claim costs");
+  }
+
+  const db = getDb();
+  if (!db) {
+    return unavailable(
+      "The relayer spend ledger is unavailable, so the daily cap cannot be enforced",
+    );
+  }
+
+  const day = spendDayKey();
+  const amount = amountWei.toString();
+
+  try {
+    const rows = await db.all<{ wei: string }>(sql`
+      INSERT INTO relayer_spend (day, wei, updated_at)
+      VALUES (${day}, ${amount}, ${Date.now()})
+      ON CONFLICT(day) DO UPDATE SET
+        wei = CAST(CAST(relayer_spend.wei AS INTEGER) + CAST(${amount} AS INTEGER) AS TEXT),
+        updated_at = ${Date.now()}
+      WHERE CAST(relayer_spend.wei AS INTEGER) + CAST(${amount} AS INTEGER) <= ${cap.value.toString()}
+      RETURNING wei
+    `);
+
+    if (!rows || rows.length === 0) {
+      logger.warn("Relayer daily cap reached", { action: "RELAYER_CAP_REACHED", day });
+      return unavailable("The relayer has reached its daily limit — try again tomorrow");
+    }
+
+    return real({ day, reservedWei: amountWei });
+  } catch (err) {
+    logger.error("Relayer spend ledger unavailable", err, { action: "RELAYER_LEDGER_ERROR" });
+    return unavailable(
+      "The relayer spend ledger could not be updated, so the claim was not sent",
+    );
+  }
+}
+
+/** Releases a reservation when the transaction was never broadcast. Best effort. */
+export async function releaseRelayerSpend(day: string, amountWei: bigint): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  try {
+    await db.run(sql`
+      UPDATE relayer_spend
+      SET wei = CAST(MAX(0, CAST(wei AS INTEGER) - CAST(${amountWei.toString()} AS INTEGER)) AS TEXT),
+          updated_at = ${Date.now()}
+      WHERE day = ${day}
+    `);
+  } catch {
+    // The reservation simply stands for the rest of the day: the cap binds slightly early, which
+    // is the safe direction.
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Relayed claim                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -207,7 +330,7 @@ export async function submitClaimHandover(
       rockId: rockId.toString(),
     });
     return unavailable(
-      `The claim was not broadcast: ${err instanceof Error ? err.message : String(err)}`,
+      publicReasonWith("The claim was not broadcast", err),
     );
   }
 }
@@ -303,7 +426,7 @@ export async function submitSignedUserOp(
     ])) as Hex;
   } catch (err) {
     return unavailable(
-      `The bundler rejected the stored operation: ${err instanceof Error ? err.message : String(err)}`,
+      publicReasonWith("The bundler rejected the stored operation", err),
     );
   }
 

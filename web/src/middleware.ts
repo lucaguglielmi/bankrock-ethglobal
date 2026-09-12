@@ -45,7 +45,10 @@ export async function middleware(request: NextRequest) {
     }
 
     try {
-      const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+      // Algorithm pinned to match `lib/auth.ts` (audit P-8).
+      const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
+        algorithms: ["HS256"],
+      });
       if (payload.role !== "admin") {
         throw new Error("Invalid role");
       }

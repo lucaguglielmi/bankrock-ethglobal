@@ -7,6 +7,7 @@ import {
   redactEmail,
   redactText,
   redactUid,
+  redactUrl,
 } from "./telemetry";
 
 // Built rather than written out, so the repository-wide "no address literals outside lib/chain"
@@ -100,5 +101,52 @@ describe("stack traces", () => {
       (e) => e.context?.action === "TEST_STACK_DEV",
     );
     expect(entry?.error?.stack).toBeDefined();
+  });
+});
+
+describe("URL redaction (audit P-15)", () => {
+  // `SEPOLIA_RPC_URL` carries the provider's API key in its path and Pimlico's in a query string.
+  // viem puts that URL into its error text, and error text reaches this buffer.
+  const RPC = "https://eth-sepolia.g.alchemy.com/v2/SUPER-SECRET-KEY";
+  const BUNDLER = "https://api.pimlico.io/v2/sepolia/rpc?apikey=pim_SECRET";
+
+  it("keeps the origin and drops the path, the query and any userinfo", () => {
+    expect(redactUrl(RPC)).toBe("https://eth-sepolia.g.alchemy.com/[redacted]");
+    expect(redactUrl(BUNDLER)).toBe("https://api.pimlico.io/[redacted]");
+    expect(redactUrl("https://user:pass@internal.example.com/x")).toBe(
+      "https://internal.example.com/[redacted]",
+    );
+  });
+
+  it("leaves a bare origin recognisable", () => {
+    expect(redactUrl("https://bank-rock.com")).toBe("https://bank-rock.com");
+  });
+
+  it("redacts a URL wherever it appears in free text", () => {
+    const text = `HTTP request failed. URL: ${RPC}. Details: none`;
+    const redacted = redactText(text);
+    expect(redacted).not.toContain("SUPER-SECRET-KEY");
+    expect(redacted).toContain("https://eth-sepolia.g.alchemy.com/[redacted]");
+  });
+
+  it("keeps a provider key out of the buffer even when it arrives inside an error", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    logger.error("chain read failed", new Error(`HttpRequestError: ${BUNDLER}`), {
+      action: "TEST_URL_REDACTION",
+    });
+    const entry = queryTelemetryLogs({ limit: 5 }).find(
+      (e) => e.context?.action === "TEST_URL_REDACTION",
+    );
+    expect(JSON.stringify(entry)).not.toContain("pim_SECRET");
+    expect(JSON.stringify(entry)).not.toContain("apikey");
+  });
+
+  it("redacts a URL held in a context field", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    logger.warn("upstream unavailable", { action: "TEST_URL_CONTEXT", endpoint: RPC });
+    const entry = queryTelemetryLogs({ limit: 5 }).find(
+      (e) => e.context?.action === "TEST_URL_CONTEXT",
+    );
+    expect(entry?.context?.endpoint).toBe("https://eth-sepolia.g.alchemy.com/[redacted]");
   });
 });

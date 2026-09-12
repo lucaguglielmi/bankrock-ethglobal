@@ -81,6 +81,10 @@ export async function verifyPrivyToken(token: string | null): Promise<Capability
     const { payload } = await jwtVerify(token, getJwks(appId), {
       issuer: PRIVY_ISSUER,
       audience: appId,
+      // Privy signs access tokens with ES256 and publishes a single P-256 key in its JWKS
+      // (audit P-8). Pinning it means a future key of another type cannot be used to verify a
+      // token this app accepts, whatever the JWKS starts advertising.
+      algorithms: ["ES256"],
     });
     return real(identityFromPayload(payload));
   } catch (err) {

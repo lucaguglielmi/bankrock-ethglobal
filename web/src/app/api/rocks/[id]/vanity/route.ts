@@ -15,7 +15,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { requirePrivyIdentity } from "@/lib/auth/privy";
 import { getDb, NO_DATABASE_REASON } from "@/lib/db";
 import { rocks } from "@/lib/db/schema";
-import { consumeIpRateLimit } from "@/lib/rate-limit";
+import { requireIpRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/telemetry";
 
 const VANITY_REGEX = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
@@ -26,9 +26,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const auth = await requirePrivyIdentity(req);
   if (!auth.ok) return auth.response;
 
-  const limit = await consumeIpRateLimit(req, "vanity", 20, 60 * 60 * 1000);
-  if (!limit.allowed) {
-    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
+  const limit = await requireIpRateLimit(req, "vanity", 20, 60 * 60 * 1000);
+  if (!limit.ok) {
+    // Fail closed: this route claims a name on the caller's behalf (audit P-11).
+    return NextResponse.json(
+      limit.status === 503
+        ? { state: "UNAVAILABLE", reason: limit.reason }
+        : { error: limit.reason },
+      { status: limit.status },
+    );
   }
 
   const body = (await req.json().catch(() => ({}))) as {

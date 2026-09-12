@@ -57,6 +57,7 @@ import {
   type SignedAttestation,
 } from "@/lib/rock-account";
 import { useAuth } from "@/context/auth-context";
+import { publicReasonWith } from "@/lib/errors";
 
 export type { SignedAttestation } from "@/lib/rock-account";
 
@@ -178,7 +179,7 @@ async function buildSmartAccountClient(params: {
     return real(client as unknown as RockAccountClient);
   } catch (err) {
     return unavailable(
-      `The Rock Account could not be prepared: ${err instanceof Error ? err.message : String(err)}`,
+      publicReasonWith("The Rock Account could not be prepared", err),
     );
   }
 }
@@ -322,7 +323,7 @@ export function useRockActions(): UseRockActions {
         return real({ txHash, smartAccount: owner.value.smartAccount });
       } catch (err) {
         return unavailable(
-          `The operation was not accepted: ${err instanceof Error ? err.message : String(err)}`,
+          publicReasonWith("The operation was not accepted", err),
         );
       }
     },
@@ -391,7 +392,7 @@ export function useRockActions(): UseRockActions {
           return real({ txHash, smartAccount });
         } catch (err) {
           return unavailable(
-            `The rock was not awakened: ${err instanceof Error ? err.message : String(err)}`,
+            publicReasonWith("The rock was not awakened", err),
           );
         }
       }),
@@ -469,7 +470,7 @@ export function useRockActions(): UseRockActions {
           return unavailable(body.reason ?? "The claim was not completed");
         } catch (err) {
           return unavailable(
-            `The claim could not be submitted: ${err instanceof Error ? err.message : String(err)}`,
+            publicReasonWith("The claim could not be submitted", err),
           );
         }
       }),
@@ -597,7 +598,7 @@ export function useRockActions(): UseRockActions {
           });
         } catch (err) {
           return unavailable(
-            `The strategy was not shipped: ${err instanceof Error ? err.message : String(err)}`,
+            publicReasonWith("The strategy was not shipped", err),
           );
         }
       }),
@@ -645,7 +646,7 @@ export function useRockActions(): UseRockActions {
           return real({ txHash: receipt.receipt.transactionHash });
         } catch (err) {
           return unavailable(
-            `The strategy was not docked: ${err instanceof Error ? err.message : String(err)}`,
+            publicReasonWith("The strategy was not docked", err),
           );
         }
       }),

@@ -57,7 +57,7 @@ async function call(query: string) {
   const response = await GET(new Request(`https://bank-rock.com/api/rocks/1/quote${query}`), {
     params: Promise.resolve({ id: "1" }),
   });
-  return { status: response.status, body: await response.json() };
+  return { status: response.status, body: JSON.parse(await response.text()) };
 }
 
 function shippedStream(overrides: Partial<{ virtual: typeof VIRTUAL; streamIndex: bigint }> = {}) {

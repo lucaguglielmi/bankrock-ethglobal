@@ -5,8 +5,16 @@
  * isolates are created and discarded constantly, so that limiter counted a few requests per
  * isolate and limited nothing. Buckets now live in D1, where every isolate sees the same counter.
  *
- * When there is no D1 binding the limiter reports UNAVAILABLE. The caller decides: a public read
- * route serves the request and says so in telemetry, a spending route (the faucet) refuses.
+ * Fail-open or fail-closed is the caller's decision, and it is a real decision (audit P-11):
+ *
+ *  - **read routes fail open.** `consumeIpRateLimit` returns `allowed: true, enforced: false` when
+ *    D1 is unreachable, so a database outage does not take the rock pages down with it. The limit
+ *    on those routes protects the operator's RPC bill, and an outage is the wrong moment to also
+ *    stop serving. `enforced: false` is in the result so a caller can log it;
+ *  - **routes that spend money fail closed.** The faucet, the relayed claim, and the write routes
+ *    use `requireRateLimit`, which refuses when the ledger cannot be consulted. A limiter that
+ *    cannot count is not a limit, and "we could not check" must never mean "go ahead" on a path
+ *    that spends gas or writes a row on someone's behalf.
  */
 
 import { sql } from "drizzle-orm";
@@ -104,4 +112,63 @@ export async function consumeIpRateLimit(
     };
   }
   return consumeRateLimit(`${scope}:${await hashKey(ip)}`, limit, windowMs);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Fail-closed variant                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A rate limit that must hold, for routes that spend money or write on a caller's behalf.
+ *
+ * Unlike `consumeIpRateLimit`, an unreachable ledger is a refusal, not a pass: on these routes the
+ * limit is the only thing between a captured credential and an unbounded bill. Returns the reason
+ * to put in a 429 or a 503 body — never an error object, so nothing internal escapes (audit P-2).
+ */
+export interface RequiredLimitResult {
+  ok: boolean;
+  /** 429 when the caller is over the limit, 503 when the limiter itself could not be consulted. */
+  status?: 429 | 503;
+  reason?: string;
+}
+
+export async function requireRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+): Promise<RequiredLimitResult> {
+  const decision = await consumeRateLimit(key, limit, windowMs);
+
+  if (!decision.enforced) {
+    return {
+      ok: false,
+      status: 503,
+      reason:
+        "The rate-limit ledger is unavailable, so this request cannot be accepted — it would be unlimited",
+    };
+  }
+  if (!decision.allowed) {
+    return { ok: false, status: 429, reason: "Too Many Requests" };
+  }
+  return { ok: true };
+}
+
+/** `requireRateLimit`, keyed on the client IP under a named scope. */
+export async function requireIpRateLimit(
+  req: Request,
+  scope: string,
+  limit: number,
+  windowMs: number,
+): Promise<RequiredLimitResult> {
+  const ip = clientIp(req);
+  if (!ip) {
+    // No IP header at all means the request did not come through the edge. On a spending route
+    // that is refused rather than waved through.
+    return {
+      ok: false,
+      status: 503,
+      reason: "This request carries no client address, so it cannot be rate-limited",
+    };
+  }
+  return requireRateLimit(`${scope}:${await hashKey(ip)}`, limit, windowMs);
 }

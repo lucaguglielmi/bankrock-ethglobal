@@ -2,6 +2,10 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "main": ".open-next/worker.js",
   "name": "web",
+  "routes": [
+    { "pattern": "bank-rock.com", "custom_domain": true },
+    { "pattern": "www.bank-rock.com", "custom_domain": true }
+  ],
   "compatibility_date": "2026-09-11",
   "compatibility_flags": [
     "global_fetch_strictly_public"

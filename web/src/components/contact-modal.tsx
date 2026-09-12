@@ -55,15 +55,28 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [message, setMessage] = React.useState("");
+  // Only asked for the OG-rock / barter form (ported from main's contact form, folded into the
+  // stored `message` with a label rather than becoming new columns — both are free text and
+  // neither needs to be queried on its own).
+  const [skill, setSkill] = React.useState("");
+  const [link, setLink] = React.useState("");
 
   const kind = contactKindFor(title, variant);
   const messageLabel =
-    kind === "sponsor" ? "How would you like to sponsor?" : "Why do you deserve an OG rock?";
+    kind === "sponsor" ? "How would you like to sponsor?" : "What are you bartering, or why should you get one?";
 
   const handleSubmit = React.useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       setStatus({ state: "sending" });
+
+      const composedMessage = [
+        message.trim(),
+        skill.trim() ? `What they can do well: ${skill.trim()}` : null,
+        link.trim() ? `Portfolio / social link: ${link.trim()}` : null,
+      ]
+        .filter((part): part is string => Boolean(part))
+        .join("\n\n");
 
       try {
         const response = await fetch("/api/contact", {
@@ -72,7 +85,7 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
           body: JSON.stringify({
             name: name.trim(),
             email: email.trim(),
-            message: message.trim(),
+            message: composedMessage,
             kind,
           }),
         });
@@ -112,7 +125,7 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
         });
       }
     },
-    [name, email, message, kind],
+    [name, email, message, skill, link, kind],
   );
 
   const handleOpenChange = React.useCallback((open: boolean) => {
@@ -236,6 +249,42 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
                   className="w-full resize-none rounded-2xl border border-border bg-transparent px-3 py-3 text-base text-ink outline-none placeholder:text-ink-4 focus:border-ring focus:ring-3 focus:ring-ring/50"
                 />
               </div>
+
+              {kind === "og_rock" ? (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="contact-skill" className="text-label text-ink-3">
+                      WHAT&apos;S SOMETHING YOU CAN DO VERY WELL? (OPTIONAL)
+                    </label>
+                    <input
+                      id="contact-skill"
+                      name="skill"
+                      type="text"
+                      maxLength={200}
+                      value={skill}
+                      onChange={(event) => setSkill(event.target.value)}
+                      className="h-12 w-full rounded-2xl border border-border bg-transparent px-3 text-base text-ink outline-none placeholder:text-ink-4 focus:border-ring focus:ring-3 focus:ring-ring/50"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="contact-link" className="text-label text-ink-3">
+                      LINK TO YOUR PORTFOLIO, TWITTER, OR WEBSITE (OPTIONAL)
+                    </label>
+                    <input
+                      id="contact-link"
+                      name="link"
+                      type="text"
+                      maxLength={300}
+                      autoComplete="url"
+                      spellCheck={false}
+                      value={link}
+                      onChange={(event) => setLink(event.target.value)}
+                      className="h-12 w-full rounded-2xl border border-border bg-transparent px-3 text-base text-ink outline-none placeholder:text-ink-4 focus:border-ring focus:ring-3 focus:ring-ring/50"
+                    />
+                  </div>
+                </>
+              ) : null}
             </form>
           )}
         </SheetBody>

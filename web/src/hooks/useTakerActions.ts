@@ -59,6 +59,7 @@ import {
   type Call,
 } from "@/lib/rock-account";
 import { useAuth } from "@/context/auth-context";
+import { publicReasonWith } from "@/lib/errors";
 
 export interface SwapParams {
   rockId: string;
@@ -131,7 +132,7 @@ async function buildTakerClient(params: {
     return real(client as unknown as TakerClient);
   } catch (err) {
     return unavailable(
-      `Your account could not be prepared: ${err instanceof Error ? err.message : String(err)}`,
+      publicReasonWith("Your account could not be prepared", err),
     );
   }
 }
@@ -310,7 +311,7 @@ export function useTakerActions(): UseTakerActions {
         return real({ txHash: receipt.receipt.transactionHash, amountOut });
       } catch (err) {
         return unavailable(
-          `The swap was not completed: ${err instanceof Error ? err.message : String(err)}`,
+          publicReasonWith("The swap was not completed", err),
         );
       } finally {
         setIsPending(false);

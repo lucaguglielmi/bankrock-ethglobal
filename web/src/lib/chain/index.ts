@@ -12,6 +12,7 @@
 import { createPublicClient, http, fallback, isAddress, getAddress, type Address } from "viem";
 import { sepolia } from "viem/chains";
 import { env, optionalEnv, unavailable, real, type Capability } from "@/lib/demo";
+import { publicReasonWith } from "@/lib/errors";
 
 export const SEPOLIA_CHAIN_ID = 11155111;
 
@@ -205,7 +206,7 @@ export async function assertDeployed(address: Address | undefined): Promise<Capa
     return real(address);
   } catch (err) {
     return unavailable(
-      `Could not reach the Sepolia RPC to verify ${address}: ${err instanceof Error ? err.message : String(err)}`,
+      publicReasonWith(`Could not reach the Sepolia RPC to verify ${address}`, err),
     );
   }
 }

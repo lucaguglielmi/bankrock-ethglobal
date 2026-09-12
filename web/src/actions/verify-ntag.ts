@@ -79,6 +79,8 @@ const MESSAGES: Record<VerifyFailureReason, string> = {
   invalid_cmac: "Cryptographic signature mismatch — this URL was not produced by the rock.",
   counter_store_unavailable: "Replay protection is unavailable, so the tap cannot be trusted.",
   stale_counter: "This tap has already been used. Copied links cannot be replayed.",
+  rate_limited: "Too many verification attempts. Wait a moment and tap again.",
+  rate_limit_unavailable: "Tap verification is temporarily unavailable. Try again shortly.",
   verifier_error: "The verifier could not complete this check.",
 };
 

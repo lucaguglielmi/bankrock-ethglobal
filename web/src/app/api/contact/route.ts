@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { getDb, NO_DATABASE_REASON } from "@/lib/db";
 import { contactRequests } from "@/lib/db/schema";
-import { consumeIpRateLimit } from "@/lib/rate-limit";
+import { requireIpRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/telemetry";
 
 const EMAIL_REGEX =
@@ -18,9 +18,15 @@ const EMAIL_REGEX =
 const KINDS = new Set(["og_rock", "sponsor"]);
 
 export async function POST(req: Request) {
-  const limit = await consumeIpRateLimit(req, "contact", 10, 60 * 60 * 1000);
-  if (!limit.allowed) {
-    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
+  const limit = await requireIpRateLimit(req, "contact", 10, 60 * 60 * 1000);
+  if (!limit.ok) {
+    // Fail closed: this route writes a row on an anonymous caller's behalf (audit P-11).
+    return NextResponse.json(
+      limit.status === 503
+        ? { state: "UNAVAILABLE", reason: limit.reason }
+        : { error: limit.reason },
+      { status: limit.status },
+    );
   }
 
   const body = (await req.json().catch(() => ({}))) as {

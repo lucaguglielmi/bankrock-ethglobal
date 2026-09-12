@@ -14,6 +14,13 @@
  * It is one-shot and it is revocable: the claim route deletes it after submitting, and
  * `{ discard: true }` — sent when a handover is cancelled — deletes it too. A cancelled gift whose
  * owner-swap operation survived would be a live path to hand the account away.
+ *
+ * Revocable **by its creator only** (audit P-5). A Privy token proves *an account*, not *this
+ * rock's owner*, and Privy sign-up is open — so checking merely that the caller is signed in let
+ * any stranger discard or overwrite another rock's pre-signed hand-over, leaving the recipient
+ * with the registry claim and no Rock Account. The DID that stored the row is kept with it, and
+ * only that DID may replace or delete it. The claim route reads it without a DID, because by then
+ * the attestation has already proved the claim.
  */
 
 import { NextResponse } from "next/server";
@@ -52,6 +59,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     recipient?: string;
     userOp?: Record<string, string>;
   };
+
+  const existing = await db
+    .select()
+    .from(pendingUserOps)
+    .where(eq(pendingUserOps.rockId, id))
+    .get();
+
+  // A row with no creator predates this column; treat it as unowned and let the first writer
+  // claim it, rather than stranding it forever.
+  if (existing?.creatorDid && existing.creatorDid !== auth.identity.did) {
+    return NextResponse.json(
+      {
+        state: "UNAVAILABLE",
+        reason: "This rock's pending hand-over was stored by another account",
+      },
+      { status: 403 },
+    );
+  }
 
   if (body.discard) {
     await db.delete(pendingUserOps).where(eq(pendingUserOps.rockId, id));
@@ -106,10 +131,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     await db
       .insert(pendingUserOps)
-      .values({ rockId: id, kind, recipient, userOp, createdAt: Date.now() })
+      .values({
+        rockId: id,
+        kind,
+        creatorDid: auth.identity.did,
+        recipient,
+        userOp,
+        createdAt: Date.now(),
+      })
       .onConflictDoUpdate({
         target: pendingUserOps.rockId,
-        set: { kind, recipient, userOp, createdAt: Date.now() },
+        set: {
+          kind,
+          creatorDid: auth.identity.did,
+          recipient,
+          userOp,
+          createdAt: Date.now(),
+        },
       });
 
     logger.info("Stored pre-signed Rock Account hand-over", {
@@ -141,13 +179,23 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   const row = await db
-    .select({ kind: pendingUserOps.kind, recipient: pendingUserOps.recipient })
+    .select({
+      kind: pendingUserOps.kind,
+      recipient: pendingUserOps.recipient,
+      creatorDid: pendingUserOps.creatorDid,
+    })
     .from(pendingUserOps)
     .where(eq(pendingUserOps.rockId, id))
     .get();
 
+  // Only the creator sees the recipient it names; anyone else learns whether one exists and
+  // nothing more (audit P-5).
+  const isCreator = Boolean(row?.creatorDid && row.creatorDid === auth.identity.did);
+
   return NextResponse.json({
     state: "REAL",
-    pending: row ? { kind: row.kind, recipient: row.recipient } : null,
+    pending: row
+      ? { kind: row.kind, recipient: isCreator ? row.recipient : null, mine: isCreator }
+      : null,
   });
 }

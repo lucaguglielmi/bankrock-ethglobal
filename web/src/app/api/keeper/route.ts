@@ -15,6 +15,7 @@
 
 import { NextResponse } from "next/server";
 import { evaluateAquaPosition, executeAquaRebalance } from "@/lib/aqua-keeper";
+import { consumeIpRateLimit } from "@/lib/rate-limit";
 import { requireCronSecret } from "@/lib/secure";
 import { logger } from "@/lib/telemetry";
 
@@ -24,6 +25,13 @@ function parseRockId(raw: unknown): string | null {
 }
 
 export async function GET(request: Request) {
+  // Public and unauthenticated, and it reads the chain — metered like the other public reads
+  // (audit P-10).
+  const limit = await consumeIpRateLimit(request, "keeper-read", 60, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
+  }
+
   const rockId = parseRockId(new URL(request.url).searchParams.get("rockId") ?? "1");
   if (!rockId) {
     return NextResponse.json({ error: "rockId must be a positive integer" }, { status: 400 });

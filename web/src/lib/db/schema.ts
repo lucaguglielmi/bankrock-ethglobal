@@ -181,8 +181,52 @@ export const handoverMessages = sqliteTable(
 export const pendingUserOps = sqliteTable('pending_userops', {
   rockId: text('rock_id').primaryKey(),
   kind: text('kind').notNull(),
+  /**
+   * The Privy DID that stored this operation (audit P-5).
+   *
+   * Only that DID may overwrite or discard it. Without this column any signed-in account could
+   * delete another rock's pre-signed Safe owner swap — the recipient would then get the registry
+   * claim and never the Rock Account.
+   */
+  creatorDid: text('creator_did'),
   recipient: text('recipient'),
   /** The serialised, signed UserOperation, exactly as it will be sent to the bundler. */
   userOp: text('user_op', { mode: 'json' }).$type<Record<string, string>>().notNull(),
   createdAt: integer('created_at').notNull(),
+});
+
+/**
+ * Web Push subscriptions (spec 14 §4.9 / Phase 2).
+ *
+ * `endpoint` is the browser push service URL and is unique per device/browser, so it is the
+ * natural primary key — the same shape `ON CONFLICT(endpoint) DO UPDATE` used before. `userDid`
+ * is the Privy DID that registered the subscription (never a client-supplied `userId`, SA-5): the
+ * subscribe and unsubscribe routes require a verified Privy access token and store the identity
+ * the token names, not one the caller asserts.
+ */
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+  endpoint: text('endpoint').primaryKey(),
+  rockId: text('rock_id'),
+  userDid: text('user_did').notNull(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: integer('created_at').notNull(),
+});
+
+/**
+ * What the relayer has spent today (audit P-1).
+ *
+ * `POST /api/rocks/[id]/claim` broadcasts from a funded key on the strength of an attestation, so
+ * the only bound on that spend is a cap someone sets. It is accumulated here, per UTC day, and
+ * checked *before* the transaction is sent — a cap consulted afterwards is a report, not a cap.
+ *
+ * `wei` is TEXT holding a decimal integer: wei does not fit a JS `number`, and SQLite's INTEGER is
+ * 64-bit, which a cap above ~9.2 ETH would overflow. The arithmetic is done in SQL with a CAST, so
+ * `relayerDailyCapWei()` refuses a cap that does not fit rather than silently wrapping.
+ */
+export const relayerSpend = sqliteTable('relayer_spend', {
+  /** `YYYY-MM-DD`, UTC. */
+  day: text('day').primaryKey(),
+  wei: text('wei').notNull(),
+  updatedAt: integer('updated_at').notNull(),
 });

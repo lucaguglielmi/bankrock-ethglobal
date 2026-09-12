@@ -25,7 +25,7 @@ export function VersionCheck() {
         const res = await fetch(`/api/version?t=${Date.now()}`, {
           cache: "no-store",
         });
-        const data = await res.json();
+        const data = (await res.json()) as { version?: string };
 
         if (data.version && data.version !== "dev" && data.version !== currentVersion) {
           setUpdateAvailable(true);
