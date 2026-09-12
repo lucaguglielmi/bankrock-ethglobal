@@ -71,11 +71,8 @@ export default function DefiPage() {
             </div>
           </div>
           <div className="order-1 md:order-2 flex justify-center">
-            <div className="w-full max-w-md aspect-square rounded-3xl relative overflow-hidden bg-ink-4/10 border border-black/5 flex items-center justify-center">
-              <span className="text-ink-3 font-mono font-medium tracking-widest uppercase text-center px-4">
-                [ Infographic 3 Placeholder ]<br/>
-                <span className="text-xs mt-2 block">The Automation Stack</span>
-              </span>
+            <div className="w-full max-w-md aspect-square rounded-3xl relative overflow-hidden shadow-xl bg-white border border-black/5">
+              <Image src="/infographics/automation_stack.jpg" alt="Automation Stack Architecture" fill className="object-cover" />
             </div>
           </div>
         </section>
