@@ -522,6 +522,77 @@ export function encodeSwapOwner(oldOwner: Address, newOwner: Address): Hex {
 }
 
 /* -------------------------------------------------------------------------- */
+/* ERC-20 approvals                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** One call in a batch. Structurally identical to `lib/aqua`'s `Call`. */
+export interface Call {
+  to: Address;
+  data: Hex;
+  value: bigint;
+}
+
+/**
+ * The approval calls needed to move an allowance from `currentAllowance` to `amount`.
+ *
+ * Circle's USDC — the Sepolia token every rock trades — inherits the original USDT-era guard and
+ * **reverts on a non-zero to non-zero `approve`**. An approval sequence that ignores this works on
+ * WETH and fails on USDC, which is the worst possible shape for a bug: it passes every test that
+ * uses a plain ERC-20 and breaks on the one token the product is about.
+ *
+ * So: reset to zero first whenever both the current and the target allowance are non-zero. When
+ * they are already equal there is nothing to do, and the empty array keeps a pointless approval
+ * out of the batch (and out of the sponsored gas).
+ *
+ * Pure, so the rule is stated once and is testable without a chain.
+ */
+export function approvalCalls(params: {
+  token: Address;
+  spender: Address;
+  currentAllowance: bigint;
+  amount: bigint;
+}): Call[] {
+  const { token, spender, currentAllowance, amount } = params;
+
+  const approve = (value: bigint): Call => ({
+    to: token,
+    data: encodeFunctionData({
+      abi: ERC20_ABI,
+      functionName: "approve",
+      args: [spender, value],
+    }),
+    value: BigInt(0),
+  });
+
+  if (currentAllowance === amount) return [];
+  if (currentAllowance > BigInt(0) && amount > BigInt(0)) {
+    return [approve(BigInt(0)), approve(amount)];
+  }
+  return [approve(amount)];
+}
+
+/** Reads an ERC-20 allowance. UNAVAILABLE rather than 0 when it cannot be read. */
+export async function readAllowance(
+  token: Address,
+  owner: Address,
+  spender: Address,
+): Promise<Capability<bigint>> {
+  try {
+    const allowance = (await readClient().readContract({
+      address: token,
+      abi: ERC20_ABI,
+      functionName: "allowance",
+      args: [owner, spender],
+    })) as bigint;
+    return real(allowance);
+  } catch (err) {
+    return unavailable(
+      `The current allowance could not be read: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Account abstraction availability                                            */
 /* -------------------------------------------------------------------------- */
 
@@ -627,3 +698,16 @@ export async function computeRockAccountAddress(params: {
     );
   }
 }
+
+/**
+ * Salt for a visitor's *personal* Safe.
+ *
+ * Zero, deliberately: a taker's account is not tied to any tag. A visitor who swaps against three
+ * different rocks uses one account, because it is their wallet's smart-account twin — it exists
+ * so the swap can be a sponsored batch (approve + swap) and so the periphery has a contract to
+ * call back into (`contracts/aqua/NOTES.md` §5), not because it belongs to a rock.
+ *
+ * Rock Accounts are salted with the tag instead (`rockAccountSaltFor`), which is what keeps one
+ * owner's two rocks from sharing a reserve.
+ */
+export const PERSONAL_ACCOUNT_SALT = BigInt(0);

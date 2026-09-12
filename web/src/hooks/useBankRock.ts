@@ -34,7 +34,9 @@ import { createPimlicoClient } from "permissionless/clients/pimlico";
 import { http } from "viem";
 import { chain, ENTRY_POINT_07_ADDRESS } from "@/lib/chain";
 import { real, unavailable, type Capability } from "@/lib/demo";
+import { buildDockCalls, buildShipCalls, getAquaAddresses, readRockStreams } from "@/lib/aqua";
 import {
+  approvalCalls,
   checkAwakenAttestation,
   encodeArchiveRock,
   encodeAwaken,
@@ -47,9 +49,11 @@ import {
   parseRockId,
   pimlicoApiKey,
   pimlicoRpcUrl,
+  readAllowance,
   readRock,
   registryAddress,
   rockAccountSaltFor,
+  type Call,
   type SignedAttestation,
 } from "@/lib/rock-account";
 import { useAuth } from "@/context/auth-context";
@@ -79,6 +83,18 @@ export interface UseRockActions {
   /** Flow F: the owner's informational lost flag. It freezes nothing on chain. */
   markLost(rockId: string): Promise<Capability<{ txHash: Hex }>>;
   clearLost(rockId: string): Promise<Capability<{ txHash: Hex }>>;
+  /** Opens a liquidity stream on Aqua. Deposits nothing: the reserve stays in the Rock Account. */
+  shipStrategy(
+    rockId: string,
+    params: {
+      usdcAmount: bigint;
+      wethAmount: bigint;
+      feeBps: number;
+      streamIndex?: number;
+    },
+  ): Promise<Capability<{ txHash: Hex; strategyHash: Hex }>>;
+  /** Closes one. Also moves no tokens — docking *is* the withdrawal (NOTES.md §4). */
+  dockStrategy(rockId: string, streamIndex: number): Promise<Capability<{ txHash: Hex }>>;
   isPending: boolean;
   availability: RockActionsAvailability;
 }
@@ -99,6 +115,12 @@ const SIGNED_OUT_REASON = "Sign in to act on this rock";
 interface RockAccountClient {
   account: { address: Address; signUserOperation: (op: never) => Promise<Hex> };
   sendTransaction: (args: { to: Address; data: Hex; value: bigint }) => Promise<Hex>;
+  /** The batch form: one signature, several calls, one transaction (D-012). */
+  sendUserOperation: (args: { calls: Call[] }) => Promise<Hex>;
+  waitForUserOperationReceipt: (args: { hash: Hex }) => Promise<{
+    receipt: { transactionHash: Hex };
+    success: boolean;
+  }>;
   prepareUserOperation: (args: {
     calls: { to: Address; data: Hex; value: bigint }[];
   }) => Promise<Record<string, unknown>>;
@@ -510,6 +532,126 @@ export function useRockActions(): UseRockActions {
     [withPending, sendFromRockAccount],
   );
 
+  /**
+   * Opens a liquidity stream (spec 04, Phase 3).
+   *
+   * One sponsored batch from the Rock Account: the two approvals Aqua needs, then `ship`. Nothing
+   * is deposited — after this the tokens are still in the rock's own wallet and what exists on
+   * Aqua is an allowance keyed by `keccak256(strategy)` (NOTES.md §4).
+   *
+   * The approvals are allowance-aware because Circle's USDC reverts on a non-zero to non-zero
+   * `approve`, and because `approve` *sets* rather than adds: a second stream over the same
+   * reserve must approve the whole reserve, not its own slice, or it silently shrinks the first
+   * stream's settleable size.
+   */
+  const shipStrategy = useCallback(
+    (
+      rockId: string,
+      params: { usdcAmount: bigint; wethAmount: bigint; feeBps: number; streamIndex?: number },
+    ) =>
+      withPending(async (): Promise<Capability<{ txHash: Hex; strategyHash: Hex }>> => {
+        if (parseRockId(rockId) === null) return unavailable(`"${rockId}" is not a rock id`);
+
+        const owner = await ownerClientFor(rockId);
+        if (owner.state === "UNAVAILABLE") return unavailable(owner.reason);
+        const { client, smartAccount } = owner.value;
+
+        const aqua = getAquaAddresses();
+        if (aqua.state === "UNAVAILABLE") return unavailable(aqua.reason);
+
+        const plan = buildShipCalls({
+          maker: smartAccount,
+          rockId,
+          streamIndex: params.streamIndex ?? 0,
+          feeBps: params.feeBps,
+          usdcAmount: params.usdcAmount,
+          wethAmount: params.wethAmount,
+        });
+        if (plan.state === "UNAVAILABLE") return unavailable(plan.reason);
+
+        // The ship call is the last of the three the builder produced; the approvals in front of
+        // it are rebuilt here against the allowances that actually exist on chain.
+        const shipCall = plan.value.calls[plan.value.calls.length - 1] as Call;
+
+        const approvals = await buildApprovals({
+          owner: smartAccount,
+          spender: aqua.value.aqua,
+          wants: [
+            { token: aqua.value.usdc, amount: params.usdcAmount },
+            { token: aqua.value.weth, amount: params.wethAmount },
+          ],
+        });
+        if (approvals.state === "UNAVAILABLE") return unavailable(approvals.reason);
+
+        try {
+          const userOpHash = await client.sendUserOperation({
+            calls: [...approvals.value, shipCall],
+          });
+          const receipt = await client.waitForUserOperationReceipt({ hash: userOpHash });
+          if (!receipt.success) {
+            return unavailable("The strategy was not shipped: the operation reverted on chain");
+          }
+          return real({
+            txHash: receipt.receipt.transactionHash,
+            strategyHash: plan.value.strategyHash,
+          });
+        } catch (err) {
+          return unavailable(
+            `The strategy was not shipped: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }),
+    [withPending, ownerClientFor],
+  );
+
+  /**
+   * Closes a stream (Flow H).
+   *
+   * It returns nothing, because nothing was ever taken: docking zeroes the virtual balances and
+   * the reserve was in the Rock Account the whole time. The UI must not promise an incoming
+   * transfer (NOTES.md §4, §8.1). Docking is final — the strategy hash is burned.
+   */
+  const dockStrategy = useCallback(
+    (rockId: string, streamIndex: number) =>
+      withPending(async (): Promise<Capability<{ txHash: Hex }>> => {
+        if (parseRockId(rockId) === null) return unavailable(`"${rockId}" is not a rock id`);
+
+        const owner = await ownerClientFor(rockId);
+        if (owner.state === "UNAVAILABLE") return unavailable(owner.reason);
+        const { client, smartAccount } = owner.value;
+
+        const aqua = getAquaAddresses();
+        if (aqua.state === "UNAVAILABLE") return unavailable(aqua.reason);
+
+        const live = await findShippedStream({
+          rockId,
+          maker: smartAccount,
+          streamIndex,
+          usdc: aqua.value.usdc,
+          weth: aqua.value.weth,
+          app: aqua.value.app,
+        });
+        if (live.state === "UNAVAILABLE") return unavailable(live.reason);
+
+        const plan = buildDockCalls({ strategyHash: live.value.strategyHash });
+        if (plan.state === "UNAVAILABLE") return unavailable(plan.reason);
+
+        try {
+          const userOpHash = await client.sendUserOperation({ calls: plan.value.calls as Call[] });
+          const receipt = await client.waitForUserOperationReceipt({ hash: userOpHash });
+          if (!receipt.success) {
+            return unavailable("The strategy was not docked: the operation reverted on chain");
+          }
+          return real({ txHash: receipt.receipt.transactionHash });
+        } catch (err) {
+          return unavailable(
+            `The strategy was not docked: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }),
+    [withPending, ownerClientFor],
+  );
+
   return {
     awaken,
     initiateHandover,
@@ -518,9 +660,81 @@ export function useRockActions(): UseRockActions {
     archiveRock,
     markLost,
     clearLost,
+    shipStrategy,
+    dockStrategy,
     isPending,
     availability,
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Aqua helpers                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The approval calls a batch needs, built against the allowances that exist right now.
+ *
+ * Two rules, both of which bite only in production (`lib/rock-account.ts`, `approvalCalls`):
+ * Circle's USDC reverts on a non-zero to non-zero `approve`, and `approve` sets rather than adds.
+ * An allowance that already covers the amount produces no call at all.
+ */
+async function buildApprovals(params: {
+  owner: Address;
+  spender: Address;
+  wants: { token: Address; amount: bigint }[];
+}): Promise<Capability<Call[]>> {
+  const calls: Call[] = [];
+
+  for (const want of params.wants) {
+    if (want.amount <= BigInt(0)) continue;
+
+    const current = await readAllowance(want.token, params.owner, params.spender);
+    if (current.state === "UNAVAILABLE") return unavailable(current.reason);
+
+    // The allowance must cover the whole reserve, not this stream's slice: a second stream over
+    // the same tokens shares one allowance (lib/aqua `ShipParams.approveUsdcAmount`).
+    if (current.value >= want.amount) continue;
+
+    calls.push(
+      ...approvalCalls({
+        token: want.token,
+        spender: params.spender,
+        currentAllowance: current.value,
+        amount: want.amount,
+      }),
+    );
+  }
+
+  return real(calls);
+}
+
+/**
+ * The live strategy at one stream index, found by probing — there is no stored hash anywhere
+ * (NOTES.md §3).
+ */
+async function findShippedStream(params: {
+  rockId: string;
+  maker: Address;
+  streamIndex: number;
+  usdc: Address;
+  weth: Address;
+  app: Address;
+}): Promise<Capability<{ strategyHash: Hex; feeBps: bigint }>> {
+  const view = await readRockStreams({
+    rockId: params.rockId,
+    maker: params.maker,
+    app: params.app,
+  });
+  if (view.state === "UNAVAILABLE") return unavailable(view.reason);
+
+  const stream = view.value.streams.find(
+    (candidate) => candidate.streamIndex === BigInt(params.streamIndex),
+  );
+  if (!stream) {
+    return unavailable(`This rock has no live Aqua strategy at stream ${params.streamIndex}`);
+  }
+
+  return real({ strategyHash: stream.strategyHash, feeBps: stream.feeBps });
 }
 
 /* -------------------------------------------------------------------------- */

@@ -69,25 +69,65 @@ export const AQUA_ABI = [
       { name: "balance1", type: "uint256" },
     ],
   },
+  /* ------------------------------------------------------------------------ */
+  /* Events                                                                     */
+  /*                                                                            */
+  /* No Aqua event parameter is `indexed` on the deployed contract               */
+  /* (`src/interfaces/IAqua.sol`; contracts/aqua/NOTES.md §2 and §8.2). Every log */
+  /* therefore has exactly one topic — the signature — and all four arguments    */
+  /* live in `data`.                                                             */
+  /*                                                                            */
+  /* This ABI previously marked `maker`, `app` and `strategyHash` as indexed on  */
+  /* `Shipped` and `Docked`. Against the real contract that matches no log when   */
+  /* used as a filter and mis-decodes any log it is handed. Two consequences the  */
+  /* rest of the app has to respect: a maker or a strategy hash cannot be         */
+  /* filtered server-side by topic — fetch by address and signature, decode, then */
+  /* filter in JavaScript — and `Pulled`/`Pushed` are the only record of a swap,  */
+  /* which is how fees are read (NOTES.md §6).                                    */
+  /* ------------------------------------------------------------------------ */
   {
     type: "event",
     name: "Shipped",
+    anonymous: false,
     inputs: [
-      { name: "maker", type: "address", indexed: true },
-      { name: "app", type: "address", indexed: true },
-      { name: "strategyHash", type: "bytes32", indexed: true },
+      { name: "maker", type: "address", indexed: false },
+      { name: "app", type: "address", indexed: false },
+      { name: "strategyHash", type: "bytes32", indexed: false },
       { name: "strategy", type: "bytes", indexed: false },
     ],
-    anonymous: false,
   },
   {
     type: "event",
     name: "Docked",
-    inputs: [
-      { name: "maker", type: "address", indexed: true },
-      { name: "app", type: "address", indexed: true },
-      { name: "strategyHash", type: "bytes32", indexed: true },
-    ],
     anonymous: false,
+    inputs: [
+      { name: "maker", type: "address", indexed: false },
+      { name: "app", type: "address", indexed: false },
+      { name: "strategyHash", type: "bytes32", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Pulled",
+    anonymous: false,
+    inputs: [
+      { name: "maker", type: "address", indexed: false },
+      { name: "app", type: "address", indexed: false },
+      { name: "strategyHash", type: "bytes32", indexed: false },
+      { name: "token", type: "address", indexed: false },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Pushed",
+    anonymous: false,
+    inputs: [
+      { name: "maker", type: "address", indexed: false },
+      { name: "app", type: "address", indexed: false },
+      { name: "strategyHash", type: "bytes32", indexed: false },
+      { name: "token", type: "address", indexed: false },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
   },
 ] as const;

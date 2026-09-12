@@ -53,19 +53,21 @@ export const chainId = parseChainIdEnv(env.chainId);
 /**
  * Every address the application knows about. `undefined` means "not deployed / not configured".
  *
- * aqua / usdc / weth  : fixed, published values (spec 16 §1.1)
- * registry            : output of our own deploy (Phase 2)
- * swapVmRouter        : output of our own deploy (Phase 3)
+ * aqua / usdc / weth      : fixed, published values (spec 16 §1.1)
+ * registry                : output of our own deploy (Phase 2)
+ * aquaApp / aquaTaker     : outputs of `contracts/scripts/deploy-aqua-app.js` (Phase 3)
+ *
+ * There is no SwapVM router address. That path was not taken — the reference `XYCSwap` AquaApp is
+ * what is deployed — and the router's `quote` signature was never verified, so an ABI for it would
+ * have been a guess. See `contracts/scripts/deploy-swapvm-router.md` if it is ever revisited.
  */
 export const addresses = {
   aqua: parseAddressEnv("NEXT_PUBLIC_AQUA_ADDRESS", env.aquaAddress),
   usdc: parseAddressEnv("NEXT_PUBLIC_USDC_ADDRESS", env.usdcAddress),
   weth: parseAddressEnv("NEXT_PUBLIC_WETH_ADDRESS", env.wethAddress),
   registry: parseAddressEnv("NEXT_PUBLIC_REGISTRY_ADDRESS", env.registryAddress),
-  swapVmRouter: parseAddressEnv(
-    "NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS",
-    env.swapVmRouterAddress,
-  ),
+  aquaApp: parseAddressEnv("NEXT_PUBLIC_AQUA_APP_ADDRESS", env.aquaAppAddress),
+  aquaTaker: parseAddressEnv("NEXT_PUBLIC_AQUA_TAKER_ADDRESS", env.aquaTakerAddress),
 } as const;
 
 export type AddressKey = keyof typeof addresses;
@@ -75,7 +77,8 @@ const ADDRESS_ENV_NAMES: Record<AddressKey, string> = {
   usdc: "NEXT_PUBLIC_USDC_ADDRESS",
   weth: "NEXT_PUBLIC_WETH_ADDRESS",
   registry: "NEXT_PUBLIC_REGISTRY_ADDRESS",
-  swapVmRouter: "NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS",
+  aquaApp: "NEXT_PUBLIC_AQUA_APP_ADDRESS",
+  aquaTaker: "NEXT_PUBLIC_AQUA_TAKER_ADDRESS",
 };
 
 /**
@@ -167,6 +170,18 @@ export function getPublicClient(): ReturnType<typeof createSepoliaClient> {
     cachedPublicClient = createSepoliaClient();
   }
   return cachedPublicClient;
+}
+
+/**
+ * The block the Aqua app was deployed in, if the operator recorded it. Server-side only.
+ *
+ * Used to bound a log scan for fee history. Without it the scan covers a short recent window and
+ * the figure is reported as partial rather than guessed at (NOTES.md §6).
+ */
+export function aquaAppDeployBlock(): bigint | undefined {
+  const raw = optionalEnv("AQUA_APP_DEPLOY_BLOCK");
+  if (!raw || !/^\d+$/.test(raw)) return undefined;
+  return BigInt(raw);
 }
 
 /** True when a dedicated RPC provider is configured (required by the indexer). */

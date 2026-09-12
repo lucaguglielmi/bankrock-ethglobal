@@ -58,7 +58,10 @@ export const env = {
   usdcAddress: process.env.NEXT_PUBLIC_USDC_ADDRESS || "",
   wethAddress: process.env.NEXT_PUBLIC_WETH_ADDRESS || "",
   registryAddress: process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || "",
-  swapVmRouterAddress: process.env.NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS || "",
+  /** Our XYCSwap deployment — the AquaApp strategies are shipped to. */
+  aquaAppAddress: process.env.NEXT_PUBLIC_AQUA_APP_ADDRESS || "",
+  /** The XYCSwapTaker periphery a visitor's wallet calls to swap (NOTES.md §5). */
+  aquaTakerAddress: process.env.NEXT_PUBLIC_AQUA_TAKER_ADDRESS || "",
   /** Browser-visible Pimlico key. Restrict by origin in the Pimlico dashboard. */
   pimlicoApiKeyPublic: process.env.NEXT_PUBLIC_PIMLICO_API_KEY || "",
 } as const;

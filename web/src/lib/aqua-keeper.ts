@@ -47,7 +47,7 @@ function missingPrerequisites(): string[] {
   const missing: string[] = [];
   if (!addresses.registry) missing.push("NEXT_PUBLIC_REGISTRY_ADDRESS");
   if (!addresses.aqua) missing.push("NEXT_PUBLIC_AQUA_ADDRESS");
-  if (!addresses.swapVmRouter) missing.push("NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS");
+  if (!addresses.aquaApp) missing.push("NEXT_PUBLIC_AQUA_APP_ADDRESS");
   return missing;
 }
 
