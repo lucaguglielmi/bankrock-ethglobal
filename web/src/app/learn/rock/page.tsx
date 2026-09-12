@@ -51,11 +51,8 @@ export default function RockPage() {
         {/* The Activation Flow */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 items-center">
           <div className="order-1 flex justify-center">
-            <div className="w-full max-w-md aspect-square rounded-3xl relative overflow-hidden bg-ink-4/10 border border-black/5 flex flex-col items-center justify-center p-8">
-              <span className="text-ink-3 font-mono text-sm mb-6 text-center">[ D2 Animated Flow Diagram Placeholder ]</span>
-              <div className="text-sm text-ink-2 text-center max-w-xs">
-                Tap Rock &rarr; Resolve NFC Payload &rarr; Privy Auth &rarr; Paymaster sponsors gas &rarr; Account Transferred.
-              </div>
+            <div className="w-full max-w-md aspect-square rounded-3xl relative overflow-hidden shadow-xl bg-white border border-black/5">
+              <Image src="/infographics/activation_flow.jpg" alt="Activation Flow" fill className="object-cover" />
             </div>
           </div>
 
