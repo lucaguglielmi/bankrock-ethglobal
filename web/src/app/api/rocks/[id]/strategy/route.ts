@@ -1,0 +1,133 @@
+/**
+ * GET /api/rocks/[id]/strategy — a rock's live Aqua streams.
+ *
+ *   ?maker=0x…     the Rock Account. Optional: without it the registry is asked which account
+ *                  this rock has, so the public rock page needs nothing but the id.
+ *   ?stream=&feeBps=  probe one specific stream instead of the two defaults.
+ *   ?fees=0        skip the fee scan (it costs an eth_getLogs round trip).
+ *
+ * The response is capability-shaped (D-013), and every branch that cannot produce a real number
+ * says so instead of producing one:
+ *
+ *   REAL         at least one strategy is shipped; virtual, actual and executable balances
+ *                come from `Aqua.safeBalances` and `ERC20.balanceOf` on Sepolia.
+ *   UNAVAILABLE  the app address is unset, the RPC is unreachable, the rock has no Rock Account,
+ *                or nothing is shipped. `reason` names which.
+ *
+ * There is no DEMO branch here at all: this endpoint has no simulated mode to fall back to.
+ *
+ * Amounts are decimal strings in base units — a `number` cannot hold 18-decimal WETH without
+ * losing precision, and a rounded balance is a wrong balance.
+ */
+
+import { NextResponse } from "next/server";
+import { isAddress, getAddress, zeroAddress, type Address } from "viem";
+import {
+  DEFAULT_STREAMS,
+  readAccruedFees,
+  readRockStreams,
+  serializeFees,
+  serializeStrategyView,
+  type AccruedFeesJson,
+} from "@/lib/aqua";
+import { getAppDeployBlock } from "@/lib/aqua/config";
+import { parseRockId, readRock } from "@/lib/rock-account";
+import { logger } from "@/lib/telemetry";
+import type { Hex } from "viem";
+
+function unavailable(rockId: string, reason: string) {
+  return NextResponse.json({ state: "UNAVAILABLE", reason, rockId });
+}
+
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const url = new URL(req.url);
+
+  if (parseRockId(id) === null) {
+    return unavailable(id, `"${id}" is not a rock id: it must be a positive integer`);
+  }
+
+  // Who the maker is: the caller may say, or the registry can.
+  let maker: Address;
+  const makerParam = url.searchParams.get("maker");
+  if (makerParam) {
+    if (!isAddress(makerParam, { strict: false })) {
+      return unavailable(id, "The `maker` parameter is not a valid address");
+    }
+    maker = getAddress(makerParam);
+  } else {
+    const rock = await readRock(id);
+    if (rock.state !== "REAL") {
+      return unavailable(
+        id,
+        rock.state === "UNAVAILABLE" ? rock.reason : "This rock's record is not readable",
+      );
+    }
+    if (!rock.value.smartAccount || rock.value.smartAccount === zeroAddress) {
+      return unavailable(id, "This rock has no Rock Account yet, so it has no strategy");
+    }
+    maker = rock.value.smartAccount;
+  }
+
+  // Which streams to probe. A rock's strategies are recomputable from its id, so this needs no
+  // stored list — see lib/aqua/strategy.ts.
+  const streamParam = url.searchParams.get("stream");
+  const feeParam = url.searchParams.get("feeBps");
+  let streams = DEFAULT_STREAMS as ReadonlyArray<{
+    streamIndex: number;
+    feeBps: number;
+    label?: string;
+  }>;
+  if (streamParam !== null || feeParam !== null) {
+    const streamIndex = Number(streamParam ?? 0);
+    const feeBps = Number(feeParam ?? DEFAULT_STREAMS[0].feeBps);
+    if (!Number.isInteger(streamIndex) || streamIndex < 0 || !Number.isInteger(feeBps) || feeBps < 0) {
+      return unavailable(id, "`stream` and `feeBps` must be non-negative integers");
+    }
+    streams = [{ streamIndex, feeBps }];
+  }
+
+  try {
+    const view = await readRockStreams({ rockId: id, maker, streams });
+    if (view.state === "UNAVAILABLE") {
+      return unavailable(id, view.reason);
+    }
+
+    // Fees are read from Aqua's own Pushed events (contracts/aqua/NOTES.md §6). The scan is
+    // skipped rather than approximated when it cannot be bounded or the RPC refuses the range.
+    const fees = new Map<Hex, AccruedFeesJson | string>();
+    const wantFees = url.searchParams.get("fees") !== "0";
+    if (wantFees) {
+      if (getAppDeployBlock() === undefined) {
+        for (const stream of view.value.streams) {
+          fees.set(
+            stream.strategyHash,
+            "Set AQUA_APP_DEPLOY_BLOCK to read fees earned since the app was deployed",
+          );
+        }
+      } else {
+        for (const stream of view.value.streams) {
+          const accrued = await readAccruedFees({
+            maker,
+            app: view.value.app,
+            strategyHash: stream.strategyHash,
+            feeBps: stream.feeBps,
+          });
+          fees.set(
+            stream.strategyHash,
+            accrued.state === "UNAVAILABLE" ? accrued.reason : serializeFees(accrued.value),
+          );
+        }
+      }
+    }
+
+    return NextResponse.json({
+      state: "REAL",
+      rockId: id,
+      value: serializeStrategyView(view.value, fees),
+    });
+  } catch (error) {
+    logger.error("Error reading the Aqua strategy", error, { rockId: id });
+    return unavailable(id, "The Aqua strategy could not be read from the chain");
+  }
+}
