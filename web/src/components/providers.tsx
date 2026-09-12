@@ -8,6 +8,7 @@ import { http } from "wagmi";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { BankRockAuthProvider, isValidPrivyAppId } from "@/context/auth-context";
+import { AudioProvider } from "@/context/audio-context";
 
 const queryClient = new QueryClient();
 
@@ -52,9 +53,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={wagmiConfig}>
           <BankRockAuthProvider isRealPrivyConfigured={isRealApp}>
-            <TooltipProvider>
-              {children}
-            </TooltipProvider>
+            <AudioProvider>
+              <TooltipProvider>
+                {children}
+              </TooltipProvider>
+            </AudioProvider>
           </BankRockAuthProvider>
         </WagmiProvider>
       </QueryClientProvider>

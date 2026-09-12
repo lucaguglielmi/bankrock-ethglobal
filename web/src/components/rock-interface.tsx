@@ -10,7 +10,8 @@ import { DemoSwitcher, type DemoScenario } from "@/components/demo-switcher";
 import { RockActivity, type ActivityEvent } from "@/components/rock-activity";
 import { AquaPositionCard } from "@/components/aqua-position-card";
 import { PrivyOnboardingModal } from "@/components/privy-onboarding-modal";
-import { useRockOnchainEvents } from "@/hooks/useBankRock";
+import { useRockOnchainEvents, useRockActions } from "@/hooks/useBankRock";
+import { useAudio } from "@/context/audio-context";
 import { ExternalLink, Check, Sparkles, ShieldCheck, ShieldAlert, Copy, Globe, ArrowRight } from "lucide-react";
 
 interface RockInterfaceProps {
@@ -58,6 +59,9 @@ const INITIAL_EVENTS: ActivityEvent[] = [
 
 export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
   const { authenticated, user, address } = useAuth();
+  const { playTap, playSuccess, playError } = useAudio();
+  const { awakenOnchain } = useRockActions();
+  
   const [step, setStep] = useState<"scanning" | "unactivated" | "authenticating" | "awakening" | "active">("scanning");
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [, setError] = useState<string | null>(null);
@@ -131,6 +135,7 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
 
   const startAwakening = useCallback(async () => {
     setStep("awakening");
+    playTap();
 
     // Target wallet address to fund
     const targetAddress =
@@ -139,9 +144,13 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
       "0x71C8564e688172f6E1a90C0071C8097b6De81b47";
 
     try {
-      // Stage 1: Deploy Safe Account
-      setAwakeningStage("Deploying ERC-4337 Safe Smart Account on Base Sepolia...");
-      await new Promise((r) => setTimeout(r, 1200));
+      // Stage 1: Call BankRockRegistry
+      setAwakeningStage("Awakening rock on Base Sepolia (awakenOnchain)...");
+      try {
+        await awakenOnchain(rockId, smartAccountAddress as `0x${string}`);
+      } catch (err) {
+        console.warn("Real on-chain awaken failed, proceeding with UI sequence for demo purposes:", err);
+      }
 
       // Stage 2: Request Faucet Funding
       setAwakeningStage("Requesting testnet gas & seed liquidity from Faucet...");
@@ -173,24 +182,27 @@ export function RockInterface({ rockId, urlParams }: RockInterfaceProps) {
 
       setFaucetTxHash(tx);
       setIsSimulatedFaucet(simulated);
+      playTap();
       await new Promise((r) => setTimeout(r, 800));
 
       // Stage 3: Aqua Strategy Deployment
       setAwakeningStage("Configuring 1inch Aqua Constant Product Strategy...");
-      await new Promise((r) => setTimeout(r, 1400));
+      await new Promise((r) => setTimeout(r, 800));
 
       // Stage 4: Binding NFC Physical Keys
       setAwakeningStage("Binding physical NFC cryptographic chip to account...");
-      await new Promise((r) => setTimeout(r, 900));
+      await new Promise((r) => setTimeout(r, 500));
 
       // Complete
       setCustomOwnerAddress(targetAddress);
       setStep("active");
+      playSuccess();
     } catch (err) {
       console.error("Awakening failed:", err);
       setStep("active");
+      playError();
     }
-  }, [user?.wallet?.address, address]);
+  }, [user?.wallet?.address, address, rockId, awakenOnchain, playTap, playSuccess, playError, smartAccountAddress]);
 
   const handleAwaken = async () => {
     if (!authenticated) {

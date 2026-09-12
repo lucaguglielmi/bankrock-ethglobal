@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LoginButton } from "@/components/login-button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Volume2, VolumeX } from "lucide-react";
+import { useAudio } from "@/context/audio-context";
 
 export function Header() {
   const pathname = usePathname();
+  const { isMuted, toggleMute } = useAudio();
 
   return (
     <nav className="w-full flex justify-between items-center z-50 p-6 md:px-12 fixed top-0 bg-white/50 backdrop-blur-md border-b border-black/5">
@@ -33,6 +35,15 @@ export function Header() {
           Live Demo
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
+        
+        <button
+          onClick={toggleMute}
+          className="p-2 -mr-2 text-neutral-500 hover:text-black transition-colors rounded-full hover:bg-neutral-100"
+          title={isMuted ? "Unmute sounds" : "Mute sounds"}
+        >
+          {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+        </button>
+
         <LoginButton />
       </div>
     </nav>

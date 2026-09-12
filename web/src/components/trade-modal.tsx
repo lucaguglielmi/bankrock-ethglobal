@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { 
   X, 
   ArrowUpDown, 
@@ -10,8 +10,11 @@ import {
   Copy, 
   Sparkles, 
   Loader2,
-  AlertCircle 
+  AlertCircle,
+  ChevronRight,
+  Zap
 } from "lucide-react";
+import { useAudio } from "@/context/audio-context";
 
 type TokenType = "USDC" | "WETH";
 
@@ -40,6 +43,7 @@ function TradeModalInner({
   currentReserve,
   onTradeSuccess,
 }: Omit<TradeModalProps, "isOpen">) {
+  const { playTap, playSuccess, playError, playSwipe } = useAudio();
   const [fromToken, setFromToken] = useState<TokenType>("USDC");
   const [toToken, setToToken] = useState<TokenType>("WETH");
   const [amountIn, setAmountIn] = useState<string>("");
@@ -62,6 +66,10 @@ function TradeModalInner({
     WETH: 0.25,
   });
 
+  const dragX = useMotionValue(0);
+  const swipeProgressWidth = useTransform(dragX, [0, 250], [0, 250]);
+  const swipeOpacity = useTransform(dragX, [0, 150], [1, 0]);
+
   // Handle ESC key to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -74,6 +82,7 @@ function TradeModalInner({
   }, [status, onClose]);
 
   const toggleTokens = () => {
+    playTap();
     setFromToken(toToken);
     setToToken(fromToken);
     setAmountIn("");
@@ -114,6 +123,7 @@ function TradeModalInner({
     if (!canSwap) return;
 
     try {
+      playSwipe();
       // Step 1: UserOp Signing
       setStatus("signing");
       await new Promise((resolve) => setTimeout(resolve, 800));
@@ -164,9 +174,11 @@ function TradeModalInner({
       });
 
       setStatus("success");
+      playSuccess();
     } catch (err) {
       console.error("Swap execution failed:", err);
       setStatus("idle");
+      playError();
     }
   };
 
@@ -428,11 +440,27 @@ function TradeModalInner({
                 </span>
               </div>
 
-              <div className="flex justify-between items-center text-neutral-500">
-                <span>Price Impact</span>
-                <span className="font-mono text-neutral-800">
-                  {inputNumber > 0 ? `${priceImpact.toFixed(2)}%` : "< 0.01%"}
+              <div className="flex justify-between items-center text-neutral-500 group relative">
+                <span className="border-b border-dashed border-neutral-300 cursor-help" title="Slippage occurs when large trades change the price of the asset before the trade executes. Lower impact means you get a better deal.">
+                  Deal Quality (Price Impact)
                 </span>
+                <div className="flex items-center gap-2">
+                  {inputNumber > 0 ? (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-16 h-1.5 rounded-full bg-neutral-200 overflow-hidden flex">
+                        <div 
+                          className={`h-full ${priceImpact < 0.5 ? 'bg-green-500' : priceImpact < 1.5 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                          style={{ width: `${Math.min(100, Math.max(5, (priceImpact / 2.5) * 100))}%` }}
+                        />
+                      </div>
+                      <span className={`font-mono text-xs font-semibold ${priceImpact < 0.5 ? 'text-green-600' : priceImpact < 1.5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {priceImpact.toFixed(2)}%
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="font-mono text-neutral-800">&lt; 0.01%</span>
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-between items-center text-neutral-500">
@@ -464,21 +492,67 @@ function TradeModalInner({
               </div>
             )}
 
-            {/* Action Button */}
-            <button
-              type="button"
-              disabled={!canSwap}
-              onClick={handleExecuteSwap}
-              className="w-full bg-black text-white py-4 rounded-full font-bold text-base hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-black transition-all shadow-lg active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
-            >
-              {inputNumber <= 0
-                ? "Enter Amount"
-                : isInsufficientBalance
-                ? `Insufficient ${fromToken} Balance`
-                : isInsufficientReserve
-                ? "Exceeds Rock Reserve"
-                : "Swap via Aqua Reserve"}
-            </button>
+            {/* Action Button / Swipe to Swap */}
+            <div className="relative h-14 rounded-full overflow-hidden bg-black shadow-lg">
+              <AnimatePresence mode="wait">
+                {status !== "idle" ? (
+                  <motion.div
+                    key="processing"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 flex items-center justify-center gap-2 text-white font-bold bg-blue-600"
+                  >
+                    {status === "signing" && <Loader2 className="w-5 h-5 animate-spin" />}
+                    {status === "bundling" && <Zap className="w-5 h-5 animate-pulse text-yellow-300" />}
+                    {status === "settling" && <ChevronRight className="w-5 h-5 animate-bounce" />}
+                    <span>
+                      {status === "signing" ? "Signing UserOp..." 
+                      : status === "bundling" ? "Paymaster Bundling..." 
+                      : "Settling on Aqua..."}
+                    </span>
+                  </motion.div>
+                ) : !canSwap ? (
+                  <motion.div
+                    key="disabled"
+                    className="absolute inset-0 flex items-center justify-center font-bold text-white opacity-40 cursor-not-allowed bg-black"
+                  >
+                    {inputNumber <= 0 ? "Enter Amount" : isInsufficientBalance ? `Insufficient ${fromToken}` : "Exceeds Reserve"}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="swipe"
+                    className="absolute inset-0 flex items-center bg-neutral-900"
+                  >
+                    <motion.div 
+                      style={{ opacity: swipeOpacity }}
+                      className="absolute inset-0 flex items-center justify-center text-white/50 font-bold pr-6 pointer-events-none"
+                    >
+                      Swipe to Swap <ChevronRight className="w-4 h-4 ml-1 opacity-50" /><ChevronRight className="w-4 h-4 -ml-2 opacity-30" />
+                    </motion.div>
+                    <motion.div 
+                      className="absolute left-0 h-full bg-blue-600 z-0 rounded-l-full"
+                      style={{ width: swipeProgressWidth }}
+                    />
+                    <motion.div
+                      style={{ x: dragX }}
+                      drag="x"
+                      dragConstraints={{ left: 0, right: 300 }}
+                      dragElastic={0.05}
+                      dragSnapToOrigin
+                      onDragEnd={(e, info) => {
+                        if (info.offset.x > 200) {
+                          handleExecuteSwap();
+                        }
+                      }}
+                      className="w-14 h-14 bg-white rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing z-10 shadow-md border-2 border-neutral-900"
+                    >
+                      <Zap className="w-5 h-5 text-black" />
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         )}
       </motion.div>

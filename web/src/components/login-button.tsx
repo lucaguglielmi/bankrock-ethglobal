@@ -5,7 +5,7 @@ import { useAuth } from "@/context/auth-context";
 import { Check, Copy } from "lucide-react";
 
 export function LoginButton() {
-  const { ready, authenticated, login, logout, user, address, isEmbedded, isDemoMode } = useAuth();
+  const { ready, authenticated, login, logout, user, address, isEmbedded, isDemoMode, lastLoginMethod } = useAuth();
   const [copied, setCopied] = useState(false);
 
   const activeAddress = address || user?.wallet?.address;
@@ -70,11 +70,18 @@ export function LoginButton() {
   }
 
   return (
-    <button
-      onClick={() => login()}
-      className="px-4 py-2 rounded-full bg-black text-white hover:bg-black/80 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50"
-    >
-      Connect Wallet
-    </button>
+    <div className="flex flex-col items-center gap-1.5">
+      <button
+        onClick={() => login()}
+        className="px-4 py-2 rounded-full bg-black text-white hover:bg-black/80 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50"
+      >
+        Connect Wallet
+      </button>
+      {lastLoginMethod && (
+        <span className="text-[10px] text-neutral-400 font-medium tracking-wide">
+          Last used: <span className="capitalize font-bold text-neutral-600">{lastLoginMethod}</span>
+        </span>
+      )}
+    </div>
   );
 }

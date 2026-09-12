@@ -51,6 +51,7 @@ export interface BankRockAuthContextType {
   address?: string;
   isEmbedded: boolean;
   isDemoMode: boolean;
+  lastLoginMethod: string | null;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   connectDemoWallet: () => void;
@@ -194,11 +195,14 @@ export function BankRockAuthProvider({
         await privy.login();
         return;
       } catch (err) {
-        console.warn("[BankRock Auth] Privy login failed or closed with error, falling back to Demo Mode:", err);
+        console.warn("[BankRock Auth] Privy login failed or closed with error:", err);
+        return;
       }
     }
-    // Fallback: Instantaneous high-fidelity Demo Embedded Wallet
-    activateDemo();
+    // Fallback: Instantaneous high-fidelity Demo Embedded Wallet (only if no Privy app configured)
+    if (!isRealPrivyConfigured) {
+      activateDemo();
+    }
   }, [isRealPrivyConfigured, privy, activateDemo]);
 
   const logout = useCallback(async () => {
@@ -209,6 +213,9 @@ export function BankRockAuthProvider({
       } catch (err) {
         console.warn("[BankRock Auth] Error during Privy logout:", err);
       }
+    }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("bankrock_last_login_method");
     }
   }, [deactivateDemo, privy]);
 
@@ -222,6 +229,27 @@ export function BankRockAuthProvider({
     : isDemoActive
     ? createDemoUser()
     : null;
+
+  // Track last login method when authenticated
+  const [lastLoginMethod, setLastLoginMethod] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("bankrock_last_login_method");
+      if (saved && !isAuthenticated) {
+        setLastLoginMethod(saved);
+      }
+    }
+  }, [isAuthenticated]);
+
+  React.useEffect(() => {
+    if (isAuthenticated && activeUser?.linkedAccounts && activeUser.linkedAccounts.length > 0) {
+      // Find the most likely primary login method (e.g., google, apple, email, wallet)
+      const primaryMethod = activeUser.linkedAccounts[0].type;
+      localStorage.setItem("bankrock_last_login_method", primaryMethod);
+      setLastLoginMethod(primaryMethod);
+    }
+  }, [isAuthenticated, activeUser]);
 
   const activeAddress =
     wagmiAddress ||
@@ -247,6 +275,7 @@ export function BankRockAuthProvider({
         address: activeAddress,
         isEmbedded,
         isDemoMode,
+        lastLoginMethod,
         login,
         logout,
         connectDemoWallet: activateDemo,
