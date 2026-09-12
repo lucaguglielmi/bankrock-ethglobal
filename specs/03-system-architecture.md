@@ -39,6 +39,36 @@ Only immutable or ownership-critical facts belong onchain. Rich presentation met
 
 Each physical rock maps to a persistent smart account (e.g., Safe configured via permissionless.js or Alto). This ensures the Rock Account address and its assets remain stable, even when the controller changes.
 
+**Narrowed by D-029 — the salt rule, stated exactly.** A Rock Account is a Safe 1.4.1 on
+EntryPoint 0.7 whose single owner is the user's Privy embedded wallet, with
+
+```
+saltNonce = uint256(uidHash) = uint256(keccak256(rawUid7Bytes))
+```
+
+so the mapping is **(tag, owner) → account**, not rock id → account. Consequences, all load-bearing:
+
+- two rocks held by the same person have two accounts, and their reserves never pool;
+- the same tag under two different owners yields two different addresses — the account is per
+  owner, and the giver's account is not silently the recipient's;
+- the address follows the **tag**, not the rock id, so after an archive (D-028) the tag awakens a
+  *different* rock id into the *same* account for the same owner. That is what makes the
+  rehearse-and-restart loop work without stranding a balance;
+- the rock id is deliberately **not** in the salt: at the moment of the tap the id is not yet
+  settled, and the attestation has to name the account.
+
+The address is **counterfactual** — a CREATE2 prediction from (owner, salt) — so it exists and can
+be quoted before anything is deployed. It is derived **server-side by the NFC verifier** and
+signed into the attestation; a `smartAccount` supplied by a client is ignored, not honoured
+(D-026). The first sponsored UserOperation deploys the Safe as a side effect of doing the work.
+
+**A visitor is not a rock.** Someone who only trades against a rock transacts from a *personal*
+Safe with `saltNonce = 0`, owned by their own Privy wallet and tied to no tag: one account no
+matter how many rocks they trade with. It exists so the swap can be a sponsored
+`approve` + `swapExactIn` batch and so the taker periphery has a contract to call back into
+(D-030) — not because it belongs to any rock. This is spec 05's "separate visitor/taker wallets
+from Rock Accounts", made concrete.
+
 The Rock Account:
 
 - holds the rock's ERC-20 balances;
@@ -92,6 +122,8 @@ A bridge layer (e.g., Across, LayerZero, CCIP) abstracts the underlying network 
 | Privy | Authentication and wallet signing infrastructure | Deciding product-level ownership rules |
 | Rock Registry | Object identity and lifecycle | Custody of trading funds |
 | Rock Account | Asset custody and authorized execution | Offchain metadata |
+| Attestation signer | Stating that a genuine tap happened, for a named subject and account | Spending anything; it never holds funds and never transacts |
+| Claim relayer | Paying gas for `claimHandover`, and submitting a UserOperation the giver already signed | Choosing who receives a rock — the registry credits `att.subject`, which is inside the signature |
 | Aqua | Virtual liquidity accounting and strategy execution | Guaranteed yield or price safety |
 | MCP Server | Providing structured read-only rock state to AI agents | Executing unauthorized transactions or hallucinated financial claims |
 | Telemetry | Observing and recording system state for AI agents | Source of truth for financial balances |
@@ -103,8 +135,17 @@ A bridge layer (e.g., Across, LayerZero, CCIP) abstracts the underlying network 
 3. Privy authenticates the acting user.
 4. Frontend prepares a Rock Account call.
 5. The owner signs through Privy.
-6. Rock Account interacts with Aqua or a Bank Rock Aqua App.
+6. Rock Account interacts with Aqua through the reference XYCSwap AquaApp; a visitor's swap goes
+   from their personal Safe through the `XYCSwapTaker` periphery (D-030).
 7. Events are indexed and reflected in the UI.
+
+Two paths do not follow this shape, and both are deliberate:
+
+- **Awakening and claiming** are attested, not owner-signed. Neither reads `msg.sender`, so
+  either may be relayed — a sponsored UserOperation from the rock's Safe, or an operator relayer
+  — which is what lets a user with an empty wallet take or receive a rock (D-026).
+- **A claim is relayed by the operator**, because the recipient has no gas and the Rock Account's
+  Safe is still the giver's at that moment (D-027).
 
 ## Non-goals for the MVP
 

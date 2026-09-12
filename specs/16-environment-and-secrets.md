@@ -40,12 +40,36 @@ All addresses below returned non-empty `eth_getCode` on Ethereum Sepolia via
 `version: "1.4.1"`, EntryPoint 0.7) has its canonical dependencies on Sepolia. `permissionless`
 resolves these addresses itself; nothing needs to be configured.
 
+**Correction (Fact, read from Sepolia 2026-09-12, `contracts/contracts/aqua/NOTES.md` §8.6): the
+two Aqua rows above are labelled the wrong way round.** `0x1111113ccf…6a90a` — the canonical
+address, the one we use — answers `owner()` with `0x4134e66d52EfC4C77DD8Ccc952D87b9E92E0C352` and
+its dispatcher carries `transferOwnership`, `renounceOwnership`, `rescueFunds`, `multicall` and
+`simulate` **alongside** the six `IAqua` selectors. That shape is an **`AquaRouter`**
+(`Aqua` + `Simulator` + `Multicall` + `Rescuable`), not plain `Aqua`. `0x4999…6d31`, which the
+table calls the AquaRouter, has **no `owner()` at all**.
+
+What the integration relies on, stated so the mislabelling cannot become a surprise:
+
+- **only the six `IAqua` selectors**, all present and verified at the canonical address —
+  `ship f50b870f`, `dock 28defc17`, `rawBalances 6d58b4cc`, `safeBalances 65f2fe14`,
+  `pull b00bbd10`, `push 47d72768`;
+- the address as an *input from the environment* (`NEXT_PUBLIC_AQUA_ADDRESS`), never a literal;
+- nothing about `owner()`, `rescueFunds`, `multicall` or `simulate`, which are never called.
+
+Nothing changes in the integration. What is worth knowing is that an **owner exists** on the
+contract that holds our makers' ERC-20 allowances, and that `0x4999…6d31` is not the router the
+table claims. Separately: the vendored `Aqua.sol` does **not** compile to the deployed bytecode
+under our settings (3,891 bytes against 5,619, same selectors, different jump table). That is
+fine, because we never deploy it — the local copy is a source-faithful test double, not a
+bytecode-identical one, and a local `Aqua` deployment must not be treated as a reproduction of
+the canonical contract.
+
 ### 1.2 Not on Sepolia — must be deployed by us (Fact)
 
 | Dependency | Canonical address elsewhere | Sepolia | Action |
 | --- | --- | --- | --- |
-| **SwapVM router** | `0x111111338c5091e8440b67b168bae16a668ac0de` (Base, Ethereum mainnet, 13 others) | **no code** | Self-deploy from `github.com/1inch/swap-vm`. Plain `m.contract("SwapVMRouter", [aqua, weth, owner, name, version])` via Hardhat Ignition — no CREATE2 factory, so our address will be non-canonical. Constructor: `aqua = 0x1111113ccf…6a90a`, `weth = 0xfFf9…6B14`, `owner = our deployer`. Solidity 0.8.30, `viaIR`. The repo's `hardhat.config.ts` configures only `localhost`; a `sepolia` network entry must be added. |
-| **BankRockRegistry** | never deployed anywhere | no code | Rewrite per D-018/D-020, then deploy. `contracts/hardhat.config.js` needs a `sepolia` network (it has only `baseSepolia`). |
+| ~~**SwapVM router**~~ *(not deployed — D-030)* | `0x111111338c5091e8440b67b168bae16a668ac0de` (Base, Ethereum mainnet, 13 others) | **no code** | Self-deploy from `github.com/1inch/swap-vm`. Plain `m.contract("SwapVMRouter", [aqua, weth, owner, name, version])` via Hardhat Ignition — no CREATE2 factory, so our address will be non-canonical. Constructor: `aqua = 0x1111113ccf…6a90a`, `weth = 0xfFf9…6B14`, `owner = our deployer`. Solidity 0.8.30, `viaIR`. The repo's `hardhat.config.ts` configures only `localhost`. **Superseded:** what is deployed instead is `XYCSwap` + `XYCSwapTaker` (spec 04, D-030), and the router module that can read Aqua balances is `AquaSwapVMRouter`, not plain `SwapVMRouter`. |
+| **BankRockRegistry** | never deployed anywhere | no code | **Rewritten (done);** `contracts/scripts/deploy.js` is a real deploy and the `sepolia` network is configured. Still needs to be run. |
 
 ### 1.3 Dead on Sepolia — must be removed from the code (Fact)
 
@@ -64,7 +88,7 @@ resolves these addresses itself; nothing needs to be configured.
 | --- | --- | --- | --- |
 | **Privy** | Yes. `import { sepolia } from "viem/chains"` in `supportedChains`; embedded wallets connect to the first listed chain. | Privy docs, "Configuring EVM networks" | `providers.tsx` must list `sepolia` first and set `defaultChain: sepolia`. |
 | **Pimlico** bundler + verifying paymaster | Yes. Endpoint `https://api.pimlico.io/v2/sepolia/rpc?apikey=…` (or `/v2/11155111/rpc`). ERC-20 paymaster also lists USDC on Sepolia. | Pimlico docs | `lib/aa.ts` currently hardcodes `/v2/84532/`. A sponsorship policy must be created in the Pimlico dashboard for chain 11155111. |
-| **1inch Swap API** (`/api/quote`) | **No.** Supported chains are mainnets only: Ethereum, Base, BNB, zkSync, Gnosis, Optimism, Cronos, Polygon, Monad, Linea, Sonic, Unichain, Arbitrum, Avalanche, HyperEVM, Robinhood, Solana. No testnet appears in the list. | 1inch Business portal, Classic Swap introduction | `/api/quote` and `1INCH_API_KEY` are **deleted**. Quotes come from `SwapVMRouter.quote()` (a view) against the shipped strategy — which is also the only source that is guaranteed to match `swap()` output exactly. |
+| **1inch Swap API** (`/api/quote`) | **No.** Supported chains are mainnets only: Ethereum, Base, BNB, zkSync, Gnosis, Optimism, Cronos, Polygon, Monad, Linea, Sonic, Unichain, Arbitrum, Avalanche, HyperEVM, Robinhood, Solana. No testnet appears in the list. | 1inch Business portal, Classic Swap introduction | `/api/quote` and `1INCH_API_KEY` are **deleted**. Quotes come from `XYCSwap.quoteExactIn` (a view) against the shipped strategy — the identical code path `swapExactIn` runs, on the same block's balances (D-030). |
 | **Resend** | Chain-agnostic. **Until `bank-rock.com` is verified in Resend (SPF + DKIM DNS records), the sandbox sender `*@resend.dev` delivers only to the email address the Resend account was created with.** | Resend docs, Verified Domains | The current `from: 'alerts@resend.dev'` will never reach a user. Domain verification is a prerequisite for any real email. |
 | **Cloudflare Workers / OpenNext** | Chain-agnostic. With `compatibility_date >= 2026-08-04`, `nodejs_compat` is **enabled by default**; the repo's date is `2026-09-11`. | Cloudflare changelog 2026-08-04 | `node:crypto` and `Buffer` in the NFC verifier work as-is. Fact F-4 in spec 15 is corrected accordingly. `node-aes-cmac@0.1.1` is pure JS with no dependencies. |
 | **Cloudflare D1** | Chain-agnostic. Database `bankrock-db` (`f0a28d6f-…`) is already bound in `wrangler.jsonc`. | `wrangler.jsonc` | Reachable only after D-016 (`getCloudflareContext()`). |
@@ -101,13 +125,17 @@ From `github.com/1inch/aqua` `src/Aqua.sol`, `src/interfaces/IAqua.sol` and the 
      and a program built from `_staticBalancesXD` / `_limitSwap1D` / XYC instructions;
    - the reference **`examples/apps/XYCSwap.sol`** constant-product app from the Aqua repo, which
      is smaller and maps directly onto spec 04's "constant-product strategy".
-   *(Hypothesis: for SwapVM in Aqua mode, `strategy` is the ABI-encoded order and `strategyHash`
-   equals `swapVM.hash(order)`. The tests delegate this to `AquaStrategyBuilders`, which was not
-   retrievable; confirm by reading `test/solidity/helpers/` in the swap-vm repo before building.)*
+   *(**Resolved 2026-09-12, and the second option was taken — D-030.** The hypothesis about
+   SwapVM was checked and is a **Fact**: for an Aqua-mode order `strategy = abi.encode(order)` and
+   `strategyHash == swapVM.hash(order)`, per swap-vm's own
+   `test/solidity/base/AquaStrategyBuilders.sol`. It was not the blocker; the program bytes were.
+   The shipped encoding is XYCSwap's `abi.encode(Strategy{maker, token0, token1, feeBps, salt})`
+   with the rock id in the salt — spec 04 "Strategy direction".)*
 5. **There is no JavaScript SDK.** `@1inch/swap-vm` is not published on npm; the repo's
-   `package.json` has no `main` or `exports`. Programs are built in Solidity via `ProgramBuilder`.
-   Strategy bytes must therefore be produced by a Foundry/Hardhat script and committed, or the
-   encoding must be ported to TypeScript. This is the largest unknown in Phase 3.
+   `package.json` has no `main` or `exports`. SwapVM *programs* are built in Solidity via
+   `ProgramBuilder`. ~~This is the largest unknown in Phase 3.~~ **It no longer applies to the
+   path taken:** XYCSwap's strategy is a plain ABI-encoded struct with no program bytes at all
+   (D-030). It remains the reason the router path was not taken.
 6. Balances read for the UI come from `Aqua.safeBalances(rockAccount, app, strategyHash, USDC, WETH)`
    (virtual) and `ERC20.balanceOf(rockAccount)` (actual), which is exactly the pair spec 04 requires
    the UI to distinguish.
@@ -116,8 +144,10 @@ From `github.com/1inch/aqua` `src/Aqua.sol`, `src/interfaces/IAqua.sol` and the 
 
 ## Part 2 — Secrets and configuration inventory
 
-Variable names are **as the code reads them today**; where the name should change, the target
-name is given in the last column and the rename belongs to Phase 1 (D-015).
+Variable names below are **as the code reads them now**. The renames flagged in §2.1 have been
+made, and [`../web/.env.example`](../web/.env.example) is the authoritative list: every variable
+it names is read by the code as spelled, and anything the code does not read has been removed from
+it. §2.1 is kept as history of what the mismatch was.
 
 ### 2.1 Mismatches between `.env.example` and the code (Fact)
 
@@ -140,29 +170,64 @@ secret you create locally (`openssl rand -hex 32`). *Output* = produced by a dep
 | 1 | `NEXT_PUBLIC_PRIVY_APP_ID` | You — dashboard.privy.io | `providers.tsx` | Phase 0 | Also configure in the dashboard: allowed origin `https://bank-rock.com`, login methods email / Google / Apple / wallet, and enable Sepolia. Without it the app boots with a placeholder app ID and `login()` silently activates a **fabricated embedded wallet** (`0x71C8…1b47`, `collector@bankrock.eth`) — spec 15 A-1/A-2. Phase 1 replaces that with an `UNAVAILABLE` sign-in state. |
 | 2 | `NEXT_PUBLIC_APP_URL` | Fixed: `https://bank-rock.com` | CORS in `middleware.ts`; email CTAs; MCP base URL | Phase 0 | Replaces the `bankrock.xyz` / `pages.dev` literals (D-022). |
 | 3 | `NEXT_PUBLIC_CHAIN_ID` → read by the chain config module | Fixed: `11155111` | D-015 chain module | Phase 1 | Currently unread. |
-| 4 | `BASE_SEPOLIA_RPC_URL` + `RPC_URL` → `SEPOLIA_RPC_URL` | You — Alchemy or Infura Sepolia endpoint | `lib/aa.ts`, `lib/indexer.ts`, cron, faucet | Phase 1 | Public RPCs rate-limit and reject wide `eth_getLogs`; the indexer needs a real provider. |
+| 4 | `SEPOLIA_RPC_URL` | You — Alchemy or Infura Sepolia endpoint | `lib/chain`, `lib/indexer.ts`, `lib/aqua/read.ts`, faucet, relayer, Rock Account derivation | Phase 1 | **Done:** one name, no aliases. Public RPCs rate-limit and reject wide `eth_getLogs`; the indexer and the fee log scan need a real provider. |
 | 5 | `ADMIN_PASSWORD` | Generate | `/api/admin/login` | Phase 0 | |
 | 6 | `ADMIN_JWT_SECRET` | Generate, 32 bytes | `lib/auth.ts`, `middleware.ts` | Phase 0 | Must be set; the fallback string makes admin sessions forgeable (SA-8). |
 | 7 | `CRON_SECRET` | Generate | `/api/cron/snapshot` | Phase 1 | Moves from query string to header in Phase 5. |
 | 8 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | You — Cloudflare dashboard, token with Pages + D1 edit | GitHub Actions secrets for `deploy.yml` | Phase 0 | `deploy.yml` must be rewritten first (B-5). |
 | 9 | `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` | You — same token; ID is `f0a28d6f-0a36-46aa-b711-8b5297913d2e` | `drizzle.config.ts` (migrations / studio only) | Phase 1 | Not needed at runtime; the Worker uses the `DB` binding. |
-| 10 | `PRIVATE_KEY` → `DEPLOYER_PRIVATE_KEY` | Wallet — fresh, funded | `contracts/hardhat.config.js`; SwapVM router deploy | Phase 2 | Deploys registry and SwapVM router; becomes `owner` of both. |
+| 10 | `DEPLOYER_PRIVATE_KEY` | Wallet — fresh, funded | `contracts/scripts/deploy.js`, `contracts/scripts/deploy-aqua-app.js` — the operator's shell only, never a file | Phase 2 | Deploys the registry and becomes its administrator (pause, rotate attester). Also deploys XYCSwap + XYCSwapTaker, **neither of which has an owner**, so it keeps no privilege there. |
 | 11 | `REGISTRY_ADDRESS` / `NEXT_PUBLIC_REGISTRY_ADDRESS` → `NEXT_PUBLIC_REGISTRY_ADDRESS` | Output of registry deploy | chain module, MCP | Phase 2 | Startup must assert code exists at it (D-015). |
-| 12 | `NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS` (new) | Output of SwapVM router deploy | chain module | Phase 3 | Non-canonical; ours. |
+| 12 | `NEXT_PUBLIC_AQUA_APP_ADDRESS`, `NEXT_PUBLIC_AQUA_TAKER_ADDRESS` | Output of `deploy-aqua-app.js` | chain module, `lib/aqua`, taker hook | Phase 3 | Replaces `NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS`, which is **removed**: no SwapVM router is deployed (D-030). The app is the reference XYCSwap; the taker is the periphery a visitor calls. Both unset ⇒ every Aqua surface is UNAVAILABLE. |
 | 13 | `NEXT_PUBLIC_AQUA_ADDRESS` (new) | Fixed: `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` | chain module | Phase 3 | |
 | 14 | `NEXT_PUBLIC_USDC_ADDRESS`, `NEXT_PUBLIC_WETH_ADDRESS` (new) | Fixed: `0x1c7D…7238`, `0xfFf9…6B14` | chain module | Phase 2 | |
 | 15 | `PIMLICO_API_KEY` and `NEXT_PUBLIC_PIMLICO_API_KEY` | You — dashboard.pimlico.io | `lib/aa.ts` | Phase 2 | Create a **sponsorship policy** for chain 11155111 in the dashboard or the verifying paymaster rejects every UserOp. Testnet sponsorship is free. The `NEXT_PUBLIC_` copy is exposed to browsers — restrict the key by origin in the dashboard. |
 | 16 | `FAUCET_PRIVATE_KEY` | Wallet — fresh, funded | `/api/faucet` | Phase 2 | **Must be set.** The current default is the public Anvil key (SA-4). Sends 0.01 ETH per claim. |
-| 17 | `SIGNER_PRIVATE_KEY` → `ATTESTATION_SIGNER_PRIVATE_KEY` | Wallet — fresh, **unfunded** | NFC EIP-712 attestations (D-018) | Phase 4 | Its address is set in the registry as the trusted attester. Never holds funds. |
+| 17 | `ATTESTATION_SIGNER_PRIVATE_KEY` | Wallet — fresh, **unfunded** | `lib/nfc/attestation.ts`; `lib/rock-account.server.ts` derives the expected attester from it | Phase 4 | **Renamed from `SIGNER_PRIVATE_KEY`, which is removed.** Its address is the registry's trusted attester and is passed to the deploy script as `ATTESTATION_SIGNER_ADDRESS`. Signs the six-field struct (D-026) and nothing else. Never holds funds. |
 | 18 | `NXP_MASTER_KEY` | Generate, 16 bytes hex, at tag provisioning | `/api/nfc/verify` | Phase 4 | Must equal the key written to the physical NTAG 424 DNA tags. Store in Cloudflare secrets only. |
 | 19 | `RESEND_API_KEY` | You — resend.com | `lib/email-service.ts`, Gelato alert route | Phase 5 | **Plus** domain verification for `bank-rock.com` (add the SPF/DKIM records Resend shows) and change `from` to `alerts@bank-rock.com`. Without verification, mail reaches only your own inbox. |
-| 20 | `ALERT_EMAIL_ADDRESS` | Fixed: an inbox you read | Gelato alert route | Phase 5 | Currently defaults to `security@bankrock.xyz`. |
+| 20 | `ALERT_EMAIL_ADDRESS` | Fixed: an inbox you read | Gelato alert route | Phase 5 | **No default.** The `security@bankrock.xyz` fallback is gone (D-017, D-022): unset means `/api/alerts/gelato` answers UNAVAILABLE rather than mailing anyone. |
 | 21 | `ADMIN_API_KEY` | Generate | `/api/newsletter` operator view | Phase 5 | |
 | 22 | `ALCHEMY_WEBHOOK_SECRET` | You — Alchemy Notify, only if used | `/api/webhooks/alchemy` | Optional | If unset the route must reject, not accept (D-017). |
 | 23 | `BANKROCK_API_URL` | Fixed: `https://bank-rock.com` | `mcp/index.ts` | Phase 1 | |
-| 24 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Optional | `lib/counter-store.ts` | — | Superseded by D1 in Phase 4. Drop. |
-| 25 | `1INCH_API_KEY` | — | `/api/quote` | — | **Delete.** The API does not serve Sepolia (§1.4). |
+| 24 | ~~`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`~~ | — | — | — | **Removed.** The counter store is D1 (`nfc_counters`); the in-memory store is used only when `NEXT_PUBLIC_DEMO_MODE=true`. |
+| 25 | ~~`1INCH_API_KEY`~~ | — | — | — | **Removed** with `/api/quote`. The API does not serve Sepolia (§1.4); quotes come from `XYCSwap.quoteExactIn` (spec 04). |
 | 26 | `ALERT_API_URL`, `QUOTE_API_URL`, `ROCK_ID` (Gelato secrets) | — | `web3-functions/` | — | `DEMO`; not needed. |
+| 27 | `NEXT_PUBLIC_DEMO_MODE` | Fixed: `false` in production | everywhere, through `lib/demo.ts` | Phase 1 | D-013. Only the literal `"true"` enables simulation; the deploy job sets `"false"` explicitly and a spec check asserts it. |
+| 28 | `REGISTRY_DEPLOY_BLOCK` | Output of the registry deploy | `lib/indexer.ts` | Phase 2 | The indexer scans forward from here in 2,000-block chunks. Unset ⇒ provenance is UNAVAILABLE, never scanned from block 0. |
+| 29 | `AQUA_APP_DEPLOY_BLOCK` | Output of `deploy-aqua-app.js` | `lib/chain`, `lib/aqua/read.ts` | Phase 3 | Bounds the `Pushed` log scan the cumulative fee figure is summed from. Unset ⇒ a short recent window, reported as partial. |
+| 30 | `RELAYER_PRIVATE_KEY` | Wallet — fresh, **funded** | `lib/rock-account.server.ts`, `POST /api/rocks/[id]/claim` | Phase 2 | Pays gas for `claimHandover` (D-027): a gift recipient has no gas and does not yet control the Rock Account. Safe because the registry credits `att.subject`, not `msg.sender` (D-026). Unset ⇒ claims are UNAVAILABLE, never free. |
+| 31 | `NXP_KEY_DIVERSIFY` | Optional, default off | `lib/nfc/config.ts` | Phase 4 | `"true"` enables AN10922 per-tag key diversification. Must match how the tags were provisioned. Keep it **off** for the hackathon (spec 18 §4.2 item 4). |
+| 32 | `NXP_KEY_DIVERSIFY_APP_ID` | With #31 only | `lib/nfc/config.ts` | Phase 4 | The 3-byte AID used in the derivation. Meaningless unless #31 is on. |
+| 33 | `ALERT_FROM_ADDRESS` | You — a verified Resend sender | `lib/email-service.ts` | Phase 5 | e.g. `Bank Rock <alerts@bank-rock.com>`, once the domain is verified. Until then the sandbox sender reaches only your own inbox (E-6). |
+
+### 2.2a Cross-check against `web/.env.example`
+
+The table above covers exactly the variables in [`../web/.env.example`](../web/.env.example), in
+its order: `NEXT_PUBLIC_APP_URL` (#2), `NEXT_PUBLIC_CHAIN_ID` (#3), `NEXT_PUBLIC_DEMO_MODE` (#27),
+`NEXT_PUBLIC_PRIVY_APP_ID` (#1), `SEPOLIA_RPC_URL` (#4), `REGISTRY_DEPLOY_BLOCK` (#28),
+`ADMIN_PASSWORD` (#5), `ADMIN_JWT_SECRET` (#6), `ADMIN_API_KEY` (#21), `CRON_SECRET` (#7),
+`NEXT_PUBLIC_AQUA_ADDRESS` (#13), `NEXT_PUBLIC_USDC_ADDRESS` and `NEXT_PUBLIC_WETH_ADDRESS`
+(#14), `NEXT_PUBLIC_REGISTRY_ADDRESS` (#11), `NEXT_PUBLIC_AQUA_APP_ADDRESS` and
+`NEXT_PUBLIC_AQUA_TAKER_ADDRESS` (#12), `AQUA_APP_DEPLOY_BLOCK` (#29), `PIMLICO_API_KEY` and
+`NEXT_PUBLIC_PIMLICO_API_KEY` (#15), `FAUCET_PRIVATE_KEY` (#16),
+`ATTESTATION_SIGNER_PRIVATE_KEY` (#17), `RELAYER_PRIVATE_KEY` (#30), `NXP_MASTER_KEY` (#18),
+`NXP_KEY_DIVERSIFY` (#31), `NXP_KEY_DIVERSIFY_APP_ID` (#32), `RESEND_API_KEY` (#19),
+`ALERT_FROM_ADDRESS` (#33), `ALERT_EMAIL_ADDRESS` (#20), `ALCHEMY_WEBHOOK_SECRET` (#22),
+`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` (#8, #9).
+
+**Not in that file, and deliberately:**
+
+| Variable | Where it lives instead |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | GitHub Actions secret for `deploy.yml` (#8) |
+| `DEPLOYER_PRIVATE_KEY`, `ATTESTATION_SIGNER_ADDRESS`, `DEPLOY_CONFIRMATIONS` | The operator's shell when running the `contracts/scripts/*` deploys (#10, #17) |
+| `BANKROCK_API_URL` | The agent's MCP `env` block (#23) |
+
+**Removed, and must not come back:** `NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS` (no router is deployed —
+D-030), `SIGNER_PRIVATE_KEY` (renamed to `ATTESTATION_SIGNER_PRIVATE_KEY`), `1INCH_API_KEY`,
+`NTAG_MASTER_KEY`, `BASE_SEPOLIA_RPC_URL`, `RPC_URL`, `PRIVATE_KEY`, `REGISTRY_ADDRESS`,
+`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
 
 ### 2.3 What only you can do
 
@@ -187,9 +252,10 @@ These are dashboard or DNS actions, not env vars:
 
 | Wallet | Role | Initial balance | Why |
 | --- | --- | --- | --- |
-| Deployer (#10) | Deploys registry + SwapVM router, whitelists attester | 0.3 ETH | Two contract deploys with `viaIR` bytecode ≈ 0.05–0.1 ETH at Sepolia gas; headroom for redeploys. |
+| Deployer (#10) | Deploys the registry (and becomes its admin), then XYCSwap + XYCSwapTaker | 0.3 ETH | Three deploys; headroom for redeploys. Neither Aqua-path contract has an owner, so this key keeps no privilege over them. |
 | Faucet (#16) | Sends 0.01 ETH per awakening | 1.0 ETH | 100 awakenings. Refill before the demo. |
 | Attester (#17) | Signs attestations off-chain | 0 | Never transacts. |
+| Relayer (#30) | Sends `claimHandover` for gift recipients (D-027) | 0.2 ETH | One transaction per claim, plus the pre-signed Safe owner swap it submits through the bundler. Unset or empty ⇒ claims are UNAVAILABLE, never free. |
 | Pimlico | Sponsors every UserOp | — | Free on testnets; no balance to hold. |
 | Each Rock Account | Aqua reserve | 20 USDC + 0.01 WETH | USDC from `faucet.circle.com` (20 / 2 h / address — claim to the Rock Account address directly). WETH by wrapping ETH at `0xfFf9…6B14`. |
 | Demo taker wallet | Swaps against the rock | 20 USDC + 0.005 WETH | Same sources. |
@@ -205,14 +271,21 @@ The minimum set to see a **real** rock page with **real** data, in the order the
 allow:
 
 1. Phase 0 of spec 15 (build green). No secrets needed beyond #1, #2, #5, #6, #8.
-2. Set #4 (`SEPOLIA_RPC_URL`). Switch `viem/chains` from `baseSepolia` to `sepolia` in the 20
-   files that import it; `providers.tsx` chain list; Pimlico URL; explorer links
-   (`sepolia.basescan.org` → `sepolia.etherscan.io`); `hardhat.config.js` network.
-3. Generate and fund #10 and #16. Deploy the rewritten registry → #11.
-4. Set #15 and create the Pimlico policy. Awaken a rock: real Safe, real transaction.
-5. Add a `sepolia` network to swap-vm's `hardhat.config.ts`; set its `chain-11155111.json`
-   `aqua` parameter to the real address; deploy → #12. Ship the first strategy.
-6. Everything else.
+2. Set #4 (`SEPOLIA_RPC_URL`). *(The Sepolia switch itself — imports, chain list, Pimlico URL,
+   explorer links, hardhat network — is done in code.)*
+3. Generate and fund #10 (deployer) and #16 (faucet); generate #17 (attester, unfunded) and #30
+   (relayer, funded). Deploy the registry with
+   `SEPOLIA_RPC_URL=… DEPLOYER_PRIVATE_KEY=… ATTESTATION_SIGNER_ADDRESS=… npm run deploy` in
+   `contracts/`, which prints #11 (`NEXT_PUBLIC_REGISTRY_ADDRESS`) and #28
+   (`REGISTRY_DEPLOY_BLOCK`), and sets the attester in the constructor. Verify the source.
+4. Set #15 and create the Pimlico sponsorship policy for chain 11155111. Awaken a rock: real
+   Safe, real transaction, zero gas for the user.
+5. **Deploy XYCSwap + XYCSwapTaker** — `NEXT_PUBLIC_AQUA_ADDRESS=… DEPLOYER_PRIVATE_KEY=…
+   node scripts/deploy-aqua-app.js` in `contracts/` — which prints #12
+   (`NEXT_PUBLIC_AQUA_APP_ADDRESS`, `NEXT_PUBLIC_AQUA_TAKER_ADDRESS`) and #29
+   (`AQUA_APP_DEPLOY_BLOCK`). Aqua itself is never deployed: it is an input read from the
+   environment. Ship the first strategy.
+6. Set #18 (`NXP_MASTER_KEY`) and program the tag with it (spec 18 §4.2). Everything else.
 
 ---
 

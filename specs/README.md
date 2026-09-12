@@ -31,6 +31,7 @@ Working line: **Liquidity you can hold.**
 | [15-exit-demo-mode.md](./15-exit-demo-mode.md) | Audit baseline, simulation ledger, and the phased plan to replace simulated behaviour with real behaviour | Active |
 | [16-environment-and-secrets.md](./16-environment-and-secrets.md) | Verified external dependencies on Ethereum Sepolia, every secret the code reads, who provides it, funding budget | Active |
 | [17-mobile-ui-and-typography.md](./17-mobile-ui-and-typography.md) | Phone-first layout contract, typeface and type scale, contrast tokens, sheet primitive, and the CI checks that enforce them | Active |
+| [18-demo-readiness.md](./18-demo-readiness.md) | What is still missing to run the three-minute demo end to end on a physical rock: the beat-by-beat state, the operator blockers, the tag's exact SDM settings, and the day-before checklist | Active |
 
 ## Spec rules
 
@@ -41,3 +42,10 @@ Working line: **Liquidity you can hold.**
 - Aqua is not described as guaranteed yield.
 - Scope additions must identify what they displace from the MVP.
 - When a decision is made, update the relevant spec and the decision log.
+- **Rule 1 of [`../STEERING.md`](../STEERING.md) is answered by
+  [`../DEMO-STATE.md`](../DEMO-STATE.md).**
+  That file is the living list of everything faked, mocked, hardcoded, unconfigured or merely
+  unproven, one line each with the spec ID and the condition that makes it real. Read it before
+  answering "what's next?", and add a line to it before merging any new simulated surface.
+  [`15-exit-demo-mode.md`](./15-exit-demo-mode.md) §1.3 is the frozen audit baseline that file
+  replaced, and is kept as history rather than updated.

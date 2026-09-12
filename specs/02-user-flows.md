@@ -28,12 +28,34 @@ Registration does not create or fund a wallet.
 2. The public rock page detects that the rock is unactivated.
 3. User chooses **Awaken this rock**.
 4. Privy authenticates the user and creates or restores their embedded wallet.
-5. The server mathematically verifies the NTAG 424 DNA signature.
-6. The system creates or links the Rock Account.
-7. The user funds it with the supported testnet token pair **(via a built-in 1-click testnet faucet to eliminate onboarding friction)**.
-8. The owner selects a predefined liquidity personality and deposit amounts.
-9. **Atomic UserOperation Batching (1-Click Launch):** The user approves once via Privy. The ERC-4337 Smart Account executes a batched call (`executeBatch`) bundling `tokenA.approve(Aqua)`, `tokenB.approve(Aqua)`, and `Aqua.ship(strategyHash, SwapVM bytecode)` into a single atomic transaction.
-10. The application confirms the live Aqua strategy and updates available virtual liquidity immediately.
+5. The verifier decrypts the PICC data, derives the NXP session keys and checks the SDM CMAC
+   against the tag's own key. Only then does it advance the read counter. A failure here ends the
+   flow: there is no other way to reach step 9.
+6. Still inside the verifier, and in this order: it resolves the **effective rock** from the
+   registry — `bound`, `url`, `next_free` or `registry_unavailable` (D-028) — and derives the
+   **Rock Account** from `(subject, uidHash)` with `saltNonce = uint256(uidHash)` (D-029). The
+   address is counterfactual: nothing is deployed and no transaction is sent. A `smartAccount`
+   supplied by the client is ignored, not honoured.
+7. The verifier signs one EIP-712 attestation naming `rockId` (the effective one), `uidHash`,
+   `counter`, `deadline`, `subject` and `smartAccount` (D-026), and returns it with the resolution.
+   Verification and attestation are staged: a real CMAC match with no signer key configured
+   still shows `Verified Physical` and reports the attestation `UNAVAILABLE`.
+8. The user submits `awakenRock(rockId, smartAccount, att, sig)` as a gas-sponsored UserOperation
+   from the Rock Account itself, which deploys the Safe as a side effect of doing the work. The
+   registry takes the owner from `att.subject` and requires `att.smartAccount == smartAccount`, so
+   the transaction may equally be relayed — the tapping user never needs ETH. The client refuses
+   to send an attestation that names a different wallet, rock or account than the one on screen.
+9. The user funds the Rock Account with the supported testnet token pair **(0.01 ETH from the
+   built-in faucet; USDC and WETH from the public faucets — spec 16 Part 3)**.
+10. The owner selects a fee rate and the amounts to expose.
+11. **Atomic UserOperation Batching (1-Click Launch):** the user approves once via Privy. The Rock
+    Account executes one batched UserOperation bundling `USDC.approve(Aqua, a)`,
+    `WETH.approve(Aqua, b)` and
+    `Aqua.ship(app, strategy, [USDC, WETH], [a, b])`. The approvals go to **Aqua**, never to the
+    app. `strategy` is `abi.encode(XYCSwap.Strategy)` with the rock id in its salt (D-030).
+12. The application confirms the live stream by recomputing `strategyHash` and reading
+    `Aqua.safeBalances`. **No tokens moved:** shipping is an allowance over balances that stay in
+    the Rock Account's own wallet, and the UI says so rather than showing a deposit.
 
 The UI must distinguish pending, confirmed and failed onchain operations.
 
@@ -54,30 +76,65 @@ No login should be required for public inspection.
 
 ## Flow D — Trade with a rock
 
-1. Visitor taps the rock and selects **Trade with this rock**.
-2. If necessary, Privy creates or restores the visitor wallet.
-3. The interface shows input, expected output, price impact, fee and network.
+1. Visitor taps the rock and selects **Trade with this rock**. No attestation is required: a
+   swap is a public action against a public strategy, and the tap proves nothing a swap needs.
+2. If necessary, Privy creates or restores the visitor wallet. The account that transacts is the
+   visitor's **personal Safe** — `saltNonce = 0`, not tied to any tag, one per visitor no matter
+   how many rocks they trade with (D-029).
+3. The interface shows input, expected output, price impact, fee rate and network. The quote
+   comes from `XYCSwap.quoteExactIn` — the identical code path the swap runs — with the mirrored
+   client-side maths only as a preview while the user types. Price impact is computed from the
+   curve's own reserves, never from a formula invented for display.
 4. The visitor confirms the trade.
-5. The transaction executes against the strategy associated with that rock.
-6. The rock page updates its balances, virtual balances and earned fees.
-7. The visitor receives a plain-language receipt.
+5. The transaction is **two calls in one sponsored batch**: `tokenIn.approve(taker, amountIn)`
+   then `XYCSwapTaker.swapExactIn(...)`. It goes through the **taker periphery** because the app
+   settles by calling `xycSwapCallback` back into its caller, which an EOA and a plain Safe cannot
+   answer (D-030). The approval goes to the periphery — the opposite of the maker's rule. The
+   visitor pays no gas, so a wallet with no ETH can trade.
+6. The rock page updates its actual balances, its virtual balances and its fee figure. The three
+   are read separately and never summed. Fees are not a pot to claim: they are the unpriced slice
+   of the input, and they land inside the rock's own reserve (D-030).
+7. The visitor receives a plain-language receipt. `amountOut` is read back from the receipt's own
+   `Pulled` / `Pushed` events, never from the preview the visitor was shown.
 
 The application must never imply that a swap is risk-free.
 
 ## Flow E — Gift an active rock
 
-Preferred target experience:
+There is exactly one path (D-027). There is no immediate `transferOwnership`: a rock changes
+hands when someone holding the physical object presents a fresh attestation, and never otherwise.
 
-1. Current owner selects **Give this rock**.
-2. Owner chooses an expiry and optionally adds a message.
-3. A pending handover is created.
+1. Current owner selects **Give this rock**, names a recipient or leaves it open, chooses an
+   expiry and optionally adds a message.
+2. `initiateHandover(rockId, recipient, expiresAt, messageHash)` goes out as a sponsored
+   UserOperation from the Rock Account. Only the message *hash* is on chain; the text is stored
+   off-chain and shown after the claim.
+3. **In the same interaction, the giver pre-signs the Safe owner swap.** They are online and are
+   still the Safe's only owner, which is the one moment that signature can be produced:
+   `Safe.swapOwner(SENTINEL, giver, recipient)`. The signed UserOperation is stored server-side
+   until the claim. It is one-shot, and cancelling the handover discards it — a cancelled gift
+   whose owner-swap operation survived would be a live path to hand the account away.
+   *An open handover (no named recipient) cannot be pre-signed, because there is no address to
+   sign for. That case is stated plainly in the UI rather than papered over: the registry claim
+   still works; the account hand-over does not.*
 4. Recipient physically receives and taps the rock.
-5. Recipient signs in through Privy (Email, Passkey, or Social).
-6. The server mathematically verifies the NTAG 424 DNA signature to prove physical possession.
-7. The system applies the **asynchronous pre-signed handover policy** (created in step 3), completing the transfer instantly without requiring the original owner to be online.
-8. Control of the ERC-4337 Smart Account updates its owner signing key. **Gas is 100% sponsored by a Paymaster**, ensuring the recipient pays zero fees and requires no native tokens.
-9. The account address and history remain completely stable.
-10. Both parties receive a transfer receipt.
+5. Recipient signs in through Privy (email, passkey or social).
+6. The verifier checks the SDM CMAC, advances the counter, and signs an attestation naming the
+   recipient as `subject`. `smartAccount` is the account the registry already holds for this rock
+   — a claim changes no account, and the registry ignores the field there anyway (D-026).
+7. `claimHandover(rockId, att, sig)` is **relayed by the server** from `RELAYER_PRIVATE_KEY`. It
+   has to be: the recipient has no gas, and the Rock Account's Safe is still the giver's, so it
+   cannot sponsor the claim either. This is not an open relay — the registry credits
+   `att.subject`, which is inside the signature, so the relayer cannot redirect the rock to
+   itself, and the route refuses any attestation not signed by this deployment's attester.
+8. The claim route then submits the stored owner-swap operation, so control of the Rock Account
+   follows the object. **Gas is sponsored end to end**: the recipient pays nothing and needs no
+   native tokens. If the swap cannot be submitted, the response says so instead of implying the
+   account moved.
+9. The account address, its assets and its Aqua maker identity remain completely stable. The
+   strategies stay shipped; nothing is docked and re-shipped.
+10. Both parties receive a receipt. Provenance shows `HandoverInitiated` then `HandoverClaimed`,
+    both backed by a tap.
 
 ## Flow F — Lost or copied tag
 
@@ -99,9 +156,19 @@ Preferred target experience:
 
 1. Owner authenticates via Privy.
 2. Owner selects **Cash In** to extract their liquidity.
-3. The interface docks the active Aqua strategies.
-4. Assets are routed to a fiat off-ramp (simulated for MVP) or swapped to stablecoins and sent to an external exchange wallet.
-5. This abstracts the DeFi complexity of removing liquidity.
+3. The interface docks the active Aqua strategies:
+   `Aqua.dock(app, strategyHash, [USDC, WETH])`, listing **every** token of the strategy in one
+   call or it reverts.
+4. **Docking is the withdrawal, and it moves nothing.** The tokens never left the Rock Account:
+   a strategy is an allowance over balances that stayed in the maker's wallet the whole time
+   (D-030). `dock` zeroes the virtual balances and marks the strategy closed; the wallet balance
+   is unchanged. The interface must not promise an incoming transfer, show a "receiving" state,
+   or animate funds returning — there is nothing in flight.
+5. Only then, and as a **separate** act, may the owner send those tokens somewhere: an external
+   wallet, or a fiat off-ramp (out of scope for the MVP — spec 08). That transfer is an ordinary
+   ERC-20 transfer from the Rock Account, unrelated to Aqua.
+6. A docked strategy can never be revived. Re-opening a stream means shipping a new one under a
+   new `streamIndex`.
 
 ## Flow I — AI Query (via MCP)
 
@@ -120,3 +187,32 @@ Preferred target experience:
 3. The AI (via MCP tools) automatically calculates the optimal Aqua strategy parameters for the requested risk profile.
 4. The AI prepares the transaction data and prompts the owner for approval, providing a direct link or payload for the Bank Rock app.
 5. The owner reviews the payload and taps a button to sign the transaction via Privy.
+
+## Flow K — Archive and start over
+
+The one-way exit, and the only supported way to reuse a physical tag (D-028). Its practical use
+is rehearsal: awakening the demo beat again and again with a single tag, without reprogramming it.
+
+1. Owner opens the owner menu and selects **Retire this rock and free the tag**, behind a
+   confirmation that states what is irreversible.
+2. `archiveRock(rockId)` goes out as a sponsored UserOperation from the Rock Account. The
+   registry accepts either the owner's wallet or the rock's Safe as the caller (D-026), so this
+   costs the owner nothing. It is deliberately callable while the contract is paused: archiving
+   only removes ways to act on a rock, and an emergency stop must not trap a tag.
+3. Any outstanding handover is cancelled first, emitting `HandoverCancelled` before
+   `RockArchived`, so a reader of the log sees the claim path close explicitly.
+4. The rock's state becomes `Archived`, and the **tag binding is released**:
+   `rockIdForUid(uidHash)` returns to 0. There is no `unarchive`.
+5. **History is kept.** `getRock` still returns the archived rock's owner, Rock Account and UID
+   hash. The record becomes a closed chapter, not a blank, and its rock id is never reissued.
+6. **The tag URL does not change.** SDM rewrites only `e` and `c` on each read; the path is
+   written once at provisioning (spec 06, spec 18 §4.2). So the number in the URL is now stale,
+   and the next tap resolves `next_free` — the verifier offers the next unused rock id and signs
+   the attestation for *that* id.
+7. **The read counter is not reset.** `lastCounter(uidHash)` keeps climbing across the boundary,
+   so an attestation captured before the archive cannot be replayed against the rock that follows.
+8. Awakening the next rock id reuses the **same Rock Account address** for the same owner, because
+   the account is salted by the tag rather than by the rock id (D-029). Any balance left in it is
+   still there.
+
+**Not a recovery tool for a lost tag.** That is Flow F, and it changes nothing on chain.

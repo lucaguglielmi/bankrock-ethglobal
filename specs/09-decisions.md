@@ -34,11 +34,21 @@
 
 **Consequence:** stable address, isolated funds and seamless ownership transfer without moving assets.
 
+**Narrowed by D-026 and D-029:** the mapping implemented is (tag, owner) -> account, with
+`saltNonce = uint256(keccak256(rawUid))`, derived server-side by the NFC verifier and bound into
+the attestation. "Seamless transfer without moving assets" is realised by a pre-signed
+`Safe.swapOwner` operation, not by the registry (D-027).
+
 ### D-006 — SwapVM for MVP
 
 **Decision:** the MVP will use an existing SwapVM program rather than a Custom Aqua App.
 
 **Consequence:** faster development and less contract security risk during the hackathon. Custom apps are deferred.
+
+**Superseded by D-030.** What shipped is the reference `XYCSwap` AquaApp, vendored unmodified,
+with one Bank Rock periphery contract (`XYCSwapTaker`) on the taker side — an explicit, justified
+deviation from "zero custom contract logic", because the app's callback design makes a plain
+wallet unable to swap at all. The SwapVM path stays documented, not taken.
 
 ### D-007 — Cryptographic NFC Tags (NTAG 424 DNA)
 
@@ -198,6 +208,204 @@ viewport matrix in CI ([`17-mobile-ui-and-typography.md`](./17-mobile-ui-and-typ
 background canvas and the hover-only 3D background are cut; the seven ad-hoc modals are replaced.
 The user tests the result on devices; CI catches regressions.
 
+## Implementation decisions (exit-from-demo-mode branch)
+
+D-026 through D-031 were taken while the exit plan was implemented. Each is verified against the
+code it lives in; the file is named so the claim can be rechecked.
+
+### D-026 — The attestation names the subject and the Rock Account
+
+**Decision:** the EIP-712 struct the registry accepts is, exactly:
+
+```
+Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)
+```
+
+signed under the domain `BankRockRegistry` / version `1` / chain 11155111 / `verifyingContract` =
+the registry (`EIP712("BankRockRegistry", "1")` in `BankRockRegistry.sol`). Ownership comes from
+`att.subject`; `msg.sender` is not an input to any attested decision. `awakenRock(rockId,
+smartAccount, att, sig)` requires `att.smartAccount == smartAccount`. `claimHandover(rockId, att,
+sig)` ignores the field — it changes no smart account — and the signer sets it to zero there.
+Owner-gated actions (`initiateHandover`, `cancelHandover`, `archiveRock`, `markLost`,
+`clearLost`) accept either the owner's wallet or the rock's own Safe as `msg.sender`.
+
+**Consequence:** both attested calls are relayable. An awakening can be a gas-sponsored UserOp
+from the rock's Safe or a transaction from an operator relayer; a claim is relayed by the server
+(D-027). A user who has just tapped a rock never needs a funded wallet. An attestation is a bearer
+token, but a narrow one: the only address it can enrich is the `subject` the attester named, and
+it is spent when it lands, because its counter is consumed.
+
+**Rationale:** a `msg.sender == subject` rule would have made gasless flows impossible without
+closing the front-running gap it appears to close — an observer who captures a mempool
+attestation could still re-submit it naming a Safe of their own, leaving the rock owned by the
+right person but custodied at the attacker's address. Covering `smartAccount` in the signature
+closes that; requiring a particular sender does not.
+
+**Files:** `contracts/contracts/BankRockRegistry.sol` (struct, `ATTESTATION_TYPEHASH`,
+`_consumeAttestation`, `_requireRockController`); `web/src/lib/nfc/attestation.ts`;
+`web/src/lib/rock-account.ts` (`toContractAttestation`, `checkAwakenAttestation`);
+`web/src/lib/rock-account.server.ts` (`verifyAttestation` rebuilds the domain server-side and
+never trusts the client's copy).
+
+### D-027 — Ownership transfer only through a pending handover
+
+**Decision:** there is no immediate `transferOwnership(rockId, newOwner)`. Every change of object
+ownership goes through `initiateHandover` → `claimHandover`, including the case where the giver
+already knows the recipient's address. Control of the Rock Account moves separately: the giver
+pre-signs a `Safe.swapOwner(SENTINEL, giver, recipient)` UserOperation at initiate time; it is
+stored server-side and submitted immediately after the registry claim succeeds.
+
+**Consequence:** provenance is uniform — a rock changes hands exactly when someone holding the
+physical object presents a fresh attestation — and a compromised owner key cannot hand the object
+to an attacker who never held it. The claim is relayed from `RELAYER_PRIVATE_KEY`, because the
+recipient has no gas and the Safe is still the giver's at that moment. Two consequences are
+stated rather than hidden: an **open** handover (`recipient == address(0)`) cannot be pre-signed,
+so its registry claim succeeds while the Safe owner swap is reported `UNAVAILABLE`; and the stored
+operation is one-shot and revocable — the claim route deletes it after submitting, and cancelling
+the handover discards it.
+
+**Rationale:** two on-chain shapes for one real-world event would make the history unreadable:
+some transfers proven by a tap, some not, distinguishable only by which function was called.
+
+**Files:** `contracts/contracts/BankRockRegistry.sol` (contract-level NatSpec, `initiateHandover`,
+`claimHandover`, `cancelHandover`); `web/src/lib/rock-account.server.ts`
+(`buildSwapOwnerUserOpCall`, `submitSignedUserOp`, `submitClaimHandover`);
+`web/src/app/api/rocks/[id]/pending-userop/route.ts`; `web/src/app/api/rocks/[id]/claim/route.ts`.
+
+### D-028 — Archive and start over
+
+**Decision:** `archiveRock(rockId)` is the one-way exit. It is owner-gated, cancels any pending
+handover (emitting `HandoverCancelled` before `RockArchived`), sets `RockState.Archived`, and
+deletes the UID binding so `rockIdForUid(uidHash)` returns 0 and the tag may awaken a *different*
+rock id. The archived record keeps its owner, smart account and UID hash as readable history;
+there is no `unarchive`. `lastCounter(uidHash)` is deliberately **not** reset: replay protection
+follows the tag, not the rock.
+
+**Consequence:** the awakening beat can be rehearsed repeatedly with one physical tag. **The tag
+URL never changes** — SDM rewrites only `e` and `c` on each read, and the path is written once
+(spec 18 §4.2) — so the number in the path is a hint, not the answer. The verifier therefore
+resolves the *effective* rock after the CMAC match and before the counter advance, and reports how
+it did so: `bound` (the registry maps this UID to a rock), `url` (tag unbound, the id on the tag
+is dormant and free), `next_free` (tag unbound, the id on the tag is archived or already awake),
+or `registry_unavailable` (the registry could not be read; the tag's id is echoed and nothing is
+claimed about it). The attestation is signed for the effective id, never for the URL id.
+
+**Rationale:** allocating a fresh rock per tap would break Flows C and D and contradicts the
+registry's own `UidBoundToDifferentRock` rule (spec 18 §4.3).
+
+**Files:** `contracts/contracts/BankRockRegistry.sol` (`archiveRock`, `lastCounter`,
+`rockIdForUid`); `web/src/lib/nfc/rock-resolution.ts`;
+`web/src/app/api/nfc/verify/route.ts`; `web/src/app/r/[id]/page.tsx`.
+
+### D-029 — One Rock Account per physical rock, per owner
+
+**Decision:** the Rock Account is a Safe 1.4.1 on EntryPoint 0.7 whose single owner is the user's
+Privy embedded wallet, with `saltNonce = uint256(uidHash)` — the same `keccak256(rawUid7Bytes)`
+the registry binds and the attestation signs. It is derived **server-side** by the verifier and
+signed into the attestation; a client-supplied `smartAccount` is ignored, not honoured. A
+visitor's taker account is a *personal* Safe with `saltNonce = 0`, not tied to any tag.
+
+**Consequence:** this narrows spec 03's "each physical rock maps to a persistent smart account".
+The mapping is (tag, owner) → account, not rock id → account. Two rocks held by the same person
+have two accounts whose balances never pool; the same tag under two owners yields two addresses;
+and a tag whose rock was archived awakens the *next* rock id into the *same* account for the same
+owner, which is what D-028's rehearsal loop needs. The address is counterfactual, so the verifier
+can quote it inside the signed attestation before any transaction exists. The rock id is
+deliberately not in the salt: it is not settled at the moment of the tap.
+
+**Files:** `web/src/lib/rock-account.ts` (`rockAccountSaltFor`, `computeRockAccountAddress`,
+`PERSONAL_ACCOUNT_SALT`); `web/src/lib/nfc/rock-resolution.ts` (`resolveSmartAccount`);
+`web/src/hooks/useRockAccount.ts`; `web/src/hooks/useTakerActions.ts`.
+
+### D-030 — Aqua through the reference XYCSwap app plus a Bank Rock taker periphery
+
+**Decision:** the Aqua path is the reference constant-product `XYCSwap` AquaApp, vendored
+unmodified and deployed by us, against the canonical Sepolia Aqua. The SwapVM router is not
+deployed; that path stays documented as the alternative
+(`contracts/scripts/deploy-swapvm-router.md`). One Bank Rock contract sits on the Aqua path:
+`XYCSwapTaker`, the taker-side periphery.
+
+**Consequence — an explicit deviation from D-006's "zero custom contract logic", and why it is
+unavoidable:** `XYCSwap.swapExactIn` settles by calling `xycSwapCallback` back into its *caller*,
+which must answer by pushing the input into Aqua. An EOA cannot answer it and a plain Safe would
+push nothing, so **a plain wallet cannot swap against the app at all**. `XYCSwapTaker` pulls the
+input from the taker, calls the app naming the taker as `to`, and fulfils the callback. It holds
+no funds between transactions, gates its public callback on a transient in-progress slot, and
+contains no pricing or accounting logic — it is periphery, the analogue of a swap router, not a
+strategy. The strategy logic is still entirely 1inch's.
+
+**The encoding it settles (E-4):**
+
+| Item | Value |
+| --- | --- |
+| Strategy struct | `Strategy { address maker, token0, token1; uint256 feeBps; bytes32 salt }` |
+| Salt domain | `keccak256("bankrock.aqua.strategy.v1")` |
+| Salt | `keccak256(abi.encode(SALT_DOMAIN, rockId, streamIndex))` — spec 04's strategy salt |
+| `strategy` | `abi.encode(Strategy)` — 160 bytes, five words |
+| `strategyHash` | `keccak256(strategy)`, recomputed by the app on every call |
+| Approval | the maker approves **Aqua**, once, for every strategy — never the app |
+| Taker approval | the taker approves the **periphery**, which is the opposite rule |
+
+Because the hash is recomputable from a public rock id and the Rock Account address, **a rock's
+strategies are addressable without an indexer**: build the hash for `streamIndex = 0, 1, …` and
+call `safeBalances`. A revert means "not shipped"; a success means "live, and here are the virtual
+balances".
+
+**Fee model:** there is no fee accumulator anywhere. The app prices a trade off
+`amountIn·(10000−feeBps)/10000` while the full gross `amountIn` is pushed back into the maker's
+wallet and virtual balance, so the fee is the unpriced slice of the input. Fees therefore accrue
+*inside the rock's own reserve* and show up as growth of the invariant `k`; there is nothing to
+claim and no `feesAccrued` to read. The UI shows the **rate** as `feeBps` read from the strategy
+(authenticated, because a strategy differing by one basis point hashes differently and has no
+balances), and the **cumulative amount** as `Σ Pushed.amount · feeBps / 10000` over that
+strategy's `Pushed` events, excluding the two the ship emits per token at launch. When the RPC
+cannot serve the log range the cumulative figure is `UNAVAILABLE`; it is never derived from
+balance deltas, which are P&L, not fees. Nothing here is annualised (D-004).
+
+**`dock` returns nothing**, because nothing ever left: shipping is an allowance over balances
+that stay in the maker's wallet. Docking zeroes the virtual balances and must list every token of
+the strategy in one call. Flow H's withdrawal *is* the dock; any transfer afterwards is a separate
+act by the maker.
+
+**Quoting:** `XYCSwap.quoteExactIn(strategy, zeroForOne, amountIn)` is the quote source — the
+identical code path `swapExactIn` runs, on the same block's balances. `quoteExactOut` is **not**
+its inverse: the reference app takes its fee off the input when quoting an exact input and off the
+output when quoting an exact output, so a round trip returns roughly `feeBps` high. Bank Rock's
+swap path is exact-in only, so the asymmetry never reaches a user.
+
+**Files:** `contracts/contracts/aqua/NOTES.md` (the full reading), `UPSTREAM.md` (provenance and
+licence), `XYCSwapTaker.sol`; `contracts/scripts/deploy-aqua-app.js`;
+`web/src/lib/aqua/{strategy,calls,quote,read,events,config}.ts`; `web/src/hooks/useTakerActions.ts`.
+
+### D-031 — The phone-first UI contract is delivered, and the checks are mechanical
+
+**Decision:** [`17-mobile-ui-and-typography.md`](./17-mobile-ui-and-typography.md) phases U0–U4
+are done in code — Inter wired through `next/font`, the named type scale with `text-xs` removed
+from the theme, the contrast tokens, the page frame with safe-area insets and `dvh`, the collapsing
+header, `BottomDock`, and one `Sheet` primitive behind every overlay. The static
+definition-of-done greps from spec 15 Part 7 and spec 17 Part 7 live in one runnable script,
+`scripts/spec-checks.sh`, which prints a spec ID per check and exits non-zero on any failure.
+
+**Consequence:** `bash scripts/spec-checks.sh` runs **20 checks** and the CI job that runs it is
+**blocking** — `continue-on-error` is gone, so a single failure stops the pull request. U4 landed too: `e2e-responsive` runs
+the Part 7 browser checks (items 1–9, including `axe-core` colour-contrast and target-size) over
+the route × viewport matrix against a production build with `NEXT_PUBLIC_DEMO_MODE=true`, so
+every surface renders. The `SIMULATED` badge, the demo banner and every `UNAVAILABLE` empty state
+are built to the contract rather than retrofitted, and are rendered into the layout so they
+survive a screenshot.
+
+**Two limits, stated rather than implied:** the e2e job configures **no chain**, so `/rock/*`
+reads `UNAVAILABLE` and the checks that need a live rock (items 7 and 8) *skip with a reason*
+rather than fail — point the job at a deployed registry and they exercise the real sheets. And
+item 10, the Lighthouse mobile budget, is not run in CI: it needs a throttled run against a public
+deployment, and stays manual, as does device testing.
+
+**Files:** `scripts/spec-checks.sh`; `.github/workflows/ci.yml` (`spec-checks` and
+`e2e-responsive` jobs); `web/playwright.config.ts`, `web/e2e/responsive.spec.ts`,
+`web/e2e/helpers.ts`; `web/src/components/ui/` (`sheet`, `button`, `icon-button`, `bottom-dock`,
+`amount`, `address`, `tx-hash`, `code-block`, `simulated-badge`, `demo-banner`,
+`unavailable-state`).
+
 ## Open product questions
 
 1. **Is the hackathon's main story gifting, a public micro-exchange, or both?** Gifting is the core product journey; public tap-to-trade is the primary demonstration of the liquidity.
@@ -210,7 +418,22 @@ The user tests the result on devices; CI catches regressions.
 8. **Is the initial custom strategy AMM-like, fixed-price or time-limited?** Constant-product (AMM-like).
 9. **Does ownership transfer preserve the maker address in the selected account architecture?** Yes, the ERC-4337 smart account architecture explicitly guarantees this.
 10. **Which sponsor-specific requirements must be reflected in the final demo?** The demo must clearly highlight Privy onboarding and 1inch/Aqua liquidity provision.
-11. **Which network actually hosts a usable Aqua deployment, and at what address?** Verified 2026-09-12 — see [`15-exit-demo-mode.md`](./15-exit-demo-mode.md) §1.3 C-4. Canonical deterministic addresses from the official READMEs are Aqua `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` and SwapVM router `0x111111338c5091e8440b67b168bae16a668ac0de`. **Neither exists on Base Sepolia**, nor on Arbitrum, OP or Unichain Sepolia. Both exist on Base mainnet. Aqua alone exists on Ethereum Sepolia; the SwapVM router does not, but the swap-vm repo ships Sepolia ignition parameters for self-deploying it. **Resolved by D-023:** Ethereum Sepolia, self-deploying only `SwapVMRouter` against the existing Aqua.
+11. **Which network actually hosts a usable Aqua deployment, and at what address?** Verified 2026-09-12 — see [`15-exit-demo-mode.md`](./15-exit-demo-mode.md) §1.3 C-4. Canonical deterministic addresses from the official READMEs are Aqua `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` and SwapVM router `0x111111338c5091e8440b67b168bae16a668ac0de`. **Neither exists on Base Sepolia**, nor on Arbitrum, OP or Unichain Sepolia. Both exist on Base mainnet. Aqua alone exists on Ethereum Sepolia; the SwapVM router does not, but the swap-vm repo ships Sepolia ignition parameters for self-deploying it. **Resolved by D-023:** Ethereum Sepolia, against the canonical Aqua. **Closed by D-030:** no SwapVM router is deployed at all — the app is the reference `XYCSwap`, deployed by `contracts/scripts/deploy-aqua-app.js`. The router path is written up but not taken (`contracts/scripts/deploy-swapvm-router.md`), and it names `AquaSwapVMRouter`, not `SwapVMRouter`, as the module that can read Aqua balances.
+
+12. **How are Aqua strategy bytes encoded (E-4)?** Resolved 2026-09-12 by reading the vendored
+    source, and pinned by tests on both sides. **Fact — XYCSwap (the path taken):**
+    `strategy = abi.encode(XYCSwap.Strategy{maker, token0, token1, feeBps, salt})` and
+    `strategyHash = keccak256(strategy)`, with
+    `salt = keccak256(abi.encode(keccak256("bankrock.aqua.strategy.v1"), rockId, streamIndex))`.
+    **Fact — SwapVM (the documented alternative):** `strategy = abi.encode(order)` and
+    `strategyHash == swapVM.hash(order)` for an Aqua-mode order, straight out of swap-vm's own
+    `test/solidity/base/AquaStrategyBuilders.sol`; `ISwapVM.hash` documents itself as
+    `keccak256(abi.encode(order))` for Aqua orders. What remains unsolved on that path is the
+    *program* bytes, not the envelope: `order.data` is SwapVM bytecode assembled by
+    `ProgramBuilder` in **Solidity only** — `@1inch/swap-vm` is still not on npm and its
+    `package.json` has no `main` or `exports` — so program bytes would have to come from a
+    committed Foundry script or a TypeScript port. That cost, not the encoding, is why D-030 took
+    the XYCSwap path. See `contracts/contracts/aqua/NOTES.md` §3 and §8.8.
 
 ## Implementation spikes
 

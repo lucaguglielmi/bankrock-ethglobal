@@ -18,7 +18,7 @@
  * deltas, which are inventory P&L, not fees (NOTES §6). Nothing here is annualised.
  *
  * Deleted with the rewrite: the `Math.random()` deposit hash and its BaseScan link (S-2), the
- * "Est. APR" figure (N-3), the fabricated second strategy, and the SIMULATED spread selector —
+ * estimated-return figure (N-3), the fabricated second strategy, and the SIMULATED spread selector —
  * the real fee tier is chosen once, in the ship sheet, because it is the strategy's identity.
  */
 

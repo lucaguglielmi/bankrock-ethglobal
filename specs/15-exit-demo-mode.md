@@ -298,6 +298,21 @@ to `(rockId, uid, counter)`.
 
 **Rationale:** F-1 defeats decision D-002, which is the product's central security claim.
 
+**Amended by D-026 — the attestation has six fields, not three.** What shipped binds
+`(rockId, uidHash, counter, deadline, subject, smartAccount)`:
+
+```
+Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)
+```
+
+under the domain `BankRockRegistry` / `1` / chain 11155111 / `verifyingContract` = the registry.
+`subject` is the wallet the tap authorises and becomes the owner; `smartAccount` is the Rock
+Account `awakenRock` is allowed to bind, and it is resolved **server-side** by the verifier — a
+`smartAccount` in the query string is ignored, not honoured. Neither attested call reads
+`msg.sender`, so both are relayable and neither is malleable: the signature covers every
+consequence the call can have. `claimHandover` ignores `smartAccount`, because it changes no
+account. See D-026 in [`09-decisions.md`](./09-decisions.md) for the full reasoning.
+
 ### D-019 — MCP returns `unavailable`, never invents
 
 **Decision:** every MCP tool either reads a real source or returns
@@ -378,6 +393,48 @@ Target state per capability at each phase:
 **Note:** APY is *removed*, not staged. It cannot be `REAL` — decision D-004 forbids the claim
 regardless of data quality.
 
+## After this branch
+
+The phase columns above are the plan. This column is the code, read on 2026-09-12 on branch
+`exit-from-demo-mode`. Two states are distinguished, because they fail differently in front of a
+judge:
+
+- **REAL (needs config)** — the code path is complete and reaches a live contract, RPC or
+  database. It renders `UNAVAILABLE` naming the missing variable until the secret is set or the
+  contract is deployed. Nothing is fabricated in either case.
+- **UNAVAILABLE (no path)** — there is no implementation to configure, on purpose.
+
+| Capability | After this branch | What makes it REAL |
+| --- | --- | --- |
+| Rock lifecycle state | REAL (needs config) | Registry deployed; `NEXT_PUBLIC_REGISTRY_ADDRESS` |
+| Rock Account address | REAL (needs config) | `NEXT_PUBLIC_PIMLICO_API_KEY`; derived, not deployed |
+| Token reserves | REAL | `ERC20.balanceOf(rockAccount)`; token addresses are fixed |
+| Provenance timeline | REAL (needs config) | `SEPOLIA_RPC_URL` + `REGISTRY_DEPLOY_BLOCK` |
+| Aqua strategy (ship / dock) | REAL (needs config) | `NEXT_PUBLIC_AQUA_APP_ADDRESS` |
+| Visitor swap | REAL (needs config) | `NEXT_PUBLIC_AQUA_TAKER_ADDRESS` as well (D-030) |
+| Earned fees | REAL (needs config) | App address + a provider RPC for the `Pushed` log range |
+| APY display | removed | Never returns (D-004) |
+| NFC attestation | REAL (needs config) | `NXP_MASTER_KEY` + attester key + a tag |
+| Ownership transfer | REAL (needs config) | Registry + `RELAYER_PRIVATE_KEY` (D-027) |
+| Archive and start over | REAL (needs config) | Registry; releases the tag binding (D-028) |
+| Cross-chain deposit | DEMO (badged) | Nothing — no bridge is integrated |
+| Keeper rebalance | UNAVAILABLE in data, DEMO in UI | Nothing — it invents no position |
+| Alerts delivery | UNAVAILABLE | Nothing — the pipeline is cut (Part 6) |
+| Admin dashboard | REAL (needs config) | D1 bound; admin session required |
+| MCP tools | REAL (partial) | `SEPOLIA_RPC_URL` + registry address; reads only |
+| User identity (Privy sign-in) | REAL (needs config) | `NEXT_PUBLIC_PRIVY_APP_ID`; no fake wallet left |
+| Judge scenario switcher | DEMO (flag only) | Cannot set attestation or any balance |
+| Shop contact / vanity forms | REAL (needs config) | D1 bound; no success state without a write |
+| AR / WebXR view | UNAVAILABLE (no path) | Cut in Part 6 |
+
+The living, one-line-per-item version of this, with the condition that makes each entry real, is
+[`../DEMO-STATE.md`](../DEMO-STATE.md) (Phase 6 item 4, STEERING rule 1).
+
+**Keeper rebalance, stated precisely:** `lib/aqua-keeper.ts` no longer synthesizes anything — both
+entry points return `UNAVAILABLE` naming the missing prerequisites, and no transaction hash can
+originate there. The *surface* remains a badged `DEMO` beat because the Gelato function behind it
+still targets an interface that does not exist (X-7).
+
 ---
 
 # Part 4 — Exit phases
@@ -430,18 +487,33 @@ over `web/src` returns nothing.
 
 ## Phase 2 — Real chain
 
-1. Rewrite `BankRockRegistry.sol` per D-020 and D-018: remove `executeTrade` and
+**Status:** items 1–7 are **done in code**; items 2's deploy step and everything downstream of it
+**need a deploy**. Marked per item below.
+
+1. **Done.** Rewrite `BankRockRegistry.sol` per D-020 and D-018: remove `executeTrade` and
    `setRouterWhitelist`; add `Ownable`; gate `awakenRock` on a server-signed EIP-712 attestation;
-   add pending-handover state with expiry for Flow E (SC-5).
-2. Write a real deploy script (C-3) and deploy to **Ethereum Sepolia** (D-023). Record the address
-   in env, verify on Sepolia Etherscan. Before this: switch every `baseSepolia` import to
-   `sepolia`, `providers.tsx` chain list, the Pimlico URL (`/v2/sepolia/rpc`), explorer links
-   (`sepolia.etherscan.io`), token addresses (spec 16 §1.1), and `hardhat.config.js`.
-3. Wire `lib/aa.ts` into the awaken path: deploy a Safe per rock via Pimlico, sponsored (C-6).
-4. Read lifecycle, owner and Rock Account address from the registry (C-7, C-8, C-9).
-5. Fix the indexer: query from the real deploy block in chunks, read block timestamps (X-5).
-6. Replace the admin dashboard mock with D1 reads (N-7).
-7. Fix the faucet: remove the default key (SA-4), add per-IP limiting (X-8).
+   add pending-handover state with expiry for Flow E (SC-5). Beyond the original scope:
+   `Pausable`, the six-field attestation (D-026), `archiveRock` (D-028), the informational lost
+   flag, and owner-gated actions that accept the rock's Safe as well as the owner wallet.
+2. **Script done, deploy pending.** `contracts/scripts/deploy.js` is a real deploy: it
+   broadcasts, waits for the receipt, reads the attester back off the chain, writes
+   `contracts/deployments/sepolia.json` and prints `NEXT_PUBLIC_REGISTRY_ADDRESS` and
+   `REGISTRY_DEPLOY_BLOCK`. It holds no address literal. The Sepolia switch (imports, chain list,
+   Pimlico URL, explorer links, token addresses, hardhat network) is done. **Needs a deploy** and
+   a source verification on Sepolia Etherscan.
+3. **Done, differently.** The Safe is not created by a separate step: its address is
+   counterfactual, derived from (owner, `saltNonce = uint256(uidHash)`) and signed into the
+   attestation (D-029), and the first sponsored UserOperation deploys it while doing the work.
+   `hooks/useBankRock.ts` and `hooks/useRockAccount.ts` are the call sites; `lib/aa.ts`'s role is
+   now filled by `lib/rock-account.ts`.
+4. **Done.** Lifecycle, owner, Rock Account address, lost flag and handover come from `getRock`.
+5. **Done.** The indexer scans forward from `REGISTRY_DEPLOY_BLOCK` in 2,000-block chunks, reads
+   the block's own timestamp, and uses the current event vocabulary —
+   `RockOwnershipTransferred` is gone, `HandoverClaimed` and `RockArchived` are in (X-5, C-3).
+6. **Done.** `GET /api/admin/stats` reads D1 behind the admin session and says so when the
+   database holds nothing (N-7).
+7. **Done.** `FAUCET_PRIVATE_KEY` is required with no default, and the limits are per address and
+   per IP in D1 (SA-4, X-8).
 
 **Acceptance:** `eth_getCode` at the configured registry returns non-empty. Awakening a rock from a
 fresh Privy account produces a real, explorer-verifiable transaction and a Safe whose address the
@@ -452,42 +524,86 @@ Two browsers show the same state for the same rock.
 
 This is the sponsor integration and the reason the project exists.
 
-1. **Network decided: Ethereum Sepolia (D-023).** Deploy `SwapVMRouter` from an unmodified
-   checkout of `github.com/1inch/swap-vm`: add a `sepolia` network to its `hardhat.config.ts`, set
-   `aqua` in `ignition/parameters/chain-11155111.json` to `0x1111113ccf…6a90a`, run
-   `npx hardhat ignition deploy ignition/modules/SwapVMRouter.ts --network sepolia --parameters …`.
-   Record the address as `NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS`.
-2. **Resolve the strategy encoding** (E-4). Read `test/solidity/helpers/AquaStrategyBuilders.sol`
-   in the swap-vm repo to confirm what `ship()` receives as `strategy` for an Aqua-mode order
-   *(hypothesis: the ABI-encoded order, with `strategyHash == swapVM.hash(order)`)*. Produce the
-   constant-product program bytes with a committed Foundry script. If this takes more than a day,
-   fall back to the reference `XYCSwap` AquaApp per spec 04.
-3. Fix the ABI in `lib/aa.ts` (E-3) and implement `ship` via the atomic batch (D-012):
-   `approve(Aqua, USDC)`, `approve(Aqua, WETH)`, `Aqua.ship(app, strategy, [USDC, WETH], [a, b])`.
-4. Implement the visitor swap path against the strategy — from the Rock Account, not the registry
-   (SC-4, D-020).
-5. Read actual *and* virtual balances and display both, per spec 04's explicit requirement that
-   virtual allocations are not summed and presented as owned capital.
-6. Implement `dock` (Flow H).
-7. Delete `/api/quote` and `1INCH_API_KEY` (E-5). Quote from `SwapVMRouter.quote()` — the only
-   source guaranteed to equal what `swap()` executes.
-8. Ship the second strategy sharing one reserve (spec 04).
+**Status:** the path is decided and built (**D-030**). Items 2–7 are done in code; item 1 was
+superseded; item 8 is unblocked but not shipped. Everything here needs the app deploy.
+
+1. ~~Deploy `SwapVMRouter`.~~ **Superseded by D-030 — and the instruction was wrong twice.**
+   (a) For Aqua-shipped strategies the module is **`AquaSwapVMRouter`**
+   (`ignition/modules/AquaSwapVMRouter.ts`); plain `SwapVMRouter` carries no `AquaOpcodes` and
+   cannot read or move Aqua balances at all. (b) The path taken is **not** SwapVM: it is the
+   reference constant-product **`XYCSwap`** AquaApp, vendored unmodified and deployed by
+   `contracts/scripts/deploy-aqua-app.js` together with the `XYCSwapTaker` periphery, against the
+   canonical Sepolia Aqua. The router is 20 KB of virtual machine whose *program* bytes still have
+   no JavaScript path; the app is 5 KB that maps directly onto spec 04's constant-product
+   strategy. The router route stays documented, with the deploy steps and what it would change,
+   in `contracts/scripts/deploy-swapvm-router.md`.
+   There is no `NEXT_PUBLIC_SWAPVM_ROUTER_ADDRESS`.
+2. **Done — E-4 is resolved, on both paths.** For XYCSwap,
+   `strategy = abi.encode(Strategy{maker, token0, token1, feeBps, salt})` with
+   `salt = keccak256(abi.encode(keccak256("bankrock.aqua.strategy.v1"), rockId, streamIndex))` and
+   `strategyHash = keccak256(strategy)`. The SwapVM hypothesis was checked anyway and is **true**:
+   `strategy = abi.encode(order)`, `strategyHash == swapVM.hash(order)`. What is still unsolved on
+   that path is the *program* bytes, which are Solidity-only. Full reading:
+   [`../contracts/contracts/aqua/NOTES.md`](../contracts/contracts/aqua/NOTES.md).
+3. **Done.** The correct Aqua ABI is in `lib/chain/abi/aqua.ts` (E-3) and `lib/aqua/calls.ts`
+   builds the atomic batch (D-012): `approve(Aqua, USDC)`, `approve(Aqua, WETH)`,
+   `Aqua.ship(app, strategy, [USDC, WETH], [a, b])`. The maker approves **Aqua**, never the app.
+4. **Done.** The visitor swap runs from the visitor's own personal Safe (salt 0, D-029) through
+   `XYCSwapTaker`, never from the registry (SC-4, D-020) — and it must, because `XYCSwap` calls
+   `xycSwapCallback` back into its caller and a plain wallet cannot answer it (D-030).
+5. **Done.** `lib/aqua/read.ts` reads actual, virtual and *executable* separately and never sums
+   virtual balances across streams.
+6. **Done, with the semantics corrected.** `dock` returns nothing, because nothing ever left the
+   maker's wallet: docking zeroes the virtual balances and *is* the withdrawal. The UI must not
+   promise an incoming transfer (Flow H).
+7. **Done.** `/api/quote` and `1INCH_API_KEY` are deleted (E-5). The quote source is
+   `XYCSwap.quoteExactIn(strategy, zeroForOne, amountIn)` — the identical code path
+   `swapExactIn` runs, on the same block's balances — with the mirrored integer maths in
+   `lib/aqua/quote.ts` as a preview only. `quoteExactOut` is **not** the inverse of
+   `quoteExactIn`; the swap path is exact-in only, so that asymmetry never reaches a user.
+8. **Unblocked, not shipped.** A second strategy sharing one reserve is a second `streamIndex` and
+   nothing more; `SharedReserve.t.sol` pins the behaviour. It stays last in line (spec 08's
+   fallback order, item 4).
 
 **Acceptance:** a second Privy account executes a real swap against a rock's strategy; the rock's
 actual and virtual balances both change on-chain; the fee figure shown is read from Aqua, not
 computed client-side. Two strategies share one reserve and the UI shows availability correctly.
 
+**Acceptance, restated for the fee figure (D-030):** "read from Aqua" means the **rate** is
+`feeBps` read out of the strategy, and the **cumulative amount** is
+`Σ Pushed.amount · feeBps / 10000` over that strategy's `Pushed` events, excluding the two the
+ship itself emits. There is no fee accumulator to read: the fee is the unpriced slice of the
+input and accrues inside the rock's own reserve. A figure derived from balance deltas is P&L, not
+fees, and is forbidden.
+
 ## Phase 4 — Real NFC
 
-1. Delete `actions/verify-ntag.ts` (D-018, F-1).
-2. Implement correct SDM verification (F-3): PICC offsets, SV1/SV2 session key derivation, CMAC,
-   truncation.
+**Status:** items 1–4 and 6–8 are **done in code**; item 5 is operator work; nothing here has been
+tested against a physical tag.
+
+1. **Done.** One verifier. `actions/verify-ntag.ts` no longer holds an implementation
+   (D-018, F-1).
+2. **Done.** `lib/nfc/sdm.ts` performs PICC decryption at the correct offsets, NXP SV1/SV2
+   session-key derivation, the CMAC and its odd-byte truncation (F-3). **Unverified against a
+   physical tag** — that is the one thing code cannot settle.
 3. ~~Add `nodejs_compat`.~~ Not needed (F-4 withdrawn). Keep `compatibility_date >= 2026-08-04`.
-4. Move the counter store to D1 with a conditional update; it must be durable and atomic (R-4).
-5. Provision real tag keys; store the master key in Cloudflare secrets, never in `.env.example`.
-6. Implement `/r/{publicRockId}` (R-7, D-022).
-7. Bind attestation to the on-chain claim path (F-5, F-6).
-8. Gate the `Verified Physical` badge on a real CMAC match only.
+4. **Done.** The counter store is D1 (`nfc_counters`) with a conditional update; the in-memory
+   store is selected only when `NEXT_PUBLIC_DEMO_MODE=true` (R-4).
+5. **Operator work.** Generate `NXP_MASTER_KEY`, write it to the tags, and keep it in Cloudflare
+   secrets — it is not in `.env.example` and must not be. Settings: spec 18 §4.2.
+6. **Done.** `/r/{publicRockId}` exists and preserves the query verbatim on the hop to the rock
+   page. It deliberately does **not** verify: verification advances the tag's counter, and a
+   counter advanced on a redirect would burn the tap (R-7, D-022).
+7. **Done, and widened.** The attestation binds the claim path *and* the awakening, and names the
+   Rock Account as well as the subject (D-026). `verifiedPubKey` is gone (F-5); the registry
+   consumes the counter on-chain and rejects a reused one (F-6).
+8. **Done.** No client-side code path can set the verified state; the judge switcher has no
+   callback that could (F-7).
+
+**Also delivered here, and not in the original plan:** the verifier resolves the *effective* rock
+after the CMAC match and before the counter advance — `bound` / `url` / `next_free` /
+`registry_unavailable` — and signs the attestation for the effective id, never for the id written
+on the tag (D-028).
 
 **Acceptance:** a physical tap shows `Verified Physical`. Replaying that exact URL a second time is
 rejected as a stale counter. A hand-edited `?c=` value shows `unverified`. **A copied URL never
@@ -512,16 +628,22 @@ address, email, UID, or stack trace.
 
 ## Phase 6 — Honesty pass
 
-1. Audit every remaining `DEMO` surface for its badge.
-2. Write the demo-mode banner.
-3. Update `README.md`: replace "Specification and technical validation only. No product
-   implementation has started." — which is no longer true either — with the real state.
-4. Regenerate the simulation ledger (§1.3) as a living `DEMO-STATE.md`, per STEERING rule 1.
-5. Correct spec 12 (D-021); update spec 06 if the tag URL scheme changed.
-6. Every `SIMULATED` badge, the banner and every `UNAVAILABLE` empty state follow the type scale,
-   contrast tokens and 44 px targets of
-   [`17-mobile-ui-and-typography.md`](./17-mobile-ui-and-typography.md), which lands before this
-   phase.
+**Status:** items 1, 2 and 6 are done in code; 3, 4 and 5 are done in this documentation pass.
+
+1. **Done.** `SimulatedBadge` and `UnavailableState` are primitives, applied surface by surface.
+2. **Done.** `web/src/components/ui/demo-banner.tsx`.
+3. **Done.** `README.md` now states the real state instead of "Specification and technical
+   validation only."
+4. **Done.** [`../DEMO-STATE.md`](../DEMO-STATE.md) is the living list, one line per item with
+   the spec ID and the condition that makes it real (STEERING rule 1). §1.3 stays frozen as the
+   audit baseline.
+5. **Done.** Spec 12 describes Cloudflare and the current deploy order (D-021); spec 06 now
+   carries the exact tag URL template, points at spec 18 §4.2 for the SDM settings, and records
+   that the URL never changes across an archive (D-028).
+6. **Done.** Every `SIMULATED` badge, the banner and every `UNAVAILABLE` empty state follow the
+   type scale, contrast tokens and 44 px targets of
+   [`17-mobile-ui-and-typography.md`](./17-mobile-ui-and-typography.md) — U0–U3 landed before
+   this phase, as required, and U4 has since landed as well (D-031).
 
 **Acceptance:** every simulated pixel is labelled. A judge shown the app with
 `NEXT_PUBLIC_DEMO_MODE=true` can identify what is real without asking.
@@ -540,7 +662,9 @@ Required by the spec rules for security-sensitive behaviour.
 | Tag cloned bit-for-bit | AES-128 master key is never on the tag in readable form; CMAC requires the diversified key | Physical key extraction from the chip. Out of scope; NTAG 424 DNA is the stated boundary (spec 06). |
 | Forged `c` parameter | CMAC verified server-side against the derived session key | None if the master key stays secret. |
 | Master key disclosure | Cloudflare secret; never in `.env.example`; rotate per batch | Full compromise of all tags in a batch. Accepted for the hackathon; per-tag diversification is the post-hackathon fix. |
-| Attestation replayed against the chain | EIP-712 payload binds `(rockId, uid, counter, deadline)`; registry rejects a reused counter | Requires the attestation signer key to stay secret. |
+| Attestation replayed against the chain | EIP-712 payload binds `(rockId, uidHash, counter, deadline, subject, smartAccount)`; the registry requires a strictly higher counter for that UID | Requires the attestation signer key to stay secret. |
+| Attestation re-submitted by an observer naming their own Safe | `awakenRock` requires `att.smartAccount == smartAccount`, and the field is inside the signature (D-026) | None. A relayer can only carry out the awakening the attester already authorised. |
+| Attestation replayed across an archive boundary | `lastCounter(uidHash)` is never reset — replay protection follows the tag, not the rock (D-028) | None. |
 
 **Non-goal, restated from spec 06:** physical possession is never sufficient financial
 authorization. Attestation gates *claiming*, never *spending*.
@@ -551,7 +675,9 @@ authorization. Attestation gates *claiming*, never *spending*.
 | --- | --- |
 | Arbitrary call from the registry (SC-1) | The primitive is removed, not guarded. |
 | Rock squatting / front-running `awakenRock` (SC-2) | Requires a server-signed attestation bound to a verified tap. |
-| Ownership seized mid-handover (SC-5) | Pending handover with expiry; only the named recipient can complete it. |
+| Ownership seized mid-handover (SC-5) | Pending handover with expiry; a named recipient is matched against `att.subject`, not against the sender. |
+| A cancelled gift's pre-signed Safe owner swap surviving | The claim route deletes the stored operation after submitting, and cancelling the handover discards it (D-027). |
+| The claim relayer redirecting a gift to itself | It cannot: ownership comes from `att.subject`, inside the signature. `msg.sender` is not an input (D-026). |
 | Registry holding value | It never holds tokens and never receives approvals. Assets live in the Rock Account. |
 
 ## Demo mode itself
@@ -586,7 +712,27 @@ working Aqua transaction or security model."* Phases 2, 3 and 4 are precisely th
 
 # Part 7 — Definition of done
 
-Mechanically checkable. Add each as a CI step.
+Mechanically checkable. **The static checks below are implemented in
+[`../scripts/spec-checks.sh`](../scripts/spec-checks.sh)**, which runs both this section and spec
+17 Part 7, prints the spec ID and PASS/FAIL for each, shows the offending lines on a failure, and
+exits non-zero if any check fails. There are **20 checks**, and they are expected to pass on
+every pull request.
+
+Three deviations from the literal greps here are implemented in the script and documented in its
+header: build output and installed packages are excluded everywhere (a `pages.dev` string inside
+a dependency is not a D-022 violation); `--exclude-dir=chain` is used rather than the path form,
+because GNU grep matches that option against the directory's *basename* and the path form would
+pass vacuously; and a check whose target file is missing FAILs rather than passing quietly.
+
+CI runs it as the `spec-checks` job, and **that job is blocking** (spec 17 U4, D-031). The browser
+half of spec 17 Part 7 runs alongside it as `e2e-responsive`: Playwright over the route × viewport
+matrix plus `axe-core`, against a production build with `NEXT_PUBLIC_DEMO_MODE=true` so every
+surface renders. That job configures no chain, so the two checks that need a live rock skip with a
+reason instead of failing; the Lighthouse budget stays a manual check.
+
+The build, lint, typecheck, test and `npm run build` steps are separate CI jobs; the live `curl`
+and `cast code` assertions need a deployed site and a deployed contract, so the script does not
+attempt them.
 
 ```
 # Build integrity
@@ -638,30 +784,54 @@ And the one test that cannot be automated:
 
 # Part 8 — What remains simulated after exit
 
-Stated plainly so it can be stated plainly to judges:
+Stated plainly so it can be stated plainly to judges. The living, per-item version with the
+condition that clears each one is [`../DEMO-STATE.md`](../DEMO-STATE.md).
 
 - Cross-chain deposit — `DEMO`, badged. No bridge is integrated.
-- Keeper rebalancing — `DEMO`, badged. The Gelato function is written but points at a
-  non-existent interface (X-7).
-- Alert delivery — `UNAVAILABLE`. Preferences persist; nothing dispatches.
-- Fiat on-ramp / off-ramp (Flows G, H fiat legs) — out of scope per spec 08, unchanged.
-- AR view — cut (Part 6).
+- Keeper rebalancing — `UNAVAILABLE` in the data layer (`lib/aqua-keeper.ts` invents nothing and
+  can produce no transaction hash); the *surface* stays a badged `DEMO` beat because the Gelato
+  function behind it points at a non-existent interface (X-7).
+- Alert delivery — `UNAVAILABLE`. Preferences persist, behind a verified Privy token; nothing
+  dispatches.
+- Fiat on-ramp / off-ramp (Flows G, H fiat legs) — out of scope per spec 08, unchanged. Note that
+  Flow H's on-chain leg is *not* simulated: `dock` is real, and docking is the withdrawal.
+- AR view — cut (Part 6). The demo script's opening beat is rewritten without it (spec 08).
+- The second strategy sharing one reserve — not shipped. Unblocked: it is one more `streamIndex`.
 
-Everything else is either real or shows an honest empty state. That is the exit condition.
+And two that are neither simulated nor real, because no deploy has happened yet:
+
+- Everything downstream of the registry deploy — lifecycle, ownership, provenance, archive —
+  renders `UNAVAILABLE` naming `NEXT_PUBLIC_REGISTRY_ADDRESS` until `contracts/scripts/deploy.js`
+  has run.
+- Everything downstream of the Aqua app deploy — ship, dock, visitor swap, fees, quotes — renders
+  `UNAVAILABLE` naming `NEXT_PUBLIC_AQUA_APP_ADDRESS` / `NEXT_PUBLIC_AQUA_TAKER_ADDRESS` until
+  `contracts/scripts/deploy-aqua-app.js` has run.
+
+That distinction is the point of D-013: an unconfigured capability says what is missing; it never
+substitutes a number. Everything else is either real or shows an honest empty state. That is the
+exit condition.
 
 ---
 
 ## Amendments to the decision log
 
-Decisions D-013 through D-022 are added to [`09-decisions.md`](./09-decisions.md).
+Decisions D-013 through D-022 are added to [`09-decisions.md`](./09-decisions.md), and
+**D-026 through D-031** record what was decided while this plan was implemented: the six-field
+attestation and the relayable calls (D-026), handover as the only ownership path (D-027), archive
+and start over (D-028), the Rock Account salt rule (D-029), the XYCSwap path and its taker
+periphery (D-030), and the delivered UI contract with its mechanical checks (D-031).
 
 Open question 11 is added: **which network actually hosts a usable Aqua deployment?** C-4 exists
-because this was never verified. Phase 3 does not start until it is answered.
+because this was never verified. Phase 3 does not start until it is answered. *Answered by D-023
+and closed by D-030.* Open question 12 records the resolution of **E-4**, the strategy encoding,
+on both the XYCSwap and SwapVM paths.
 
 ## Relationship to spec 17
 
 [`17-mobile-ui-and-typography.md`](./17-mobile-ui-and-typography.md) is UI-only work with its
-own phases (U0–U4). It runs in parallel with Phases 1–5 above and must land before Phase 6: the
+own phases (U0–U4). **U0–U3 landed before Phase 6, as required, and U4 — the blocking spec-check
+job and the Playwright viewport matrix — has landed too** (D-031). It runs in parallel with
+Phases 1–5 above and must land before Phase 6: the
 `SIMULATED` badge, the demo banner and the `UNAVAILABLE` empty states introduced by D-013 are new
 surfaces and are built to that contract, not retrofitted. The two documents share one rule: a
 badge, banner or empty state is rendered into the layout, never overlaid, so it survives a
@@ -674,3 +844,17 @@ Ledger additions A-1, A-2, F-7, S-6, S-7, N-11; B-9 marked resolved; Phase 0 ite
 numbered 3); Part 7 `--exclude-dir` fixed and the `.env.production` check replaced (no such file
 exists by design — spec 16 puts secrets in the dashboard); capability table rows for identity,
 the switcher and the forms.
+
+## Third-pass changes (this branch, after implementation)
+
+Part 3 gains the **After this branch** table — the code's state, with `REAL (needs config)`
+separated from `UNAVAILABLE (no path)` because they fail differently in front of a judge. D-018
+is amended for the six-field attestation (D-026). Phases 2, 3, 4 and 6 are marked item by item as
+done in code, needing a deploy, or operator work. Phase 3 step 1 is corrected twice over: the
+Aqua-capable SwapVM module is `AquaSwapVMRouter`, not `SwapVMRouter`, and the path taken is
+neither — it is the reference `XYCSwap` app plus the `XYCSwapTaker` periphery (D-030). Part 5
+gains three attestation threats and three registry threats that the implemented design answers.
+Part 7 names `scripts/spec-checks.sh` and records that the job is blocking, alongside the
+Playwright matrix U4 added. Part 8
+separates "simulated" from "not deployed yet". Part 1 is untouched: it is the audit baseline, and
+the living replacement for its §1.3 is [`../DEMO-STATE.md`](../DEMO-STATE.md).

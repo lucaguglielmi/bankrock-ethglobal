@@ -19,7 +19,9 @@ Target integrations are Aqua and Privy. Exact sponsor prize eligibility and requ
 9. NFC cloning-safe authorization.
 10. Explorer links and honest risk disclosure.
 11. An MCP Server allowing an AI agent to read the rock's state.
-12. WebXR (AR) visualization of the physical rock.
+12. ~~WebXR (AR) visualization of the physical rock.~~ **Cut** — spec 15 Part 6. Zero
+    implementation existed; it is a presentation flourish, and the exit phases are the
+    submission. It is also removed from the demo script below.
 13. Proof of physical tap using NTAG 424 DNA signatures.
 
 ## Strong target
@@ -43,13 +45,23 @@ After the must-have path works:
 
 ## Three-minute demo story
 
-### 0:00–0:25 — The object & AR Hologram
+### 0:00–0:25 — The object, and the proof
 
 Show the physical rock.
 
-“This is not a hardware wallet. It is a physical interface to a self-custodial liquidity account.”
+"This is not a hardware wallet. It is a physical interface to a self-custodial liquidity account."
 
-Tap it with a phone. The NTAG 424 DNA tag mathematically proves the tap. The public page opens. Tap "AR View" and point the camera at the rock to see its live token balances floating around it in Augmented Reality.
+Tap it with a phone. The page opens and the badge reads **Verified Physical** — the chip generated
+a fresh signed URL for that one read, the server checked the CMAC against the tag's own key, and
+the read counter moved.
+
+Then do the thing that makes the claim falsifiable: **copy the URL out of the address bar and open
+it in a second browser.** The badge reads `unverified`. Same link, same rock, no proof — because
+the counter it carries has been spent.
+
+"The tag proves the object. It never proves the person, and it never authorises a payment."
+
+*(There is no AR beat. WebXR is cut — spec 15 Part 6. Do not open an AR view; there isn't one.)*
 
 ### 0:25–0:55 — Privy onboarding
 
@@ -69,7 +81,14 @@ Use a second account to execute a small testnet swap against the selected rock. 
 
 ### 2:10–2:30 — Gift or transfer (Zero Gas)
 
-Transfer control to a second Privy account. Emphasize that thanks to ERC-4337 and Paymasters, the recipient claims the rock with **zero gas fees** and no complex setup.
+Open the gift, name the second Privy account, and sign once. That single signature does two
+things: it opens the pending handover on chain, and it pre-signs the Safe owner swap that the
+recipient cannot produce for themselves (D-027).
+
+Then hand over the rock. The recipient taps it, signs in on a fresh account with no ETH, and the
+claim is relayed: the registry credits the subject named inside the attestation, and the stored
+owner swap follows, so the account and everything in it move with the object. **Zero gas fees,
+no native tokens, and the giver did not need to be present.**
 
 ### 2:30–2:55 — The AI Oracle & Agentic Strategies (MCP)
 
@@ -78,6 +97,26 @@ Open an external chat interface with an AI agent (e.g., ChatGPT or Claude Deskto
 ### 2:55–3:10 — Platform potential
 
 “Bank Rock binds physical objects to programmable, self-custodial liquidity, and makes them conversational via AI. Rocks are the first interface; art, cards, products and installations can use the same model.”
+
+## Rehearsal — archive and start over
+
+The awakening beat is one-shot per rock: a rock can be awakened exactly once, and a tag binds to
+exactly one rock at a time. To rehearse it more than once with a single physical tag, use
+`archiveRock` (D-028, Flow K):
+
+1. Retire the rock from the owner menu. The tag binding is released; the archived rock stays
+   readable as history and its id is never reissued.
+2. Tap again. The URL is unchanged — SDM rewrites only `e` and `c` — so the verifier resolves
+   `next_free` and offers the next unused rock id.
+3. Awaken into it. **Same Rock Account address**, because the account is salted by the tag, not
+   by the rock id (D-029) — so whatever was funded is still there and does not need re-funding.
+4. The read counter never resets, so nothing captured before the archive can be replayed.
+
+The cheaper rehearsal, for everything except the on-chain awakening itself, is
+`NEXT_PUBLIC_DEMO_MODE=true` locally: the in-memory counter store is used, and every beat can be
+walked through without spending a faucet claim (spec 18 §4.3). **The demo needs one successful
+awakening on stage, not many.** Fund one Rock Account the night before, rehearse against a second
+rock id, and keep `archiveRock` as the recovery lever if the stage awakening has to be redone.
 
 ## Acceptance test
 

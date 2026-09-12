@@ -15,6 +15,21 @@ There are two distinct identities:
 
 The user wallet should control the Rock Account. The rock's funds should not be mixed with the user's unrelated wallet balances.
 
+**How that separation is actually produced (D-029).** Both accounts are Safe 1.4.1 smart accounts
+on EntryPoint 0.7 owned by the same Privy embedded wallet, and what distinguishes them is the
+CREATE2 salt:
+
+| Account | `saltNonce` | Belongs to | Used for |
+| --- | --- | --- | --- |
+| Rock Account | `uint256(keccak256(rawUid))` — the tag | one rock, one owner | Holding the reserve, shipping and docking |
+| Personal account | `0` | the person | Trading against *any* rock, as a visitor |
+
+So one owner's two rocks have two accounts that never pool, and one visitor has one account no
+matter how many rocks they trade with. The Rock Account's address is counterfactual and derived
+**server-side by the NFC verifier**, which signs it into the attestation; the client cannot choose
+it (D-026). The personal account exists so a visitor's swap can be one sponsored batch and so the
+taker periphery has a contract to call back into (D-030) — not because it belongs to a rock.
+
 ## Supported login methods
 
 MVP preference:
@@ -65,9 +80,9 @@ To enable the Model Context Protocol (MCP) AI agent to assist the owner without 
 Standard DeFi interactions require repetitive token approvals followed by contract deposits. Bank Rock leverages ERC-4337 native batch execution (`executeBatch`):
 
 - In a single user interaction, the Privy wallet signs one UserOperation that bundles:
-  1. `USDC.approve(AquaContract, depositAmount)`
-  2. `WETH.approve(AquaContract, depositAmount)`
-  3. `Aqua.ship(strategyHash, SwapVMBytecode)`
+  1. `USDC.approve(Aqua, amount)` — the approval goes to **Aqua**, never to the app
+  2. `WETH.approve(Aqua, amount)`
+  3. `Aqua.ship(app, strategy, [USDC, WETH], [a, b])` — the real signature (E-3, D-030)
 - This executes atomically: either all approvals and strategy registrations succeed, or the entire operation reverts, preventing "approved but un-deposited" stranded token states.
 
 ## Gas and Paymaster Architecture
@@ -97,6 +112,22 @@ Because the Rock Account is an ERC-4337 Smart Account, we can seamlessly transfe
 - account address, funds and Aqua maker identity remain completely stable.
 
 This avoids the complexity of the "dock, transfer, reship" fallback entirely.
+
+**When the signature is produced, and by whom (D-027).** The Safe can only authorise its own owner
+swap with a signature from its current owner — the giver — and the giver is by definition not
+present when the recipient taps. So the giver signs
+`Safe.swapOwner(SENTINEL, giver, recipient)` as a UserOperation **at the moment the gift is
+created**, and it is stored until the claim. The claim route submits it immediately after the
+registry claim succeeds. Two consequences are stated rather than hidden: an **open** handover has
+no recipient address to sign for, so its owner swap cannot be pre-signed and is reported
+`UNAVAILABLE` while the registry claim still succeeds; and the stored operation is one-shot and
+revocable — cancelling the handover deletes it.
+
+**Two different keys pay for this, and neither can redirect it.** The *attestation signer* never
+transacts and holds no funds; it only states that a genuine tap happened, for a named `subject`
+and `smartAccount`. The *relayer* pays gas for `claimHandover`, because the recipient has none and
+the Safe is still the giver's. Neither can send the rock elsewhere: ownership comes from
+`att.subject` inside the signature, never from `msg.sender` (D-026).
 
 ## Failure states
 
