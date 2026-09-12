@@ -7,6 +7,8 @@
 #   specs/15-exit-demo-mode.md  Part 7  — demo mode, synthesized evidence, one adapter,
 #                                         one origin, fail-closed secrets, no APY
 #   specs/17-mobile-ui-and-typography.md Part 7 — typography scale, viewport units, overlays
+#   specs/20-privy-earn-and-hackathon-qualification.md Part 7 — no rate reaches a bundle, the
+#                                         app secret is read in one file, the signed path exists
 #
 # Only the *static* checks live here. The build, lint, typecheck, test and `npm run build`
 # steps from the same sections are separate CI jobs, and the live `curl` / `cast code`
@@ -231,6 +233,43 @@ if paths_exist "$t7_id" "$t7_desc" "web/src"; then
     pass "$t7_id" "$t7_desc"
   fi
 fi
+
+# ---------------------------------------------------------------------------
+section "specs/20-privy-earn-and-hackathon-qualification.md — Part 7"
+# ---------------------------------------------------------------------------
+
+# E-1 — D-004 as amended by D-033: Privy's rate fields are stripped on the server and never
+# reach a bundle.
+expect_absent "E-1" "no Privy rate field (user_apy, app_apy, total_rewards_apr, tvl_usd) in components or hooks" \
+  2 "web/src/components" "web/src/hooks" \
+  -rE 'user_apy|app_apy|total_rewards_apr|tvl_usd'
+
+# E-2 — the app secret is read in exactly one file. Tests that set process.env are excepted.
+e2_id="E-2"
+e2_desc="PRIVY_APP_SECRET is read only in web/src/lib/earn/config.ts"
+if paths_exist "$e2_id" "$e2_desc" "web/src/lib/earn/config.ts" "web/src"; then
+  e2_out="$(grep -rl 'PRIVY_APP_SECRET' "${EXCLUDES[@]}" --exclude='*.test.ts' -- "web/src" 2>/dev/null | grep -v 'web/src/lib/earn/config.ts')" || true
+  if [ -n "$e2_out" ]; then
+    fail "$e2_id" "$e2_desc" "$e2_out"
+  else
+    pass "$e2_id" "$e2_desc"
+  fi
+fi
+
+# E-3 — the secret has no public twin, anywhere under web/.
+expect_absent "E-3" "no NEXT_PUBLIC_PRIVY_APP_SECRET anywhere in web/" \
+  1 "web" \
+  -r -F 'NEXT_PUBLIC_PRIVY_APP_SECRET'
+
+# E-4 — the signed path exists: the client's signature is forwarded to Privy.
+expect_present "E-4" "privy-api.ts forwards privy-authorization-signature" \
+  1 "web/src/lib/earn/privy-api.ts" \
+  -F 'privy-authorization-signature'
+
+# E-5 — and there is no unsigned path: the write route refuses a missing signature.
+expect_present "E-5" "the earn write route refuses a request without the wallet's signature" \
+  1 "web/src/lib/earn/write-route.server.ts" \
+  -F 'the wallet must sign the request'
 
 # ---------------------------------------------------------------------------
 printf '\n%s%d passed, %d failed%s\n' "$BOLD" "$PASSED" "$FAILED" "$RESET"

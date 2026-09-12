@@ -204,12 +204,16 @@ secret you create locally (`openssl rand -hex 32`). *Output* = produced by a dep
 | 35 | `NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY` | Generate — `npx web-push generate-vapid-keys` | `hooks/useNotifications.ts` (browser), `app/api/webpush/route.ts` | Phase 5, optional | The browser subscribes with this key and the server signs with #36; **the two must be halves of one pair, or every delivery fails silently.** Perimeter `P-7` was exactly that mismatch, under two different variable names — the browser read `NEXT_PUBLIC_VAPID_PUBLIC_KEY` while the route read `WEB_PUSH_VAPID_PUBLIC_KEY`. One name now, and it is `NEXT_PUBLIC_`-prefixed because the public key is public by construction |
 | 36 | `WEB_PUSH_VAPID_PRIVATE_KEY` | Generate — the other half of #35 | `app/api/webpush/route.ts` | Phase 5, optional | Server-side only. Never `NEXT_PUBLIC_`. Cloudflare secret, not a file |
 | 37 | `WEB_PUSH_SUBJECT` | Fixed — a `mailto:` or `https:` URL you own | `app/api/webpush/route.ts` | Phase 5, optional | The VAPID `sub` claim: who a push service should contact about this sender. e.g. `mailto:security@bank-rock.com`. All three of #35–#37 unset ⇒ push is `UNAVAILABLE`, which is the correct state; a partial set is the failure mode worth avoiding (spec 14) |
+| 38 | `PRIVY_APP_SECRET` | You — dashboard.privy.io → App settings → Basics | `lib/earn/config.ts` only (spec 20 check E-2); every `/api/earn/*` route through it | Spec 20 | **Server-only, never `NEXT_PUBLIC_`.** Authenticates this server to Privy's REST API for the savings surface. It cannot move a user's money by itself: every deposit and withdrawal carries the user's own wallet signature (D-034). Unset ⇒ every savings surface is `UNAVAILABLE` naming this variable. Cloudflare secret, not a file |
+| 39 | `PRIVY_EARN_VAULT_ID` | You — dashboard.privy.io → Wallet infrastructure → Earn, after deploying the fee wrapper on *Gauntlet USDC Prime* (USDC on Base) at 0 % fee | `lib/earn/config.ts` | Spec 20 | The one vault this deployment offers (D-033). The server refuses a signed request naming any other. Unset ⇒ `UNAVAILABLE` naming this variable |
+| 40 | `PRIVY_EARN_API_BASE` | Optional; default `https://api.privy.io/api/v1` | `lib/earn/config.ts` | Spec 20 | Only if Privy's earn endpoints turn out to live elsewhere at rehearsal (spec 20 Part 7 item 1). Must be `https:` |
 
 ### 2.2a Cross-check against `web/.env.example`
 
 The table above covers exactly the variables in [`../web/.env.example`](../web/.env.example), in
 its order: `NEXT_PUBLIC_APP_URL` (#2), `NEXT_PUBLIC_CHAIN_ID` (#3), `NEXT_PUBLIC_DEMO_MODE` (#27),
-`NEXT_PUBLIC_PRIVY_APP_ID` (#1), `SEPOLIA_RPC_URL` (#4), `REGISTRY_DEPLOY_BLOCK` (#28),
+`NEXT_PUBLIC_PRIVY_APP_ID` (#1), `PRIVY_APP_SECRET` (#38), `PRIVY_EARN_VAULT_ID` (#39),
+`PRIVY_EARN_API_BASE` (#40, commented), `SEPOLIA_RPC_URL` (#4), `REGISTRY_DEPLOY_BLOCK` (#28),
 `ADMIN_PASSWORD` (#5), `ADMIN_JWT_SECRET` (#6), `ADMIN_API_KEY` (#21), `CRON_SECRET` (#7),
 `NEXT_PUBLIC_AQUA_ADDRESS` (#13), `NEXT_PUBLIC_USDC_ADDRESS` and `NEXT_PUBLIC_WETH_ADDRESS`
 (#14), `NEXT_PUBLIC_REGISTRY_ADDRESS` (#11), `NEXT_PUBLIC_AQUA_APP_ADDRESS` and
@@ -345,6 +349,10 @@ allow:
    (`AQUA_APP_DEPLOY_BLOCK`). Aqua itself is never deployed: it is an input read from the
    environment. Ship the first strategy.
 6. Set #18 (`NXP_MASTER_KEY`) and program the tag with it (spec 18 §4.2). Everything else.
+7. **Savings (spec 20 Part 8).** In the Privy dashboard: confirm user-owned (TEE) embedded
+   wallets; deploy the Earn fee wrapper on *Gauntlet USDC Prime* at 0 % and copy #39; enable gas
+   sponsorship (App pays) for Base; copy #38. Send 20 USDC on Base to the demo sign-in's embedded
+   wallet. Independent of steps 1–6: the savings beat needs no registry and no Sepolia.
 
 ---
 

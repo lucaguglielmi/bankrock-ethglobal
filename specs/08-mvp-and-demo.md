@@ -23,6 +23,8 @@ Target integrations are Aqua and Privy. Exact sponsor prize eligibility and requ
     implementation existed; it is a presentation flourish, and the exit phases are the
     submission. It is also removed from the demo script below.
 13. Proof of physical tap using NTAG 424 DNA signatures.
+14. **Savings through Privy Earn** — add USDC to a vault, see what it has actually paid, take it
+    out — from the same embedded wallet, signed by that wallet each time (spec 20, D-033, D-034).
 
 ## Strong target
 
@@ -35,7 +37,9 @@ After the must-have path works:
 
 ## Explicitly out of scope
 
-- mainnet funds;
+- mainnet funds **in any Bank Rock contract or key** — the one exception is the user's own USDC
+  in their own embedded wallet for savings through Privy Earn, which has no testnet vault
+  (spec 20, D-033);
 - fiat on-ramp;
 - guaranteed or projected yield;
 - native iOS or Android application;
@@ -69,17 +73,34 @@ Use a fresh browser session. Sign in with email or passkey and obtain a wallet w
 
 Explain that scanning identifies the object; Privy identifies and authorizes the person.
 
-### 0:55–1:35 — Aqua liquidity
+### 0:55–1:20 — Savings (Privy Earn)
+
+Still signed in, no wallet installed, no seed phrase. Open **Savings** on the rock (or `/savings`).
+
+"The rock trades on Aqua. The dollars that are not trading do not sit still."
+
+Tap **Add to savings**, 5 USDC, review — "your wallet signs this itself; Bank Rock cannot change
+it" — confirm. The sheet lands with a Basescan link. **In the vault** moves; **Earned so far**
+already shows what last night's deposit paid. Tap **Take out**, 1 USDC, confirm: back in the
+wallet.
+
+"Privy Earn, a Morpho vault on Base, three verbs, and not a single rate on the screen — because
+what it earned is a fact and what it will earn is not."
+
+If time is short, cut the *Take out* half, never the deposit. Deposit the night before so the
+earned figure is positive on stage (spec 20 Part 8 step 7).
+
+### 1:20–1:45 — Aqua liquidity
 
 Show the Rock Account's actual two-token reserve. Open or reveal the Aqua strategy and explain that the assets remain with the maker while Aqua tracks strategy balances.
 
 If ready, show two streams sharing the reserve.
 
-### 1:35–2:10 — Trade
+### 1:45–2:15 — Trade
 
 Use a second account to execute a small testnet swap against the selected rock. Show confirmation, changed token composition and fee accounting.
 
-### 2:10–2:30 — Gift or transfer (Zero Gas)
+### 2:15–2:35 — Gift or transfer (Zero Gas)
 
 Open the gift, name the second Privy account, and sign once. That single signature does two
 things: it opens the pending handover on chain, and it pre-signs the Safe owner swap that the
@@ -90,11 +111,11 @@ claim is relayed: the registry credits the subject named inside the attestation,
 owner swap follows, so the account and everything in it move with the object. **Zero gas fees,
 no native tokens, and the giver did not need to be present.**
 
-### 2:30–2:55 — The AI Oracle & Agentic Strategies (MCP)
+### 2:35–3:00 — The AI Oracle & Agentic Strategies (MCP)
 
 Open an external chat interface with an AI agent (e.g., ChatGPT or Claude Desktop). Say, "I want to fund this rock with 50 USDC but keep it low risk." The user's external agent connects via the Bank Rock MCP Server, bridges the funds from an L2 (Cross-chain Abstraction), and automatically generates and ships a customized Aqua strategy. *Note: We do not run our own AI agent in the app; we simply expose the MCP server for the user's preferred agent to connect to.*
 
-### 2:55–3:10 — Platform potential
+### 3:00–3:15 — Platform potential
 
 “Bank Rock binds physical objects to programmable, self-custodial liquidity, and makes them conversational via AI. Rocks are the first interface; art, cards, products and installations can use the same model.”
 
@@ -139,4 +160,5 @@ Cut in this order:
 4. second shared-liquidity strategy;
 5. creator registration UI.
 
-Never cut the real NFC interaction, Privy onboarding, working Aqua transaction or security model.
+Never cut the real NFC interaction, Privy onboarding, the savings deposit, the working Aqua
+transaction or the security model.

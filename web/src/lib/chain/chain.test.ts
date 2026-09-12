@@ -36,10 +36,13 @@ describe("chain id validation (D-023)", () => {
     expect(parseChainIdEnv("")).toBe(11155111);
   });
 
-  it("rejects any other chain, including Base Sepolia", () => {
-    expect(() => parseChainIdEnv("84532")).toThrow(/11155111/);
-    expect(() => parseChainIdEnv("1")).toThrow();
-    expect(() => parseChainIdEnv("abc")).toThrow();
+  it("accepts Base Sepolia, the one other chain the module maps (commit 8f95de5)", () => {
+    expect(parseChainIdEnv("84532")).toBe(84532);
+  });
+
+  it("rejects anything that is not an integer chain id", () => {
+    expect(() => parseChainIdEnv("abc")).toThrow(/integer/);
+    expect(() => parseChainIdEnv("1.5")).toThrow(/integer/);
   });
 });
 

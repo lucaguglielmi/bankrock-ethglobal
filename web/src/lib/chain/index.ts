@@ -10,7 +10,7 @@
  */
 
 import { createPublicClient, http, fallback, isAddress, getAddress, type Address } from "viem";
-import { sepolia, baseSepolia } from "viem/chains";
+import { base, baseSepolia, mainnet, sepolia, type Chain } from "viem/chains";
 import { env, optionalEnv, unavailable, real, type Capability } from "@/lib/demo";
 import { publicReasonWith } from "@/lib/errors";
 
@@ -210,4 +210,52 @@ export async function assertDeployed(address: Address | undefined): Promise<Capa
       publicReasonWith(`Could not reach the Sepolia RPC to verify ${address}`, err),
     );
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Other chains this app reads, never transacts on from a Rock Account          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The chains a CAIP-2 identifier may resolve to. Privy Earn names its vault's chain this way
+ * (`eip155:8453` for Base), and the savings surface reads the asset balance there (spec 20).
+ * Nothing here changes which chain a Rock Account transacts on: that is `chain`, above.
+ */
+const KNOWN_CHAINS: readonly Chain[] = [sepolia, baseSepolia, base, mainnet];
+
+/** `eip155:<id>` -> the viem chain, or undefined for any chain this app does not know. */
+export function chainFromCaip2(caip2: string): Chain | undefined {
+  const match = /^eip155:(\d+)$/.exec(caip2.trim());
+  if (!match) return undefined;
+  const id = Number(match[1]);
+  return KNOWN_CHAINS.find((candidate) => candidate.id === id);
+}
+
+export interface Explorer {
+  name: string;
+  baseUrl: string;
+  tx(hash: string): string;
+  address(address: string): string;
+}
+
+const EXPLORERS: Record<number, { name: string; baseUrl: string }> = {
+  [sepolia.id]: { name: "Sepolia Etherscan", baseUrl: "https://sepolia.etherscan.io" },
+  [baseSepolia.id]: { name: "Sepolia Basescan", baseUrl: "https://sepolia.basescan.org" },
+  [base.id]: { name: "Basescan", baseUrl: "https://basescan.org" },
+  [mainnet.id]: { name: "Etherscan", baseUrl: "https://etherscan.io" },
+};
+
+/**
+ * The block explorer for a chain id, or undefined when this app knows none. A transaction link
+ * may only ever be built from a real, broadcast hash (D-014) — the same rule as `explorer`.
+ */
+export function explorerFor(chainIdToExplain: number): Explorer | undefined {
+  const entry = EXPLORERS[chainIdToExplain];
+  if (!entry) return undefined;
+  return {
+    name: entry.name,
+    baseUrl: entry.baseUrl,
+    tx: (hash: string) => `${entry.baseUrl}/tx/${hash}`,
+    address: (address: string) => `${entry.baseUrl}/address/${address}`,
+  };
 }

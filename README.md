@@ -25,6 +25,10 @@ What exists:
   encoding settled and pinned by matching tests in Solidity and TypeScript.
 - **Rock Accounts** — Safe 1.4.1 smart accounts on EntryPoint 0.7, counterfactual, gas-sponsored,
   salted by the tag so one physical rock is one account per owner.
+- **Savings** — Privy Earn from the embedded wallet: seven `/api/earn/*` routes that forward
+  wallet-signed requests, a `useEarn` hook, a card on the owner's rock page and at `/savings`.
+  Real in code, unproven live until a vault id and the app secret are set (`DEMO-STATE.md` K-10,
+  P-11).
 
 What is not real yet, and why, is tracked one line at a time in
 **[`DEMO-STATE.md`](./DEMO-STATE.md)** — the answer to rule 1 of
@@ -32,7 +36,27 @@ What is not real yet, and why, is tracked one line at a time in
 [`specs/15-exit-demo-mode.md`](./specs/15-exit-demo-mode.md); what it would take to run the demo
 end to end is [`specs/18-demo-readiness.md`](./specs/18-demo-readiness.md).
 
-No mainnet funds are involved. The target network is Ethereum Sepolia (chain 11155111).
+The target network is Ethereum Sepolia (chain 11155111). No Bank Rock contract or key holds
+mainnet funds; the one mainnet surface is **Savings**, the user's own USDC in their own Privy
+embedded wallet, in a Morpho vault on Base through Privy Earn (spec 20, D-033).
+
+## How Privy is used
+
+Privy is the sign-in, the wallet, the signature behind every financial action, and the savings
+rail:
+
+- **Embedded wallets** — sign in with email, Google or Apple and get a wallet on the spot; it is
+  the sole owner of the rock's smart account, so the person controls the reserve and the Aqua
+  strategy and Bank Rock's servers cannot move a thing.
+- **Earn** — *Savings* puts idle USDC into a Morpho vault through Privy Earn: add, take out, and
+  see what the vault has actually paid. No rate is shown, only the realised figure (D-004).
+- **User authorization signatures** — each deposit and withdrawal is signed by the user's wallet
+  and forwarded unchanged; the app secret cannot move money on its own (D-034).
+- **Gas sponsorship** — a saver never needs ETH.
+
+The submission text is [`docs/submission/privy.md`](./docs/submission/privy.md); the
+requirement-by-requirement assessment and the design are
+[`specs/20-privy-earn-and-hackathon-qualification.md`](./specs/20-privy-earn-and-hackathon-qualification.md).
 
 ## Documentation
 

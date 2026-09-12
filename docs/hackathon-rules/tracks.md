@@ -51,7 +51,15 @@
 * **🏢 Best B2B Financial Product — $2,500**
   * **Focus**: Treasury platforms, business accounts, payroll, spend management, shared organization wallets with policies, quorums, and signers.
 
-#### Qualification Requirements (Best Financial Flow)
+#### Qualification Requirements (as published for the Earn prize — assessed in [`specs/20`](../../specs/20-privy-earn-and-hackathon-qualification.md))
+
+* Your project must use Privy embedded wallets.
+* Your project must integrate Privy's Earn capability.
+* Your demo should clearly show users depositing, managing, or earning on assets.
+* Include a short explanation of how Privy was used in your submission ([`docs/submission/privy.md`](../submission/privy.md)).
+* Bonus: creative use of onchain financial services; exceptional user experience; products that make crypto more accessible to mainstream users.
+
+#### Qualification Requirements (Best Financial Flow, earlier listing)
 * Integrate Privy as a core part of the product.
 * Create or restore at least one Privy embedded wallet.
 * Complete at least one functional financial flow using a generally available Privy feature (funding, transfers, swaps, earn vaults, or wallet actions).

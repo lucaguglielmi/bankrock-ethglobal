@@ -26,6 +26,12 @@
 
 **Consequence:** APY projections and savings-account language are excluded.
 
+**Amended by D-033 (spec 20).** The prohibition is on *promised* returns: no APY, no APR, no
+projection, nothing annualised, nothing "guaranteed". A real lending-vault position may be called
+*savings* and may show one realised figure — what the vault has actually paid so far, in the
+asset. Privy's `user_apy` / `app_apy` are stripped on the server and a CI grep keeps them out of
+the client (spec 20 Part 7).
+
 ## Proposed decisions requiring proof
 
 ### D-005 — One persistent smart account per rock
@@ -469,6 +475,38 @@ is a transfer of title, rotatable through `setAttester`.
 (both `testReview_N1_*` proofs-of-concept); `web/src/app/api/rocks/[id]/claim/route.ts`;
 `web/src/lib/rock-account.server.ts` (`submitSignedUserOp`'s receipt check, `reserveRelayerSpend`);
 `web/src/lib/nfc/rock-resolution.ts` (`resolveSmartAccount`).
+
+### D-033 — Savings run on Privy Earn, on Base mainnet, from the embedded wallet
+
+**Decision:** Bank Rock integrates Privy Earn against one vault configured in the Privy dashboard
+(a Morpho USDC vault on Base mainnet — the self-serve option; no testnet vault exists), and the
+wallet that deposits is the user's Privy embedded wallet itself. The Rock Account, the registry
+and Aqua stay on Ethereum Sepolia. Fee share 0 %.
+
+**Consequence:** savings belong to the person, not the rock — the same position shows on every
+rock they own and a gift does not move it, and the UI says so. This is the only mainnet money in
+the project: the user's own USDC, in their own wallet's name, never held or approved to Bank Rock.
+Spec 08's "no mainnet funds" narrows to "no mainnet funds in any Bank Rock contract or key".
+D-004 is amended, not broken (see there). Full reasoning: [`20-privy-earn-and-hackathon-qualification.md`](./20-privy-earn-and-hackathon-qualification.md) Part 2.
+
+**Files:** `web/src/lib/earn/*`, `web/src/app/api/earn/*`, `web/src/hooks/useEarn.ts`,
+`web/src/components/earn/*`, `web/src/app/savings/page.tsx`, `web/src/lib/chain/index.ts`
+(`chainFromCaip2`, `explorerFor`).
+
+### D-034 — Every earn write is signed by the user's wallet; the server forwards it unchanged
+
+**Decision:** a deposit or withdrawal is authorised by a Privy *user authorization signature*
+produced in the browser (`useAuthorizationSignature`) over the exact request — method, URL, body,
+`privy-app-id`, `privy-idempotency-key`, `privy-request-expiry` — and forwarded by the server with
+`privy-authorization-signature` beside the app's Basic credentials. Session signers (server acts
+while the user is away) are not used.
+
+**Consequence:** the operator, or a stolen app secret, cannot move a user's savings: any change to
+vault, amount or wallet invalidates the signature, and there is no unsigned path in the code. The
+signed request expires in five minutes and is idempotent. **Hypothesis:** the signature needs
+user-owned (TEE-executed) embedded wallets — spec 20 Part 7 item 3 proves it at rehearsal.
+
+**Threat model:** spec 20 Part 4.3.
 
 ## Open product questions
 

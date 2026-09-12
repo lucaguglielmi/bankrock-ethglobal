@@ -4,7 +4,7 @@
  * An awake rock, in the order spec 17 Part 5 requires on a phone:
  *
  *   identity → attestation → headline reserve → Trade / Give → cross-chain → position →
- *   alerts → social → provenance
+ *   savings (owner only) → alerts → social → provenance
  *
  * Identity and attestation are rendered by the page above this component, so the primary action
  * stays inside the first 640 px at 360 px wide (L-13).
@@ -18,6 +18,7 @@ import { Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SimulatedBadge } from "@/components/ui/simulated-badge";
 import { AquaPositionCard } from "@/components/aqua-position-card";
+import { SavingsCard } from "@/components/earn/savings-card";
 import { RockAlerts } from "@/components/rock-alerts";
 import { RockActivity } from "@/components/rock-activity";
 import { SocialBridge } from "@/components/social-bridge";
@@ -100,6 +101,8 @@ export function AwakeRock({
         onSync={onRefresh}
         isSyncing={isRefreshing}
       />
+
+      {isOwner ? <SavingsCard context="rock" /> : null}
 
       <RockAlerts rockId={rockId} />
 

@@ -44,6 +44,22 @@ from the way the registry verifies that binding:
   carries the `initCode` and deploys it as a side effect, so the ordinary flow never meets this.
   At *awakening* the address is still purely counterfactual and no such check applies.
 
+## Privy capabilities in use (spec 20)
+
+| Capability | Where | What it does for the product |
+| --- | --- | --- |
+| Authentication — email, Google, Apple, external wallet | `providers.tsx`, `auth-context.tsx`, `login-button.tsx` | Sign-in with no seed phrase; the last method used is surfaced (STEERING). |
+| Embedded wallets, created on login for users without one | `providers.tsx` (`createOnLogin: "users-without-wallets"`) | The sole owner of every Rock Account Safe (D-029) and the wallet that saves (D-033). |
+| Access tokens, verified server-side against Privy's JWKS | `lib/auth/privy.ts` | Every owner-only and savings route. |
+| **Earn** — deposit, withdraw, position, vault, action status and history | `lib/earn/*`, `app/api/earn/*`, `hooks/useEarn.ts`, `components/earn/*` | *Savings*: USDC in a Morpho vault on Base from the embedded wallet (D-033). |
+| **User authorization signatures** (`useAuthorizationSignature`) | `hooks/useEarn.ts` → `privy-authorization-signature` on the forward | Every earn write is signed by the user's wallet; the server cannot alter it (D-034). |
+| Funding (`useFundWallet`) | `components/earn/fund-wallet-button.tsx` | *Get USDC on Base* through whatever the dashboard enables; the wallet address is the fallback. |
+| Gas sponsorship for earn actions | Privy dashboard, App pays | A saver never needs ETH. |
+
+Not used, on purpose: session signers / delegated actions (they would give the operator standing
+power over user money — D-034), and Privy smart wallets (the Rock Account is a Safe the app
+derives itself, salted by the tag — D-029).
+
 ## Supported login methods
 
 MVP preference:

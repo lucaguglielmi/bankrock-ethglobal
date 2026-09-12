@@ -39,7 +39,7 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 | N-3 | Fiat on-ramp / off-ramp (Flows G and H fiat legs) | 08 | Out of scope. Note that Flow H's on-chain leg is real: docking *is* the withdrawal. |
 | N-4 | ERC-7579 scoped session keys for the MCP runtime | 15 Part 6, 05 D-010 | Post-hackathon. MCP is read-only (D-008, D-019). |
 | N-5 | ERC-20 token paymaster ("self-sustaining rock") | 15 Part 6, 05 D-011 | Post-hackathon. The verifying paymaster alone covers the zero-gas beat. |
-| N-6 | Idle yield into Aave v3 / Morpho | 15 Part 6, 04 | Post-hackathon. |
+| N-6 | ~~Idle yield into Aave v3 / Morpho~~ **Moved.** Savings through Privy Earn (a Morpho vault on Base) is now real in code — see K-10 and P-11. What stays cut is *auto-sweeping the Rock Account's Sepolia USDC* into it: different chain, different wallet, and the honest version is a bridge (S-1). | 20 D-033 | — |
 | N-7 | Replacement tags; creator registration UI | 15 Part 6, 02 Flows A and F | Cut. `markLost` / `clearLost` exist and are informational only — they freeze nothing. |
 | N-8 | A second strategy sharing one reserve | 04, 15 P3.8 | Unblocked: it is one more `streamIndex`. Not shipped; item 4 in spec 08's fallback order. |
 | N-9 | An APY or APR figure, anywhere | 09 D-004 | Never. A CI grep enforces its absence in `web/src/components`. |
@@ -69,6 +69,7 @@ The code is complete; the address is not. Each renders `UNAVAILABLE` naming the 
 | K-7 | Provenance, the fee log scan, Rock Account derivation | 16 #4 | `SEPOLIA_RPC_URL` points at a real provider. Public RPCs reject the log ranges the indexer needs. |
 | K-8 | Admin figures, contact and vanity forms, counters, rate limits | 12 | The D1 binding is live and `drizzle/` migrations are applied to production. |
 | K-9 | Any email at all | 16 #19, #33 | `RESEND_API_KEY` plus SPF/DKIM verification of `bank-rock.com`. Until then the sandbox sender reaches only the account owner's inbox. |
+| K-10 | Savings — the vault, the position, *Add to savings*, *Take out*, the history | 20 Part 6, 16 #38–#40 | `PRIVY_APP_SECRET` and `PRIVY_EARN_VAULT_ID` are set, the Earn fee wrapper is deployed in the Privy dashboard, and the app's embedded wallets are the user-owned (TEE) kind. Either variable unset ⇒ `UNAVAILABLE` naming it. There is no simulated savings balance, in demo mode or otherwise. |
 
 ## 5. Real in code, unproven in the world
 
@@ -87,6 +88,7 @@ most dangerous category on this page, because it looks finished.
 | P-8 | **The on-chain `isOwner` check on claim** | 09 D-032, audit `N-1` | `claimHandover` reverts `AccountDoesNotAnswerToOwner` unless the named account already reports the new owner as a signing owner. Proven against a real Safe 1.4.1 on Sepolia, not the mock the Solidity tests use — including the counterfactual case, where an undeployed account has no code to answer and the claim must revert until the owner-swap UserOperation deploys it. |
 | P-9 | **The taker's deadline and recipient rules** | 04, 19 `F-8`, `N-2` | `swapExactIn` now takes a `deadline` and refuses `to == address(0)` (the old "pay the caller" sentinel) and `to == address(this)`. The hooks pass the caller's own account explicitly. Proven when a visitor swap lands on Sepolia with a real deadline and the output arrives at the named recipient. |
 | P-10 | **The relayer's daily spend cap** | 16 #34, audit `F-10` / `P-1` | `RELAYER_DAILY_CAP_WEI` is reserved in D1 before each broadcast and released on either failure path, and unset means relaying is **off**. Proven when a claim is refused because the day's cap is exhausted, and the next UTC day allows one again. |
+| P-11 | **Privy Earn, end to end** | 20 Part 7, D-033, D-034 | The routes, the client and the signed-request path are written against Privy's documentation of 2026-09-12 and tested against a stubbed API; no real request has been made. Proven, in order, when: the vault endpoint answers with `eip155:8453` (or `PRIVY_EARN_API_BASE` is corrected); the embedded wallet produces a user authorization signature; one deposit lands with a Basescan hash; *Earned so far* is positive the next morning; a full *Take out* lands; a second account is refused another account's position with 403. |
 
 ## 6. Known-wrong, outside the app
 
