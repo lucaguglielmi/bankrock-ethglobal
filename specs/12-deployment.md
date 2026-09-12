@@ -11,7 +11,7 @@ To achieve an automated "push to main and go live" workflow, we utilize the foll
 - **Framework:** Next.js 16.3.5 (Turbopack)
 - **Pipeline:** GitHub Actions (`.github/workflows/deploy.yml`) running `npm run deploy` on push to `main`, **or on demand**: the workflow declares `workflow_dispatch: {}`, so a failed run can be re-tried from the Actions tab once the thing it was missing is supplied, without an empty commit. Node 22, one deploy at a time (`concurrency: deploy-production`, `cancel-in-progress: false`). `npm run deploy:pages` is kept as a **manual alternative** — it publishes the same OpenNext output to the Pages project `bankrock-ethglobal`, which is useful as a preview surface (`bankrock-ethglobal.pages.dev`) and is *not* what serves the custom domain.
 - **Domain:** `https://bank-rock.com` (D-022), and `www.bank-rock.com`, both attached as custom domains in `wrangler.jsonc` `routes`. The `www` host must redirect to the apex with the path preserved. **Fact:** that redirect now ships **in the application** — `web/next.config.ts` `redirects()` matches `host = www.bank-rock.com` and 308s to `https://bank-rock.com/:path*`, with the path substituted by Next rather than by a dashboard template. The old Cloudflare redirect rule that returned the literal string `:path*` (spec 15 R-1) **must be deleted in the dashboard**, because a dashboard rule is evaluated before the request reaches the Worker: shipping the redirect in the app makes the correct behaviour the default, it does not overrule a rule that is still in place.
-- **Configuration:** `web/wrangler.jsonc` — D1 binding `DB` → `bankrock-db`, the `ASSETS` and `IMAGES` bindings, the `WORKER_SELF_REFERENCE` service binding, `compatibility_date` `2026-09-11` so `nodejs_compat` is on by default, and `observability`. Runtime environment variables and secrets are set **on the Worker** (dashboard → Workers & Pages → `web` → Settings → Variables and Secrets), never in files and not on a Pages project. `@cloudflare/next-on-pages` must not be installed — it is a different adapter and its `getRequestContext()` does not work under OpenNext (D-016).
+- **Configuration:** `web/wrangler.jsonc` — D1 binding `DB` → `bankrock-db`, the `ASSETS` and `IMAGES` bindings, the `WORKER_SELF_REFERENCE` service binding, `compatibility_date` `2026-09-11` so `nodejs_compat` is on by default, `observability`, and the **`vars` block that holds every non-secret configuration value** (*Configuration model (D-034)*, below). Secrets are set **on the Worker** as encrypted secrets (dashboard → Workers & Pages → `web` → Settings → Variables and Secrets → Secret, or `wrangler secret put`), never in files and not on a Pages project. `@cloudflare/next-on-pages` must not be installed — it is a different adapter and its `getRequestContext()` does not work under OpenNext (D-016).
 - **Service worker (Fact, spec 14 §4 / spec 15 R-6):** `public/sw.js` is **not** produced by a Next.js bundler plugin. `@serwist/next`'s webpack plugin does not run under Turbopack, which is Next 16's default and what this app builds with, so nothing ever wrote the file and `/sw.js` returned 404. It is now built independently by `web/scripts/build-sw.mjs`, wired in as the **`prebuild`** npm script: esbuild bundles `src/sw.ts` and `@serwist/build`'s `injectManifest` writes the result to `public/sw.js` before Next starts. Because it is `prebuild`, every path that runs `next build` — CI, `deploy`, `deploy:pages`, a local build — gets the worker without remembering to ask for it.
 
 ### 2. Master Oracle MCP Server
@@ -40,7 +40,7 @@ To achieve an automated "push to main and go live" workflow, we utilize the foll
 | 1 | Registry | `SEPOLIA_RPC_URL=… DEPLOYER_PRIVATE_KEY=… ATTESTATION_SIGNER_ADDRESS=… npm run deploy` | `NEXT_PUBLIC_REGISTRY_ADDRESS`, `REGISTRY_DEPLOY_BLOCK` |
 | 2 | Attester set | none — the constructor takes it, and the script reads it back off chain | the registry's trusted attester |
 | 3 | Aqua app + taker | `SEPOLIA_RPC_URL=… DEPLOYER_PRIVATE_KEY=… NEXT_PUBLIC_AQUA_ADDRESS=… node scripts/deploy-aqua-app.js` | `NEXT_PUBLIC_AQUA_APP_ADDRESS`, `NEXT_PUBLIC_AQUA_TAKER_ADDRESS`, `AQUA_APP_DEPLOY_BLOCK` |
-| 4 | Environment | paste the outputs into the Cloudflare Pages project (Settings → Environment variables) | a build that can reach the chain |
+| 4 | Environment | commit the outputs to `web/wrangler.jsonc` `vars` (D-034), which `scripts/spec-checks.sh` then compares against `contracts/deployments/*.json` | a build that can reach the chain |
 | 5 | Tag | program the NTAG 424 DNA tag per spec 18 §4.2 | a rock that can be tapped |
 
 Notes on the order:
@@ -60,6 +60,72 @@ Notes on the order:
   (see §1), so what remains is to delete or correct the dashboard rule and re-check with
   `curl -sIL https://www.bank-rock.com`, which must end 200.
 - Verify the registry source on Sepolia Etherscan afterwards: `contracts/scripts/verify.md`.
+
+## Configuration model (D-034)
+
+**One source of truth per kind of value, and exactly three homes.** Before this, every runtime value
+was typed into the Cloudflare dashboard: nothing was reviewable, a wrong address was invisible in a
+diff, and the deployed configuration could not be compared with the deploy records that produced it.
+
+| | Home | What lives there | Changed by |
+| --- | --- | --- | --- |
+| **[1]** | `web/wrangler.jsonc` `vars`, **in git** | Non-secret, account-independent configuration: `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CHAIN_ID`, `NEXT_PUBLIC_DEMO_MODE`, the six addresses, `REGISTRY_DEPLOY_BLOCK`, `AQUA_APP_DEPLOY_BLOCK`, `RELAYER_DAILY_CAP_WEI` | A commit, reviewed like code, applied by the next deploy |
+| **[2]** | GitHub Actions inputs, read by `deploy.yml` | Account-specific *public* identifiers: `NEXT_PUBLIC_PRIVY_APP_ID` (repository **variable**), `NEXT_PUBLIC_PIMLICO_API_KEY` (repository **secret**) | The operator, once, in repository settings |
+| **[3]** | Encrypted **secrets on the Worker** (`wrangler secret put`, or dashboard → Variables and Secrets → Secret) | `SEPOLIA_RPC_URL`, `PIMLICO_API_KEY`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY`, `FAUCET_PRIVATE_KEY`, `NXP_MASTER_KEY`, `ADMIN_*`, `CRON_SECRET`, `RESEND_API_KEY`, `ALCHEMY_WEBHOOK_SECRET`, the web-push server pair | The operator, in the dashboard or with `wrangler` |
+
+Spec 16 §2.2 marks every variable with its home; §2.3 is the operator's whole remaining list.
+
+**There is no fourth home, and the dashboard's *Variables* pane is not one.** `wrangler deploy`
+deletes every plain-text variable on the Worker and re-sets exactly the `vars` block from the
+configuration file — Cloudflare's own wording is *"Wrangler will delete all vars before setting
+those found in the Wrangler configuration"* — and `keep_vars` is deliberately not set. Secrets are
+the exception: *"Secrets are never deleted by a deployment"*. So a value typed into the dashboard's
+Variables pane lives until the next deploy and then disappears, which is the worst of both kinds;
+a secret typed there is permanent and never enters git. The asymmetry is what makes the model work.
+(Sources: [Wrangler configuration → source of truth](https://developers.cloudflare.com/workers/wrangler/configuration/),
+[`wrangler deploy --keep-vars`](https://developers.cloudflare.com/workers/wrangler/commands/workers/).)
+
+### Build time versus runtime — verified, not assumed (Fact, 2026-09-12)
+
+`NEXT_PUBLIC_*` values are **inlined by Next at build time**, so the `vars` block alone is not
+enough: the build has to see them too. `web/scripts/export-public-vars.mjs` prints the
+`NEXT_PUBLIC_*` entries of `wrangler.jsonc` as `KEY=VALUE` lines, and the deploy job appends them to
+`$GITHUB_ENV` before `npm run deploy`. One file, both halves; nothing is retyped.
+
+Measured on this repository, by running the export script and then `opennextjs-cloudflare build`
+(the same build `npm run deploy` performs) and grepping the output for the registry address
+`0x2A3101Fc525C6DBEc39bef45034E23b13f28F757`:
+
+| Where | Result |
+| --- | --- |
+| Client chunk (`.open-next/assets/_next/static/chunks/…`) | **Contains the literal.** `registryAddress:"0x2A3101Fc…F757"` — the whole `lib/demo.ts` `env` object is frozen into the bundle |
+| Server bundle (`.open-next/server-functions/default/handler.mjs` and its chunks) | **Contains the literal too** — 10 files in `.open-next/`, plus 1 client chunk |
+| A server-only variable left unset at build (`AQUA_APP_DEPLOY_BLOCK`) | **Absent from the whole build.** The code is emitted as `deployBlock:process.env.AQUA_APP_DEPLOY_BLOCK||""`, a runtime read |
+
+**So both mechanisms are in use, and each covers what the other cannot.** `NEXT_PUBLIC_*` must be in
+the *build* environment, which is what the export step is for; server-only variables
+(`REGISTRY_DEPLOY_BLOCK`, `AQUA_APP_DEPLOY_BLOCK`, `RELAYER_DAILY_CAP_WEI`, every secret) are read
+from `process.env` at *runtime*, which the Worker provides: `@opennextjs/cloudflare`'s entry
+(`.open-next/worker.js` → `cloudflare/init.js`) runs `populateProcessEnv` on the first request,
+copying every string-valued binding — `vars` **and** secrets — into `process.env`. That is why
+`lib/demo.ts` can read public config through literal member access and `requireEnv` /`optionalEnv`
+can read secrets by name, and both work in the same runtime.
+
+A consequence worth stating: **changing anything in [1] or [2] requires a re-deploy**, not a Worker
+restart, because the public half of it is inside the bundle.
+
+### The drift check
+
+`scripts/spec-checks.sh` check **`D-034`** (blocking, in the `spec-checks` CI job) compares the
+address and deploy-block `vars` in `web/wrangler.jsonc` against
+`contracts/deployments/sepolia.json` and `contracts/deployments/sepolia-aqua-app.json` — the files
+the deploy scripts themselves wrote — plus the chain id. Addresses are compared case-insensitively,
+because the two files carry different EIP-55 spellings of the same address and that is not drift.
+A mismatch fails the build and names both values.
+
+This is the bug the decision exists to prevent: the addresses are inlined into the bundle, so a
+stale one points the whole application at a contract we did not deploy, on a deploy that looks
+green and serves a page that looks fine.
 
 ## Continuous Integration (CI)
 

@@ -8,7 +8,8 @@ baseline — the record of what was wrong on 2026-09-12, not of what is wrong no
 **Read it before answering "what's next?".** One line per item, with the spec that governs it and
 the single condition that makes it real.
 
-Branch `exit-from-demo-mode`. `bash scripts/spec-checks.sh` runs 20 checks and is blocking in CI.
+Branch `exit-from-demo-mode`. `bash scripts/spec-checks.sh` runs 21 checks and is blocking in CI
+(the 21st is `D-034`, the committed configuration against `contracts/deployments/*.json`).
 
 ## The three states
 
@@ -46,15 +47,24 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 
 ## 3. Unavailable until something is deployed
 
-The code is complete; the address is not. Each renders `UNAVAILABLE` naming the variable.
+**The contracts are deployed and their addresses are now committed** (D-034): `web/wrangler.jsonc`
+`vars` carries the registry, the XYCSwap app, the taker and both deploy blocks, copied from
+`contracts/deployments/sepolia.json` and `contracts/deployments/sepolia-aqua-app.json` and compared
+against them by `scripts/spec-checks.sh`. What is *not* yet true is that a deployed build is reading
+them — production last shipped before they were committed, and `NEXT_PUBLIC_*` values are inlined at
+build time, so only a new deploy carries them.
+
+**These five rows are deleted when the next successful deploy has been observed serving real
+data** — deployed *and* observed on `https://bank-rock.com`, not merely committed. Until then each
+surface still renders `UNAVAILABLE` naming the variable, because that is what the live build does.
 
 | # | What | Spec | Becomes real when |
 | --- | --- | --- | --- |
-| D-1 | Rock lifecycle, owner, Rock Account address, provenance, archive | 15 P2 | `contracts/scripts/deploy.js` has run → `NEXT_PUBLIC_REGISTRY_ADDRESS`, `REGISTRY_DEPLOY_BLOCK`. |
-| D-2 | Ship and dock a liquidity stream | 15 P3, 04 | `contracts/scripts/deploy-aqua-app.js` has run → `NEXT_PUBLIC_AQUA_APP_ADDRESS`. |
-| D-3 | Visitor swap | 15 P3, 02 Flow D | The same run also gives `NEXT_PUBLIC_AQUA_TAKER_ADDRESS`. A taker must be a contract (D-030). |
-| D-4 | Cumulative earned fees | 04, 09 D-030 | App deployed, plus `AQUA_APP_DEPLOY_BLOCK` and a provider RPC that serves the log range. The fee *rate* needs only the strategy. |
-| D-5 | Quotes | 04 | App deployed. `XYCSwap.quoteExactIn` is the source; there is no price feed and no external API. |
+| D-1 | Rock lifecycle, owner, Rock Account address, provenance, archive | 15 P2 | Committed: `NEXT_PUBLIC_REGISTRY_ADDRESS` = `0x2A3101Fc…F757`, `REGISTRY_DEPLOY_BLOCK` = `11689716`. Delete when a deploy carrying them serves a real rock page. Provenance additionally needs K-7. |
+| D-2 | Ship and dock a liquidity stream | 15 P3, 04 | Committed: `NEXT_PUBLIC_AQUA_APP_ADDRESS` = `0x8a293F43…316B`. Delete when a deployed build ships a strategy on chain. |
+| D-3 | Visitor swap | 15 P3, 02 Flow D | Committed: `NEXT_PUBLIC_AQUA_TAKER_ADDRESS` = `0xCd7899E3…0016`. A taker must be a contract (D-030). Delete when a deployed build takes a real swap. |
+| D-4 | Cumulative earned fees | 04, 09 D-030 | Committed: `AQUA_APP_DEPLOY_BLOCK` = `11689724`. Still needs a provider RPC that serves the log range (K-7). The fee *rate* needs only the strategy. |
+| D-5 | Quotes | 04 | Committed with D-2. `XYCSwap.quoteExactIn` is the source; there is no price feed and no external API. Delete when a deployed build quotes from it. |
 
 ## 4. Unavailable until a secret is set
 

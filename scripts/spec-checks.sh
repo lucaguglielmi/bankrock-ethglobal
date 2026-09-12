@@ -7,6 +7,8 @@
 #   specs/15-exit-demo-mode.md  Part 7  — demo mode, synthesized evidence, one adapter,
 #                                         one origin, fail-closed secrets, no APY
 #   specs/17-mobile-ui-and-typography.md Part 7 — typography scale, viewport units, overlays
+#   specs/12-deployment.md      "Configuration model (D-034)" — the committed non-secret
+#                                         configuration matches what was actually deployed
 #
 # Only the *static* checks live here. The build, lint, typecheck, test and `npm run build`
 # steps from the same sections are separate CI jobs, and the live `curl` / `cast code`
@@ -229,6 +231,65 @@ if paths_exist "$t7_id" "$t7_desc" "web/src"; then
     fail "$t7_id" "$t7_desc" "$t7_out"
   else
     pass "$t7_id" "$t7_desc"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+section "specs/12-deployment.md — configuration model (D-034)"
+# ---------------------------------------------------------------------------
+
+# D-034 — non-secret configuration lives in web/wrangler.jsonc `vars`, and the deploy scripts
+# record what they actually deployed in contracts/deployments/*.json. Drift between the two is the
+# bug this decision exists to prevent: the NEXT_PUBLIC_* values are inlined into the bundle at
+# build time, so a stale address there points the whole app at a contract we did not deploy, on a
+# deploy that looks green. Addresses are compared case-insensitively — the two files carry
+# different EIP-55 checksum spellings of the same address, which is not drift.
+#
+# wrangler.jsonc is JSONC (it has comments), so it is parsed by the same tolerant parser the
+# deploy job uses, web/scripts/export-public-vars.mjs, rather than by a second grep.
+d034_id="D-034"
+d034_desc="web/wrangler.jsonc vars match contracts/deployments/*.json"
+if paths_exist "$d034_id" "$d034_desc" \
+    "web/wrangler.jsonc" "web/scripts/export-public-vars.mjs" \
+    "contracts/deployments/sepolia.json" "contracts/deployments/sepolia-aqua-app.json"; then
+  if ! command -v node >/dev/null 2>&1; then
+    fail "$d034_id" "$d034_desc" "node is needed to parse web/wrangler.jsonc, and is not on PATH"
+  else
+    d034_out="$(node --input-type=module -e '
+      import { readFileSync } from "node:fs";
+      const { readWranglerVars } = await import("./web/scripts/export-public-vars.mjs");
+      const vars = readWranglerVars();
+      const json = (p) => JSON.parse(readFileSync(p, "utf8"));
+      const registry = json("contracts/deployments/sepolia.json");
+      const aquaApp = json("contracts/deployments/sepolia-aqua-app.json");
+      const expected = [
+        ["NEXT_PUBLIC_CHAIN_ID", registry.chainId, "number", "sepolia.json chainId"],
+        ["NEXT_PUBLIC_REGISTRY_ADDRESS", registry.address, "address", "sepolia.json address"],
+        ["REGISTRY_DEPLOY_BLOCK", registry.deployBlock, "number", "sepolia.json deployBlock"],
+        ["NEXT_PUBLIC_AQUA_ADDRESS", aquaApp.aqua, "address", "sepolia-aqua-app.json aqua"],
+        ["NEXT_PUBLIC_AQUA_APP_ADDRESS", aquaApp.app.address, "address", "sepolia-aqua-app.json app.address"],
+        ["AQUA_APP_DEPLOY_BLOCK", aquaApp.app.deployBlock, "number", "sepolia-aqua-app.json app.deployBlock"],
+        ["NEXT_PUBLIC_AQUA_TAKER_ADDRESS", aquaApp.taker.address, "address", "sepolia-aqua-app.json taker.address"],
+      ];
+      const problems = [];
+      for (const [name, want, kind, source] of expected) {
+        const got = vars[name];
+        if (typeof got !== "string" || got.trim() === "") {
+          problems.push(name + " is not set in web/wrangler.jsonc vars (expected " + want + ", from " + source + ")");
+          continue;
+        }
+        const norm = (v) => (kind === "address" ? String(v).trim().toLowerCase() : String(v).trim());
+        if (norm(got) !== norm(want)) {
+          problems.push(name + " is " + got + " but " + source + " says " + want);
+        }
+      }
+      if (problems.length) { console.log(problems.join("\n")); process.exit(1); }
+    ' 2>&1)" || true
+    if [ -n "$d034_out" ]; then
+      fail "$d034_id" "$d034_desc" "$d034_out"
+    else
+      pass "$d034_id" "$d034_desc"
+    fi
   fi
 fi
 

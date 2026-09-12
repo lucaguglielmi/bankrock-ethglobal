@@ -26,6 +26,48 @@
   "observability": {
     "enabled": true
   },
+  // Non-secret configuration, in git, as the single source of truth (D-034 — specs/09-decisions.md,
+  // specs/12-deployment.md "Configuration model", specs/16-environment-and-secrets.md §2).
+  //
+  // Three rules make this block safe to read literally:
+  //
+  //   1. `wrangler deploy` DELETES every plain-text variable on the Worker and re-sets exactly what
+  //      is here (there is no `keep_vars`), so a value typed into the Cloudflare dashboard survives
+  //      only until the next deploy. Encrypted secrets are never touched by a deploy — they stay on
+  //      the Worker and must never appear here.
+  //   2. Addresses and deploy blocks are copied from contracts/deployments/sepolia.json and
+  //      contracts/deployments/sepolia-aqua-app.json, the records the deploy scripts wrote.
+  //      `scripts/spec-checks.sh` (check D-034) fails if the two ever disagree.
+  //   3. Wrangler `vars` are strings. The numeric readers take decimal digit strings
+  //      (lib/chain/index.ts, lib/indexer.ts, lib/rock-account.server.ts all parse with /^\d+$/).
+  //
+  // `NEXT_PUBLIC_*` values are inlined by Next at BUILD time, so the deploy job exports them from
+  // this file into the build environment first (web/scripts/export-public-vars.mjs). The copies
+  // here are what the Worker runtime reads; the exported copies are what the bundle carries.
+  //
+  // Not here, deliberately: NEXT_PUBLIC_PRIVY_APP_ID and NEXT_PUBLIC_PIMLICO_API_KEY (account
+  // identifiers — GitHub Actions inputs), and every secret (Worker secrets, set by hand).
+  "vars": {
+    "NEXT_PUBLIC_APP_URL": "https://bank-rock.com",
+    "NEXT_PUBLIC_CHAIN_ID": "11155111",
+    // D-013: only the literal "true" enables simulation. Production is never a simulation, and
+    // .github/workflows/deploy.yml pins the same value in the build job.
+    "NEXT_PUBLIC_DEMO_MODE": "false",
+    // contracts/deployments/sepolia.json
+    "NEXT_PUBLIC_REGISTRY_ADDRESS": "0x2A3101Fc525C6DBEc39bef45034E23b13f28F757",
+    "REGISTRY_DEPLOY_BLOCK": "11689716",
+    // contracts/deployments/sepolia-aqua-app.json — `aqua`, `app`, `taker`
+    "NEXT_PUBLIC_AQUA_ADDRESS": "0x1111113ccf1426a8e30e2bff5e005d929bf6a90a",
+    "NEXT_PUBLIC_AQUA_APP_ADDRESS": "0x8a293F43Eb0DBaA834b40b2eC4E0751e3ce6316B",
+    "NEXT_PUBLIC_AQUA_TAKER_ADDRESS": "0xCd7899E37D50B226E882e79572AB189080fD0016",
+    "AQUA_APP_DEPLOY_BLOCK": "11689724",
+    // Fixed, published testnet tokens (specs/16 §1.1)
+    "NEXT_PUBLIC_USDC_ADDRESS": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    "NEXT_PUBLIC_WETH_ADDRESS": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+    // 0.02 ETH per UTC day. Unset or "0" disables relaying entirely — that is the closed branch
+    // (D-032, audit P-1), so this value is what makes gift claims possible at all.
+    "RELAYER_DAILY_CAP_WEI": "20000000000000000"
+  },
   "d1_databases": [
     {
       "binding": "DB",

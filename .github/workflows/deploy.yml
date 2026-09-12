@@ -20,17 +20,28 @@ jobs:
       run:
         working-directory: ./web
 
-    # Decision D-013: demo mode is opt-in and must never be on in production. It defaults to
-    # false, and is pinned here as well so the production build cannot become a simulation
-    # through a change to that default alone. `npm run deploy` runs the OpenNext build, so the
-    # flag has to be in scope for the whole job, not just a build step.
+    # Configuration model D-034, in three parts — see specs/12-deployment.md.
     #
-    # Everything else comes from repository/environment secrets. No secret is committed to this
-    # repository (spec 16); the Cloudflare Worker `web` holds the runtime environment variables
-    # and the D1 binding (web/wrangler.jsonc), and only the two credentials below are needed to
-    # publish.
+    #  1. Non-secret configuration is in git, in web/wrangler.jsonc `vars`. The "Export the public
+    #     build-time variables" step below reads the NEXT_PUBLIC_* ones out of that file into this
+    #     job's environment, because Next inlines them at build time and `npm run deploy` builds.
+    #  2. Account-specific public identifiers are the two GitHub inputs below: a repository
+    #     *variable* for the Privy app id, a repository *secret* for the browser-visible Pimlico
+    #     key (it is public by construction, but it is still a key, so it is not committed).
+    #  3. True secrets are set on the Cloudflare Worker `web` as encrypted secrets and never appear
+    #     here or anywhere in git. A deploy never touches them.
+    #
+    # Decision D-013: demo mode is opt-in and must never be on in production. wrangler.jsonc sets
+    # it to "false" and the export step refuses to continue if it ever says anything else; it is
+    # pinned here as well so the production build cannot become a simulation through a change to
+    # that default alone. `npm run deploy` runs the OpenNext build, so the flag has to be in scope
+    # for the whole job, not just a build step.
+    #
+    # Only the two Cloudflare credentials are needed to publish.
     env:
       NEXT_PUBLIC_DEMO_MODE: "false"
+      NEXT_PUBLIC_PRIVY_APP_ID: ${{ vars.NEXT_PUBLIC_PRIVY_APP_ID }}
+      NEXT_PUBLIC_PIMLICO_API_KEY: ${{ secrets.NEXT_PUBLIC_PIMLICO_API_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -56,6 +67,24 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # D-034. Next.js inlines `process.env.NEXT_PUBLIC_*` at build time, so the values in
+      # web/wrangler.jsonc `vars` — which the Worker reads at *runtime* — have to be in the
+      # environment before `npm run deploy` builds, or the bundle carries empty strings and every
+      # address-dependent surface renders UNAVAILABLE on a deploy that looked green.
+      # One file configures both halves; nothing is retyped here.
+      - name: Export the public build-time variables from wrangler.jsonc
+        run: |
+          node scripts/export-public-vars.mjs > "${RUNNER_TEMP}/public-vars.env"
+          echo "Exported from web/wrangler.jsonc:"
+          cat "${RUNNER_TEMP}/public-vars.env"
+          # D-013, stated twice on purpose: the job env above pins demo mode off, and a
+          # wrangler.jsonc that disagreed would be a production simulation. Fail instead.
+          if ! grep -qx 'NEXT_PUBLIC_DEMO_MODE=false' "${RUNNER_TEMP}/public-vars.env"; then
+            echo "web/wrangler.jsonc must set NEXT_PUBLIC_DEMO_MODE to \"false\" (D-013)."
+            exit 1
+          fi
+          cat "${RUNNER_TEMP}/public-vars.env" >> "$GITHUB_ENV"
 
       # Migrations are additive (create table / add column) and the Worker's routes need the
       # tables to exist, so they are applied before the new code goes live. `bankrock-db` and
