@@ -133,11 +133,12 @@ export default function Home() {
       <footer className="w-full bg-black text-white py-24 px-6 md:px-12 z-10 relative">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-12">
           <div className="text-4xl font-black tracking-tighter">Bank Rock</div>
-          <div className="flex gap-8 text-neutral-400 font-medium">
+          <div className="flex flex-wrap gap-8 text-neutral-400 font-medium">
             <Link href="/mcp" className="hover:text-white transition-colors">AI Oracle</Link>
             <Link href="/shop" className="hover:text-white transition-colors">Shop</Link>
-            <Link href="#" className="hover:text-white transition-colors">Twitter</Link>
-            <Link href="https://github.com/lucaguglielmi/bankrock-ethglobal" className="hover:text-white transition-colors">GitHub</Link>
+            <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+            <Link href="https://github.com/lucaguglielmi/bankrock-ethglobal" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</Link>
           </div>
         </div>
       </footer>
