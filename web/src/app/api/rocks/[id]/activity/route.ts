@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { getDb, NO_DATABASE_REASON } from "@/lib/db";
+import { consumeIpRateLimit } from "@/lib/rate-limit";
 import { rockEvents } from "@/lib/db/schema";
 import { logger } from "@/lib/telemetry";
 
@@ -18,6 +19,11 @@ const TX_HASH_REGEX = /^0x[0-9a-fA-F]{64}$/;
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+
+  const limit = await consumeIpRateLimit(req, "rock-read", 60, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
+  }
 
   try {
     const db = getDb();

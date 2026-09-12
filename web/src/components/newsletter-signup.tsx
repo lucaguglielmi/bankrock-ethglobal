@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight, Check, Loader2, Sparkles, Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function NewsletterSignup() {
   const [email, setEmail] = useState("");
@@ -26,7 +27,7 @@ export function NewsletterSignup() {
         body: JSON.stringify({ email, source: "landing_page" }),
       });
 
-      const data = (await res.json().catch(() => ({}))) as any;
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
 
       if (!res.ok) {
         throw new Error(data.error || "Failed to join newsletter.");
@@ -51,44 +52,40 @@ export function NewsletterSignup() {
   };
 
   return (
-    <section className="w-full bg-white text-black py-28 md:py-36 px-6 md:px-12 border-t border-neutral-100 relative overflow-hidden">
+    <section className="relative w-full overflow-hidden border-t border-neutral-100 bg-white px-[var(--gutter)] py-16 text-ink sm:py-24">
       {/* Background subtle radial aura */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-neutral-100/60 blur-[120px] rounded-full pointer-events-none z-0" />
+      <div className="pointer-events-none absolute top-1/2 left-1/2 z-0 h-[350px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-100/60 blur-[120px]" />
 
-      <div className="max-w-4xl mx-auto flex flex-col items-center text-center relative z-10">
-        <div className="inline-flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-widest text-blue-600 mb-6">
-          <Sparkles className="w-3.5 h-3.5" />
+      <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center text-center">
+        <div className="mb-6 inline-flex items-center gap-2 text-label uppercase text-link">
+          <Sparkles className="size-3.5" aria-hidden />
           <span>Genesis Batch</span>
         </div>
 
-        <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-6 leading-tight max-w-2xl">
-          Notify me on launch.
-        </h2>
+        <h2 className="mb-6 max-w-2xl text-h2 font-bold">Notify me on launch.</h2>
 
-        <p className="text-lg md:text-xl text-neutral-500 font-medium max-w-xl mx-auto mb-10 leading-relaxed">
+        <p className="mx-auto mb-10 max-w-prose text-lead text-ink-2">
           Subscribe to know when and where the first batch of OG Bank Rocks will be released.{" "}
-          <span className="text-neutral-700 font-semibold block sm:inline mt-1 sm:mt-0">
+          <span className="mt-1 block font-semibold text-ink sm:mt-0 sm:inline">
             (Likely a global Ethereum convention)
           </span>
         </p>
 
         {status === "success" ? (
-          <div className="w-full max-w-md bg-neutral-50 border border-neutral-200 rounded-3xl p-8 flex flex-col items-center animate-in fade-in zoom-in-95 duration-500">
-            <div className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center mb-4 shadow-md">
-              <Check className="w-6 h-6 stroke-[2.5]" />
+          <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-500 flex w-full max-w-md flex-col items-center rounded-3xl border border-neutral-200 bg-neutral-50 p-8">
+            <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md">
+              <Check className="size-6 stroke-[2.5]" aria-hidden />
             </div>
-            <h3 className="text-xl font-bold tracking-tight mb-2">You&apos;re on the list</h3>
-            <p className="text-sm text-neutral-500 font-medium leading-relaxed">
+            <h3 className="mb-2 text-h3 font-semibold">You&apos;re on the list</h3>
+            <p className="text-sm text-ink-2">
               We&apos;ll dispatch an alert with exact coordinates, dates, and booth location before the genesis drop goes live.
             </p>
-            <div className="mt-4 text-xs font-mono text-neutral-400">
-              {email}
-            </div>
+            <div className="mt-4 text-caption text-ink-3">{email}</div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="w-full max-w-md flex flex-col sm:flex-row gap-3">
+          <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
-              <Mail className="w-5 h-5 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Mail className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-ink-4" aria-hidden />
               <input
                 type="email"
                 value={email}
@@ -99,40 +96,32 @@ export function NewsletterSignup() {
                 placeholder="vitalik@ethereum.org"
                 aria-label="Email address"
                 required
-                className="w-full bg-neutral-50 border border-neutral-200 text-black placeholder:text-neutral-400 text-base font-medium rounded-full pl-11 pr-5 py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all shadow-sm"
+                className="h-14 w-full rounded-full border border-neutral-200 bg-neutral-50 pr-5 pl-11 text-base font-medium text-ink placeholder:text-ink-4 shadow-sm outline-none transition-all focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
               />
             </div>
-            <button
-              type="submit"
-              disabled={status === "loading"}
-              className="bg-black text-white font-semibold text-base px-8 py-4 rounded-full hover:bg-neutral-800 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-            >
+            <Button type="submit" size="lg" disabled={status === "loading"} className="w-full sm:w-auto">
               {status === "loading" ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Subscribing...</span>
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  <span>Subscribing…</span>
                 </>
               ) : (
                 <>
                   <span>Notify Me</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="size-4" aria-hidden />
                 </>
               )}
-            </button>
+            </Button>
           </form>
         )}
 
         {status === "error" && (
-          <p className="text-sm text-red-600 font-medium mt-3 animate-in fade-in">
-            {errorMessage}
-          </p>
+          <p className="motion-safe:animate-in motion-safe:fade-in mt-3 text-sm text-danger">{errorMessage}</p>
         )}
 
-        <div className="mt-8 flex items-center justify-center gap-6 text-xs text-neutral-400 font-medium">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-3">
           <span>✓ Zero spam</span>
-          <span>•</span>
           <span>✓ Exclusive booth access</span>
-          <span>•</span>
           <span>✓ Hand-forged in Tuscany</span>
         </div>
       </div>

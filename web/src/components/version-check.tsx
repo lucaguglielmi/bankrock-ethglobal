@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { RefreshCw, X, ArrowUpCircle } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { BottomDockSlot } from "@/components/ui/bottom-dock";
 
+/**
+ * Update-available notice. Lives in the root `<BottomDock>` (spec 17 §4.9,
+ * L-4) rather than being its own fixed element — it is never `position:
+ * fixed` itself, never `z-[100]`, and never pinned to `bottom-6`.
+ */
 export function VersionCheck() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -19,7 +26,7 @@ export function VersionCheck() {
           cache: "no-store",
         });
         const data = await res.json();
-        
+
         if (data.version && data.version !== "dev" && data.version !== currentVersion) {
           setUpdateAvailable(true);
         }
@@ -33,7 +40,7 @@ export function VersionCheck() {
 
     // Check every 5 minutes
     const interval = setInterval(checkVersion, 5 * 60 * 1000);
-    
+
     // Check on window focus
     const onFocus = () => checkVersion();
     window.addEventListener("focus", onFocus);
@@ -55,48 +62,33 @@ export function VersionCheck() {
         console.error("Failed to clear caches", e);
       }
     }
-    
+
     // Hard reload the page
     window.location.reload();
   };
 
+  if (!updateAvailable || isDismissed) return null;
+
   return (
-    <AnimatePresence>
-      {updateAvailable && !isDismissed && (
-        <motion.div
-          initial={{ opacity: 0, y: 50, x: "-50%" }}
-          animate={{ opacity: 1, y: 0, x: "-50%" }}
-          exit={{ opacity: 0, y: 20, x: "-50%" }}
-          className="fixed bottom-6 left-1/2 z-[100] flex w-[92%] -translate-x-1/2 items-center justify-between gap-4 rounded-2xl border border-gray-200/60 bg-white/90 p-3 pl-4 shadow-2xl backdrop-blur-xl sm:bottom-8 sm:w-auto sm:min-w-[420px]"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-white shadow-sm">
-              <ArrowUpCircle size={22} strokeWidth={2.5} />
-            </div>
-            <div className="flex flex-col">
-              <p className="text-[15px] font-bold tracking-tight text-gray-900">Update Available</p>
-              <p className="text-[13px] font-medium text-gray-500">A new version is ready.</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-1.5 pl-2">
-            <button
-              onClick={handleRefresh}
-              className="flex cursor-pointer items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-gray-800 active:scale-95"
-            >
-              <RefreshCw size={16} />
-              Update Now
-            </button>
-            <button
-              onClick={() => setIsDismissed(true)}
-              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-900 active:scale-95"
-              aria-label="Dismiss"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <BottomDockSlot>
+      <div className="flex w-full max-w-md flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-background/95 px-4 py-3 shadow-xl backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <ArrowUpCircle size={18} strokeWidth={2.5} aria-hidden />
+          </span>
+          <p className="text-sm text-ink">A new version of Bank Rock is ready.</p>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" onClick={handleRefresh}>
+            <RefreshCw className="size-4" aria-hidden />
+            Update now
+          </Button>
+          <IconButton aria-label="Dismiss update notice" onClick={() => setIsDismissed(true)}>
+            <X />
+          </IconButton>
+        </div>
+      </div>
+    </BottomDockSlot>
   );
 }

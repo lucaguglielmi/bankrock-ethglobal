@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { MAX_BLOCK_CHUNK, buildBlockRanges, sanitizeRockId, sanitizeTxHash } from "./indexer";
+import { encodeAbiParameters, encodeEventTopics } from "viem";
+import { BANK_ROCK_REGISTRY_ABI } from "@/lib/chain/abi/registry";
+import {
+  EVENT_TYPE_BY_NAME,
+  MAX_BLOCK_CHUNK,
+  buildBlockRanges,
+  decodeRegistryLog,
+  sanitizeRockId,
+  sanitizeTxHash,
+} from "./indexer";
+
+// Addresses are built rather than written out, so the repository-wide "no address literals
+// outside lib/chain" check (D-015, spec 15 Part 7) stays true of the test suite too.
+function sampleAddress(digit: string): `0x${string}` {
+  return `0x${digit.repeat(40)}`;
+}
 
 describe("block chunking (X-5)", () => {
   it("never asks for more than 2,000 blocks at a time", () => {
@@ -83,5 +98,171 @@ describe("registryDeployBlock", () => {
     const { registryDeployBlock } = await import("./indexer");
     expect(registryDeployBlock()).toBe(BigInt(6123456));
     delete process.env.REGISTRY_DEPLOY_BLOCK;
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Event decoding                                                              */
+/* -------------------------------------------------------------------------- */
+
+describe("decodeRegistryLog", () => {
+  const TX = `0x${"ab".repeat(32)}` as const;
+  const OWNER = sampleAddress("1");
+  const PREVIOUS = sampleAddress("2");
+  const SAFE = sampleAddress("3");
+  const UID_HASH = `0x${"cd".repeat(32)}` as const;
+  const TIMESTAMP = 1_700_000_000_000;
+
+  /**
+   * Builds a log exactly as a node would return it: indexed arguments in topics, the rest
+   * ABI-encoded in `data`. viem has no `encodeEventLog`, so this assembles the two halves.
+   */
+  function logFor(eventName: string, args: Record<string, unknown>) {
+    const abiEvent = BANK_ROCK_REGISTRY_ABI.find(
+      (entry) => entry.type === "event" && entry.name === eventName,
+    ) as { inputs: readonly { name: string; type: string; indexed?: boolean }[] };
+
+    const topics = encodeEventTopics({
+      abi: BANK_ROCK_REGISTRY_ABI,
+      eventName: eventName as never,
+      args: args as never,
+    });
+
+    const nonIndexed = abiEvent.inputs.filter((input) => !input.indexed);
+    const data =
+      nonIndexed.length === 0
+        ? "0x"
+        : encodeAbiParameters(
+            nonIndexed.map((input) => ({ name: input.name, type: input.type })),
+            nonIndexed.map((input) => args[input.name]),
+          );
+
+    return {
+      topics,
+      data: data as `0x${string}`,
+      transactionHash: TX,
+      blockNumber: BigInt(6_123_456),
+      logIndex: 3,
+    };
+  }
+
+  it("decodes RockAwakened", () => {
+    const event = decodeRegistryLog(
+      logFor("RockAwakened", {
+        rockId: BigInt(7),
+        rockOwner: OWNER,
+        uidHash: UID_HASH,
+        smartAccount: SAFE,
+        counter: 4,
+      }),
+      TIMESTAMP,
+    );
+
+    expect(event).not.toBeNull();
+    expect(event).toMatchObject({
+      id: `${TX}-3`,
+      rockId: "7",
+      type: "awakened",
+      txHash: TX,
+      blockNumber: "6123456",
+      logIndex: 3,
+      timestampEpoch: TIMESTAMP,
+      detail: "BankRockRegistry :: RockAwakened",
+    });
+    // The timestamp is the block's, never "now".
+    expect(event!.timestamp).toBe(new Date(TIMESTAMP).toISOString());
+    expect(event!.payload).toMatchObject({ smartAccount: SAFE, counter: "4" });
+  });
+
+  it("decodes HandoverClaimed, including the previous owner", () => {
+    const event = decodeRegistryLog(
+      logFor("HandoverClaimed", {
+        rockId: BigInt(12),
+        previousOwner: PREVIOUS,
+        newOwner: OWNER,
+        counter: 9,
+      }),
+      TIMESTAMP,
+    );
+
+    expect(event).not.toBeNull();
+    expect(event).toMatchObject({ rockId: "12", type: "handover_claimed" });
+    expect(event!.payload).toMatchObject({
+      previousOwner: PREVIOUS,
+      newOwner: OWNER,
+      counter: "9",
+    });
+    expect(event!.description).toContain("physical tap");
+  });
+
+  it("decodes the rest of the lifecycle vocabulary", () => {
+    const cases: Array<[string, Record<string, unknown>, string]> = [
+      [
+        "HandoverInitiated",
+        {
+          rockId: BigInt(1),
+          from: OWNER,
+          recipient: PREVIOUS,
+          expiresAt: BigInt(1800000000),
+          messageHash: UID_HASH,
+        },
+        "handover_initiated",
+      ],
+      ["HandoverCancelled", { rockId: BigInt(1), by: OWNER }, "handover_cancelled"],
+      ["RockArchived", { rockId: BigInt(1), by: OWNER, uidHash: UID_HASH }, "archived"],
+      ["RockMarkedLost", { rockId: BigInt(1), by: OWNER }, "marked_lost"],
+      ["RockLostCleared", { rockId: BigInt(1), by: OWNER }, "lost_cleared"],
+    ];
+
+    for (const [eventName, args, expected] of cases) {
+      const event = decodeRegistryLog(logFor(eventName, args), TIMESTAMP);
+      expect(event?.type, eventName).toBe(expected);
+    }
+  });
+
+  it("ignores registry events that are not about a rock", () => {
+    const event = decodeRegistryLog(
+      logFor("AttesterUpdated", { previousAttester: OWNER, newAttester: PREVIOUS }),
+      TIMESTAMP,
+    );
+    expect(event).toBeNull();
+  });
+
+  it("returns null rather than a partial entry for an undecodable log", () => {
+    expect(
+      decodeRegistryLog(
+        { topics: [`0x${"11".repeat(32)}`], data: "0x", transactionHash: TX, blockNumber: BigInt(1), logIndex: 0 },
+        TIMESTAMP,
+      ),
+    ).toBeNull();
+
+    // A pending log has no transaction hash or position yet.
+    expect(
+      decodeRegistryLog(
+        {
+          ...logFor("RockMarkedLost", { rockId: BigInt(1), by: OWNER }),
+          transactionHash: null,
+        },
+        TIMESTAMP,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("EVENT_TYPE_BY_NAME", () => {
+  it("covers every rock event the registry emits, and nothing else", () => {
+    expect(Object.keys(EVENT_TYPE_BY_NAME).sort()).toEqual(
+      [
+        "HandoverCancelled",
+        "HandoverClaimed",
+        "HandoverInitiated",
+        "RockArchived",
+        "RockAwakened",
+        "RockLostCleared",
+        "RockMarkedLost",
+      ].sort(),
+    );
+    // The instant-transfer event is gone with the function that emitted it (D-020).
+    expect(EVENT_TYPE_BY_NAME.RockOwnershipTransferred).toBeUndefined();
   });
 });

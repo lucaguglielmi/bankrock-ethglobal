@@ -1,29 +1,36 @@
 /**
- * GET /api/events?rockId=N — indexed registry provenance (X-5).
+ * GET /api/events?rockId=N — a rock's indexed provenance (X-5).
  *
- * Returns real events, or an empty list carrying `state: "UNAVAILABLE"` and the reason when the
- * registry address is unset, the deploy block is unknown, or the RPC could not be read. An empty
- * `REAL` list means the chain really holds no events for that rock; the two cases are never
- * conflated.
+ * Returns the decoded registry events with the block's own timestamp and the transaction hash, or
+ * an empty list carrying `state: "UNAVAILABLE"` and a reason when the registry address is unset,
+ * the deploy block is unknown, or the RPC could not be read. An empty `REAL` list means the chain
+ * really holds no events for that rock; the two are never conflated.
  */
 
 import { NextResponse } from "next/server";
 import { getRockOnchainEvents, sanitizeRockId } from "@/lib/indexer";
+import { consumeIpRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/telemetry";
 
 export async function GET(req: Request) {
   const start = Date.now();
+
+  const limit = await consumeIpRateLimit(req, "events", 60, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
+  }
+
   const { searchParams } = new URL(req.url);
   const rawRockId = searchParams.get("rockId");
+  const rockId = rawRockId === null ? null : sanitizeRockId(rawRockId);
 
-  if (!rawRockId || sanitizeRockId(rawRockId) === null) {
+  if (rockId === null) {
     return NextResponse.json(
       { error: "rockId is required and must be an unsigned integer" },
       { status: 400 },
     );
   }
 
-  const rockId = sanitizeRockId(rawRockId)!;
   const result = await getRockOnchainEvents(rockId);
 
   const headers = {

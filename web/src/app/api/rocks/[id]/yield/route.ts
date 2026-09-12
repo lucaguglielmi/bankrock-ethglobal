@@ -13,11 +13,19 @@
 import { NextResponse } from "next/server";
 import { asc, eq } from "drizzle-orm";
 import { getDb, NO_DATABASE_REASON } from "@/lib/db";
+import { consumeIpRateLimit } from "@/lib/rate-limit";
 import { yieldSnapshots } from "@/lib/db/schema";
 import { logger } from "@/lib/telemetry";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+
+  // 60 reads a minute per IP. The middleware limiter this replaces was a per-isolate Map and
+  // counted nothing (SA-11).
+  const limit = await consumeIpRateLimit(req, "rock-read", 60, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
+  }
 
   try {
     const db = getDb();

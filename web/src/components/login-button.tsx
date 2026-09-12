@@ -1,87 +1,123 @@
 "use client";
 
-import { useState } from "react";
+import * as React from "react";
 import { useAuth } from "@/context/auth-context";
-import { Check, Copy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet } from "@/components/ui/sheet";
+import { Address } from "@/components/ui/address";
+import { HelpTerm } from "@/components/ui/popover";
+import { truncateMiddle } from "@/lib/ui/format";
+import { explorer } from "@/lib/chain";
 
+/**
+ * The header auth control (spec 17 §4.3). Signed out: a `Connect` button.
+ * Unavailable (spec 15 A-1/A-2 removed the fabricated wallet — sign-in can
+ * genuinely be unconfigured): a muted, non-interactive-looking chip with a
+ * `HelpTerm` naming the reason. Signed in: one 44 px chip that opens the
+ * account `Sheet` — nothing else lives in the header.
+ */
 export function LoginButton() {
-  const { ready, authenticated, login, logout, user, address, isEmbedded, isDemoMode, lastLoginMethod } = useAuth();
-  const [copied, setCopied] = useState(false);
-
-  const activeAddress = address || user?.wallet?.address;
-
-  const handleCopy = () => {
-    if (activeAddress) {
-      navigator.clipboard.writeText(activeAddress);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  const {
+    ready,
+    authenticated,
+    login,
+    logout,
+    address,
+    isEmbedded,
+    lastLoginMethod,
+    unavailable,
+    unavailableReason,
+  } = useAuth();
+  const [accountOpen, setAccountOpen] = React.useState(false);
+  const [loggingOut, setLoggingOut] = React.useState(false);
 
   if (!ready) {
     return (
-      <button
-        disabled
-        className="px-4 py-2 rounded-full border border-black/10 bg-black/5 text-sm font-medium transition-colors"
-      >
-        Loading...
-      </button>
+      <Button size="default" disabled>
+        Loading…
+      </Button>
     );
   }
 
-  if (authenticated) {
+  if (unavailable) {
     return (
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 bg-neutral-100/90 border border-neutral-200/80 rounded-full px-3 py-1.5 text-xs">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" title="Base Sepolia Testnet" />
-          {isEmbedded && (
-            <span
-              className="text-[10px] font-mono bg-black text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
-              title={isDemoMode ? "High-fidelity Demo Embedded Wallet on Base Sepolia" : "Privy Embedded Signer"}
-            >
-              Embedded
-            </span>
-          )}
-          {activeAddress ? (
-            <span className="font-mono text-neutral-800 font-medium">
-              {activeAddress.slice(0, 5)}...{activeAddress.slice(-4)}
-            </span>
-          ) : (
-            <span className="text-neutral-600 font-medium">Authenticated</span>
-          )}
-          {activeAddress && (
-            <button
-              onClick={handleCopy}
-              className="text-neutral-400 hover:text-black transition-colors cursor-pointer p-0.5"
-              title="Copy address"
-            >
-              {copied ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
-            </button>
-          )}
-        </div>
+      <HelpTerm
+        term={
+          <span className="inline-flex h-11 items-center rounded-full border border-border bg-muted px-4 text-sm font-medium text-ink-3">
+            Sign-in unavailable
+          </span>
+        }
+      >
+        {unavailableReason ?? "Sign-in is not configured."}
+      </HelpTerm>
+    );
+  }
+
+  if (authenticated && address) {
+    const handleLogout = async () => {
+      setLoggingOut(true);
+      try {
+        await logout();
+        setAccountOpen(false);
+      } finally {
+        setLoggingOut(false);
+      }
+    };
+
+    return (
+      <>
         <button
-          onClick={() => logout()}
-          className="px-3.5 py-1.5 rounded-full border border-neutral-300 hover:border-black text-xs font-medium transition-colors cursor-pointer"
+          type="button"
+          onClick={() => setAccountOpen(true)}
+          className="inline-flex h-11 items-center rounded-full border border-border bg-muted px-4 font-mono text-caption text-ink-2 hover:bg-muted/70 hover:text-ink motion-safe:transition-colors"
         >
-          Log out
+          {truncateMiddle(address)}
         </button>
-      </div>
+
+        <Sheet
+          open={accountOpen}
+          onOpenChange={setAccountOpen}
+          title="Account"
+          footer={
+            <Button
+              size="default"
+              variant="outline"
+              className="w-full"
+              onClick={handleLogout}
+              disabled={loggingOut}
+            >
+              Log out
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-5 py-4">
+            <div>
+              <p className="text-label uppercase text-ink-3">Address</p>
+              <Address value={address} explorerHref={explorer.address(address)} className="mt-1" />
+            </div>
+            <div>
+              <p className="text-label uppercase text-ink-3">Network</p>
+              <p className="mt-1 text-base text-ink">Ethereum Sepolia</p>
+            </div>
+            <div>
+              <p className="text-label uppercase text-ink-3">Wallet type</p>
+              <p className="mt-1 text-base text-ink">{isEmbedded ? "Embedded" : "External"}</p>
+            </div>
+            {lastLoginMethod ? (
+              <p className="text-sm text-ink-2">
+                Last signed in with{" "}
+                <span className="font-medium capitalize text-ink">{lastLoginMethod}</span>
+              </p>
+            ) : null}
+          </div>
+        </Sheet>
+      </>
     );
   }
 
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      <button
-        onClick={() => login()}
-        className="px-4 py-2 rounded-full bg-black text-white hover:bg-black/80 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50"
-      >
-        Connect Wallet
-      </button>
-      {lastLoginMethod && (
-        <span className="text-[10px] text-neutral-400 font-medium tracking-wide">
-          Last used: <span className="capitalize font-bold text-neutral-600">{lastLoginMethod}</span>
-        </span>
-      )}
-    </div>
+    <Button size="default" onClick={() => login()}>
+      Connect
+    </Button>
   );
 }

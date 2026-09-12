@@ -90,6 +90,24 @@ export function requireAddress(key: AddressKey): Capability<Address> {
   return real(value);
 }
 
+/**
+ * ERC-4337 EntryPoint v0.7, verified on Sepolia at 16,035 bytes (spec 16 §1.1).
+ *
+ * Canonical and identical on every chain, so it is a constant rather than a variable — and this
+ * module is the only place an address literal may appear (D-015).
+ */
+export const ENTRY_POINT_07_ADDRESS: Address = "0x0000000071727De22E5E9d8BAf0edAc6f37da032";
+
+/**
+ * Safe's owner linked-list sentinel.
+ *
+ * The owner list of a single-owner Safe is `SENTINEL -> owner -> SENTINEL`, and `swapOwner` takes
+ * the entry that points at the one being replaced — the sentinel, in that case. It is a protocol
+ * constant, identical on every chain; it lives here because this module is the only place an
+ * address literal may appear (D-015).
+ */
+export const SAFE_SENTINEL_OWNER: Address = "0x0000000000000000000000000000000000000001";
+
 /** Token metadata. Decimals verified on Sepolia (spec 16 §1.1). */
 export const tokens = {
   USDC: { symbol: "USDC", decimals: 6, address: addresses.usdc },

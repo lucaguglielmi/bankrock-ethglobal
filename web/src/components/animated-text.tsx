@@ -1,26 +1,52 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { createElement } from "react";
+
+/** Heading tags this component knows how to animate. */
+type HeadingTag = "h1" | "h2" | "h3" | "p" | "span";
 
 interface AnimatedTextProps {
   text: string;
   className?: string;
   delay?: number;
+  /** The rendered heading element. @default "h1" */
+  as?: HeadingTag;
 }
 
-export function AnimatedText({ text, className = "", delay = 0 }: AnimatedTextProps) {
-  // Split text into characters
-  const characters = Array.from(text);
+const MOTION_TAGS: Record<HeadingTag, typeof motion.h1> = {
+  h1: motion.h1,
+  h2: motion.h2 as typeof motion.h1,
+  h3: motion.h3 as typeof motion.h1,
+  p: motion.p as typeof motion.h1,
+  span: motion.span as typeof motion.h1,
+};
+
+/**
+ * Animates a heading per word (spec 17 §4.7, T-11): each word is an
+ * `inline-block` with `white-space: nowrap` so it never breaks mid-word,
+ * spaces between words are preserved as ordinary text nodes, and the
+ * heading itself has no `overflow: hidden` so descenders and the blur-in
+ * are never clipped. Entirely `motion-safe`: under `prefers-reduced-motion`
+ * the text renders statically, with no animation at all.
+ */
+export function AnimatedText({ text, className = "", delay = 0, as = "h1" }: AnimatedTextProps) {
+  const words = text.split(" ");
+  const prefersReducedMotion = useReducedMotion();
+
+  if (prefersReducedMotion) {
+    return createElement(as, { className }, text);
+  }
 
   const container = {
     hidden: { opacity: 0 },
     visible: (i: number = 1) => ({
       opacity: 1,
-      transition: { staggerChildren: 0.03, delayChildren: delay * i },
+      transition: { staggerChildren: 0.08, delayChildren: delay * i },
     }),
   };
 
-  const child: import("framer-motion").Variants = {
+  const child: Variants = {
     visible: {
       opacity: 1,
       y: 0,
@@ -43,23 +69,26 @@ export function AnimatedText({ text, className = "", delay = 0 }: AnimatedTextPr
     },
   };
 
+  const MotionTag = MOTION_TAGS[as];
+
   return (
-    <motion.h1
-      style={{ overflow: "hidden", display: "flex", flexWrap: "wrap" }}
+    <MotionTag
+      style={{ display: "flex", flexWrap: "wrap" }}
       variants={container}
       initial="hidden"
       animate="visible"
       className={className}
     >
-      {characters.map((char, index) => (
+      {words.map((word, index) => (
         <motion.span
-          variants={child}
           key={index}
-          style={{ paddingRight: char === " " ? "0.3em" : "0" }}
+          variants={child}
+          style={{ display: "inline-block", whiteSpace: "nowrap" }}
         >
-          {char === " " ? "\u00A0" : char}
+          {word}
+          {index < words.length - 1 ? " " : ""}
         </motion.span>
       ))}
-    </motion.h1>
+    </MotionTag>
   );
 }

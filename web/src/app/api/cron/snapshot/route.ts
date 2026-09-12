@@ -11,10 +11,11 @@
  */
 
 import { NextResponse } from "next/server";
-import { formatUnits, zeroAddress, type Address } from "viem";
+import { formatUnits, zeroAddress } from "viem";
 import { addresses, getPublicClient, tokens } from "@/lib/chain";
 import { BANK_ROCK_REGISTRY_ABI } from "@/lib/chain/abi/registry";
 import { ERC20_ABI } from "@/lib/chain/abi/erc20";
+import { mapRockRecord, type GetRockResult } from "@/lib/rock-account";
 import { getDb, NO_DATABASE_REASON } from "@/lib/db";
 import { yieldSnapshots } from "@/lib/db/schema";
 import { requireCronSecret } from "@/lib/secure";
@@ -49,15 +50,16 @@ export async function GET(req: Request) {
 
   for (const rockId of rockIds) {
     try {
-      const rock = (await client.readContract({
+      const raw = (await client.readContract({
         address: registry,
         abi: BANK_ROCK_REGISTRY_ABI,
-        functionName: "rocks",
+        functionName: "getRock",
         args: [BigInt(rockId)],
-      })) as readonly [Address, Address, bigint, boolean];
+      })) as unknown as GetRockResult;
 
-      const rockAccount = rock[0];
-      if (!rockAccount || rockAccount === zeroAddress) {
+      const record = mapRockRecord(rockId, raw);
+      const rockAccount = record.smartAccount;
+      if (record.state === "dormant" || !rockAccount || rockAccount === zeroAddress) {
         skipped.push({ rockId, reason: "No Rock Account is registered for this rock" });
         continue;
       }

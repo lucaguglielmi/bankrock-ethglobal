@@ -1,51 +1,126 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LoginButton } from "@/components/login-button";
-import { ArrowRight, Volume2, VolumeX } from "lucide-react";
+import { ArrowRight, Menu, Volume2, VolumeX } from "lucide-react";
 import { useAudio } from "@/context/audio-context";
+import { isDemoMode } from "@/lib/demo";
+import { LoginButton } from "@/components/login-button";
+import { IconButton } from "@/components/ui/icon-button";
+import { Sheet } from "@/components/ui/sheet";
+import { cn } from "@/lib/ui/cn";
 
+const NAV_LINKS = [
+  { href: "/shop", label: "Shop" },
+  { href: "/mcp", label: "AI Oracle" },
+] as const;
+
+/**
+ * Fixed site header (spec 17 §4.3, L-2, L-3). Below `md` the nav links
+ * collapse into a `Sheet`; from `md` up they render inline as before. The
+ * `Live Demo` entry only exists while NEXT_PUBLIC_DEMO_MODE is on (spec 15
+ * D-013).
+ */
 export function Header() {
   const pathname = usePathname();
   const { isMuted, toggleMute } = useAudio();
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const demoMode = isDemoMode();
+
+  const isLinkActive = (href: string) => pathname === href;
+  const isLiveDemoActive = pathname.startsWith("/rock");
+
+  const soundLabel = isMuted ? "Unmute sounds" : "Mute sounds";
 
   return (
-    <nav className="w-full flex justify-between items-center z-50 p-6 md:px-12 fixed top-0 bg-white/50 backdrop-blur-md border-b border-black/5">
-      <Link href="/" className="text-xl font-bold tracking-tighter hover:opacity-70 transition-opacity">
-        Bank Rock
-      </Link>
-      <div className="flex gap-6 md:gap-8 items-center">
-        <Link 
-          href="/shop" 
-          className={`text-sm transition-opacity ${pathname === '/shop' ? 'font-semibold text-black border-b border-black pb-0.5' : 'font-medium hover:opacity-50'}`}
-        >
-          Shop
+    <header
+      className="fixed inset-x-0 top-0 border-b border-black/5 bg-white/70 pt-[var(--safe-top)] backdrop-blur-md"
+      style={{ height: "var(--header-h)", zIndex: "var(--z-header)" }}
+    >
+      <nav className="flex h-[calc(var(--header-h)-var(--safe-top))] items-center justify-between px-[var(--gutter)]">
+        <Link href="/" className="text-h3 font-bold text-ink hover:opacity-70 motion-safe:transition-opacity">
+          Bank Rock
         </Link>
-        <Link 
-          href="/mcp" 
-          className={`text-sm transition-opacity ${pathname === '/mcp' ? 'font-semibold text-black border-b border-black pb-0.5' : 'font-medium hover:opacity-50'}`}
-        >
-          AI Oracle
-        </Link>
-        <Link
-          href="/rock/1"
-          className={`text-sm transition-colors flex items-center gap-1 ${pathname.startsWith('/rock') ? 'font-semibold text-black border-b border-black pb-0.5' : 'font-medium text-neutral-500 hover:text-black'}`}
-        >
-          Live Demo
-          <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
-        
-        <button
-          onClick={toggleMute}
-          className="p-2 -mr-2 text-neutral-500 hover:text-black transition-colors rounded-full hover:bg-neutral-100"
-          title={isMuted ? "Unmute sounds" : "Mute sounds"}
-        >
-          {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-        </button>
 
-        <LoginButton />
-      </div>
-    </nav>
+        {/* >= md: inline links, sound, auth */}
+        <div className="hidden items-center gap-8 md:flex">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={cn(
+                "text-sm motion-safe:transition-opacity",
+                isLinkActive(link.href)
+                  ? "border-b border-ink pb-0.5 font-semibold text-ink"
+                  : "font-medium text-ink-2 hover:opacity-70"
+              )}
+            >
+              {link.label}
+            </Link>
+          ))}
+          {demoMode ? (
+            <Link
+              href="/rock/1"
+              className={cn(
+                "flex items-center gap-1 text-sm motion-safe:transition-colors",
+                isLiveDemoActive
+                  ? "border-b border-ink pb-0.5 font-semibold text-ink"
+                  : "font-medium text-ink-3 hover:text-ink"
+              )}
+            >
+              Live Demo
+              <ArrowRight className="size-3.5" />
+            </Link>
+          ) : null}
+          <IconButton aria-label={soundLabel} onClick={toggleMute}>
+            {isMuted ? <VolumeX /> : <Volume2 />}
+          </IconButton>
+          <LoginButton />
+        </div>
+
+        {/* < md: sound, auth, menu */}
+        <div className="flex items-center gap-1 md:hidden">
+          <IconButton aria-label={soundLabel} onClick={toggleMute}>
+            {isMuted ? <VolumeX /> : <Volume2 />}
+          </IconButton>
+          <LoginButton />
+          <IconButton aria-label="Open menu" onClick={() => setMenuOpen(true)}>
+            <Menu />
+          </IconButton>
+        </div>
+      </nav>
+
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Menu">
+        <nav className="flex flex-col py-2">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setMenuOpen(false)}
+              className={cn(
+                "flex h-12 items-center text-base",
+                isLinkActive(link.href) ? "font-semibold text-ink" : "font-medium text-ink-2"
+              )}
+            >
+              {link.label}
+            </Link>
+          ))}
+          {demoMode ? (
+            <Link
+              href="/rock/1"
+              onClick={() => setMenuOpen(false)}
+              className={cn(
+                "flex h-12 items-center gap-1.5 text-base",
+                isLiveDemoActive ? "font-semibold text-ink" : "font-medium text-ink-2"
+              )}
+            >
+              Live Demo
+              <ArrowRight className="size-4" />
+            </Link>
+          ) : null}
+        </nav>
+      </Sheet>
+    </header>
   );
 }

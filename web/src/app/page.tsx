@@ -5,52 +5,49 @@ import { ArrowRight } from "lucide-react";
 import { NewsletterSignup } from "@/components/newsletter-signup";
 import { AboutRocks } from "@/components/about-rocks";
 import { HowItWorksDynamic } from "@/components/how-it-works-dynamic";
+import { Button } from "@/components/ui/button";
+
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col bg-white text-black font-sans selection:bg-black selection:text-white">
-      
-
-
-      {/* Hero Section */}
-      <section className="relative w-full h-[100vh] flex flex-col items-center justify-center pt-20 overflow-hidden">
-        
+    <main className="flex min-h-dvh flex-col bg-white text-ink selection:bg-black selection:text-white">
+      {/* Hero Section — pulled up by its own height to sit under the transparent header (spec 17 §4.2) */}
+      <section className="relative -mx-[var(--gutter)] -mt-[calc(var(--header-h)+var(--safe-top))] flex min-h-dvh flex-col items-center justify-center overflow-hidden px-[var(--gutter)]">
         {/* 3D Canvas Background */}
-        <div className="absolute inset-0 z-0 opacity-80 mix-blend-multiply pointer-events-auto">
+        <div className="pointer-events-auto absolute inset-0 z-0 mix-blend-multiply opacity-80">
           <RockCanvasDynamic />
         </div>
 
-        <div className="z-10 flex flex-col items-center justify-center text-center w-full max-w-5xl mx-auto px-6 pointer-events-none">
-          <AnimatedText 
-            text="Tangible DeFi." 
-            className="text-7xl md:text-[9rem] leading-none font-black tracking-tighter mb-8"
-          />
-          
-          <p className="text-xl md:text-2xl text-neutral-500 font-medium max-w-2xl mx-auto mb-12 opacity-0 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500 fill-mode-forwards tracking-tight">
-            A physical interface to your self-custodial liquidity. Tap your Bank Rock to access agentic strategies and automated yield generation.
+        <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center pt-[calc(var(--header-h)+var(--safe-top))] text-center">
+          <AnimatedText text="Tangible DeFi." className="mb-8 text-display font-extrabold text-ink" />
+
+          <p className="mb-12 max-w-prose text-lead text-ink-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-1000 motion-safe:delay-500 motion-safe:fill-mode-forwards">
+            A physical interface to your self-custodial liquidity. Tap your Bank Rock to put idle capital into agentic
+            trading strategies that earn a share of the trading fees they generate.
           </p>
 
-          <div className="flex items-center gap-6 opacity-0 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-700 fill-mode-forwards pointer-events-auto">
-            <Link href="/shop" className="group flex items-center gap-3 bg-black text-white px-10 py-5 rounded-full font-semibold text-lg hover:bg-black/90 transition-all hover:scale-105 active:scale-95 shadow-xl shadow-black/10">
+          <div className="flex w-full flex-col gap-4 pointer-events-auto motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-1000 motion-safe:delay-700 motion-safe:fill-mode-forwards sm:w-auto sm:flex-row">
+            <Button size="lg" className="w-full sm:w-auto" render={<Link href="/shop" />}>
               Get your Rock
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
+              <ArrowRight className="size-5" aria-hidden />
+            </Button>
+            <Button size="lg" variant="outline" className="w-full sm:w-auto" render={<Link href="#how-it-works" />}>
+              See how it works
+            </Button>
           </div>
         </div>
       </section>
 
       {/* The Story Section */}
-      <section className="w-full bg-neutral-50 py-32 md:py-48 px-6 md:px-12 relative z-10">
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 md:gap-24 items-center">
-          
+      <section className="relative z-10 -mx-[var(--gutter)] w-auto bg-neutral-50 px-[var(--gutter)] py-16 sm:py-24">
+        <div className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-16 md:grid-cols-2 md:gap-24">
+
           <div className="flex flex-col gap-6">
-            <span className="text-sm font-bold uppercase tracking-widest text-neutral-400">The Origin</span>
-            <h2 className="text-5xl md:text-7xl font-bold tracking-tighter leading-tight">
-              Forged in Florence.
-            </h2>
-            <p className="text-xl text-neutral-600 leading-relaxed font-medium mt-4">
+            <span className="text-label text-ink-3 uppercase">The Origin</span>
+            <h2 className="text-h2 font-bold text-ink">Forged in Florence.</h2>
+            <p className="mt-4 max-w-prose text-lead text-ink-2">
               During the 15th century, the Medici family revolutionized global finance in Florence, inventing double-entry bookkeeping and the letter of credit. They laid the foundation for modern banking.
             </p>
-            <p className="text-xl text-neutral-600 leading-relaxed font-medium">
+            <p className="max-w-prose text-lead text-ink-2">
               Every Bank Rock is handpicked from the riverbeds near Florence, bridging the birthplace of classical finance with the frontier of agentic, self-custodial DeFi.
             </p>
             <AboutRocks />
@@ -114,9 +111,9 @@ export default function Home() {
           </g>
             </svg>
 
-            <div className="absolute bottom-6 left-6 text-[10px] font-bold tracking-widest text-neutral-400 uppercase z-30 flex flex-col gap-1">
+            <div className="absolute bottom-6 left-6 z-30 flex flex-col gap-1 text-caption text-ink-3 uppercase">
               <span>Tuscany, IT</span>
-              <span className="font-mono text-neutral-300">43.7696° N, 11.2558° E</span>
+              <span className="text-ink-4">43.7696° N, 11.2558° E</span>
             </div>
           </div>
 
@@ -130,15 +127,30 @@ export default function Home() {
       <NewsletterSignup />
 
       {/* Footer */}
-      <footer className="w-full bg-black text-white py-24 px-6 md:px-12 z-10 relative">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-12">
-          <div className="text-4xl font-black tracking-tighter">Bank Rock</div>
-          <div className="flex flex-wrap gap-8 text-neutral-400 font-medium">
-            <Link href="/mcp" className="hover:text-white transition-colors">AI Oracle</Link>
-            <Link href="/shop" className="hover:text-white transition-colors">Shop</Link>
-            <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-            <Link href="https://github.com/lucaguglielmi/bankrock-ethglobal" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</Link>
+      <footer className="relative z-10 -mx-[var(--gutter)] w-auto bg-black px-[var(--gutter)] py-16 text-white sm:py-24">
+        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 md:flex-row md:items-center">
+          <div className="text-h1 font-extrabold">Bank Rock</div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 font-medium">
+            <Link href="/mcp" className="inline-flex h-11 items-center text-white/70 motion-safe:transition-colors hover:text-white">
+              AI Oracle
+            </Link>
+            <Link href="/shop" className="inline-flex h-11 items-center text-white/70 motion-safe:transition-colors hover:text-white">
+              Shop
+            </Link>
+            <Link href="/terms" className="inline-flex h-11 items-center text-white/70 motion-safe:transition-colors hover:text-white">
+              Terms
+            </Link>
+            <Link href="/privacy" className="inline-flex h-11 items-center text-white/70 motion-safe:transition-colors hover:text-white">
+              Privacy
+            </Link>
+            <Link
+              href="https://github.com/lucaguglielmi/bankrock-ethglobal"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 items-center text-white/70 motion-safe:transition-colors hover:text-white"
+            >
+              GitHub
+            </Link>
           </div>
         </div>
       </footer>

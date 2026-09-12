@@ -3,15 +3,37 @@ import { sql } from 'drizzle-orm';
 
 const nowMs = sql`(cast((julianday('now') - 2440587.5)*86400000 as integer))`;
 
-export const rockEvents = sqliteTable('rock_events', {
-  id: text('id').primaryKey(),
-  rockId: text('rock_id').notNull(),
-  eventType: text('event_type').notNull(), // 'AWAKEN', 'TRADE', 'TRANSFER'
-  txHash: text('tx_hash').notNull().unique(), // Added unique constraint for idempotency
-  amountUsdc: real('amount_usdc'),
-  amountWeth: real('amount_weth'),
-  timestamp: integer('timestamp').notNull().default(nowMs),
-});
+/**
+ * Indexed registry events — the rock's provenance.
+ *
+ * `id` is `${txHash}-${logIndex}`, which is the natural key of a log and makes re-indexing
+ * idempotent. The previous unique constraint on `tx_hash` alone was wrong: one transaction can
+ * emit several events for the same rock — archiving a rock with a pending gift emits
+ * `HandoverCancelled` and `RockArchived` together — and the second would have been silently
+ * dropped.
+ *
+ * `event_type` is one of: awakened | handover_initiated | handover_claimed | handover_cancelled |
+ * archived | marked_lost | lost_cleared. The old AWAKEN/TRADE/TRANSFER vocabulary is gone with
+ * the contract revision that produced it.
+ */
+export const rockEvents = sqliteTable(
+  'rock_events',
+  {
+    id: text('id').primaryKey(),
+    rockId: text('rock_id').notNull(),
+    eventType: text('event_type').notNull(),
+    txHash: text('tx_hash').notNull(),
+    logIndex: integer('log_index').notNull().default(0),
+    blockNumber: text('block_number'),
+    /** Free-form JSON with the decoded, non-indexed arguments. */
+    payload: text('payload', { mode: 'json' }).$type<Record<string, string>>(),
+    amountUsdc: real('amount_usdc'),
+    amountWeth: real('amount_weth'),
+    /** Unix milliseconds, from the block header. Never synthesized. */
+    timestamp: integer('timestamp').notNull().default(nowMs),
+  },
+  (table) => [index('rock_events_rock_id_idx').on(table.rockId, table.timestamp)],
+);
 
 export const rocks = sqliteTable('rocks', {
   id: text('id').primaryKey(),
@@ -113,3 +135,54 @@ export const contactRequests = sqliteTable(
   },
   (table) => [index('contact_requests_created_at_idx').on(table.createdAt)],
 );
+
+/**
+ * Tag -> rock binding, maintained off chain (spec 06, R-7).
+ *
+ * The registry is the authority: `rockIdForUid(uidHash)` is the truth, and archiving releases the
+ * tag there. This table is a cache written after a successful awaken and cleared after an
+ * archive, so a tap can be routed to the right rock without a chain read on the critical path.
+ * It stores `keccak256(uid)`, never the UID: the raw UID is a stable physical identifier and does
+ * not belong in a database (SA-2).
+ */
+export const tagBindings = sqliteTable('tag_bindings', {
+  uidHash: text('uid_hash').primaryKey(),
+  rockId: text('rock_id').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+/**
+ * Gift messages (Flow E).
+ *
+ * Only `keccak256(message)` goes on chain. The plaintext lives here so the recipient can read it
+ * after claiming, and so the hash on chain can be checked against it.
+ */
+export const handoverMessages = sqliteTable(
+  'handover_messages',
+  {
+    /** `${rockId}:${messageHash}` — one message per handover attempt. */
+    id: text('id').primaryKey(),
+    rockId: text('rock_id').notNull(),
+    messageHash: text('message_hash').notNull(),
+    message: text('message').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [index('handover_messages_rock_idx').on(table.rockId)],
+);
+
+/**
+ * UserOperations signed ahead of time and held until the event that needs them.
+ *
+ * Currently one kind: `swap_owner`, the Safe owner rotation a giver pre-signs when opening a
+ * handover, submitted by the claim route once the registry has accepted the recipient's
+ * attestation (see lib/rock-account.server.ts). One row per rock: a new handover replaces the
+ * previous operation, and cancelling deletes it.
+ */
+export const pendingUserOps = sqliteTable('pending_userops', {
+  rockId: text('rock_id').primaryKey(),
+  kind: text('kind').notNull(),
+  recipient: text('recipient'),
+  /** The serialised, signed UserOperation, exactly as it will be sent to the bundler. */
+  userOp: text('user_op', { mode: 'json' }).$type<Record<string, string>>().notNull(),
+  createdAt: integer('created_at').notNull(),
+});
