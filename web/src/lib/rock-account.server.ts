@@ -19,11 +19,13 @@
  */
 
 import {
+  createPublicClient,
   createWalletClient,
   http,
   recoverTypedDataAddress,
   type Address,
   type Hex,
+  type Transport,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
@@ -285,53 +287,217 @@ export async function releaseRelayerSpend(day: string, amountWei: bigint): Promi
 /* -------------------------------------------------------------------------- */
 
 /**
- * Sends `claimHandover` from the relayer key.
+ * How long a relayed claim is watched for its receipt.
  *
- * The returned hash comes from the node that accepted the transaction. If the send fails, the
- * result is UNAVAILABLE — there is no other way for this function to produce a hash (D-014).
+ * The same discipline `submitSignedUserOp` uses for the owner swap — ten polls, a block and a half
+ * apart — because the two halves of a gift are watched by the same person on the same screen, and
+ * one of them giving up in five seconds while the other waits fifteen would be an arbitrary
+ * difference in what "done" means.
+ */
+const RECEIPT_POLL_INTERVAL_MS = 1500;
+const RECEIPT_POLL_ATTEMPTS = 10;
+const RECEIPT_TIMEOUT_MS = RECEIPT_POLL_INTERVAL_MS * RECEIPT_POLL_ATTEMPTS;
+
+/**
+ * The gas limit a relayed `claimHandover` is sent with.
+ *
+ * Generous for the call — a storage rebind, an `isOwner` staticcall and three events — and it has
+ * to be a fixed number rather than an estimate, because it is half of the product that must stay
+ * inside the reservation.
+ */
+export const RELAYED_CLAIM_GAS_LIMIT = BigInt(300_000);
+
+/** The tip the relayer is willing to add on top of the base fee, when the budget leaves room. */
+const RELAYER_MAX_PRIORITY_FEE_WEI = BigInt(1_000_000_000); // 1 gwei
+
+/**
+ * How much the next block's base fee may exceed this one's: EIP-1559 allows +12.5% per block.
+ *
+ * A `maxFeePerGas` below that is a transaction that may simply never be mined, so it is refused
+ * here rather than broadcast and waited on.
+ */
+const NEXT_BLOCK_BASE_FEE_NUMERATOR = BigInt(9);
+const NEXT_BLOCK_BASE_FEE_DENOMINATOR = BigInt(8);
+
+export const RELAYER_GAS_PRICE_TOO_HIGH_REASON = "gas price too high for the relayer's budget";
+
+/**
+ * The fee cap a relayed claim may be sent with, so that it cannot cost more than was reserved.
+ *
+ * The daily cap is enforced by reserving `RELAYED_CLAIM_COST_ESTIMATE_WEI` *before* the send — but
+ * an unpriced `sendTransaction` lets viem choose the fees from the current block, so a fee spike
+ * between the reservation and the broadcast spends more of the relayer's key than the ledger ever
+ * recorded, and the cap stops being a cap. Bounding the transaction is what makes the reservation
+ * true: `gas * maxFeePerGas <= budget`, by construction.
+ *
+ * When that ceiling is under what the next block will demand, the honest answer is to refuse. A
+ * claim that cannot be afforded is not a claim that should be attempted: the attestation is still
+ * good, and the claimant can try again when the chain is cheaper.
+ */
+export function relayedClaimFees(
+  baseFeePerGas: bigint,
+  budgetWei: bigint = RELAYED_CLAIM_COST_ESTIMATE_WEI,
+  gas: bigint = RELAYED_CLAIM_GAS_LIMIT,
+): Capability<{ gas: bigint; maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }> {
+  if (gas <= BigInt(0) || budgetWei <= BigInt(0)) {
+    return unavailable("The relayer's gas budget is not a positive amount");
+  }
+
+  const maxFeePerGas = budgetWei / gas;
+  const nextBlockBaseFee =
+    (baseFeePerGas * NEXT_BLOCK_BASE_FEE_NUMERATOR) / NEXT_BLOCK_BASE_FEE_DENOMINATOR;
+
+  if (maxFeePerGas < nextBlockBaseFee) {
+    return unavailable(RELAYER_GAS_PRICE_TOO_HIGH_REASON);
+  }
+
+  const headroom = maxFeePerGas - nextBlockBaseFee;
+  const maxPriorityFeePerGas =
+    headroom < RELAYER_MAX_PRIORITY_FEE_WEI ? headroom : RELAYER_MAX_PRIORITY_FEE_WEI;
+
+  return real({ gas, maxFeePerGas, maxPriorityFeePerGas });
+}
+
+/**
+ * The result of relaying a claim.
+ *
+ * Not a plain `Capability`, because a failure has two shapes and the caller must tell them apart:
+ * a claim that was never broadcast costs nothing and its reservation is released, while a claim
+ * that was broadcast and then reverted or did not mine has already spent the relayer's gas. The
+ * route releases the reservation only for the first (`broadcast === null`).
+ */
+export type RelayedClaim =
+  | { state: "REAL"; value: { txHash: Hex } }
+  | { state: "UNAVAILABLE"; reason: string; broadcast: { txHash: Hex } | null };
+
+/**
+ * Sends `claimHandover` from the relayer key **and waits for it to be mined**.
+ *
+ * It used to return as soon as the node accepted the transaction, which the recipient's screen
+ * read as "This rock is yours" — a sentence about a state that did not exist yet and might never:
+ * `claimHandover` reverts for reasons this route cannot rule out in advance
+ * (`AttestationExpired` when the mempool is slow, `AccountDoesNotAnswerToOwner`,
+ * `HandoverExpired`), and a reverted claim leaves the giver owning the rock and the recipient
+ * owning the Safe. So the receipt decides, and only `status === "success"` is a claim (D-014).
+ *
+ * The fees are bounded so the broadcast cannot exceed the amount reserved against the daily cap.
  */
 export async function submitClaimHandover(
   rockIdString: string,
   attestation: SignedAttestation,
-): Promise<Capability<{ txHash: Hex }>> {
+): Promise<RelayedClaim> {
   const rockId = parseRockId(rockIdString);
-  if (rockId === null) return unavailable("Invalid rock id");
+  if (rockId === null) return { state: "UNAVAILABLE", reason: "Invalid rock id", broadcast: null };
 
   const registry = registryAddress();
-  if (registry.state === "UNAVAILABLE") return unavailable(registry.reason);
+  if (registry.state === "UNAVAILABLE") {
+    return { state: "UNAVAILABLE", reason: registry.reason, broadcast: null };
+  }
 
   const relayer = relayerAccount();
-  if (relayer.state === "UNAVAILABLE") return unavailable(relayer.reason);
+  if (relayer.state === "UNAVAILABLE") {
+    return { state: "UNAVAILABLE", reason: relayer.reason, broadcast: null };
+  }
 
   const rpcUrl = optionalEnv("SEPOLIA_RPC_URL");
-  const walletClient = createWalletClient({
-    account: relayer.value,
-    chain,
-    transport: rpcUrl ? http(rpcUrl) : http(),
-  });
+  const transport: Transport = rpcUrl ? http(rpcUrl) : http();
+  const walletClient = createWalletClient({ account: relayer.value, chain, transport });
+  // The same transport for both halves: the receipt must be read from the node that saw the send.
+  const publicClient = createPublicClient({ chain, transport });
 
+  let fees: ReturnType<typeof relayedClaimFees>;
   try {
-    const txHash = await walletClient.sendTransaction({
+    const block = await publicClient.getBlock({ blockTag: "latest" });
+    if (block.baseFeePerGas === null || block.baseFeePerGas === undefined) {
+      return {
+        state: "UNAVAILABLE",
+        reason: "the network reported no base fee, so the relayer's spend could not be bounded",
+        broadcast: null,
+      };
+    }
+    fees = relayedClaimFees(block.baseFeePerGas);
+  } catch (err) {
+    logger.error("Could not read the base fee before relaying a claim", err, {
+      action: "HANDOVER_CLAIM_FEE_READ_FAILED",
+      rockId: rockId.toString(),
+    });
+    return {
+      state: "UNAVAILABLE",
+      reason: publicReasonWith("The claim was not broadcast", err),
+      broadcast: null,
+    };
+  }
+
+  if (fees.state === "UNAVAILABLE") {
+    logger.warn("Refused to relay a claim the daily cap could not cover", {
+      action: "HANDOVER_CLAIM_GAS_PRICE_TOO_HIGH",
+      rockId: rockId.toString(),
+    });
+    return { state: "UNAVAILABLE", reason: fees.reason, broadcast: null };
+  }
+
+  let txHash: Hex;
+  try {
+    txHash = await walletClient.sendTransaction({
       to: registry.value,
       data: encodeClaimHandover(rockId, attestation),
       value: BigInt(0),
+      gas: fees.value.gas,
+      maxFeePerGas: fees.value.maxFeePerGas,
+      maxPriorityFeePerGas: fees.value.maxPriorityFeePerGas,
     });
-
-    logger.info("Relayed handover claim", {
-      action: "HANDOVER_CLAIM_RELAYED",
-      rockId: rockId.toString(),
-      txHash,
-    });
-
-    return real({ txHash });
   } catch (err) {
     logger.error("Relayed handover claim failed", err, {
       action: "HANDOVER_CLAIM_RELAY_FAILED",
       rockId: rockId.toString(),
     });
-    return unavailable(
-      publicReasonWith("The claim was not broadcast", err),
-    );
+    return {
+      state: "UNAVAILABLE",
+      reason: publicReasonWith("The claim was not broadcast", err),
+      broadcast: null,
+    };
+  }
+
+  logger.info("Relayed handover claim", {
+    action: "HANDOVER_CLAIM_RELAYED",
+    rockId: rockId.toString(),
+    txHash,
+  });
+
+  try {
+    const receipt = await publicClient.waitForTransactionReceipt({
+      hash: txHash,
+      timeout: RECEIPT_TIMEOUT_MS,
+      pollingInterval: RECEIPT_POLL_INTERVAL_MS,
+    });
+
+    if (receipt.status !== "success") {
+      // A revert is public: it is in the block, and the transaction hash is how anyone reads it.
+      // The reason string stays fixed, so nothing from the node's error text can escape here.
+      logger.warn("A relayed handover claim reverted", {
+        action: "HANDOVER_CLAIM_REVERTED",
+        rockId: rockId.toString(),
+        txHash,
+      });
+      return {
+        state: "UNAVAILABLE",
+        reason: `the claim transaction reverted on chain (${txHash}), so nothing was claimed`,
+        broadcast: { txHash },
+      };
+    }
+
+    return { state: "REAL", value: { txHash } };
+  } catch (err) {
+    logger.error("A relayed handover claim was not mined in time", err, {
+      action: "HANDOVER_CLAIM_NOT_MINED",
+      rockId: rockId.toString(),
+      txHash,
+    });
+    return {
+      state: "UNAVAILABLE",
+      reason: `the claim transaction ${txHash} was broadcast but has not been mined yet`,
+      broadcast: { txHash },
+    };
   }
 }
 
@@ -391,6 +557,18 @@ function pimlicoUrl(): Capability<string> {
   return real(`https://api.pimlico.io/v2/sepolia/rpc?apikey=${key}`);
 }
 
+/**
+ * A refusal *by* the bundler, as opposed to a failure to reach it.
+ *
+ * The two need different words: "your paymaster policy does not cover this" is something an
+ * operator can fix, and "the network is down" is not. The message is the bundler's own — an `AAxx`
+ * code, a paymaster policy, a prefund — and `publicReason` classifies it into a fixed sentence
+ * without ever quoting it (`lib/errors.ts`).
+ */
+class BundlerRpcError extends Error {
+  override name = "BundlerRpcError";
+}
+
 async function bundlerRpc(url: string, method: string, params: unknown[]): Promise<unknown> {
   const response = await fetch(url, {
     method: "POST",
@@ -399,9 +577,48 @@ async function bundlerRpc(url: string, method: string, params: unknown[]): Promi
   });
   const body = (await response.json()) as { result?: unknown; error?: { message?: string } };
   if (body.error) {
-    throw new Error(body.error.message ?? "bundler error");
+    throw new BundlerRpcError(body.error.message ?? "bundler error");
   }
   return body.result;
+}
+
+/**
+ * Asks the bundler whether an operation would validate, **without submitting it**.
+ *
+ * Why a stored hand-over key is simulated before it is kept: the only thing
+ * `POST /api/rocks/[id]/pending-userop` could check about a submitted operation was that its
+ * `sender` is the rock's Rock Account — which is public. Any signed-in Privy account could
+ * therefore store a row of nonsense against any rock, take the row's creator DID (it is
+ * first-writer-wins, audit P-5), and both lock the real giver out and hand the recipient a gift
+ * the claim route would submit and fail on. A signature is the thing a squatter cannot forge, and
+ * `eth_estimateUserOperationGas` is how the bundler is asked to check one.
+ *
+ * It uses this module's own bundler transport rather than `lib/aa.ts`'s viem client because the
+ * operation is already in the serialised, signed shape this file submits, and because a refusal
+ * has to arrive as a `BundlerRpcError` for `publicReason` to make it actionable.
+ */
+export async function simulateSignedUserOp(
+  userOp: SerializedUserOperation,
+): Promise<Capability<true>> {
+  const url = pimlicoUrl();
+  if (url.state === "UNAVAILABLE") return unavailable(url.reason);
+
+  try {
+    await bundlerRpc(url.value, "eth_estimateUserOperationGas", [userOp, ENTRY_POINT_07_ADDRESS]);
+    return real(true);
+  } catch (err) {
+    if (err instanceof BundlerRpcError) {
+      logger.warn("The bundler refused a pre-signed operation", {
+        action: "USEROP_SIMULATION_REFUSED",
+        sender: userOp.sender,
+      });
+      return unavailable(publicReasonWith("The bundler refused this operation", err));
+    }
+    logger.error("Could not simulate a pre-signed operation", err, {
+      action: "USEROP_SIMULATION_UNAVAILABLE",
+    });
+    return unavailable("The bundler could not be reached, so this operation was not checked");
+  }
 }
 
 /**
@@ -430,7 +647,7 @@ export async function submitSignedUserOp(
     );
   }
 
-  for (let attempt = 0; attempt < 10; attempt++) {
+  for (let attempt = 0; attempt < RECEIPT_POLL_ATTEMPTS; attempt++) {
     try {
       const receipt = (await bundlerRpc(url.value, "eth_getUserOperationReceipt", [
         userOpHash,
@@ -457,7 +674,7 @@ export async function submitSignedUserOp(
     } catch {
       // Keep polling: a not-yet-known operation is reported as an error by some bundlers.
     }
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, RECEIPT_POLL_INTERVAL_MS));
   }
 
   return unavailable(

@@ -147,6 +147,134 @@ describe("P-1: the relayer's daily spend cap", () => {
   });
 });
 
+/**
+ * The relayer reserves a fixed amount before it broadcasts, so the broadcast has to be bounded by
+ * the same amount or the reservation is a guess and the daily cap is not a cap.
+ */
+describe("the relayed claim's fee ceiling", () => {
+  it("keeps gas * maxFeePerGas inside the reserved budget", async () => {
+    const { relayedClaimFees, RELAYED_CLAIM_COST_ESTIMATE_WEI, RELAYED_CLAIM_GAS_LIMIT } =
+      await import("@/lib/rock-account.server");
+
+    const fees = relayedClaimFees(BigInt(1_000_000_000)); // 1 gwei base fee
+    expect(fees.state).toBe("REAL");
+    if (fees.state !== "REAL") return;
+
+    expect(fees.value.gas).toBe(RELAYED_CLAIM_GAS_LIMIT);
+    expect(fees.value.gas * fees.value.maxFeePerGas).toBeLessThanOrEqual(
+      RELAYED_CLAIM_COST_ESTIMATE_WEI,
+    );
+    expect(fees.value.maxPriorityFeePerGas).toBeLessThanOrEqual(fees.value.maxFeePerGas);
+  });
+
+  it("refuses when the next block's base fee would not fit under the ceiling", async () => {
+    const { relayedClaimFees, RELAYER_GAS_PRICE_TOO_HIGH_REASON } = await import(
+      "@/lib/rock-account.server"
+    );
+
+    // 0.002 ETH over 300k gas is a ceiling of ~6.67 gwei; a 20 gwei chain is out of budget.
+    const fees = relayedClaimFees(BigInt(20_000_000_000));
+    expect(fees.state).toBe("UNAVAILABLE");
+    if (fees.state === "UNAVAILABLE") {
+      expect(fees.reason).toBe(RELAYER_GAS_PRICE_TOO_HIGH_REASON);
+    }
+  });
+
+  it("leaves room for the 12.5% a base fee may rise by in one block", async () => {
+    const { relayedClaimFees } = await import("@/lib/rock-account.server");
+
+    // A base fee exactly at the ceiling is refused: the next block may demand more, and a
+    // transaction that can never be mined is worse than one that was never sent.
+    const ceiling = BigInt(2_000_000_000_000_000) / BigInt(300_000);
+    expect(relayedClaimFees(ceiling).state).toBe("UNAVAILABLE");
+    expect(relayedClaimFees((ceiling * BigInt(8)) / BigInt(9)).state).toBe("REAL");
+  });
+});
+
+/**
+ * A pre-signed hand-over is stored only if the bundler says it validates.
+ *
+ * Without that, the store route's only check on a submitted operation was that its `sender` is the
+ * rock's Rock Account — a public value — so any signed-in account could squat the row and make the
+ * gift permanently unclaimable.
+ */
+describe("simulateSignedUserOp", () => {
+  const BUNDLER_KEY = "pim_test_key";
+  const OP = {
+    sender: "0x2222222222222222222222222222222222222222" as const,
+    signature: "0x11" as const,
+  };
+
+  function bundlerAnswering(answer: { result?: unknown; error?: { message: string } }) {
+    return vi.fn(async (_url: string, init?: { body?: string }) => {
+      const method = JSON.parse(String(init?.body ?? "{}")).method;
+      expect(method).toBe("eth_estimateUserOperationGas");
+      return { json: async () => ({ jsonrpc: "2.0", id: 1, ...answer }) } as Response;
+    });
+  }
+
+  beforeEach(() => {
+    process.env.PIMLICO_API_KEY = BUNDLER_KEY;
+  });
+
+  it("accepts an operation the bundler can estimate", async () => {
+    vi.stubGlobal("fetch", bundlerAnswering({ result: { verificationGasLimit: "0x1" } }));
+    const { simulateSignedUserOp } = await import("@/lib/rock-account.server");
+    expect((await simulateSignedUserOp(OP)).state).toBe("REAL");
+    vi.unstubAllGlobals();
+  });
+
+  it("refuses one the bundler rejects, and says something an operator can act on", async () => {
+    vi.stubGlobal("fetch", bundlerAnswering({ error: { message: "AA24 signature error" } }));
+    const { simulateSignedUserOp } = await import("@/lib/rock-account.server");
+
+    const result = await simulateSignedUserOp(OP);
+    expect(result.state).toBe("UNAVAILABLE");
+    if (result.state === "UNAVAILABLE") {
+      expect(result.reason).toMatch(/signature was not accepted/);
+    }
+    vi.unstubAllGlobals();
+  });
+
+  it("names a sponsorship refusal rather than calling it an internal error (B5)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      bundlerAnswering({ error: { message: "paymaster: no sponsorship policy for this app" } }),
+    );
+    const { simulateSignedUserOp } = await import("@/lib/rock-account.server");
+
+    const result = await simulateSignedUserOp(OP);
+    expect(result.state).toBe("UNAVAILABLE");
+    if (result.state === "UNAVAILABLE") {
+      expect(result.reason).toMatch(/Pimlico policy for Sepolia/);
+      expect(result.reason).not.toContain(BUNDLER_KEY);
+    }
+    vi.unstubAllGlobals();
+  });
+
+  it("says the bundler could not be asked when it cannot be reached — not that it said no", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
+    const { simulateSignedUserOp } = await import("@/lib/rock-account.server");
+
+    const result = await simulateSignedUserOp(OP);
+    expect(result.state).toBe("UNAVAILABLE");
+    if (result.state === "UNAVAILABLE") expect(result.reason).toMatch(/could not be reached/);
+    vi.unstubAllGlobals();
+  });
+
+  it("is UNAVAILABLE with no bundler configured, so nothing is stored unchecked", async () => {
+    delete process.env.PIMLICO_API_KEY;
+    delete process.env.NEXT_PUBLIC_PIMLICO_API_KEY;
+    const { simulateSignedUserOp } = await import("@/lib/rock-account.server");
+    expect((await simulateSignedUserOp(OP)).state).toBe("UNAVAILABLE");
+  });
+});
+
 describe("N-6: an included-but-reverted UserOperation is not a success", () => {
   const BUNDLER_KEY = "pim_test_key";
   const TX = `0x${"ef".repeat(32)}`;

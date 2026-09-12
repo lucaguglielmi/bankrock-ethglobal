@@ -44,6 +44,15 @@
  *      reservation is released — the recipient is left exactly where they started rather than
  *      owning a rock whose account is someone else's.
  *
+ * ## What "claimed" means (defect B4)
+ *
+ * Both halves are judged by a receipt, never by acceptance. `submitClaimHandover` waits for
+ * `claimHandover` to be mined and reports `status: "success"` or nothing, because the recipient
+ * reads this answer as "This rock is yours" — and a transaction the node accepted can still revert
+ * (`AttestationExpired` behind a slow mempool, `AccountDoesNotAnswerToOwner`, `HandoverExpired`),
+ * leaving the giver owning the rock. A failure after the broadcast keeps its spend reservation:
+ * the gas is gone whether or not the claim landed.
+ *
  * `claimHandover` rebinds `rock.smartAccount` to `att.smartAccount`, and for a named gift the
  * verifier signs the rock's existing account — which, after step 2, is the claimant's. This route
  * checks that the attestation names that same account before it does anything at all.
@@ -191,16 +200,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
+  // Only a mined, successful `claimHandover` is a claim. `submitClaimHandover` waits for the
+  // receipt, so a revert and a transaction that never mined both arrive here as failures — and
+  // both of those have already spent the relayer's gas, which is why the reservation is released
+  // only when nothing was broadcast at all.
   const claim = await submitClaimHandover(id, attestation);
   if (claim.state !== "REAL") {
-    // The relayer never broadcast, so its ledger is released. The owner swap did land, and saying
-    // so is the honest report: the account is the claimant's, the registry record is not.
-    await releaseRelayerSpend(reservation.value.day, reservation.value.reservedWei);
+    if (claim.broadcast === null) {
+      await releaseRelayerSpend(reservation.value.day, reservation.value.reservedWei);
+    }
+    logger.warn("A relayed claim did not land", {
+      action: "HANDOVER_CLAIM_NOT_LANDED",
+      rockId: id,
+      reason: claim.reason,
+      broadcast: claim.broadcast !== null,
+    });
     return NextResponse.json(
       {
         state: "UNAVAILABLE",
-        reason: claim.state === "UNAVAILABLE" ? claim.reason : "The claim was not broadcast",
+        reason: claim.reason,
+        // The owner swap did land, and saying so is the honest report: the account is the
+        // claimant's, the registry record is not.
         rockAccountHandover: { state: "REAL", txHash: ownerSwap.value.txHash },
+        ...(claim.broadcast ? { claimTxHash: claim.broadcast.txHash } : {}),
       },
       { status: 503 },
     );

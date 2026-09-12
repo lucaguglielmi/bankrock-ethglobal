@@ -10,8 +10,15 @@
  *
  * What it is now: the pending handover Flow E always specified. The owner names the recipient,
  * picks an expiry, optionally writes a message, and creates a handover. The rock does not move
- * until that recipient taps the tag and claims it (`ClaimHandoverSheet`). There is no
+ * until that recipient taps the tag and claims it, on the rock page itself. There is no
  * immediate-transfer path any more.
+ *
+ * One signature does **two** things (spec 08, 2:10): it opens the handover on chain, and it
+ * pre-signs the Safe owner swap that the recipient cannot produce for themselves. The second one
+ * is the one this sheet used to lose. It was stored fire-and-forget, so "The gift is waiting"
+ * could be printed over a gift the claim route would refuse forever — and the only person able to
+ * repair it, the giver, had been told everything was fine. The done step now confirms the stored
+ * key with the server and offers to sign it again when it is missing (defect A2).
  *
  * The recipient is **required**. An unnamed gift ("whoever taps it") cannot carry the
  * pre-signed Rock Account owner swap — there is no address to sign it for — and after the
@@ -32,6 +39,7 @@ import { UnavailableState } from "@/components/ui/unavailable-state";
 import { cn } from "@/lib/ui/cn";
 import { explorer } from "@/lib/chain";
 import type { Capability } from "@/lib/demo";
+import type { HandoverKeyResult } from "@/lib/handover-key";
 import { useRockActions } from "@/hooks/useBankRock";
 
 const DAY_SECONDS = 24 * 60 * 60;
@@ -46,7 +54,11 @@ const MESSAGE_MAX = 280;
 
 type Step = "form" | "review" | "done";
 
-type HandoverResult = Capability<{ txHash: `0x${string}` }>;
+type HandoverResult = Capability<{
+  txHash: `0x${string}`;
+  /** Whether the server confirmed the pre-signed Safe owner swap. REAL, or a reason. */
+  handoverKey: HandoverKeyResult;
+}>;
 
 export interface TransferModalProps {
   isOpen: boolean;
@@ -96,7 +108,7 @@ export function TransferModal({
   onTransferSuccess,
   onHandoverInitiated,
 }: TransferModalProps) {
-  const { initiateHandover, isPending } = useRockActions();
+  const { initiateHandover, storeHandoverKey, isPending } = useRockActions();
 
   const [step, setStep] = React.useState<Step>("form");
   const [recipient, setRecipient] = React.useState("");
@@ -105,6 +117,8 @@ export function TransferModal({
   const [acknowledged, setAcknowledged] = React.useState(false);
   const [result, setResult] = React.useState<HandoverResult | null>(null);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  /** The hand-over key's state, which a retry can change without re-opening the gift. */
+  const [handoverKey, setHandoverKey] = React.useState<HandoverKeyResult | null>(null);
 
   const trimmedRecipient = recipient.trim();
   const isEmpty = trimmedRecipient === "";
@@ -151,6 +165,7 @@ export function TransferModal({
         trimmedMessage === "" ? undefined : trimmedMessage,
       );
       setResult(capability);
+      setHandoverKey(capability.state === "UNAVAILABLE" ? null : capability.value.handoverKey);
       setStep("done");
       onHandoverInitiated?.(namedRecipient, capability);
       if (capability.state === "REAL") {
@@ -174,6 +189,19 @@ export function TransferModal({
     onHandoverInitiated,
     onTransferSuccess,
   ]);
+
+  /**
+   * Signs and stores the hand-over key again, for a gift that is already on chain.
+   *
+   * It deliberately does not call `initiateHandover`: the handover exists, and opening it a second
+   * time would be a second transaction for an event that has already happened.
+   */
+  const handleRetryKey = React.useCallback(async () => {
+    if (!canReview) return;
+    setHandoverKey(null);
+    const again = await storeHandoverKey(rockId, getAddress(trimmedRecipient) as `0x${string}`);
+    setHandoverKey(again);
+  }, [canReview, storeHandoverKey, rockId, trimmedRecipient]);
 
   let footer: React.ReactNode;
   if (step === "form") {
@@ -221,10 +249,33 @@ export function TransferModal({
       </div>
     );
   } else {
+    const keyMissing =
+      result?.state !== "UNAVAILABLE" && handoverKey !== null && handoverKey.state === "UNAVAILABLE";
     footer = (
-      <Button type="button" size="lg" className="w-full" onClick={onClose}>
-        Done
-      </Button>
+      <div className="flex flex-col gap-2">
+        {keyMissing ? (
+          <Button
+            type="button"
+            size="lg"
+            className="w-full"
+            disabled={isPending}
+            onClick={handleRetryKey}
+          >
+            <span className="motion-safe:transition-opacity">
+              {isPending ? "Signing…" : "Sign the handover key again"}
+            </span>
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          size="lg"
+          variant={keyMissing ? "outline" : "default"}
+          className="w-full"
+          onClick={onClose}
+        >
+          {keyMissing ? "Leave it for now" : "Done"}
+        </Button>
+      </div>
     );
   }
 
@@ -387,13 +438,39 @@ export function TransferModal({
             ) : (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-h3 font-semibold text-ink">The gift is waiting</h3>
+                  <h3 className="text-h3 font-semibold text-ink">
+                    {handoverKey === null || handoverKey.state === "UNAVAILABLE"
+                      ? "The gift is not finished"
+                      : "The gift is waiting"}
+                  </h3>
                   {result.state === "DEMO" ? <SimulatedBadge /> : null}
                 </div>
-                <p className="max-w-prose text-base text-ink-2">
-                  They can claim it the next time they tap this rock. The rock stays in your
-                  account until they do.
-                </p>
+                {handoverKey !== null && handoverKey.state !== "UNAVAILABLE" ? (
+                  <p className="max-w-prose text-base text-ink-2">
+                    They can claim it the next time they tap this rock. The rock stays in your
+                    account until they do.
+                  </p>
+                ) : (
+                  /*
+                   * The handover is on chain and the key that moves the account with it is not.
+                   * Saying "waiting" here would be a lie the recipient pays for: the claim route
+                   * refuses a gift with no stored owner swap, and only this giver can sign one.
+                   */
+                  <div className="flex flex-col gap-2">
+                    <p className="max-w-prose text-base text-ink-2">
+                      The handover is on chain, but the key that hands over the rock&apos;s account
+                      is not stored. If they tap the rock now, the claim will be refused. Sign the
+                      key again to finish the gift — this does not create a second gift.
+                    </p>
+                    <UnavailableState
+                      reason={
+                        handoverKey === null
+                          ? "The hand-over key has not been confirmed"
+                          : handoverKey.reason
+                      }
+                    />
+                  </div>
+                )}
                 <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 text-sm">
                   <dt className="text-ink-3">To</dt>
                   <dd className="justify-self-end">

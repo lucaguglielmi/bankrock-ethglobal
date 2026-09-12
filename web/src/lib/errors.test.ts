@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { INTERNAL_ERROR_REASON, publicReason, publicReasonWith } from "./errors";
+import {
+  INTERNAL_ERROR_REASON,
+  publicReason,
+  publicReasonWith,
+  SPONSORSHIP_REJECTED_REASON,
+} from "./errors";
 import { MissingEnvError } from "./demo";
 
 /**
@@ -65,6 +70,103 @@ describe("publicReason", () => {
     const err = new Error("boom");
     expect(publicReason(err)).not.toContain("at ");
     expect(publicReason(err)).not.toContain(".ts:");
+  });
+});
+
+/**
+ * B5: a bundler or paymaster failure used to read "internal error".
+ *
+ * Every sponsored action in the app is a UserOperation, so this was the most common failure in the
+ * product wearing the least useful words. A bundler has no error *type* — the refusal arrives as a
+ * JSON-RPC message — so these are classified by message, and the first case below is the one that
+ * matters: classifying by message must not become quoting the message.
+ */
+describe("publicReason — bundler and paymaster failures", () => {
+  /** A bundler error as `lib/rock-account.server.ts` raises it: the bundler's own words. */
+  function bundlerError(message: string) {
+    return Object.assign(new Error(message), { name: "BundlerRpcError" });
+  }
+
+  it("classifies by message without ever quoting it", () => {
+    const err = bundlerError(
+      `AA33 reverted: paymaster rejected, policy check failed at ${SECRET_URL}`,
+    );
+    const reason = publicReason(err);
+    expect(reason).toBe(SPONSORSHIP_REJECTED_REASON);
+    expect(reason).not.toContain("SUPER-SECRET-KEY");
+    expect(reason).not.toContain("alchemy");
+  });
+
+  it("names a sponsorship refusal so an operator knows where to look", () => {
+    expect(publicReason(bundlerError("paymaster did not sponsor the userOperation"))).toBe(
+      SPONSORSHIP_REJECTED_REASON,
+    );
+    expect(publicReason(bundlerError("no sponsorship policy matched this request"))).toBe(
+      SPONSORSHIP_REJECTED_REASON,
+    );
+    expect(publicReason(bundlerError("AA34 signature error"))).toBe(SPONSORSHIP_REJECTED_REASON);
+  });
+
+  it("separates a deadline from a sponsorship refusal, including AA32", () => {
+    expect(publicReason(bundlerError("AA22 expired or not due"))).toMatch(/deadline had passed/);
+    expect(publicReason(bundlerError("AA32 paymaster expired or not due"))).toMatch(
+      /deadline had passed/,
+    );
+  });
+
+  it("distinguishes a low paymaster deposit from a policy refusal", () => {
+    expect(publicReason(bundlerError("AA31 paymaster deposit too low"))).toMatch(
+      /paymaster's deposit is too low/,
+    );
+  });
+
+  it("names the account-side AA2x failures", () => {
+    expect(publicReason(bundlerError("AA21 didn't pay prefund"))).toMatch(/could not pay/);
+    expect(publicReason(bundlerError("AA24 signature error"))).toMatch(/signature was not accepted/);
+    expect(publicReason(bundlerError("AA25 invalid account nonce"))).toMatch(/nonce/);
+    expect(publicReason(bundlerError("AA20 account not deployed"))).toMatch(/not deployed/);
+    expect(publicReason(bundlerError("AA13 initCode failed or OOG"))).toMatch(
+      /could not be deployed/,
+    );
+  });
+
+  it("names a reverted operation and a replacement that is underpriced", () => {
+    expect(publicReason(bundlerError("UserOperation reverted during simulation"))).toMatch(
+      /reverted while it was being executed/,
+    );
+    expect(publicReason(bundlerError("replacement underpriced"))).toMatch(/same nonce/);
+  });
+
+  it("still says it was the bundler for an AA code it has never seen", () => {
+    expect(publicReason(bundlerError("AA99 something new"))).toBe("the bundler refused the operation");
+  });
+
+  it("reads viem's account-abstraction error names too", () => {
+    const wrapped = Object.assign(new Error(SECRET_URL), {
+      name: "PaymasterDepositTooLowError",
+    });
+    expect(publicReason(wrapped)).toBe(SPONSORSHIP_REJECTED_REASON);
+
+    const timeout = Object.assign(new Error(SECRET_URL), {
+      name: "WaitForUserOperationReceiptTimeoutError",
+    });
+    expect(publicReason(timeout)).toMatch(/has not been mined yet/);
+  });
+
+  it("finds the bundler's words in viem's `details`, where the wrapper hides them", () => {
+    const err = Object.assign(new Error("UserOperation execution failed"), {
+      name: "UserOperationExecutionError",
+      details: "AA33 reverted: paymaster policy",
+    });
+    expect(publicReason(err)).toBe(SPONSORSHIP_REJECTED_REASON);
+  });
+
+  it("leaves an ordinary contract failure classified as it always was", () => {
+    // The bundler patterns are narrow on purpose: they must not swallow the name table.
+    const err = Object.assign(new Error("The contract function \"claimHandover\" reverted."), {
+      name: "ContractFunctionExecutionError",
+    });
+    expect(publicReason(err)).toBe("the contract call was rejected");
   });
 });
 

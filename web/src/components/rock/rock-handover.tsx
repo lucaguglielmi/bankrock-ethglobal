@@ -6,6 +6,15 @@
  * The owner sees who it is waiting for and how long is left. Everyone else sees whether they can
  * take it — which requires a verified tap signed for their own wallet, so holding the link is
  * never enough (D-018).
+ *
+ * This is the surface the recipient actually meets, so it is where the gift's message is read
+ * (defect B2). The note was stored off chain from the moment the gift was opened — only its hash
+ * goes on chain — and the single component that rendered it was a sheet mounted on no page, so
+ * every message written so far has been invisible to the person it was for.
+ *
+ * A signed-out visitor's tap is **held** rather than spent (`tap-gate.ts`, defect A1): an
+ * attestation with no subject cannot claim anything, and spending the counter to learn that would
+ * cost the recipient a second tap. So the copy below promises one tap, and the page keeps it.
  */
 
 import { useEffect, useState } from "react";
@@ -14,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { explorer } from "@/lib/chain";
 import { useAudio } from "@/context/audio-context";
 import { useHaptics } from "@/hooks/useHaptics";
-import { useRockActions } from "@/hooks/useBankRock";
+import { useHandoverMessage, useRockActions } from "@/hooks/useBankRock";
 import {
   ActionOutcomeNotice,
   outcomeFrom,
@@ -71,10 +80,35 @@ export function HandoverRock({
   const recipient = handover?.recipient ?? null;
   const attestation = signedAttestation(tap, address);
   const isNamedRecipient = recipient === null || sameAddress(recipient, address);
+
+  // Asked only for the person it was written for, and only once they are signed in — reading it
+  // needs a Privy token. The giver wrote it and does not need it read back to them.
+  const { message: giftMessage, unavailableReason: giftMessageReason } = useHandoverMessage(
+    rockId,
+    !isOwner && isNamedRecipient && !hasExpired,
+  );
   const registryReason =
     availability.registry.state === "UNAVAILABLE" ? availability.registry.reason : null;
   const canClaim =
     Boolean(attestation) && isNamedRecipient && !hasExpired && registryReason === null;
+
+  /**
+   * The note the giver left, on the screen the recipient is standing in front of.
+   *
+   * Nothing is invented when it cannot be read: no note and an unreadable note are different
+   * states and are worded differently (D-013).
+   */
+  const messageBlock =
+    giftMessage !== null ? (
+      <div className="rounded-2xl border border-border p-4">
+        <span className="text-label text-ink-3">THEIR MESSAGE</span>
+        <p className="mt-2 max-w-prose text-base text-ink-2">{giftMessage}</p>
+      </div>
+    ) : giftMessageReason !== null ? (
+      <p className="max-w-prose text-sm text-ink-3">
+        If a message came with this rock, it could not be read: {giftMessageReason}.
+      </p>
+    ) : null;
 
   const expiryLine = hasExpired
     ? `This handover expired on ${formatDateTime(expiresAt) ?? "an earlier date"}.`
@@ -146,6 +180,7 @@ export function HandoverRock({
         <p className="max-w-prose text-lead text-ink-2">
           This rock is waiting for you. Claiming it makes you its owner.
         </p>
+        {messageBlock}
         <Button size="lg" className="w-full" onClick={runClaim} disabled={isPending}>
           {isPending ? "Claiming…" : "Claim this rock"}
         </Button>
@@ -175,17 +210,22 @@ export function HandoverRock({
       ) : !authenticated ? (
         <>
           <p className="max-w-prose text-sm text-ink-2">
-            Sign in with the wallet this rock was given to, then tap the rock to claim it.
+            {tap.status === "held"
+              ? "Sign in with the wallet this rock was given to. This tap has not been used yet \u2014 it is checked the moment you sign in, and one tap is enough."
+              : "Sign in with the wallet this rock was given to, then tap the rock to claim it."}
           </p>
           <Button size="lg" className="w-full" onClick={onSignIn}>
             Sign in to claim
           </Button>
         </>
       ) : (
-        <p className="max-w-prose text-sm text-ink-2">
-          Tap this rock with your phone while signed in to claim it. Opening a copied link is not
-          enough.
-        </p>
+        <>
+          {messageBlock}
+          <p className="max-w-prose text-sm text-ink-2">
+            Tap this rock with your phone while signed in to claim it. Opening a copied link is not
+            enough.
+          </p>
+        </>
       )}
       {expiryLine && !hasExpired ? <p className="text-sm text-ink-3">{expiryLine}</p> : null}
     </section>

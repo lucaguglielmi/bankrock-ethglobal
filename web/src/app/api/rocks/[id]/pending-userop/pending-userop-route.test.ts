@@ -7,12 +7,34 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * Privy token proves an account and Privy sign-up is open, so any stranger could discard another
  * rock's pre-signed Safe owner swap — and the recipient would then get the registry claim and
  * never the Rock Account. These cases pin the ownership rule.
+ *
+ * P-5 left the other half open, which the security review found: first-writer-wins plus a public
+ * `sender` check meant a stranger could *store* a row of nonsense first, take the creator DID, and
+ * lock the real giver out of their own gift. The `simulateSignedUserOp` cases below are that half
+ * — the bundler is asked whether the operation validates before any row is written.
  */
+
+const simulateSignedUserOp = vi.fn();
+
+vi.mock("@/lib/rock-account.server", () => ({
+  simulateSignedUserOp: (...args: unknown[]) => simulateSignedUserOp(...args),
+}));
 
 const CREATOR = "did:privy:creator";
 const STRANGER = "did:privy:stranger";
 const SAFE = "0x2222222222222222222222222222222222222222";
 const RECIPIENT = "0x3333333333333333333333333333333333333333";
+/** The rock's registered owner: the giver, and still the Safe's only owner at this point. */
+const GIVER = "0x4444444444444444444444444444444444444444";
+const STRANGER_WALLET = "0x5555555555555555555555555555555555555555";
+
+/** `swapOwner(SENTINEL, giver, recipient)`, as the Safe module wraps it into a UserOperation. */
+function swapOwnerCallData(oldOwner = GIVER, newOwner = RECIPIENT) {
+  const selector = "e318b52b";
+  const word = (address: string) => address.slice(2).toLowerCase().padStart(64, "0");
+  const sentinel = `${"0".repeat(63)}1`;
+  return `0x${selector}${sentinel}${word(oldOwner)}${word(newOwner)}`;
+}
 
 let identity = CREATOR;
 let storedRow: Record<string, unknown> | null = null;
@@ -36,7 +58,7 @@ vi.mock("@/lib/rock-account", async () => {
       state: "REAL",
       value: {
         rockId: "1",
-        owner: RECIPIENT,
+        owner: GIVER,
         smartAccount: SAFE,
         uidHash: `0x${"ab".repeat(32)}`,
         state: "handover_pending",
@@ -79,7 +101,11 @@ async function post(body: unknown) {
 const validOp = {
   kind: "swap_owner",
   recipient: RECIPIENT,
-  userOp: { sender: SAFE, signature: `0x${"11".repeat(65)}` },
+  userOp: {
+    sender: SAFE,
+    callData: swapOwnerCallData(),
+    signature: `0x${"11".repeat(65)}`,
+  },
 };
 
 beforeEach(() => {
@@ -88,6 +114,9 @@ beforeEach(() => {
   storedRow = null;
   deleted.mockReset();
   inserted.mockReset();
+  simulateSignedUserOp.mockReset();
+  // The default is a bundler that accepts the operation; each refusal case says so for itself.
+  simulateSignedUserOp.mockResolvedValue({ state: "REAL", value: true });
 });
 
 afterEach(() => {
@@ -125,6 +154,86 @@ describe("storing", () => {
     identity = STRANGER;
     const { status } = await post(validOp);
     expect(status).toBe(200);
+  });
+});
+
+describe("an operation that is not this rock's owner swap", () => {
+  it("is refused when it carries no call at all", async () => {
+    const { status, body } = await post({
+      ...validOp,
+      userOp: { sender: SAFE, signature: `0x${"11".repeat(65)}` },
+    });
+    expect(status).toBe(409);
+    expect(body.reason).toMatch(/does not hand this rock's account/);
+    expect(inserted).not.toHaveBeenCalled();
+    // The bundler is never even asked: the shape is wrong before it could be run.
+    expect(simulateSignedUserOp).not.toHaveBeenCalled();
+  });
+
+  it("is refused when it swaps the owner to somebody else", async () => {
+    const { status } = await post({
+      ...validOp,
+      userOp: { ...validOp.userOp, callData: swapOwnerCallData(GIVER, STRANGER_WALLET) },
+    });
+    expect(status).toBe(409);
+    expect(inserted).not.toHaveBeenCalled();
+  });
+
+  it("is refused when it swaps from an owner this rock does not have", async () => {
+    const { status } = await post({
+      ...validOp,
+      userOp: { ...validOp.userOp, callData: swapOwnerCallData(STRANGER_WALLET, RECIPIENT) },
+    });
+    expect(status).toBe(409);
+    expect(inserted).not.toHaveBeenCalled();
+  });
+});
+
+describe("an operation the bundler will not validate", () => {
+  it("is refused, and no row is written for the rock", async () => {
+    // A squatter's row: the sender is public, so this is the only field they cannot fake.
+    simulateSignedUserOp.mockResolvedValue({
+      state: "UNAVAILABLE",
+      reason: "The bundler refused this operation: the operation's signature was not accepted — sign the hand-over again",
+    });
+
+    const { status, body } = await post(validOp);
+    expect(status).toBe(409);
+    expect(body.reason).toMatch(/signature was not accepted/);
+    expect(inserted).not.toHaveBeenCalled();
+  });
+
+  it("is refused when the bundler cannot be reached at all, rather than stored unchecked", async () => {
+    simulateSignedUserOp.mockResolvedValue({
+      state: "UNAVAILABLE",
+      reason: "The bundler could not be reached, so this operation was not checked",
+    });
+
+    const { status, body } = await post(validOp);
+    expect(status).toBe(409);
+    expect(body.reason).toMatch(/could not be reached/);
+    expect(inserted).not.toHaveBeenCalled();
+  });
+
+  it("cannot be used to take a row that is not yet claimed by anyone", async () => {
+    // The squat is the point: a refused operation must leave the giver's row free to write.
+    storedRow = null;
+    identity = STRANGER;
+    simulateSignedUserOp.mockResolvedValue({ state: "UNAVAILABLE", reason: "AA24 signature error" });
+
+    expect((await post(validOp)).status).toBe(409);
+    expect(inserted).not.toHaveBeenCalled();
+
+    identity = CREATOR;
+    simulateSignedUserOp.mockResolvedValue({ state: "REAL", value: true });
+    expect((await post(validOp)).status).toBe(200);
+    expect(inserted.mock.calls[0][0]).toMatchObject({ creatorDid: CREATOR });
+  });
+
+  it("is checked before the row is written, never after", async () => {
+    await post(validOp);
+    expect(simulateSignedUserOp).toHaveBeenCalledTimes(1);
+    expect(simulateSignedUserOp.mock.calls[0][0]).toMatchObject({ sender: SAFE });
   });
 });
 
