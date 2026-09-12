@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch: {}
 
 # One deploy at a time; a newer push waits rather than racing an in-flight upload.
 concurrency:
