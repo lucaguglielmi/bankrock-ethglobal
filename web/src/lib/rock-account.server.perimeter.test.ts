@@ -146,3 +146,66 @@ describe("P-1: the relayer's daily spend cap", () => {
     expect(spendDayKey(Date.UTC(2026, 8, 13, 0, 1))).toBe("2026-09-13");
   });
 });
+
+describe("N-6: an included-but-reverted UserOperation is not a success", () => {
+  const BUNDLER_KEY = "pim_test_key";
+  const TX = `0x${"ef".repeat(32)}`;
+  const USEROP = `0x${"ab".repeat(32)}`;
+
+  function bundlerAnswering(receipt: unknown) {
+    return vi.fn(async (_url: string, init?: { body?: string }) => {
+      const method = JSON.parse(String(init?.body ?? "{}")).method;
+      const result = method === "eth_sendUserOperation" ? USEROP : receipt;
+      return { json: async () => ({ jsonrpc: "2.0", id: 1, result }) } as Response;
+    });
+  }
+
+  beforeEach(() => {
+    process.env.PIMLICO_API_KEY = BUNDLER_KEY;
+  });
+
+  it("refuses a receipt with success: false, naming the transaction", async () => {
+    vi.stubGlobal(
+      "fetch",
+      bundlerAnswering({ receipt: { transactionHash: TX }, success: false }),
+    );
+    const { submitSignedUserOp } = await import("@/lib/rock-account.server");
+
+    const result = await submitSignedUserOp({
+      sender: "0x2222222222222222222222222222222222222222",
+      signature: "0x11",
+    });
+
+    expect(result.state).toBe("UNAVAILABLE");
+    if (result.state === "UNAVAILABLE") {
+      expect(result.reason).toContain("account handover reverted on-chain");
+      expect(result.reason).toContain(TX);
+    }
+    vi.unstubAllGlobals();
+  });
+
+  it("refuses a receipt that omits the success flag entirely", async () => {
+    vi.stubGlobal("fetch", bundlerAnswering({ receipt: { transactionHash: TX } }));
+    const { submitSignedUserOp } = await import("@/lib/rock-account.server");
+
+    const result = await submitSignedUserOp({
+      sender: "0x2222222222222222222222222222222222222222",
+      signature: "0x11",
+    });
+    expect(result.state).toBe("UNAVAILABLE");
+    vi.unstubAllGlobals();
+  });
+
+  it("returns REAL only when the operation actually succeeded", async () => {
+    vi.stubGlobal("fetch", bundlerAnswering({ receipt: { transactionHash: TX }, success: true }));
+    const { submitSignedUserOp } = await import("@/lib/rock-account.server");
+
+    const result = await submitSignedUserOp({
+      sender: "0x2222222222222222222222222222222222222222",
+      signature: "0x11",
+    });
+    expect(result.state).toBe("REAL");
+    if (result.state === "REAL") expect(result.value.txHash).toBe(TX);
+    vi.unstubAllGlobals();
+  });
+});
