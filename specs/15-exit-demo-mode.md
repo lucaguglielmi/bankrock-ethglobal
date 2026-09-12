@@ -598,7 +598,7 @@ cd contracts && npm test                          # exit 0
 ! grep -rP "(txHash|Hash)\s*=\s*\`0x\\\$\{(?!string\})" web/src   # excludes the `0x${string}` viem type
 
 # No address literals outside the config module (D-015)
-! grep -rE "0x[a-fA-F0-9]{40}" web/src --exclude-dir=chain      # --exclude-dir matches a basename, not a path
+! grep -rE "0x[a-fA-F0-9]{40}" web/src --exclude-dir=chain --exclude="*.test.ts"   # basename match; test vectors may hold addresses
 
 # No demo fallback in production (D-013). Secrets live in the Cloudflare dashboard, not in files
 # (spec 16), so the assertion is on the deploy job, which must set the flag explicitly.

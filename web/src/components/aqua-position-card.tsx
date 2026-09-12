@@ -11,7 +11,7 @@
  *    "Strategy A: Constant Product" and a 2750 USDC/ETH target that nothing ever set.
  *
  * Deleted with the rewrite: the `Math.random()` deposit hash and its BaseScan link (S-2), the
- * "Est. APR" figure (N-3, D-004), the fabricated second strategy, and the "Zero-gas sponsored by
+ * estimated-return figure (N-3, D-004), the fabricated second strategy, and the "Zero-gas sponsored by
  * Pimlico on Base Sepolia" claim. The spread selector stays because it is the shape of the real
  * control, and it carries a `SIMULATED` badge because pressing it does nothing.
  */

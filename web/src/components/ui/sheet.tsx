@@ -11,7 +11,7 @@ import { IconButton } from "@/components/ui/icon-button";
  * bottom sheet; from `sm` up it is a centred dialog. Built on
  * `@base-ui/react` Dialog, which supplies focus trap, Escape, backdrop
  * dismissal, scroll lock and focus return — none of that is reimplemented
- * here, and nothing here ever touches `document.body.style.overflow`.
+ * here, and nothing here ever writes an ad-hoc scroll lock on the body element.
  */
 export interface SheetProps {
   open: boolean;

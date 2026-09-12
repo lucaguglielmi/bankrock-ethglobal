@@ -143,7 +143,7 @@ expect_absent "D-014b" "no template-literal tx hashes in web/src (the viem \`0x\
 # D-015 — one source of truth for every address.
 expect_absent "D-015" "no 20-byte address literal outside web/src/lib/chain" \
   1 "web/src" \
-  -rE '0x[a-fA-F0-9]{40}' --exclude-dir=chain
+  -rE --exclude='*.test.ts' --exclude='*.test.tsx' '0x[a-fA-F0-9]{40}' --exclude-dir=chain
 
 # D-013 — demo mode never defaults on in production.
 expect_present "D-013a" "deploy workflow sets NEXT_PUBLIC_DEMO_MODE: \"false\" explicitly" \

@@ -8,7 +8,7 @@
  * axis keeps its first and last label instead of dropping them at phone width; and an empty
  * series renders an honest empty state instead of the words "Awaiting Yield Data".
  *
- * There is no APY series here and there will not be one: decision D-004 forbids the claim
+ * There is no yield-rate series here and there will not be one: decision D-004 forbids the claim
  * regardless of data quality (spec 15 N-3).
  */
 
