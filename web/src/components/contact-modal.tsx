@@ -1,8 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
-import { X, ArrowRight, Loader2, CheckCircle } from "lucide-react";
+/**
+ * Contact sheet — the shop's "Claim an OG Rock" and "Become a Sponsor" forms (spec 15 S-6,
+ * spec 17 L-5).
+ *
+ * What this file used to be: `handleSubmit` was two `setTimeout`s. It showed "Message Sent!" and
+ * closed itself, having sent nothing anywhere. Its submit button also sat below the fold of a
+ * 640 px phone, and further below it with the keyboard open (L-5).
+ *
+ * What it is now: a real `POST /api/contact`. Success is shown only for a 2xx. A 503 renders the
+ * route's own reason — the request was not stored, so it was not received. The submit button
+ * lives in the sheet's sticky footer and is reachable without scrolling.
+ */
+
+import * as React from "react";
+import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { Sheet, SheetBody } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { UnavailableState } from "@/components/ui/unavailable-state";
+
+const FORM_ID = "contact-sheet-form";
+
+type ContactKind = "og_rock" | "sponsor";
+
+type Status =
+  | { state: "idle" }
+  | { state: "sending" }
+  | { state: "sent" }
+  | { state: "error"; message: string }
+  | { state: "unavailable"; reason: string };
 
 interface ContactModalProps {
   triggerText: string;
@@ -10,181 +36,210 @@ interface ContactModalProps {
   variant?: "dark" | "light";
 }
 
+/** The request kind the API expects, read from the surface this form was opened from. */
+export function contactKindFor(title: string, variant?: "dark" | "light"): ContactKind {
+  if (/sponsor/i.test(title)) return "sponsor";
+  if (variant === "light") return "sponsor";
+  return "og_rock";
+}
+
+interface ContactResponseBody {
+  state?: string;
+  reason?: string;
+  error?: string;
+}
+
 export function ContactModal({ triggerText, title, variant = "dark" }: ContactModalProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [status, setStatus] = React.useState<Status>({ state: "idle" });
+  const [name, setName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [message, setMessage] = React.useState("");
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (isOpen) setIsOpen(false);
+  const kind = contactKindFor(title, variant);
+  const messageLabel =
+    kind === "sponsor" ? "How would you like to sponsor?" : "Why do you deserve an OG rock?";
+
+  const handleSubmit = React.useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      setStatus({ state: "sending" });
+
+      try {
+        const response = await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name.trim(),
+            email: email.trim(),
+            message: message.trim(),
+            kind,
+          }),
+        });
+
+        const body = (await response.json().catch(() => ({}))) as ContactResponseBody;
+
+        if (response.ok) {
+          setStatus({ state: "sent" });
+          return;
+        }
+
+        if (response.status === 503) {
+          setStatus({
+            state: "unavailable",
+            reason:
+              body.reason ?? "Your message could not be stored, so it was not received.",
+          });
+          return;
+        }
+
+        if (response.status === 429) {
+          setStatus({
+            state: "error",
+            message: "That is a lot of messages. Try again in an hour.",
+          });
+          return;
+        }
+
+        setStatus({
+          state: "error",
+          message: body.error ?? "The message was not sent. Check the fields and try again.",
+        });
+      } catch {
+        setStatus({
+          state: "error",
+          message: "The message was not sent — the network did not answer.",
+        });
       }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
+    },
+    [name, email, message, kind],
+  );
 
-
-  useEffect(() => {
-    setMounted(true);
+  const handleOpenChange = React.useCallback((open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      setStatus({ state: "idle" });
+    }
   }, []);
 
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "auto";
-    }
-    return () => {
-      document.body.style.overflow = "auto";
-    };
-  }, [isOpen]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmitted(true);
-      setTimeout(() => {
-        setIsOpen(false);
-        setSubmitted(false);
-      }, 2000);
-    }, 1500);
-  };
-
-  const isDark = variant === "dark";
-  const btnClass = isDark 
-    ? "w-full bg-black text-white py-4 rounded-full font-semibold hover:bg-neutral-800 active:scale-[0.98] transition-all"
-    : "w-full bg-white text-black border border-black/10 py-4 rounded-full font-semibold hover:bg-neutral-50 active:scale-[0.98] transition-all shadow-sm";
-
-  const messageLabel = variant === "light" 
-    ? "How would you like to sponsor?" 
-    : "Why do you deserve an OG Rock?";
-
-  const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 md:p-12 text-black text-left cursor-default">
-      <div 
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300"
-        onClick={() => setIsOpen(false)}
-      />
-      
-      <div className="bg-white rounded-[2rem] p-8 md:p-10 max-w-lg w-full shadow-2xl relative z-10 animate-in slide-in-from-bottom-8 fade-in zoom-in-95 duration-300">
-        <button 
-          onClick={() => setIsOpen(false)}
-          className="absolute top-6 right-6 p-2 bg-neutral-100/50 rounded-full hover:bg-neutral-200 active:scale-95 transition-all"
-        >
-          <X className="w-5 h-5 text-neutral-700" />
-        </button>
-        
-        <h3 className="text-2xl md:text-3xl font-black tracking-tighter mb-2 text-neutral-900">
-          {title}
-        </h3>
-        
-        {submitted ? (
-          <div className="py-12 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-300">
-            <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6">
-              <CheckCircle className="w-10 h-10 text-green-500" />
-            </div>
-            <h4 className="text-2xl font-bold mb-2">Message Sent!</h4>
-            <p className="text-neutral-500">We'll be in touch soon.</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5 mt-8 animate-in fade-in duration-300">
-            <div className="relative group">
-              <input 
-                required 
-                type="text" 
-                id="name"
-                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all placeholder-transparent" 
-                placeholder="Your name" 
-              />
-              <label 
-                htmlFor="name" 
-                className="absolute left-4 top-2 text-xs font-bold uppercase tracking-wider text-neutral-400 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-focus:top-2 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase"
-              >
-                Name
-              </label>
-            </div>
-            <div className="relative group">
-              <input 
-                required 
-                type="text" 
-                id="contact"
-                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all placeholder-transparent" 
-                placeholder="Email or Telegram/Twitter handle" 
-              />
-              <label 
-                htmlFor="contact" 
-                className="absolute left-4 top-2 text-xs font-bold uppercase tracking-wider text-neutral-400 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-focus:top-2 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase"
-              >
-                Contact Info
-              </label>
-            </div>
-            <div className="relative group">
-              <input 
-                required 
-                type="text" 
-                id="skill"
-                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all placeholder-transparent" 
-                placeholder="What's something you can do very well?" 
-              />
-              <label 
-                htmlFor="skill" 
-                className="absolute left-4 top-2 text-xs font-bold uppercase tracking-wider text-neutral-400 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-focus:top-2 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase"
-              >
-                What's something you can do very well?
-              </label>
-            </div>
-            <div className="relative group">
-              <textarea 
-                required 
-                id="message"
-                rows={4} 
-                className="peer w-full px-4 py-4 pt-6 rounded-2xl border-2 border-neutral-100 bg-neutral-50 focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all resize-none placeholder-transparent" 
-                placeholder={messageLabel}
-              ></textarea>
-              <label 
-                htmlFor="message" 
-                className="absolute left-4 top-2 text-xs font-bold uppercase tracking-wider text-neutral-400 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-focus:top-2 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase"
-              >
-                {messageLabel}
-              </label>
-            </div>
-            <button 
-              type="submit" 
-              disabled={isSubmitting}
-              className="w-full bg-black text-white py-4 rounded-xl font-semibold hover:bg-neutral-800 active:scale-[0.98] transition-all mt-2 flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  Send Message
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  );
+  const sending = status.state === "sending";
+  const finished = status.state === "sent" || status.state === "unavailable";
 
   return (
     <>
-      <button 
+      <Button
+        type="button"
+        variant={variant === "dark" ? "default" : "outline"}
+        size="lg"
+        className="w-full rounded-full"
         onClick={() => setIsOpen(true)}
-        className={btnClass}
       >
         {triggerText}
-      </button>
-      {mounted && isOpen && createPortal(modalContent, document.body)}
+      </Button>
+
+      <Sheet
+        open={isOpen}
+        onOpenChange={handleOpenChange}
+        title={title}
+        footer={
+          finished ? (
+            <Button
+              type="button"
+              size="lg"
+              className="w-full"
+              onClick={() => handleOpenChange(false)}
+            >
+              Close
+            </Button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {status.state === "error" ? (
+                <p role="alert" className="text-sm text-danger">
+                  {status.message}
+                </p>
+              ) : null}
+              <Button type="submit" form={FORM_ID} size="lg" className="w-full" disabled={sending}>
+                <span className="motion-safe:transition-opacity">
+                  {sending ? "Sending…" : "Send message"}
+                </span>
+                {sending ? (
+                  <Loader2 aria-hidden className="motion-safe:animate-spin" />
+                ) : (
+                  <ArrowRight aria-hidden />
+                )}
+              </Button>
+            </div>
+          )
+        }
+      >
+        <SheetBody>
+          {status.state === "sent" ? (
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <CheckCircle2 aria-hidden className="size-10 text-positive" />
+              <h3 className="text-h3 font-semibold text-ink">Message received</h3>
+              <p className="max-w-prose text-base text-ink-2">
+                It is stored and we will read it. We will reply to the address you gave us.
+              </p>
+            </div>
+          ) : status.state === "unavailable" ? (
+            <UnavailableState reason={status.reason} />
+          ) : (
+            <form id={FORM_ID} onSubmit={handleSubmit} className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="contact-name" className="text-label text-ink-3">
+                  YOUR NAME
+                </label>
+                <input
+                  id="contact-name"
+                  name="name"
+                  type="text"
+                  required
+                  maxLength={120}
+                  autoComplete="name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className="h-12 w-full rounded-2xl border border-border bg-transparent px-3 text-base text-ink outline-none placeholder:text-ink-4 focus:border-ring focus:ring-3 focus:ring-ring/50"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label htmlFor="contact-email" className="text-label text-ink-3">
+                  YOUR EMAIL
+                </label>
+                <input
+                  id="contact-email"
+                  name="email"
+                  type="email"
+                  required
+                  maxLength={254}
+                  autoComplete="email"
+                  spellCheck={false}
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="h-12 w-full rounded-2xl border border-border bg-transparent px-3 text-base text-ink outline-none placeholder:text-ink-4 focus:border-ring focus:ring-3 focus:ring-ring/50"
+                />
+                <p className="text-sm text-ink-2">This is the only way we can reply.</p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label htmlFor="contact-message" className="text-label text-ink-3">
+                  {messageLabel.toUpperCase()}
+                </label>
+                <textarea
+                  id="contact-message"
+                  name="message"
+                  required
+                  rows={5}
+                  maxLength={4000}
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  className="w-full resize-none rounded-2xl border border-border bg-transparent px-3 py-3 text-base text-ink outline-none placeholder:text-ink-4 focus:border-ring focus:ring-3 focus:ring-ring/50"
+                />
+              </div>
+            </form>
+          )}
+        </SheetBody>
+      </Sheet>
     </>
   );
 }

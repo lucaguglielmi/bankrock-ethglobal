@@ -1,434 +1,426 @@
 "use client";
-import { toast } from "sonner";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  X, 
-  ExternalLink, 
-  Check, 
-  Copy, 
-  ShieldCheck, 
-  Zap, 
-  Loader2, 
-  AlertTriangle,
-  ArrowRight
-} from "lucide-react";
+/**
+ * Give sheet — Flow E (spec 02), spec 17 Part 5 "Give sheet", spec 15 SC-5 / X-3.
+ *
+ * What this file used to be: a hand-rolled modal that called `transferOwnership` immediately and
+ * unconditionally, accepted `name.eth` as a recipient and passed the raw string on as
+ * `` `0x${string}` `` for viem to choke on (X-3), rendered a synthesized hash with an
+ * explorer link built from it (D-014), and narrated a Safe/paymaster route that does not exist.
+ *
+ * What it is now: the pending handover Flow E always specified. The owner names a recipient — or
+ * nobody, for "whoever taps the rock and claims it" — picks an expiry, optionally writes a
+ * message, and creates a handover. The rock does not move until the recipient taps the tag and
+ * claims it (`ClaimHandoverSheet`). There is no immediate-transfer path any more.
+ */
+
+import * as React from "react";
+import { isAddress, getAddress } from "viem";
+import { ArrowRight, Clipboard } from "lucide-react";
+import { Sheet, SheetBody } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Address } from "@/components/ui/address";
+import { TxHash } from "@/components/ui/tx-hash";
+import { SimulatedBadge } from "@/components/ui/simulated-badge";
+import { UnavailableState } from "@/components/ui/unavailable-state";
+import { cn } from "@/lib/ui/cn";
+import { explorer } from "@/lib/chain";
+import type { Capability } from "@/lib/demo";
 import { useRockActions } from "@/hooks/useBankRock";
-import { useAudio } from "@/context/audio-context";
 
-interface TransferModalProps {
+const DAY_SECONDS = 24 * 60 * 60;
+
+const EXPIRY_OPTIONS = [
+  { days: 1, label: "1 day" },
+  { days: 7, label: "7 days" },
+  { days: 30, label: "30 days" },
+] as const;
+
+const MESSAGE_MAX = 280;
+
+type Step = "form" | "review" | "done";
+
+type HandoverResult = Capability<{ txHash: `0x${string}` }>;
+
+export interface TransferModalProps {
   isOpen: boolean;
   onClose: () => void;
   rockId: string;
+  /** The current owner, shown on the review step. */
   currentOwner: string;
-  onTransferSuccess: (newOwner: string, txHash?: string) => void;
+  /**
+   * Compatibility callback. It now means "a handover was created", not "ownership moved":
+   * nothing moves until the recipient taps the rock and claims it. `newOwner` is the named
+   * recipient, or `""` when the gift is open to whoever taps and claims.
+   */
+  onTransferSuccess?: (newOwner: string, txHash?: string) => void;
+  /** Precise form of the callback above. */
+  onHandoverInitiated?: (
+    recipient: string | null,
+    result: HandoverResult,
+  ) => void;
 }
 
-function TransferModalInner({
+function ExpiryOption({
+  label,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant={selected ? "default" : "outline"}
+      aria-pressed={selected}
+      onClick={onSelect}
+      className="h-12 w-full text-sm font-semibold"
+    >
+      {label}
+    </Button>
+  );
+}
+
+export function TransferModal({
+  isOpen,
   onClose,
   rockId,
   currentOwner,
   onTransferSuccess,
-}: Omit<TransferModalProps, "isOpen">) {
-  const { transferOnchain } = useRockActions();
-  const { playTap, playSuccess, playError } = useAudio();
-  
-  const [recipient, setRecipient] = useState("");
-  const [step, setStep] = useState<"input" | "confirm" | "submitting" | "success">("input");
-  const [submissionStep, setSubmissionStep] = useState<number>(1);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [acknowledged, setAcknowledged] = useState(false);
+  onHandoverInitiated,
+}: TransferModalProps) {
+  const { initiateHandover, isPending } = useRockActions();
 
-  // Handle ESC key to close
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && step !== "submitting") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [step, onClose]);
+  const [step, setStep] = React.useState<Step>("form");
+  const [recipient, setRecipient] = React.useState("");
+  const [expiryDays, setExpiryDays] = React.useState<number>(7);
+  const [message, setMessage] = React.useState("");
+  const [acknowledged, setAcknowledged] = React.useState(false);
+  const [result, setResult] = React.useState<HandoverResult | null>(null);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
 
-  // Validation
   const trimmedRecipient = recipient.trim();
-  const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(trimmedRecipient);
-  const isEnsName = /^[a-zA-Z0-9-]+\.eth$/.test(trimmedRecipient);
-  const isValidRecipient = (isEthereumAddress || isEnsName) && trimmedRecipient.toLowerCase() !== currentOwner.toLowerCase();
+  const isOpenGift = trimmedRecipient === "";
+  const looksLikeEns = /\.eth$/i.test(trimmedRecipient);
+  const isValidAddress = !isOpenGift && isAddress(trimmedRecipient, { strict: false });
+  const isSelf =
+    isValidAddress &&
+    Boolean(currentOwner) &&
+    trimmedRecipient.toLowerCase() === currentOwner.toLowerCase();
 
-  const handlePaste = async () => {
+  const recipientError = looksLikeEns
+    ? "ENS names are not supported yet. Paste the recipient's address, starting with 0x."
+    : !isOpenGift && !isValidAddress
+      ? "That is not an Ethereum address. Paste the full address, starting with 0x."
+      : isSelf
+        ? "That is your own address. Give the rock to someone else."
+        : null;
+
+  const canReview = recipientError === null;
+
+  const handlePaste = React.useCallback(async () => {
     try {
       const text = await navigator.clipboard.readText();
-      if (text) {
-        setRecipient(text.trim());
-      }
+      if (text) setRecipient(text.trim());
     } catch {
-      // Clipboard read denied
+      // Clipboard access denied or unavailable — the field is still typable.
     }
-  };
+  }, []);
 
-  const handleExecuteTransfer = async () => {
-    if (!isValidRecipient || !acknowledged) return;
+  const handleConfirm = React.useCallback(async () => {
+    if (!canReview || !acknowledged) return;
+    setSubmitError(null);
 
-    setStep("submitting");
-    playTap();
+    const expiresAt = Math.floor(Date.now() / 1000) + expiryDays * DAY_SECONDS;
+    const namedRecipient = isValidAddress
+      ? (getAddress(trimmedRecipient) as `0x${string}`)
+      : null;
+    const trimmedMessage = message.trim();
 
     try {
-      // Step 1: EIP-712 Safe UserOp Encoding
-      setSubmissionStep(1);
-
-      // Step 2: Paymaster Gas Sponsorship & Execution
-      setSubmissionStep(2);
-      
-      const txRes = await transferOnchain(rockId, trimmedRecipient as `0x${string}`);
-      const generatedTx = txRes as string;
-      
-      setSubmissionStep(3);
-      setTxHash(generatedTx);
-      
-      // Call callback to update owner state in parent
-      onTransferSuccess(trimmedRecipient, generatedTx);
-      setStep("success");
-      playSuccess();
-    } catch (err: any) {
-      console.error("Transfer execution failed:", err);
-      if (err.message === "Paymaster sponsorship failed") {
-        toast.error("Gas sponsorship temporarily unavailable from Pimlico. Please try again later.");
-      } else {
-        toast.error("Transfer execution failed. Please try again.");
+      const capability = await initiateHandover(
+        rockId,
+        namedRecipient,
+        expiresAt,
+        trimmedMessage === "" ? undefined : trimmedMessage,
+      );
+      setResult(capability);
+      setStep("done");
+      onHandoverInitiated?.(namedRecipient, capability);
+      if (capability.state === "REAL") {
+        onTransferSuccess?.(namedRecipient ?? "", capability.value.txHash);
       }
-      setStep("confirm");
-      playError();
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "The gift was not created. Nothing has changed.",
+      );
     }
-  };
+  }, [
+    canReview,
+    acknowledged,
+    expiryDays,
+    isValidAddress,
+    trimmedRecipient,
+    message,
+    initiateHandover,
+    rockId,
+    onHandoverInitiated,
+    onTransferSuccess,
+  ]);
 
-  const copyTxHash = () => {
-    if (txHash) {
-      navigator.clipboard.writeText(txHash);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  const recipientLine = isOpenGift
+    ? "Whoever taps this rock and claims it"
+    : trimmedRecipient;
 
-  const formatShortAddress = (addr: string) => {
-    if (addr.length > 12) {
-      return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-    }
-    return addr;
-  };
+  let footer: React.ReactNode;
+  if (step === "form") {
+    footer = (
+      <Button
+        type="button"
+        size="lg"
+        className="w-full"
+        disabled={!canReview}
+        onClick={() => setStep("review")}
+      >
+        Review this gift
+        <ArrowRight aria-hidden />
+      </Button>
+    );
+  } else if (step === "review") {
+    footer = (
+      <div className="flex flex-col gap-2">
+        {submitError ? (
+          <p role="alert" className="text-sm text-danger">
+            {submitError}
+          </p>
+        ) : null}
+        <Button
+          type="button"
+          size="lg"
+          className="w-full"
+          disabled={!acknowledged || isPending}
+          onClick={handleConfirm}
+        >
+          <span className="motion-safe:transition-opacity">
+            {isPending ? "Creating the gift…" : "Give this rock"}
+          </span>
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="default"
+          className="w-full"
+          disabled={isPending}
+          onClick={() => setStep("form")}
+        >
+          Back
+        </Button>
+      </div>
+    );
+  } else {
+    footer = (
+      <Button type="button" size="lg" className="w-full" onClick={onClose}>
+        Done
+      </Button>
+    );
+  }
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && step !== "submitting") {
-          onClose();
-        }
+    <Sheet
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
       }}
+      title="Give this rock"
+      description={`Rock #${rockId} stays yours until the person you give it to taps it and claims it.`}
+      footer={footer}
     >
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={step !== "submitting" ? onClose : undefined}
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm"
-      />
-
-      {/* Modal Container */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 12 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
-        className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-black/10 z-10 text-black"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between pb-5 border-b border-black/5 mb-6">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight">Give Rock #{rockId}</h2>
-            <p className="text-xs text-neutral-500 font-medium mt-0.5">
-              Transfer Safe Smart Account & physical NFC ownership
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            disabled={step === "submitting"}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-400 hover:text-black hover:bg-neutral-100 transition-colors disabled:opacity-30 cursor-pointer"
-            aria-label="Close modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Step 1: Input Recipient */}
-        {step === "input" && (
-          <div>
-            {/* Current Owner summary */}
-            <div className="bg-neutral-50 p-3.5 rounded-2xl border border-neutral-100 mb-5 flex justify-between items-center text-xs">
-              <span className="text-neutral-500 font-medium">Current Controller</span>
-              <span className="font-mono text-neutral-800 font-semibold">
-                {formatShortAddress(currentOwner)}
-              </span>
-            </div>
-
-            {/* Recipient Input */}
-            <div className="mb-4">
-              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 mb-2">
-                Recipient Address or ENS
+      <SheetBody className="flex flex-col gap-6">
+        {step === "form" ? (
+          <>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="give-recipient" className="text-label text-ink-3">
+                WHO GETS IT
               </label>
-              <div className="relative">
+              <div
+                className={cn(
+                  "flex items-center gap-2 rounded-2xl border border-border px-3 py-1.5",
+                  "focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50",
+                )}
+              >
                 <input
+                  id="give-recipient"
                   type="text"
+                  inputMode="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="0x… (leave empty for anyone)"
                   value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  placeholder="0x... or name.eth"
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-4 py-3.5 pr-20 text-sm font-mono text-black placeholder:text-neutral-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-colors"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && isValidRecipient) {
-                      setStep("confirm");
-                    }
-                  }}
+                  onChange={(event) => setRecipient(event.target.value)}
+                  aria-describedby="give-recipient-hint"
+                  aria-invalid={recipientError !== null}
+                  className="h-11 min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-4"
                 />
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  className="h-11 shrink-0 px-3 text-sm"
                   onClick={handlePaste}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 px-2.5 py-1 text-xs font-semibold bg-white border border-neutral-200 rounded-lg text-neutral-600 hover:text-black hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
+                  <Clipboard aria-hidden />
                   Paste
-                </button>
+                </Button>
               </div>
-              {recipient.length > 0 && !isValidRecipient && (
-                <p className="text-xs text-red-600 mt-2 flex items-center gap-1 font-medium">
-                  Please enter a valid Ethereum address (0x...) or ENS name (.eth) different from the current owner.
+              {recipientError ? (
+                <p role="alert" className="text-sm text-danger">
+                  {recipientError}
                 </p>
-              )}
-              {isEnsName && (
-                <p className="text-xs text-green-700 mt-2 font-medium">
-                  ✓ ENS name format recognized
+              ) : (
+                <p id="give-recipient-hint" className="text-sm text-ink-2">
+                  Leave this empty and the rock goes to whoever taps it and claims it first.
                 </p>
               )}
             </div>
 
-            {/* Zero-Gas Callout */}
-            <div className="bg-neutral-50 rounded-2xl p-4 border border-neutral-100 mb-6">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-6 h-6 rounded-full bg-black text-white flex items-center justify-center text-xs">
-                  <Zap className="w-3.5 h-3.5 fill-white" />
-                </span>
-                <span className="font-bold text-xs uppercase tracking-wider text-black">
-                  Zero-Gas Ownership Transfer
-                </span>
-                <span className="ml-auto text-[10px] font-mono bg-neutral-200 text-neutral-800 px-2 py-0.5 rounded-full font-semibold">
-                  ERC-4337
-                </span>
+            <fieldset className="flex flex-col gap-2">
+              <legend className="text-label text-ink-3">HOW LONG THEY HAVE</legend>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {EXPIRY_OPTIONS.map((option) => (
+                  <ExpiryOption
+                    key={option.days}
+                    label={option.label}
+                    selected={expiryDays === option.days}
+                    onSelect={() => setExpiryDays(option.days)}
+                  />
+                ))}
               </div>
-              <p className="text-xs text-neutral-600 leading-relaxed font-medium">
-                Powered by Safe Smart Account <code className="text-neutral-900 bg-neutral-200/60 px-1 py-0.5 rounded">swapOwner</code> and Pimlico Paymaster. The transfer is 100% gas-sponsored for both sender and receiver.
+              <p className="text-sm text-ink-2">
+                After that the gift lapses and the rock is simply still yours.
+              </p>
+            </fieldset>
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="give-message" className="text-label text-ink-3">
+                A MESSAGE (OPTIONAL)
+              </label>
+              <textarea
+                id="give-message"
+                rows={3}
+                maxLength={MESSAGE_MAX}
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                placeholder="Happy birthday."
+                className="w-full resize-none rounded-2xl border border-border bg-transparent px-3 py-3 text-base text-ink outline-none placeholder:text-ink-4 focus:border-ring focus:ring-3 focus:ring-ring/50"
+              />
+              <p className="text-sm text-ink-3">
+                {message.length} of {MESSAGE_MAX} characters. They see it when they claim.
+              </p>
+            </div>
+          </>
+        ) : null}
+
+        {step === "review" ? (
+          <>
+            <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 text-sm">
+              <dt className="text-ink-3">From you</dt>
+              <dd className="justify-self-end">
+                {currentOwner ? (
+                  <Address value={currentOwner} />
+                ) : (
+                  <span className="text-ink-3">Not signed in</span>
+                )}
+              </dd>
+
+              <dt className="text-ink-3">To</dt>
+              <dd className="justify-self-end">
+                {isOpenGift ? (
+                  <span className="text-ink">Whoever taps and claims</span>
+                ) : (
+                  <Address value={trimmedRecipient} />
+                )}
+              </dd>
+
+              <dt className="text-ink-3">They have</dt>
+              <dd className="justify-self-end font-medium text-ink">
+                {EXPIRY_OPTIONS.find((option) => option.days === expiryDays)?.label}
+              </dd>
+            </dl>
+
+            {message.trim() !== "" ? (
+              <div className="rounded-2xl border border-border p-4">
+                <span className="text-label text-ink-3">YOUR MESSAGE</span>
+                <p className="mt-2 max-w-prose text-base text-ink-2">{message.trim()}</p>
+              </div>
+            ) : null}
+
+            <div className="rounded-2xl border border-border p-4">
+              <h3 className="text-h3 font-semibold text-ink">What happens next</h3>
+              <p className="mt-2 max-w-prose text-base text-ink-2">
+                The rock stays in your account until they tap it and claim it. Until then you can
+                cancel, and nothing about the rock changes.
               </p>
             </div>
 
-            {/* Continue button */}
-            <button
-              type="button"
-              disabled={!isValidRecipient}
-              onClick={() => setStep("confirm")}
-              className="w-full bg-black text-white py-4 rounded-full font-bold text-base hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-black transition-all shadow-lg cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              Review Transfer
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Step 2: Confirm Transfer */}
-        {step === "confirm" && (
-          <div>
-            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 mb-5 flex gap-3 text-amber-900">
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div className="text-xs leading-relaxed font-medium">
-                <strong className="font-bold block mb-0.5">Permanent Custody Transfer</strong>
-                You will irrevocably transfer ownership of Rock #{rockId}, its physical NFC authentication chip, and its full Aqua liquidity pool to the recipient.
-              </div>
-            </div>
-
-            {/* Transfer Breakdown */}
-            <div className="bg-neutral-50 rounded-2xl p-4 border border-neutral-100 space-y-3 mb-5 text-xs font-medium">
-              <div className="flex justify-between items-center text-neutral-500">
-                <span>Rock Identifier</span>
-                <span className="font-bold text-neutral-900">Rock #{rockId}</span>
-              </div>
-
-              <div className="flex justify-between items-center text-neutral-500">
-                <span>Current Owner</span>
-                <span className="font-mono text-neutral-800 font-semibold">{formatShortAddress(currentOwner)}</span>
-              </div>
-
-              <div className="flex justify-between items-center text-neutral-500">
-                <span>New Owner</span>
-                <span className="font-mono text-black font-bold">{formatShortAddress(trimmedRecipient)}</span>
-              </div>
-
-              <div className="pt-2 border-t border-neutral-200/60 flex justify-between items-center text-neutral-500">
-                <span>Gas Fee</span>
-                <span className="font-mono text-green-700 font-bold">$0.00 (Sponsored)</span>
-              </div>
-
-              <div className="flex justify-between items-center text-neutral-500">
-                <span>Execution Route</span>
-                <span className="font-mono text-neutral-700">Safe.swapOwner() via Pimlico</span>
-              </div>
-            </div>
-
-            {/* Acknowledgment checkbox */}
-            <label className="flex items-start gap-3 text-xs text-neutral-700 font-medium mb-6 cursor-pointer select-none">
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-base text-ink-2 select-none">
               <input
                 type="checkbox"
                 checked={acknowledged}
-                onChange={(e) => setAcknowledged(e.target.checked)}
-                className="mt-0.5 rounded border-neutral-300 text-black focus:ring-black cursor-pointer"
+                onChange={(event) => setAcknowledged(event.target.checked)}
+                className="size-6 shrink-0 rounded border-border accent-primary"
               />
               <span>
-                I confirm I want to give Rock #{rockId} to <strong className="font-mono text-black">{trimmedRecipient}</strong> and relinquish my custody.
+                I want to give rock #{rockId} to {isOpenGift ? "whoever claims it" : "this address"}.
               </span>
             </label>
+          </>
+        ) : null}
 
-            {/* Action buttons */}
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setStep("input")}
-                className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-black py-3.5 rounded-full font-bold text-sm transition-colors cursor-pointer"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                disabled={!acknowledged}
-                onClick={handleExecuteTransfer}
-                className="flex-1 bg-black hover:bg-neutral-800 text-white py-3.5 rounded-full font-bold text-sm transition-all shadow-md disabled:opacity-40 disabled:hover:bg-black cursor-pointer disabled:cursor-not-allowed"
-              >
-                Transfer Control
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Submitting State */}
-        {step === "submitting" && (
-          <div className="flex flex-col items-center text-center py-10">
-            <div className="relative mb-6">
-              <div className="w-16 h-16 border-4 border-black/10 border-t-black rounded-full animate-spin" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 text-black animate-pulse" />
-              </div>
-            </div>
-
-            <h3 className="text-xl font-bold tracking-tight mb-2">
-              {submissionStep === 1 && "Encoding Safe UserOperation..."}
-              {submissionStep === 2 && "Sponsoring Gas via Paymaster..."}
-              {submissionStep === 3 && "Broadcasting to Base Sepolia..."}
-            </h3>
-            <p className="text-sm text-neutral-500 font-medium max-w-xs">
-              {submissionStep === 1 && "Authorizing owner substitution on Safe multisig v1.4.1"}
-              {submissionStep === 2 && "Pimlico Paymaster generating gas verification signature"}
-              {submissionStep === 3 && "Mining transaction and re-keying physical rock ownership"}
-            </p>
-
-            <div className="mt-8 flex gap-2 justify-center">
-              <div className={`h-1.5 w-8 rounded-full ${submissionStep >= 1 ? "bg-black" : "bg-neutral-300"}`} />
-              <div className={`h-1.5 w-8 rounded-full ${submissionStep >= 2 ? "bg-black" : "bg-neutral-300"}`} />
-              <div className={`h-1.5 w-8 rounded-full ${submissionStep >= 3 ? "bg-black" : "bg-neutral-300"}`} />
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Success */}
-        {step === "success" && (
-          <div className="flex flex-col items-center text-center py-4">
-            <div className="w-16 h-16 bg-black text-white rounded-full flex items-center justify-center mb-5 shadow-lg shadow-black/10">
-              <Check className="w-8 h-8 stroke-[2.5]" />
-            </div>
-
-            <h3 className="text-2xl font-bold tracking-tight mb-1">Ownership Transferred!</h3>
-            <p className="text-sm text-neutral-500 font-medium mb-6">
-              Rock #{rockId} has been successfully gifted.
-            </p>
-
-            <div className="w-full bg-neutral-50 rounded-2xl p-4 border border-neutral-100 mb-6 text-left space-y-3">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-neutral-500 font-medium">Previous Owner</span>
-                <span className="font-mono text-xs font-semibold text-neutral-700">
-                  {formatShortAddress(currentOwner)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-neutral-500 font-medium">New Owner</span>
-                <span className="font-mono text-xs font-bold text-black">
-                  {formatShortAddress(trimmedRecipient)}
-                </span>
-              </div>
-              <div className="pt-2 border-t border-neutral-200/60 flex justify-between items-center text-sm">
-                <span className="text-neutral-500 font-medium flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-green-600" />
-                  Physical NFC Key
-                </span>
-                <span className="font-bold text-green-700 text-xs">
-                  Re-keyed to recipient
-                </span>
-              </div>
-            </div>
-
-            {txHash && (
-              <div className="w-full mb-6">
-                <div className="flex items-center justify-between text-xs text-neutral-500 mb-1.5 px-1">
-                  <span>Transaction Hash</span>
-                  <span className="text-neutral-400">Base Sepolia</span>
+        {step === "done" && result ? (
+          <>
+            {result.state === "UNAVAILABLE" ? (
+              <UnavailableState reason={result.reason} />
+            ) : (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-h3 font-semibold text-ink">The gift is waiting</h3>
+                  {result.state === "DEMO" ? <SimulatedBadge /> : null}
                 </div>
-                <div className="flex items-center gap-2 bg-neutral-100/80 rounded-xl p-2.5 font-mono text-xs border border-neutral-200/60">
-                  <span className="truncate flex-1 text-neutral-800 font-medium">{txHash}</span>
-                  <button
-                    onClick={copyTxHash}
-                    className="p-1.5 hover:bg-neutral-200 rounded-lg transition-colors text-neutral-600 cursor-pointer"
-                    title="Copy Hash"
-                  >
-                    {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                  <a
-                    href={`https://sepolia.basescan.org/tx/${txHash}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-1.5 hover:bg-neutral-200 rounded-lg transition-colors text-neutral-600 flex items-center"
-                    title="View on BaseScan"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                </div>
+                <p className="max-w-prose text-base text-ink-2">
+                  {isOpenGift
+                    ? "Whoever taps this rock next can claim it."
+                    : "They can claim it the next time they tap this rock."}{" "}
+                  The rock stays in your account until they do.
+                </p>
+                <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 text-sm">
+                  <dt className="text-ink-3">To</dt>
+                  <dd className="justify-self-end">
+                    {isOpenGift ? (
+                      <span className="text-ink">{recipientLine}</span>
+                    ) : (
+                      <Address value={trimmedRecipient} />
+                    )}
+                  </dd>
+                  <dt className="text-ink-3">Transaction</dt>
+                  <dd className="justify-self-end">
+                    {result.state === "REAL" ? (
+                      <TxHash
+                        value={result.value.txHash}
+                        explorerHref={explorer.tx(result.value.txHash)}
+                      />
+                    ) : (
+                      <span className="text-ink-3">no transaction — simulated</span>
+                    )}
+                  </dd>
+                </dl>
               </div>
             )}
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full bg-black hover:bg-neutral-800 text-white py-4 rounded-full font-bold text-sm transition-colors shadow-md cursor-pointer"
-            >
-              Return to Rock Interface
-            </button>
-          </div>
-        )}
-      </motion.div>
-    </div>
-  );
-}
-
-export function TransferModal({ isOpen, ...props }: TransferModalProps) {
-  return (
-    <AnimatePresence>
-      {isOpen && <TransferModalInner {...props} />}
-    </AnimatePresence>
+          </>
+        ) : null}
+      </SheetBody>
+    </Sheet>
   );
 }

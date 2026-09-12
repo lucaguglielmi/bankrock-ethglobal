@@ -1,8 +1,25 @@
 "use client";
 
+/**
+ * Onboarding sheet (spec 15 X-1, A-1/A-2; spec 17 Part 5 "Onboarding sheet").
+ *
+ * What this file used to be: `useEffect` was called **after** `if (!isOpen) return null`, so the
+ * hook count changed 1 → 2 the moment the modal opened and React threw "Rendered more hooks than
+ * during the previous render" — on the primary login path (X-1). It also promised a Safe on Base
+ * Sepolia and a "Live Yield" reserve.
+ *
+ * What it is now: a `Sheet` that is always rendered and simply passed `open`, so every hook runs
+ * on every render, in the same order, always. When sign-in cannot work at all — no configured
+ * Privy app — it renders the UNAVAILABLE state with the reason instead of a button that would do
+ * nothing (A-1: there is no fabricated wallet to fall back to any more).
+ */
+
+import * as React from "react";
+import { KeyRound, ShieldCheck, Sparkles } from "lucide-react";
+import { Sheet, SheetBody } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { UnavailableState } from "@/components/ui/unavailable-state";
 import { useAuth } from "@/context/auth-context";
-import { useEffect } from "react";
-import { X, KeyRound, Shield, Coins, ArrowRight, CheckCircle2 } from "lucide-react";
 
 interface PrivyOnboardingModalProps {
   isOpen: boolean;
@@ -11,133 +28,126 @@ interface PrivyOnboardingModalProps {
   onAuthenticated?: () => void;
 }
 
-export function PrivyOnboardingModal({ isOpen, onClose, rockId, onAuthenticated }: PrivyOnboardingModalProps) {
-  const { login } = useAuth();
+const STEPS = [
+  {
+    label: "STEP 1",
+    icon: KeyRound,
+    title: "Sign in",
+    body: "With an email address or a wallet you already have. No seed phrase to write down, no extension to install.",
+  },
+  {
+    label: "STEP 2",
+    icon: ShieldCheck,
+    title: "The rock gets its own account",
+    body: "An account that only you control. Its address and its history stay with the rock, even when you give it away.",
+  },
+  {
+    label: "STEP 3",
+    icon: Sparkles,
+    title: "Put something in it",
+    body: "Whatever the rock holds is yours, and you can take it out again whenever you want.",
+  },
+] as const;
 
-  if (!isOpen) return null;
+/** `google_oauth` -> `Google`, `email` -> `Email`, `wallet` -> `Wallet` (STEERING: login UX). */
+function prettyLoginMethod(method: string): string {
+  const cleaned = method.replace(/_oauth$/i, "").replace(/[_-]+/g, " ").trim();
+  if (cleaned === "") return method;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
 
-  const handleStart = async () => {
+export function PrivyOnboardingModal({
+  isOpen,
+  onClose,
+  rockId,
+  onAuthenticated,
+}: PrivyOnboardingModalProps) {
+  const { ready, authenticated, unavailable, unavailableReason, lastLoginMethod, login } =
+    useAuth();
+
+  const [error, setError] = React.useState<string | null>(null);
+  const wasAuthenticated = React.useRef(authenticated);
+
+  // Fires once, when the session actually appears while this sheet is open.
+  React.useEffect(() => {
+    const justAuthenticated = authenticated && !wasAuthenticated.current;
+    wasAuthenticated.current = authenticated;
+    if (!isOpen || !justAuthenticated) return;
+    onClose();
+    onAuthenticated?.();
+  }, [isOpen, authenticated, onClose, onAuthenticated]);
+
+  const handleLogin = React.useCallback(async () => {
+    setError(null);
     try {
       await login();
-      onClose();
-      onAuthenticated?.();
-    } catch (err) {
-      console.error("Authentication failed:", err);
-      onClose();
-      onAuthenticated?.();
+    } catch {
+      setError("Sign-in did not complete. Nothing was created.");
     }
-  };
+  }, [login]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  const footer = unavailable ? null : (
+    <div className="flex flex-col gap-2">
+      {error ? (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
+      {lastLoginMethod ? (
+        <p className="text-sm text-ink-2">
+          Last time you used {prettyLoginMethod(lastLoginMethod)}.
+        </p>
+      ) : null}
+      <Button
+        type="button"
+        size="lg"
+        className="w-full"
+        disabled={!ready}
+        onClick={handleLogin}
+      >
+        <span className="motion-safe:transition-opacity">
+          {ready ? "Continue with email or wallet" : "One moment…"}
+        </span>
+      </Button>
+    </div>
+  );
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={onClose}
+    <Sheet
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title="Sign in to use this rock"
+      description={`Rock #${rockId} needs to know who you are before it can do anything for you.`}
+      footer={footer}
     >
-      <div 
-        className="bg-white text-black w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-2xl border border-neutral-100 relative max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute right-5 top-5 p-2 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-black transition-colors cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Header */}
-        <div className="mb-6">
-          <div className="inline-flex items-center gap-2 bg-neutral-100 text-neutral-700 px-3 py-1 rounded-full text-xs font-semibold mb-3">
-            <Shield className="w-3.5 h-3.5 text-black" />
-            Privy Non-Custodial Onboarding
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-neutral-950">
-            Awaken Rock #{rockId}
-          </h2>
-          <p className="text-sm text-neutral-500 mt-1.5 leading-relaxed">
-            Every physical Bank Rock is backed by a self-custodial ERC-4337 Safe account on Base Sepolia.
-            No browser extensions or seed phrases required.
-          </p>
-        </div>
-
-        {/* Steps Visual List */}
-        <div className="space-y-4 mb-8">
-          <div className="flex items-start gap-4 p-4 rounded-2xl bg-neutral-50 border border-neutral-100">
-            <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center shrink-0">
-              <KeyRound className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-black flex items-center gap-1.5">
-                Passkey or Email Login
-                <span className="text-[10px] bg-neutral-200 text-neutral-700 px-1.5 py-0.5 rounded font-mono">
-                  Zero Seed Phrase
-                </span>
-              </h4>
-              <p className="text-xs text-neutral-500 mt-1 leading-relaxed">
-                Authenticate seamlessly via FaceID, TouchID, or email. Privy creates an embedded cryptographic signer on Base Sepolia.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-4 p-4 rounded-2xl bg-neutral-50 border border-neutral-100">
-            <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center shrink-0">
-              <Shield className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-black flex items-center gap-1.5">
-                ERC-4337 Safe Account
-                <span className="text-[10px] bg-neutral-200 text-neutral-700 px-1.5 py-0.5 rounded font-mono">
-                  Dual Gas Sponsorship
-                </span>
-              </h4>
-              <p className="text-xs text-neutral-500 mt-1 leading-relaxed">
-                Pimlico Paymaster sponsors all user operations so you never have to acquire testnet ETH to claim or manage your rock.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-4 p-4 rounded-2xl bg-neutral-50 border border-neutral-100">
-            <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center shrink-0">
-              <Coins className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-black flex items-center gap-1.5">
-                1inch Aqua Maker Reserve
-                <span className="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded font-mono">
-                  Live Yield
-                </span>
-              </h4>
-              <p className="text-xs text-neutral-500 mt-1 leading-relaxed">
-                Your stone automatically seeds a USDC/WETH liquidity reserve in 1inch Aqua, collecting 0.05% maker fees from peer swaps.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Button */}
-        <button
-          onClick={handleStart}
-          className="w-full bg-black text-white py-4 px-6 rounded-2xl font-bold text-base hover:bg-neutral-800 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-98"
-        >
-          <span>Continue with Passkey / Email</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
-
-        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-neutral-400">
-          <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-          <span>Secured by Privy & Safe{`{Core}`} on Base Sepolia</span>
-        </div>
-      </div>
-    </div>
+      <SheetBody className="flex flex-col gap-4">
+        {unavailable ? (
+          <UnavailableState
+            reason={unavailableReason ?? "Sign-in is not configured."}
+          />
+        ) : (
+          <ol className="flex flex-col gap-3">
+            {STEPS.map((step) => {
+              const Icon = step.icon;
+              return (
+                <li
+                  key={step.label}
+                  className="flex items-start gap-3 rounded-2xl border border-border p-4"
+                >
+                  <Icon aria-hidden className="mt-1 size-5 shrink-0 text-ink-3" />
+                  <div className="min-w-0">
+                    <span className="text-label text-ink-3">{step.label}</span>
+                    <h3 className="mt-1 text-base font-semibold text-ink">{step.title}</h3>
+                    <p className="mt-1 max-w-prose text-sm text-ink-2">{step.body}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </SheetBody>
+    </Sheet>
   );
 }
