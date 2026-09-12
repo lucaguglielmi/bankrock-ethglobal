@@ -794,9 +794,11 @@ Stated plainly so it can be stated plainly to judges. The living, per-item versi
 condition that clears each one is [`../DEMO-STATE.md`](../DEMO-STATE.md).
 
 - Cross-chain deposit — `DEMO`, badged. No bridge is integrated.
-- Keeper rebalancing — `UNAVAILABLE` in the data layer (`lib/aqua-keeper.ts` invents nothing and
-  can produce no transaction hash); the *surface* stays a badged `DEMO` beat because the Gelato
-  function behind it points at a non-existent interface (X-7).
+- Keeper rebalancing — **deleted, not rewritten (D-035).** `X-7` is closed by deletion: the Gelato
+  function targeted an interface that does not exist, and rather than repoint it at the current
+  registry and Aqua path, `web3-functions/`, `/api/keeper`, `lib/aqua-keeper.ts` and the MCP
+  `run_aqua_keeper` tool are gone. There is no keeper surface left to badge. A real rebalancer is
+  post-hackathon roadmap (spec 13).
 - Alert delivery — `UNAVAILABLE`. Preferences persist, behind a verified Privy token; nothing
   dispatches.
 - Fiat on-ramp / off-ramp (Flows G, H fiat legs) — out of scope per spec 08, unchanged. Note that

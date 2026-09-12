@@ -90,9 +90,15 @@ claim is relayed: the registry credits the subject named inside the attestation,
 owner swap follows, so the account and everything in it move with the object. **Zero gas fees,
 no native tokens, and the giver did not need to be present.**
 
-### 2:30–2:55 — The AI Oracle & Agentic Strategies (MCP)
+### 2:30–2:55 — The AI Oracle (MCP)
 
-Open an external chat interface with an AI agent (e.g., ChatGPT or Claude Desktop). Say, "I want to fund this rock with 50 USDC but keep it low risk." The user's external agent connects via the Bank Rock MCP Server, bridges the funds from an L2 (Cross-chain Abstraction), and automatically generates and ships a customized Aqua strategy. *Note: We do not run our own AI agent in the app; we simply expose the MCP server for the user's preferred agent to connect to.*
+Open an external chat interface with an AI agent (e.g., Claude Desktop). Ask it about the rock
+just traded with: "What does this rock hold, who owns it, and what has it earned in fees?" The
+agent connects to the Bank Rock MCP Server, reads the rock's live owner, reserve balances and fee
+figures straight from chain, and answers in plain language. *Note: Bank Rock runs no AI agent of
+its own; this is the user's preferred agent, reading through the server we expose.* The server is
+read-only by decision (D-008, D-019): it never bridges funds, never generates or ships a strategy,
+and never executes anything on the user's behalf.
 
 ### 2:55–3:10 — Platform potential
 

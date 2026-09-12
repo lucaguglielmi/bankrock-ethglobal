@@ -103,10 +103,6 @@ export default function TermsPage() {
                 on-chain activity, never a promise of yield. Market volatility, arbitrage, and volume fluctuations
                 may cause returns to vary or result in impermanent loss.
               </li>
-              <li>
-                <strong>Autonomous Keeper Bots:</strong> Rebalancing actions executed via our keeper network or MCP agent tools are software
-                automations designed to balance inventory. They do not guarantee price protection or profit.
-              </li>
             </ul>
           </section>
 

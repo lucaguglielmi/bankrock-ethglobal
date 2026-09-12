@@ -24,7 +24,6 @@ export type AlertTopicsConfig = {
   loss_warning: boolean;
   dangerous_trade: boolean;
   profit_milestone: boolean;
-  keeper_rebalance: boolean;
   custody_transfer: boolean;
   gas_depletion: boolean;
   genesis_drop: boolean;
@@ -34,7 +33,6 @@ export const DEFAULT_ALERT_TOPICS: AlertTopicsConfig = {
   loss_warning: true,
   dangerous_trade: true,
   profit_milestone: true,
-  keeper_rebalance: true,
   custody_transfer: true,
   gas_depletion: false,
   genesis_drop: true,

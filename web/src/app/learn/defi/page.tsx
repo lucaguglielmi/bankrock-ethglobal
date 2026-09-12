@@ -66,7 +66,7 @@ export default function DefiPage() {
                 Because capital remains in the rock, idle stablecoins are automatically deployed into yield protocols like <TooltipLink term="Aave v3" description="A decentralized non-custodial liquidity protocol." href="https://aave.com/" /> to earn passive yield.
               </p>
               <p>
-                To manage this complexity without bothering the user, we leverage <TooltipLink term="Gelato" description="A web3 automation network." href="https://www.gelato.network/" /> combined with <TooltipLink term="ERC-7579 Session Keys" description="A standard for modular smart accounts, allowing scoped permissions." href="https://erc7579.com/" />. This allows our AI Oracle to autonomously rebalance strategies and harvest yield securely.
+                A future automation layer would manage this complexity without bothering the user, using <TooltipLink term="ERC-7579 Session Keys" description="A standard for modular smart accounts, allowing scoped permissions." href="https://erc7579.com/" /> to let a delegated agent rebalance strategies and harvest yield within tight, bounded limits. This is a post-hackathon roadmap item — Bank Rock runs no automated rebalancer today.
               </p>
             </div>
           </div>

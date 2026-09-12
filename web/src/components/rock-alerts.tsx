@@ -20,7 +20,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   Bell,
-  Bot,
   Check,
   Fuel,
   KeyRound,
@@ -64,13 +63,6 @@ const TOPICS: TopicMeta[] = [
     description: "When the fees this rock has earned pass a round number.",
     badge: "Earnings",
     icon: TrendingUp,
-  },
-  {
-    id: "keeper_rebalance",
-    title: "Keeper action",
-    description: "When the automated keeper rebalances this rock.",
-    badge: "Automation",
-    icon: Bot,
   },
   {
     id: "custody_transfer",

@@ -53,3 +53,10 @@ This document defines the list of required MCP servers and connectors to interac
 - `optimize_idle_yield(rockId)` — analyzes Aave/Morpho rates and suggests yield allocation strategies for the rock's idle capital.
 - `generate_agentic_strategy(rockId, riskProfile)` — dynamically calculates optimal Aqua strategy parameters based on a natural-language risk assessment and prepares a transaction payload for user review.
 - `execute_agentic_rebalance(rockId, sessionKeyProof, strategyParams)` — executes a live rebalancing UserOperation directly onchain using the owner's delegated ERC-7579/4337 Scoped Session Key. The smart account guarantees the rebalance cannot exceed bounded slippage or move tokens outside Aqua.
+
+**Removed:** `run_aqua_keeper`, a tool that always answered `unavailable` because it fronted the
+Gelato keeper function (`web3-functions/bankrock-keeper`), which targeted a contract interface
+that does not exist (spec 15 X-7). The keeper is deleted rather than rewritten (D-035); there is
+nothing left for this tool to front, so it is gone rather than kept as a permanent `unavailable`
+stub. `analyze_strategy_yield` and the other Aqua-reading tools are unaffected — they read real
+Aqua state and remain read-only per D-008 and D-019.

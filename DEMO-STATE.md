@@ -28,7 +28,6 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 | # | What | Spec | Becomes real when |
 | --- | --- | --- | --- |
 | S-1 | Cross-chain deposit (the bridge modal) | 15 Part 6, 04 | A bridge is integrated. Cut from MVP scope; it stays a badged `DEMO` beat. |
-| S-2 | The keeper rebalance *surface* | 15 Part 8 | The Gelato function stops targeting an interface that does not exist (X-7). The data layer already invents nothing — see U-7. |
 | S-3 | The judge scenario switcher's sample views | 15 D-013, 17 | Never. It exists only to pick which badged sample renders, only under the flag, and it can set neither the attestation nor a balance. |
 
 ## 2. Unavailable — no path at all, on purpose
@@ -104,7 +103,6 @@ most dangerous category on this page, because it looks finished.
 | --- | --- | --- | --- |
 | W-1 | `https://www.bank-rock.com` returns 308 to a literal `:path*` placeholder | 15 R-1, D-022, 12 §1 | The old Cloudflare redirect rule is **deleted**. The app now ships the redirect itself (`web/next.config.ts` matches the `www` host and 308s with the path substituted), but a dashboard rule is evaluated before the Worker, so the broken one still wins. **No tag may be programmed before `curl -sIL https://www.bank-rock.com` ends 200.** |
 | W-2 | The CI responsive job configures no chain, so the two spec 17 Part 7 checks that need a live rock (items 7, 8) skip rather than run; the Lighthouse budget (item 10) is not run at all | 17 U4, 09 D-031 | That job's environment points at a deployed registry, and the Lighthouse budget is measured by hand against the public deployment. The static checks and the rest of the matrix are blocking today. |
-| W-3 | The Gelato keeper function targets a contract interface that does not exist | 15 X-7 | It is rewritten against the current registry and Aqua, or deleted. It is `DEMO` either way. |
 
 ---
 
