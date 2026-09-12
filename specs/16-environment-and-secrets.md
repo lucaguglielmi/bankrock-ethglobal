@@ -169,7 +169,7 @@ secret you create locally (`openssl rand -hex 32`). *Output* = produced by a dep
 | --- | --- | --- | --- | --- | --- |
 | 1 | `NEXT_PUBLIC_PRIVY_APP_ID` | You — dashboard.privy.io | `providers.tsx` | Phase 0 | Also configure in the dashboard: allowed origin `https://bank-rock.com`, login methods email / Google / Apple / wallet, and enable Sepolia. Without it the app boots with a placeholder app ID and `login()` silently activates a **fabricated embedded wallet** (`0x71C8…1b47`, `collector@bankrock.eth`) — spec 15 A-1/A-2. Phase 1 replaces that with an `UNAVAILABLE` sign-in state. |
 | 2 | `NEXT_PUBLIC_APP_URL` | Fixed: `https://bank-rock.com` | CORS in `middleware.ts`; email CTAs; MCP base URL | Phase 0 | Replaces the `bankrock.xyz` / `pages.dev` literals (D-022). |
-| 3 | `NEXT_PUBLIC_CHAIN_ID` → read by the chain config module | Fixed: `11155111` | D-015 chain module | Phase 1 | Currently unread. |
+| 3 | `NEXT_PUBLIC_CHAIN_ID` | Fixed: `11155111` | `lib/chain/index.ts` (D-015), `lib/demo.ts`, `lib/nfc/attestation.ts` | Phase 1 | **Read now** — the "currently unread" note this row used to carry is stale. It is also the EIP-712 domain's `chainId`, so a wrong value makes every attestation unverifiable rather than merely mis-routed. |
 | 4 | `SEPOLIA_RPC_URL` | You — Alchemy or Infura Sepolia endpoint | `lib/chain`, `lib/indexer.ts`, `lib/aqua/read.ts`, faucet, relayer, Rock Account derivation | Phase 1 | **Done:** one name, no aliases. Public RPCs rate-limit and reject wide `eth_getLogs`; the indexer and the fee log scan need a real provider. |
 | 5 | `ADMIN_PASSWORD` | Generate | `/api/admin/login` | Phase 0 | |
 | 6 | `ADMIN_JWT_SECRET` | Generate, 32 bytes | `lib/auth.ts`, `middleware.ts` | Phase 0 | Must be set; the fallback string makes admin sessions forgeable (SA-8). |
@@ -200,6 +200,10 @@ secret you create locally (`openssl rand -hex 32`). *Output* = produced by a dep
 | 31 | `NXP_KEY_DIVERSIFY` | Optional, default off | `lib/nfc/config.ts` | Phase 4 | `"true"` enables AN10922 per-tag key diversification. Must match how the tags were provisioned. Keep it **off** for the hackathon (spec 18 §4.2 item 4). |
 | 32 | `NXP_KEY_DIVERSIFY_APP_ID` | With #31 only | `lib/nfc/config.ts` | Phase 4 | The 3-byte AID used in the derivation. Meaningless unless #31 is on. |
 | 33 | `ALERT_FROM_ADDRESS` | You — a verified Resend sender | `lib/email-service.ts` | Phase 5 | e.g. `Bank Rock <alerts@bank-rock.com>`, once the domain is verified. Until then the sandbox sender reaches only your own inbox (E-6). |
+| 34 | `RELAYER_DAILY_CAP_WEI` | You — a number, in wei | `lib/rock-account.server.ts` (`relayerDailyCapWei`, `reserveRelayerSpend`), `POST /api/rocks/[id]/claim` | Phase 2 | **Fails closed, and that is the point (audit `F-10`/`P-1`, D-032).** How much the relayer may spend per **UTC day**, accumulated in D1 and reserved *before* each claim is broadcast, in one atomic statement so two concurrent claims cannot both fit under a cap only one of them fits. **Unset or `0` disables relaying entirely** — an uncapped funded key is the finding this closes, so "no cap" is the closed branch, not the permissive one. Also refused: a non-integer, and a value larger than the ledger can track. 0.05 ETH = `50000000000000000`; one claim is estimated at 0.002 ETH. Pairs with #30 |
+| 35 | `NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY` | Generate — `npx web-push generate-vapid-keys` | `hooks/useNotifications.ts` (browser), `app/api/webpush/route.ts` | Phase 5, optional | The browser subscribes with this key and the server signs with #36; **the two must be halves of one pair, or every delivery fails silently.** Perimeter `P-7` was exactly that mismatch, under two different variable names — the browser read `NEXT_PUBLIC_VAPID_PUBLIC_KEY` while the route read `WEB_PUSH_VAPID_PUBLIC_KEY`. One name now, and it is `NEXT_PUBLIC_`-prefixed because the public key is public by construction |
+| 36 | `WEB_PUSH_VAPID_PRIVATE_KEY` | Generate — the other half of #35 | `app/api/webpush/route.ts` | Phase 5, optional | Server-side only. Never `NEXT_PUBLIC_`. Cloudflare secret, not a file |
+| 37 | `WEB_PUSH_SUBJECT` | Fixed — a `mailto:` or `https:` URL you own | `app/api/webpush/route.ts` | Phase 5, optional | The VAPID `sub` claim: who a push service should contact about this sender. e.g. `mailto:security@bank-rock.com`. All three of #35–#37 unset ⇒ push is `UNAVAILABLE`, which is the correct state; a partial set is the failure mode worth avoiding (spec 14) |
 
 ### 2.2a Cross-check against `web/.env.example`
 
@@ -211,10 +215,17 @@ its order: `NEXT_PUBLIC_APP_URL` (#2), `NEXT_PUBLIC_CHAIN_ID` (#3), `NEXT_PUBLIC
 (#14), `NEXT_PUBLIC_REGISTRY_ADDRESS` (#11), `NEXT_PUBLIC_AQUA_APP_ADDRESS` and
 `NEXT_PUBLIC_AQUA_TAKER_ADDRESS` (#12), `AQUA_APP_DEPLOY_BLOCK` (#29), `PIMLICO_API_KEY` and
 `NEXT_PUBLIC_PIMLICO_API_KEY` (#15), `FAUCET_PRIVATE_KEY` (#16),
-`ATTESTATION_SIGNER_PRIVATE_KEY` (#17), `RELAYER_PRIVATE_KEY` (#30), `NXP_MASTER_KEY` (#18),
+`ATTESTATION_SIGNER_PRIVATE_KEY` (#17), `RELAYER_PRIVATE_KEY` (#30),
+`RELAYER_DAILY_CAP_WEI` (#34), `NXP_MASTER_KEY` (#18),
 `NXP_KEY_DIVERSIFY` (#31), `NXP_KEY_DIVERSIFY_APP_ID` (#32), `RESEND_API_KEY` (#19),
 `ALERT_FROM_ADDRESS` (#33), `ALERT_EMAIL_ADDRESS` (#20), `ALCHEMY_WEBHOOK_SECRET` (#22),
-`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` (#8, #9).
+`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` (#8, #9),
+`NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY`, `WEB_PUSH_VAPID_PRIVATE_KEY`, `WEB_PUSH_SUBJECT`
+(#35–#37).
+
+**Nothing was removed in this pass.** Every variable the table names is still read by the code as
+spelled — re-checked 2026-09-12 against `web/src/`, `mcp/` and `web/drizzle.config.ts`. The
+removals are the historical ones listed below, and they have not come back.
 
 **Not in that file, and deliberately:**
 
@@ -231,14 +242,62 @@ D-030), `SIGNER_PRIVATE_KEY` (renamed to `ATTESTATION_SIGNER_PRIVATE_KEY`), `1IN
 
 ### 2.3 What only you can do
 
+#### 2.3.1 The two GitHub repository secrets (Fact — this is what blocks the deploy)
+
+`.github/workflows/deploy.yml` reads exactly two credentials, and fails early and by name if either
+is missing. They are **repository secrets**, not Pages variables, because they authenticate the
+upload rather than the running app:
+
+| Secret | What it is | Scopes the token needs |
+| --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | A Cloudflare API token, created in the Cloudflare dashboard under My Profile → API Tokens | **Account → Workers Scripts: Edit** (publish the Worker), **Account → D1: Edit** (the migration step and the `DB` binding), **Zone (`bank-rock.com`) → Workers Routes: Edit** and **Zone → DNS: Edit** (the two custom domains in `wrangler.jsonc`) |
+| `CLOUDFLARE_ACCOUNT_ID` | The account id shown in the Cloudflare dashboard sidebar. Not a secret in the cryptographic sense; it is stored alongside the token so the workflow needs no dashboard lookup | — |
+
+Set both here:
+
+```
+https://github.com/lucaguglielmi/bankrock-ethglobal/settings/secrets/actions
+```
+
+The two **Zone** scopes are the ones easiest to leave off, and their absence does not stop the
+Worker from publishing — it stops the custom domains from being attached, which looks like a green
+deploy that changed nothing. The workflow's guard step catches only *unset*, not *under-scoped*: an
+under-scoped token fails later, inside `wrangler`. After setting them, re-run the deploy from the
+Actions tab (`workflow_dispatch`) rather than pushing an empty commit, and then check that
+`NEXT_PUBLIC_APP_VERSION` on the live apex actually changed (spec 12, *Deploy pipeline history*).
+
+*Note: if the Pages project `bankrock-ethglobal` is still used as a manual preview surface
+(`npm run deploy:pages`), that path additionally needs **Cloudflare Pages: Edit**. Production does
+not.*
+
+#### 2.3.2 The Cloudflare Worker `web`
+
+**Production is a Worker, not a Pages project** (spec 12 §1). Dashboard path: Workers & Pages →
+`web` → Settings. It holds everything the *running* app reads. The Pages project
+`bankrock-ethglobal` exists and can be published to by hand, but **no domain points at it**, so a
+variable set there has no effect on production.
+
+| What | Value |
+| --- | --- |
+| **D1 binding** | Binding name **`DB`**, database `bankrock-db`, id `f0a28d6f-0a36-46aa-b711-8b5297913d2e`, `migrations_dir: drizzle`. Declared in `web/wrangler.jsonc` and bound on the project. The Worker uses the binding; it never reads `CLOUDFLARE_DATABASE_ID` or `CLOUDFLARE_D1_TOKEN`, which are migration tooling only (#9). Unbound ⇒ counters, rate limits and the relayer spend ledger are all `UNAVAILABLE`, and the relayer therefore refuses to spend |
+| **Environment variables** | Every variable in [`../web/.env.example`](../web/.env.example) that the deployment needs, set under **Settings → Variables and Secrets** on the Worker — **never in a file**. Secrets (`ADMIN_*`, `CRON_SECRET`, `*_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RESEND_API_KEY`, `ALCHEMY_WEBHOOK_SECRET`, `WEB_PUSH_VAPID_PRIVATE_KEY`) go in as **Secret**, not Text |
+| **Custom domains** | `bank-rock.com` and `www.bank-rock.com`, declared in `wrangler.jsonc` `routes` with `custom_domain: true`. Attaching them is what the token's two Zone scopes are for |
+| **`NEXT_PUBLIC_DEMO_MODE`** | `false` in production. The deploy job also pins it in the job environment, so the two would have to disagree *and* the pin would have to be removed for a simulated build to ship (D-013) |
+| **`RELAYER_DAILY_CAP_WEI`** | Must be set for gift claims to work at all (#34). Unset is the closed branch |
+| **Migrations** | Applied **by the deploy job**, before the Worker is published (`wrangler d1 migrations apply bankrock-db --remote`). The same command is `npm run db:migrate:prod` by hand. Consequence, stated because it is a change: **a destructive migration must not be merged to `main`** — merging it applies it (spec 12, Database) |
+
+#### 2.3.3 Dashboard and DNS actions
+
 These are dashboard or DNS actions, not env vars:
 
 1. **Privy dashboard** — create the app; add `https://bank-rock.com` (and the `pages.dev` preview
    origin if you use it) to allowed origins; enable email, Google, Apple, wallet; enable Sepolia.
 2. **Pimlico dashboard** — create the API key; create a sponsorship policy for chain 11155111;
    restrict the public key by origin.
-3. **Cloudflare dashboard** — fix the `www` redirect rule (R-1); create the API token; set every
-   secret above on the Pages project (Settings → Environment variables) rather than in a file.
+3. **Cloudflare dashboard** — remove or fix the `www` redirect rule with the unsubstituted
+   `:path*` (R-1); the app now ships the redirect itself in `web/next.config.ts`, but a dashboard
+   rule is evaluated first, so the broken one must go. Create the API token (§2.3.1) and configure
+   the Pages project (§2.3.2).
 4. **Resend** — add `bank-rock.com`; publish the SPF, DKIM and MX records it gives you; wait for
    verification.
 5. **Alchemy or Infura** — create a Sepolia app for `SEPOLIA_RPC_URL`.

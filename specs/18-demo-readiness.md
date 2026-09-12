@@ -54,9 +54,14 @@ deploy, a dashboard, a faucet, or a physical tag.
 
 Dependency order. Nothing below is code work; all of it is a dashboard, a faucet or a shell.
 
+**Node 22 everywhere.** Every CI and deploy job sets up Node 22, because Hardhat 3 requires
+`>= 22.13`; use the same locally (`node -v`) or `npm test` in `contracts/` will not run and the
+lockfiles may resolve differently from CI's (spec 12, CI).
+
 | # | Action | Where / command | Blocks |
 | --- | --- | --- | --- |
-| 1 | Fix the `www` redirect rule (unsubstituted `:path*`) | Cloudflare dashboard → Rules → Redirect Rules (R-1) | Everything; `curl -sIL https://www.bank-rock.com` must end 200 |
+| **0** | **Add the two GitHub repository secrets.** `CLOUDFLARE_API_TOKEN` — token scopes **Account → Workers Scripts: Edit**, **Account → D1: Edit**, **Zone (`bank-rock.com`) → Workers Routes: Edit** and **Zone → DNS: Edit** — and `CLOUDFLARE_ACCOUNT_ID` | `https://github.com/lucaguglielmi/bankrock-ethglobal/settings/secrets/actions` — spec 16 §2.3.1. Then re-run the deploy from the Actions tab (`workflow_dispatch`), not by pushing a commit | **Every deploy.** Nothing below this line reaches production without it: the first run that ever got past `npm ci` stopped on exactly these two, and on nothing else |
+| 1 | **Delete** the old `www` redirect rule (unsubstituted `:path*`) | Cloudflare dashboard → Rules → Redirect Rules (R-1). The app now ships the redirect in `web/next.config.ts`, but a dashboard rule is evaluated before the Worker, so the broken one must go | Everything; `curl -sIL https://www.bank-rock.com` must end 200 |
 | 2 | Create the Privy app; allowed origin `https://bank-rock.com`; enable email + passkey/Google; enable Sepolia; set it **first** in the chain list | dashboard.privy.io → `NEXT_PUBLIC_PRIVY_APP_ID` | Beat 4 (spec 16 #1) |
 | 3 | Create a Sepolia RPC app | Alchemy/Infura → `SEPOLIA_RPC_URL` | Indexer, MCP, deploy (spec 16 #4) |
 | 4 | Generate secrets | `openssl rand -hex 16` → `ADMIN_PASSWORD`; `-hex 32` → `ADMIN_JWT_SECRET`, `ADMIN_API_KEY`, `CRON_SECRET`; `-hex 16` → **`NXP_MASTER_KEY`** (16 bytes = 32 hex chars, `lib/nfc/config.ts` enforces it) | Admin, cron, NFC |
@@ -70,9 +75,9 @@ Dependency order. Nothing below is code work; all of it is a dashboard, a faucet
 | 11 | Claim **20 USDC / 2 h / address** to each Rock Account Safe and to the taker wallet | `faucet.circle.com` or `ethglobal.com/faucet/sepolia-11155111-usdc` | Beats 7, 10 |
 | 12 | Wrap ETH → WETH: 0.01 per rock, 0.005 for the taker | `deposit()` on `0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14` | Beats 7, 10 |
 | 13 | Verify `bank-rock.com` in Resend (SPF + DKIM); set `ALERT_FROM_ADDRESS`, `ALERT_EMAIL_ADDRESS` | resend.com (E-6) | Alerts only — **cuttable** |
-| 14 | Set every variable on the Pages project (Settings → Environment variables), **not** in a file; `NEXT_PUBLIC_DEMO_MODE=false` for production | Cloudflare dashboard; `web/.env.example` is the authoritative list | Deploy |
-| 15 | Create the Cloudflare API token (Pages + D1 edit) and add `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` as GitHub secrets | `.github/workflows/deploy.yml` fails early without them | CI deploy |
-| 16 | Apply D1 migrations to production | `cd web && npm run db:migrate:prod` — `drizzle/0003_gifted_boomer.sql` creates `nfc_counters`, `faucet_ip_claims`, `alert_preferences`, `contact_requests` | Replay protection, faucet limits |
+| 14 | Set every variable **on the Worker `web`** (Workers & Pages → `web` → Settings → Variables and Secrets), **not** in a file and **not** on the Pages project — no domain points at Pages; `NEXT_PUBLIC_DEMO_MODE=false`; confirm the D1 binding is named `DB` | Cloudflare dashboard; `web/.env.example` is the authoritative list (spec 16 §2.3.2). **`RELAYER_DAILY_CAP_WEI` must be set or gift claims are off** — unset is the closed branch, not the permissive one | Deploy; beat 12 |
+| 15 | *(done at step 0)* Cloudflare API token and the two GitHub secrets | `.github/workflows/deploy.yml` fails early by name without them — spec 16 §2.3.1 | CI deploy |
+| 16 | *(automatic)* D1 migrations to production | The deploy job applies them before publishing the Worker. By hand if needed: `cd web && npm run db:migrate:prod` — `drizzle/0003_gifted_boomer.sql` creates `nfc_counters`, `faucet_ip_claims`, `alert_preferences`, `contact_requests`. **Never merge a destructive migration to `main`** (spec 12, Database) | Replay protection, faucet limits |
 | 17 | **Program the tag** (Part 4) | NXP TagWriter / TagXplorer | Beats 1–2 |
 
 ---
@@ -267,8 +272,8 @@ Per spec 15 Part 8, plus what Part 1 above adds:
 | 2 | `bash scripts/spec-checks.sh`, and the CI run itself | all 20 checks pass. The job is blocking, as is the Playwright `e2e-responsive` matrix. `D-014*` and `D-015` are the two a judge can see |
 | 3 | Registry deployed and verified; `contracts/deployments/sepolia.json` committed | `cast code $NEXT_PUBLIC_REGISTRY_ADDRESS --rpc-url $SEPOLIA_RPC_URL` non-empty |
 | 4 | XYCSwap + XYCSwapTaker deployed (**not** a SwapVM router — D-030); one strategy shipped on a throwaway rock; one swap executed against it from a second account | `Shipped` and `Pushed` events on Sepolia Etherscan, and `safeBalances` answering for the recomputed `strategyHash` |
-| 5 | Every Part 2 secret set on the Pages project; `NEXT_PUBLIC_DEMO_MODE=false` | deploy job green |
-| 6 | D1 migrations applied to production | `nfc_counters` exists |
+| 5 | Every Part 2 secret set **on the Worker `web`**; `NEXT_PUBLIC_DEMO_MODE=false` | deploy job green **and** `NEXT_PUBLIC_APP_VERSION` on `https://bank-rock.com` has changed — a green deploy to a surface no domain points at is the failure this catches (spec 12) |
+| 6 | D1 migrations applied to production (the deploy job does this) | `nfc_counters` exists |
 | 7 | Tag programmed per Part 4 | a tap on a phone opens `/r/{id}?e=…&c=…` |
 | 8 | Wallets funded: deployer 0.3 ETH, faucet 1.0 ETH, **relayer 0.2 ETH**, attester 0, Rock Account 20 USDC + 0.01 WETH, taker 20 USDC + 0.005 WETH | balances read on Etherscan |
 | 9 | Pimlico sponsorship policy exists for chain 11155111 | one sponsored UserOp lands |
