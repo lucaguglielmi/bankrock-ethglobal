@@ -1,295 +1,273 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Check, BellRing, Mail, Smartphone, Info, Edit2 } from "lucide-react";
-import { usePrivy } from "@privy-io/react-auth";
+/**
+ * The alerts page (spec 17 Part 5 "Alerts"; spec 15 Part 3 "Alerts delivery: UNAVAILABLE").
+ *
+ * Typography and targets fixed: `text-base` body and inputs, 24 px checkbox with a 44 px label,
+ * 48 and 56 px buttons, nothing below 13 px, and the full-viewport-height wrapper replaced by the
+ * page frame in `globals.css`. `usePrivy()` is replaced by `useAuth()`, which is safe when no
+ * Privy app is configured (A-2).
+ *
+ * The page also stops implying that saving a preference means an alert will arrive: nothing
+ * dispatches yet, and it says so before asking for an address.
+ */
 
-function maskEmail(email: string) {
-  if (!email || !email.includes("@")) return email;
+import { useState } from "react";
+import { BellRing, Check, Info, Mail, Smartphone } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/auth-context";
+import { cn } from "@/lib/ui/cn";
+
+const TOPICS = [
+  {
+    id: "dangerousTrade",
+    title: "Large trade",
+    description: "When one trade takes a big share of what a rock holds.",
+  },
+  {
+    id: "highSlippage",
+    title: "Poor price",
+    description: "When a rebalance would accept a noticeably worse price.",
+  },
+  {
+    id: "profitLoss",
+    title: "Weekly summary",
+    description: "One message a week with what your rocks did.",
+  },
+] as const;
+
+type TopicId = (typeof TOPICS)[number]["id"];
+
+function maskEmail(email: string): string {
+  if (!email.includes("@")) return email;
   const [name, domain] = email.split("@");
-  if (name.length <= 3) {
-    return `${name}***@${domain}`;
-  }
-  return `${name.substring(0, 3)}***@${domain}`;
+  if (name.length <= 3) return `${name}***@${domain}`;
+  return `${name.slice(0, 3)}***@${domain}`;
 }
 
 export default function AlertsPage() {
-  const { user, ready } = usePrivy();
-  
-  const [email, setEmail] = useState("");
-  const [isEditingEmail, setIsEditingEmail] = useState(false);
-  const [topics, setTopics] = useState({
+  const { user } = useAuth();
+
+  // The signed-in address is the default; an edit is an override on top of it. Deriving it here
+  // rather than copying it in an effect keeps the field correct the moment the session resolves.
+  const [emailEdit, setEmailEdit] = useState<string | null>(null);
+  const [isEditingOverride, setEditingOverride] = useState<boolean | null>(null);
+  const email = emailEdit ?? user?.email?.address ?? "";
+  const isEditingEmail = isEditingOverride ?? !user?.email?.address;
+  const [selected, setSelected] = useState<Record<TopicId, boolean>>({
     dangerousTrade: true,
     highSlippage: true,
     profitLoss: false,
   });
-  
-  const [gdprConsent, setGdprConsent] = useState(false);
-  const [step, setStep] = useState<"edit" | "confirm" | "success">("edit");
+  const [consent, setConsent] = useState(false);
+  const [step, setStep] = useState<"edit" | "confirm" | "saved">("edit");
+  const [error, setError] = useState<string | null>(null);
 
-  // Sync Privy email on load
-  useEffect(() => {
-    if (ready && user?.email?.address && !email) {
-      setEmail(user.email.address);
-    }
-  }, [ready, user, email]);
-
-  const handleSubscribeClick = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-    if (!gdprConsent) return;
-    
-    // Move to double confirmation step
-    setStep("confirm");
-  };
-
-  const handleConfirmSubscription = async () => {
+  const confirmSubscription = async () => {
+    setError(null);
     try {
-      const activeTopics = Object.entries(topics)
-        .filter(([_, isActive]) => isActive)
-        .map(([key]) => key);
-
+      const topics = (Object.keys(selected) as TopicId[]).filter((id) => selected[id]);
       const res = await fetch("/api/newsletter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, source: activeTopics.join(",") }),
+        body: JSON.stringify({ email, source: topics.join(",") }),
       });
-
-      if (res.ok) {
-        setStep("success");
-        setTimeout(() => setStep("edit"), 5000); // reset after 5s
+      if (!res.ok) {
+        setStep("edit");
+        setError("Your preferences could not be saved.");
+        return;
       }
-    } catch (err) {
-      console.error("Failed to subscribe:", err);
+      setStep("saved");
+    } catch {
+      setStep("edit");
+      setError("Your preferences could not be saved.");
     }
   };
 
-  const toggleTopic = (key: keyof typeof topics) => {
-    setTopics((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const displayEmail = (!isEditingEmail && email) ? maskEmail(email) : email;
+  const displayEmail = !isEditingEmail && email ? maskEmail(email) : email;
 
   return (
-    <main className="flex min-h-screen flex-col bg-white text-black font-sans pt-24 px-6 pb-24">
-      <div className="max-w-3xl mx-auto w-full space-y-16">
-        
-        {/* Header */}
-        <div className="space-y-4">
-          <div className="inline-flex items-center gap-2 bg-neutral-100 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest text-neutral-600">
-            <BellRing className="w-3.5 h-3.5" />
-            Alerts Dashboard
-          </div>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tighter">
-            Stay on top of your Rocks.
-          </h1>
-          <p className="text-xl text-neutral-500 font-medium max-w-xl">
-            Configure agentic notifications to monitor your Rock's automated trading strategies and health in real-time.
+    <main className="flex w-full flex-1 flex-col">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-12 py-6">
+        <header className="flex flex-col gap-4">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-muted px-3 py-1 text-label text-ink-3">
+            <BellRing aria-hidden className="size-4" />
+            Alerts
+          </span>
+          <h1 className="text-h1 font-extrabold text-ink">Stay on top of your rocks.</h1>
+          <p className="max-w-prose text-lead text-ink-2">
+            Choose what is worth telling you about. Nothing is sent yet — there is no delivery
+            behind these preferences — so this is a standing request, not a subscription.
           </p>
-        </div>
+        </header>
 
-        {/* Email Alerts Section */}
-        <section className="bg-neutral-50 rounded-3xl p-6 md:p-10 border border-neutral-100">
-          <div className="flex items-center gap-3 mb-6">
-            <Mail className="w-6 h-6 text-black" />
-            <h2 className="text-2xl font-bold tracking-tight">Email Alerts</h2>
-          </div>
-          
-          <form onSubmit={handleSubscribeClick} className="space-y-8">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-bold uppercase tracking-wider text-neutral-500">
-                  Email Address
-                </label>
-                {!isEditingEmail && (
-                  <button 
-                    type="button" 
-                    onClick={() => setIsEditingEmail(true)}
-                    className="text-sm font-bold flex items-center gap-1 hover:text-neutral-600 transition-colors"
-                  >
-                    <Edit2 className="w-3 h-3" /> Change
-                  </button>
-                )}
-              </div>
+        <section className="flex flex-col gap-6 rounded-3xl border border-border p-4 sm:p-6">
+          <h2 className="flex items-center gap-2 text-h2 font-bold text-ink">
+            <Mail aria-hidden className="size-5 shrink-0" />
+            Email
+          </h2>
 
-              {isEditingEmail ? (
-                <div>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="w-full bg-white border border-neutral-200 rounded-2xl px-5 py-4 text-lg font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all"
-                  />
-                  <p className="text-xs text-neutral-500 mt-2 flex items-start gap-1">
-                    <Info className="w-4 h-4 shrink-0" />
-                    Changing your email here only updates where alerts are sent. It does not affect your main Bank Rock account login.
-                  </p>
-                </div>
-              ) : (
-                <div className="w-full bg-white border border-neutral-200 rounded-2xl px-5 py-4 text-lg font-medium text-neutral-600 cursor-not-allowed">
-                  {displayEmail || "Loading..."}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <label className="block text-sm font-bold uppercase tracking-wider text-neutral-500">
-                Alert Topics
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <label htmlFor="alerts-email" className="text-label text-ink-3">
+                Email address
               </label>
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => toggleTopic("dangerousTrade")}
-                  className="w-full flex items-center justify-between p-4 bg-white border border-neutral-200 rounded-2xl hover:border-black transition-colors text-left group"
-                >
-                  <div>
-                    <div className="font-bold text-lg">Dangerous Trade</div>
-                    <div className="text-sm text-neutral-500">Get notified if the AI agent attempts a high-risk operation.</div>
-                  </div>
-                  <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 border ${topics.dangerousTrade ? "bg-black border-black text-white" : "border-neutral-300"}`}>
-                    {topics.dangerousTrade && <Check className="w-4 h-4" />}
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => toggleTopic("highSlippage")}
-                  className="w-full flex items-center justify-between p-4 bg-white border border-neutral-200 rounded-2xl hover:border-black transition-colors text-left group"
-                >
-                  <div>
-                    <div className="font-bold text-lg">High Slippage</div>
-                    <div className="text-sm text-neutral-500">Alerts when rebalancing encounters &gt;1% slippage.</div>
-                  </div>
-                  <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 border ${topics.highSlippage ? "bg-black border-black text-white" : "border-neutral-300"}`}>
-                    {topics.highSlippage && <Check className="w-4 h-4" />}
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => toggleTopic("profitLoss")}
-                  className="w-full flex items-center justify-between p-4 bg-white border border-neutral-200 rounded-2xl hover:border-black transition-colors text-left group"
-                >
-                  <div>
-                    <div className="font-bold text-lg">Profit/Loss Summary</div>
-                    <div className="text-sm text-neutral-500">Weekly email recap of your portfolio's performance.</div>
-                  </div>
-                  <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 border ${topics.profitLoss ? "bg-black border-black text-white" : "border-neutral-300"}`}>
-                    {topics.profitLoss && <Check className="w-4 h-4" />}
-                  </div>
-                </button>
-              </div>
+              {!isEditingEmail ? (
+                <Button variant="ghost" size="sm" onClick={() => setEditingOverride(true)}>
+                  Change
+                </Button>
+              ) : null}
             </div>
 
-            {/* GDPR Consent */}
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <div className={`w-5 h-5 mt-0.5 rounded flex items-center justify-center shrink-0 border transition-colors ${gdprConsent ? "bg-black border-black text-white" : "border-neutral-300 group-hover:border-black"}`}>
-                {gdprConsent && <Check className="w-3.5 h-3.5" />}
-              </div>
-              <input 
-                type="checkbox" 
-                className="hidden" 
-                checked={gdprConsent} 
-                onChange={(e) => setGdprConsent(e.target.checked)} 
-                required 
+            {isEditingEmail ? (
+              <input
+                id="alerts-email"
+                type="email"
+                required
+                value={email}
+                onChange={(changed) => setEmailEdit(changed.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                className="h-12 w-full rounded-xl border border-border bg-background px-4 text-base text-ink placeholder:text-ink-4"
               />
-              <span className="text-sm text-neutral-500 leading-relaxed">
-                I consent to Bank Rock storing my email address to send automated alerts. I understand this data is handled in accordance with GDPR and I can unsubscribe at any time.
-              </span>
-            </label>
-
-            {/* Actions / Double Confirmation */}
-            {step === "edit" && (
-              <button
-                type="submit"
-                disabled={!email || !gdprConsent}
-                className="w-full bg-black text-white py-4 rounded-full font-bold text-lg hover:bg-black/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Continue
-              </button>
+            ) : (
+              <p className="flex h-12 items-center rounded-xl border border-border px-4 text-base text-ink-2">
+                <span className="truncate">{displayEmail}</span>
+              </p>
             )}
 
-            {step === "confirm" && (
-              <div className="p-4 bg-white border-2 border-black rounded-2xl space-y-4">
-                <p className="font-bold text-center">Are you absolutely sure you want to subscribe {displayEmail} to these alerts?</p>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setStep("edit")}
-                    className="flex-1 bg-neutral-100 text-black py-3 rounded-full font-bold hover:bg-neutral-200 transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleConfirmSubscription}
-                    className="flex-1 bg-black text-white py-3 rounded-full font-bold hover:bg-black/90 transition-all"
-                  >
-                    Yes, Subscribe
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {step === "success" && (
-              <div className="w-full bg-green-500 text-white py-4 rounded-full font-bold text-lg flex items-center justify-center gap-2">
-                <Check className="w-5 h-5" /> Preferences Saved
-              </div>
-            )}
-          </form>
-        </section>
-
-        {/* Push Notifications Section */}
-        <section className="bg-neutral-50 rounded-3xl p-6 md:p-10 border border-neutral-100">
-          <div className="flex items-center gap-3 mb-6">
-            <Smartphone className="w-6 h-6 text-black" />
-            <h2 className="text-2xl font-bold tracking-tight">Push Notifications</h2>
-          </div>
-          
-          <p className="text-neutral-600 mb-8 font-medium">
-            Bank Rock supports native push notifications directly to your phone via Progressive Web App (PWA) technology. No app store required.
-          </p>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* iOS Instructions */}
-            <div className="bg-white p-6 rounded-2xl border border-neutral-200 space-y-4">
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                Apple iOS
-              </h3>
-              <ol className="list-decimal list-inside space-y-2 text-sm text-neutral-600">
-                <li>Open this site in <strong>Safari</strong>.</li>
-                <li>Tap the <strong>Share</strong> icon at the bottom of the screen.</li>
-                <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
-                <li>Open the new Bank Rock app from your home screen.</li>
-                <li>Accept the prompt to allow notifications.</li>
-              </ol>
-            </div>
-
-            {/* Android Instructions */}
-            <div className="bg-white p-6 rounded-2xl border border-neutral-200 space-y-4">
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                Android
-              </h3>
-              <ol className="list-decimal list-inside space-y-2 text-sm text-neutral-600">
-                <li>Open this site in <strong>Chrome</strong>.</li>
-                <li>Tap the three dots <strong>Menu</strong> icon in the top right.</li>
-                <li>Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
-                <li>Open the Bank Rock app from your home screen.</li>
-                <li>Accept the prompt to allow notifications.</li>
-              </ol>
-            </div>
-          </div>
-
-          <div className="mt-6 flex items-start gap-3 text-sm text-neutral-500 bg-white p-4 rounded-xl border border-neutral-200">
-            <Info className="w-5 h-5 shrink-0 text-blue-500" />
-            <p>
-              Push notifications are tied to your device. If you use multiple devices, you will need to add the app to your home screen on each one.
+            <p className="flex max-w-prose items-start gap-2 text-sm text-ink-3">
+              <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+              This only changes where alerts would be sent. It does not change how you sign in.
             </p>
           </div>
+
+          <div className="flex flex-col gap-3">
+            <h3 className="text-label text-ink-3">What to tell you about</h3>
+            <ul className="flex flex-col gap-2">
+              {TOPICS.map((topic) => {
+                const isOn = selected[topic.id];
+                return (
+                  <li key={topic.id}>
+                    <label
+                      className={cn(
+                        "flex min-h-11 cursor-pointer items-start gap-3 rounded-2xl border p-3 motion-safe:transition-colors",
+                        isOn ? "border-ink" : "border-border hover:bg-muted",
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isOn}
+                        onChange={() =>
+                          setSelected((previous) => ({ ...previous, [topic.id]: !previous[topic.id] }))
+                        }
+                        className="mt-0.5 size-6 shrink-0 accent-ink"
+                      />
+                      <span className="flex flex-col gap-1">
+                        <span className="text-sm font-semibold text-ink">{topic.title}</span>
+                        <span className="max-w-prose text-sm text-ink-2">{topic.description}</span>
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <label className="flex min-h-11 cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(changed) => setConsent(changed.target.checked)}
+              className="mt-0.5 size-6 shrink-0 accent-ink"
+            />
+            <span className="max-w-prose text-sm text-ink-2">
+              Store my email address so Bank Rock can write to me. I can ask for it to be removed
+              at any time.
+            </span>
+          </label>
+
+          {step === "edit" ? (
+            <Button
+              size="lg"
+              className="w-full"
+              disabled={!email || !consent}
+              onClick={() => setStep("confirm")}
+            >
+              Continue
+            </Button>
+          ) : null}
+
+          {step === "confirm" ? (
+            <div className="flex flex-col gap-4 rounded-2xl border border-ink p-4">
+              <p className="max-w-prose text-base text-ink">
+                Save {displayEmail} as the address for these alerts?
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row-reverse">
+                <Button size="lg" className="w-full sm:flex-1" onClick={confirmSubscription}>
+                  Yes, save it
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full sm:flex-1"
+                  onClick={() => setStep("edit")}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {step === "saved" ? (
+            <p className="flex items-center gap-2 text-base font-medium text-positive">
+              <Check aria-hidden className="size-5 shrink-0" />
+              Saved. Nothing will arrive until delivery exists.
+            </p>
+          ) : null}
+
+          {error ? <p className="text-sm text-danger">{error}</p> : null}
         </section>
 
+        <section className="flex flex-col gap-6 rounded-3xl border border-border p-4 sm:p-6">
+          <h2 className="flex items-center gap-2 text-h2 font-bold text-ink">
+            <Smartphone aria-hidden className="size-5 shrink-0" />
+            On your phone
+          </h2>
+          <p className="max-w-prose text-base text-ink-2">
+            Bank Rock can be added to your home screen and ask for notification permission there.
+            Permission is all it is: no notification is sent yet.
+          </p>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-3 rounded-2xl border border-border p-4">
+              <h3 className="text-h3 font-semibold text-ink">iPhone</h3>
+              <ol className="list-inside list-decimal space-y-2 text-sm text-ink-2">
+                <li>Open this site in Safari.</li>
+                <li>Tap the Share icon.</li>
+                <li>Tap Add to Home Screen.</li>
+                <li>Open Bank Rock from your home screen.</li>
+                <li>Allow notifications when asked.</li>
+              </ol>
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-2xl border border-border p-4">
+              <h3 className="text-h3 font-semibold text-ink">Android</h3>
+              <ol className="list-inside list-decimal space-y-2 text-sm text-ink-2">
+                <li>Open this site in Chrome.</li>
+                <li>Open the menu.</li>
+                <li>Tap Install app.</li>
+                <li>Open Bank Rock from your home screen.</li>
+                <li>Allow notifications when asked.</li>
+              </ol>
+            </div>
+          </div>
+
+          <p className="flex max-w-prose items-start gap-2 text-sm text-ink-3">
+            <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+            Permission is per device. Adding the app on a second phone asks again.
+          </p>
+        </section>
       </div>
     </main>
   );

@@ -1,28 +1,32 @@
-import { RockInterface } from "@/components/rock-interface";
+import { RockInterface, type RockPageParams } from "@/components/rock-interface";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+function firstValue(value: string | string[] | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value[0];
+  return undefined;
 }
 
 export default async function RockPage({ params, searchParams }: PageProps) {
-  const resolvedParams = await params;
-  const resolvedSearchParams = await searchParams;
+  const [{ id }, query] = await Promise.all([params, searchParams]);
 
-  const urlParams = {
-    e: typeof resolvedSearchParams.e === "string" ? resolvedSearchParams.e : undefined,
-    c: typeof resolvedSearchParams.c === "string" ? resolvedSearchParams.c : undefined,
-    ctr: typeof resolvedSearchParams.ctr === "string" ? resolvedSearchParams.ctr : undefined,
-    uid: typeof resolvedSearchParams.uid === "string" ? resolvedSearchParams.uid : undefined,
+  // Only the tap parameters are forwarded; nothing else in the query string reaches the client
+  // component.
+  const rockParams: RockPageParams = {
+    e: firstValue(query.e),
+    c: firstValue(query.c),
+    enc: firstValue(query.enc),
+    ctr: firstValue(query.ctr),
+    uid: firstValue(query.uid),
   };
 
   return (
-    <main className="flex min-h-screen flex-col bg-white text-black font-sans selection:bg-black selection:text-white">
-
-
-      <div className="flex-1 flex flex-col pt-10">
-        <RockInterface rockId={resolvedParams.id} urlParams={urlParams} />
-      </div>
+    <main className="flex w-full flex-1 flex-col">
+      <RockInterface rockId={id} searchParams={rockParams} />
     </main>
   );
 }

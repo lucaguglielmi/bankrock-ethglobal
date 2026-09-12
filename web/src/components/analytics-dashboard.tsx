@@ -1,110 +1,133 @@
 "use client";
 
-import React from "react";
-import { motion } from "framer-motion";
+/**
+ * Charts for a rock's recorded history (spec 17 L-11, Part 5 "Admin").
+ *
+ * Fixes: the heading no longer sits inside the `h-64` box that the chart tries to fill, so the
+ * chart stops overflowing; ticks are 13 px (the `text-caption` size) rather than 10 px; the x
+ * axis keeps its first and last label instead of dropping them at phone width; and an empty
+ * series renders an honest empty state instead of the words "Awaiting Yield Data".
+ *
+ * There is no APY series here and there will not be one: decision D-004 forbids the claim
+ * regardless of data quality (spec 15 N-3).
+ */
+
 import {
-  AreaChart,
   Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
 } from "recharts";
+import { UnavailableState } from "@/components/ui/unavailable-state";
 
 export interface YieldDataPoint {
   date: string;
+  /** Reserve value in USDC at the snapshot. */
   tvl: number;
+  /** Fees recorded for that day, in USDC. */
   fees: number;
-  apy: number;
 }
 
-interface AnalyticsDashboardProps {
+export interface AnalyticsDashboardProps {
   data: YieldDataPoint[];
+  /** Shown when there is no series at all. */
+  emptyReason?: string;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-black/90 text-white p-3 rounded-xl text-xs font-mono border border-neutral-700/50 shadow-xl backdrop-blur-xl">
-        <p className="text-neutral-400 mb-1">{label}</p>
-        {payload.map((entry: any, index: number) => (
-          <p key={index} style={{ color: entry.color }} className="font-bold">
-            {entry.name}: {entry.name === "APY" ? `${entry.value.toFixed(2)}%` : `$${entry.value.toFixed(2)}`}
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
+/** 13 px — the `text-caption` size, which is the floor for anything a reader must parse. */
+const TICK = { fontSize: 13, fill: "#525252" } as const;
+const GRID_STROKE = "#e5e5e5";
+const TOOLTIP_STYLE = {
+  borderRadius: 12,
+  border: "1px solid #e5e5e5",
+  fontSize: 13,
+  color: "#404040",
+} as const;
 
-export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
+const usdc = (value: number) => `${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+
+export function AnalyticsDashboard({
+  data,
+  emptyReason = "There is no recorded history for this rock yet.",
+}: AnalyticsDashboardProps) {
   if (!data || data.length === 0) {
-    return (
-      <div className="h-64 flex items-center justify-center text-xs text-neutral-400 font-mono">
-        Awaiting Yield Data...
-      </div>
-    );
+    return <UnavailableState reason={emptyReason} />;
   }
 
   return (
-    <div className="space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="h-64 w-full"
-      >
-        <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
-          Portfolio Value (TVL)
-        </h4>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="colorTvl" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#000000" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#000000" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5E5" />
-            <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#A3A3A3" }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: "#A3A3A3" }} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
-            <Tooltip content={<CustomTooltip />} />
-            <Area
-              type="monotone"
-              dataKey="tvl"
-              name="TVL"
-              stroke="#000000"
-              strokeWidth={2}
-              fillOpacity={1}
-              fill="url(#colorTvl)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </motion.div>
+    <div className="flex flex-col gap-8">
+      <section className="flex flex-col gap-2">
+        <h4 className="text-label text-ink-3">Reserve over time (USDC)</h4>
+        <div className="h-56 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="reserveFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#171717" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#171717" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={GRID_STROKE} />
+              <XAxis
+                dataKey="date"
+                interval="preserveStartEnd"
+                tick={TICK}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                tick={TICK}
+                tickLine={false}
+                axisLine={false}
+                width={56}
+                tickFormatter={usdc}
+              />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value) => usdc(Number(value))} />
+              <Area
+                type="monotone"
+                dataKey="tvl"
+                name="Reserve"
+                stroke="#171717"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#reserveFill)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
 
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="h-48 w-full"
-      >
-        <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
-          Cumulative Maker Fees
-        </h4>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5E5" />
-            <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#A3A3A3" }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: "#A3A3A3" }} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="fees" name="Fees" fill="#16A34A" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </motion.div>
+      <section className="flex flex-col gap-2">
+        <h4 className="text-label text-ink-3">Fees recorded (USDC)</h4>
+        <div className="h-48 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={GRID_STROKE} />
+              <XAxis
+                dataKey="date"
+                interval="preserveStartEnd"
+                tick={TICK}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                tick={TICK}
+                tickLine={false}
+                axisLine={false}
+                width={56}
+                tickFormatter={usdc}
+              />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value) => usdc(Number(value))} />
+              <Bar dataKey="fees" name="Fees" fill="#15803d" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
     </div>
   );
 }

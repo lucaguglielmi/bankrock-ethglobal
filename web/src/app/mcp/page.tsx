@@ -1,467 +1,298 @@
 "use client";
 
+/**
+ * The MCP page (spec 17 Part 5 "MCP page"; spec 15 M-1, M-2, D-004, D-013).
+ *
+ * Two changes beyond typography. First, the per-tool "Mock Sample Response" blocks are gone:
+ * they presented hardcoded fiction — "15.2% APY in the last 30 days" — as though the server had
+ * measured it, which spec 15 calls out as worse than hallucination because the numbers are
+ * stable and therefore credible. The page now states once that the tools are not connected to
+ * live data. Second, config snippets and the config path go through `<CodeBlock>`, so the long
+ * unbreakable path wraps instead of pushing the page sideways (L-7).
+ */
+
 import { useState } from "react";
 import Link from "next/link";
-import {
-  Copy,
-  Check,
-  Terminal,
-  ArrowRight,
-  Cpu,
-  Layers,
-  Sparkles,
-  ExternalLink,
-  Code,
-} from "lucide-react";
+import { ArrowRight, Copy, Check, Cpu, ExternalLink, Layers, Terminal } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CodeBlock } from "@/components/ui/code-block";
+import { UnavailableState } from "@/components/ui/unavailable-state";
+import { isDemoMode } from "@/lib/demo";
+import { cn } from "@/lib/ui/cn";
 
-export default function McpPage() {
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
-  const [activeConfigTab, setActiveConfigTab] = useState<"claude" | "cursor" | "cli">("claude");
-  const [copiedConfig, setCopiedConfig] = useState(false);
+const REPO_URL = "https://github.com/lucaguglielmi/bankrock-ethglobal/tree/main/mcp";
 
-  const agentPrompt = `You are an autonomous DeFi asset manager connected to the Bank Rock MCP server.
+const AGENT_PROMPT = `You are connected to the Bank Rock MCP server.
 
-MCP Server Repository: https://github.com/lucaguglielmi/bankrock-ethglobal/tree/main/mcp
-Protocol: Model Context Protocol (MCP) over Stdio / SSE Transport
+A Bank Rock is a physical stone with an NTAG 424 DNA chip in it. Tapping the stone proves
+physical possession; the stone's account holds two tokens and anyone may trade against them.
 
-Bank Rocks are physical Tuscan riverbed stones embedded with NTAG 424 DNA cryptographic chips, binding physical custody directly to ERC-4337 smart accounts and Aqua AMM liquidity pools.
+Tools:
+1. get_rock_status({ rockId }) — lifecycle state, owner and account address.
+2. analyze_strategy_yield({ rockId }) — the strategy a rock runs and the fees it has recorded.
+3. simulate_cross_chain_intent({ rockId, sourceChain, amount }) — a funding route, simulated.
+4. explain_recent_fees({ rockId }) — recorded fees, in plain language.
+5. query_logs({ level, limit, rockId }) — recent server-side events.
+6. optimize_idle_yield({ rockId }) — suggestions for capital that is sitting idle.
 
-Your capabilities with the Bank Rock MCP tools:
-1. \`get_rock_status\`({ rockId: "1" }): Inspect physical rock state, NTAG 424 DNA cryptographic authentication, ownership, and health.
-2. \`analyze_strategy_yield\`({ rockId: "1" }): Query active Aqua liquidity pools, capital efficiency, and 30-day APY performance.
-3. \`simulate_cross_chain_intent\`({ rockId: "1", sourceChain: "Base", amount: 100 }): Simulate cross-chain funding intents, LayerZero bridging latency, and fee execution routes.
-4. \`explain_recent_fees\`({ rockId: "1" }): Retrieve on-chain receipts to break down LP fees vs. gas sponsorship.
-5. \`query_logs\`({ level: "info", limit: 10, rockId: "1" }): Audit recent backend telemetry and state transitions.
-6. \`optimize_idle_yield\`({ rockId: "1" }): Formulate reallocation strategies for unallocated USDC across Aave, Morpho, and Aqua pools.
+Start by reading the rock's state, then say what you can and cannot tell from it. Do not state a
+figure the tools did not return.`;
 
-Initial Instruction:
-Start by inspecting the current physical and on-chain state of Rock #1 using \`get_rock_status({ rockId: "1" })\`, analyze its strategy yield with \`analyze_strategy_yield({ rockId: "1" })\`, and present an executive summary with optimization recommendations.`;
-
-  const claudeConfig = `{
+const CONFIGS = {
+  claude: {
+    label: "Claude Desktop",
+    path: "~/Library/Application Support/Claude/claude_desktop_config.json",
+    snippet: `{
   "mcpServers": {
     "bankrock": {
       "command": "npx",
-      "args": [
-        "-y",
-        "ts-node",
-        "/path/to/bankrock-ethglobal/mcp/index.ts"
-      ],
+      "args": ["-y", "ts-node", "/path/to/bankrock-ethglobal/mcp/index.ts"],
       "env": {}
     }
   }
-}`;
-
-  const cursorConfig = `{
+}`,
+  },
+  cursor: {
+    label: "Cursor and Windsurf",
+    path: ".cursor/mcp.json",
+    snippet: `{
   "mcpServers": {
     "bankrock": {
       "command": "npx",
-      "args": [
-        "-y",
-        "ts-node",
-        "./mcp/index.ts"
-      ],
+      "args": ["-y", "ts-node", "./mcp/index.ts"],
       "transport": "stdio"
     }
   }
-}`;
-
-  const cliCommand = `# Clone and run the Bank Rock MCP server locally
-git clone https://github.com/lucaguglielmi/bankrock-ethglobal.git
+}`,
+  },
+  cli: {
+    label: "Terminal",
+    path: "Run it from a checkout of the repository",
+    snippet: `git clone https://github.com/lucaguglielmi/bankrock-ethglobal.git
 cd bankrock-ethglobal/mcp
 npm install
-npm run dev`;
+npm run dev`,
+  },
+} as const;
 
-  const handleCopyPrompt = async () => {
-    await navigator.clipboard.writeText(agentPrompt);
-    setCopiedPrompt(true);
-    setTimeout(() => setCopiedPrompt(false), 2500);
+type ConfigTab = keyof typeof CONFIGS;
+
+const TOOLS = [
+  {
+    name: "get_rock_status",
+    badge: "State",
+    signature: "rockId: string",
+    description: "The rock's lifecycle state, its owner and the account that holds its tokens.",
+  },
+  {
+    name: "analyze_strategy_yield",
+    badge: "Strategy",
+    signature: "rockId: string",
+    description: "Which strategy a rock runs, and the fees recorded against it.",
+  },
+  {
+    name: "simulate_cross_chain_intent",
+    badge: "Cross-chain",
+    signature: "rockId: string, sourceChain: string, amount: number",
+    description: "A simulated route for funding a rock from another chain.",
+  },
+  {
+    name: "explain_recent_fees",
+    badge: "Accounting",
+    signature: "rockId: string",
+    description: "Recent costs and fees, decoded into plain language.",
+  },
+  {
+    name: "query_logs",
+    badge: "Telemetry",
+    signature: "level: string, limit: number, rockId?: string",
+    description: "Recent server-side events for one rock or for the whole fleet.",
+  },
+  {
+    name: "optimize_idle_yield",
+    badge: "Suggestions",
+    signature: "rockId: string",
+    description: "Where capital that is sitting idle could go instead.",
+  },
+];
+
+export default function McpPage() {
+  const [tab, setTab] = useState<ConfigTab>("claude");
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const demoMode = isDemoMode();
+
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(AGENT_PROMPT);
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 2500);
+    } catch {
+      // Clipboard access denied — the prompt is on screen and selectable.
+    }
   };
 
-  const handleCopyConfig = async (content: string) => {
-    await navigator.clipboard.writeText(content);
-    setCopiedConfig(true);
-    setTimeout(() => setCopiedConfig(false), 2500);
-  };
-
-  const activeConfigContent =
-    activeConfigTab === "claude"
-      ? claudeConfig
-      : activeConfigTab === "cursor"
-      ? cursorConfig
-      : cliCommand;
-
-  const tools = [
-    {
-      name: "get_rock_status",
-      badge: "Physical Proof",
-      signature: "rockId: string",
-      description:
-        "Aggregates data from NTAG 424 DNA cryptographic chip, Privy, and Web3 smart accounts to return unified hardware health and verified ownership.",
-      output: 'Mock: Rock 1 is healthy and active. Owner verified via SDM hardware signature.',
-    },
-    {
-      name: "analyze_strategy_yield",
-      badge: "Aqua AMM",
-      signature: "rockId: string",
-      description:
-        "Queries live Aqua liquidity positions via Web3 and returns human-readable capital allocation, fee accrual, and rolling APY metrics.",
-      output: 'Mock: Rock 1 has generated 15.2% APY in the last 30 days via Aqua Constant Product.',
-    },
-    {
-      name: "simulate_cross_chain_intent",
-      badge: "Cross-Chain",
-      signature: "rockId: string, sourceChain: string, amount: number",
-      description:
-        "Calculates cross-chain bridging routes, LayerZero message latencies, and paymaster gas subsidies to fund the rock from any EVM L2.",
-      output: 'Mock: To fund 100 USDC from Base, estimated bridge fee is 1.2 USDC taking approx 2 mins.',
-    },
-    {
-      name: "explain_recent_fees",
-      badge: "Accounting",
-      signature: "rockId: string",
-      description:
-        "Retrieves and decodes recent on-chain events to explain transaction costs, paymaster sponsorship, and protocol fee splits in plain language.",
-      output: 'Mock: Rock 1 spent 2.5 USDC on bridging fees to Optimism and 0.5 USDC on gas sponsorship.',
-    },
-    {
-      name: "query_logs",
-      badge: "Telemetry",
-      signature: "level: string, limit: number, rockId?: string",
-      description:
-        "Queries backend telemetry, hardware attestation logs, and state transitions for full observability.",
-      output: 'Mock: Retrieved 10 logs at level info for rock 1. Status: all signatures valid.',
-    },
-    {
-      name: "optimize_idle_yield",
-      badge: "Agent Strategy",
-      signature: "rockId: string",
-      description:
-        "Scans Aave, Morpho, and Aqua liquidity pools to suggest optimal reallocation for the rock\'s idle capital.",
-      output: 'Mock: Rock 1 has 500 idle USDC. Aave v3 on Base offers 8.5% APY. Recommend deposit.',
-    },
-  ];
+  const config = CONFIGS[tab];
 
   return (
-    <main className="flex min-h-screen flex-col bg-white text-black font-sans selection:bg-black selection:text-white">
-
-
-      {/* Content Container */}
-      <div className="pt-32 pb-24 px-6 md:px-12 max-w-5xl mx-auto w-full flex flex-col gap-20">
-        {/* Hero Section */}
-        <section className="flex flex-col items-start gap-6">
-          <div className="inline-flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-widest text-blue-600">
-            <Sparkles className="w-3.5 h-3.5" />
-            Model Context Protocol · Agentic Infrastructure
-          </div>
-
-          <h1 className="text-5xl md:text-7xl font-black tracking-tighter leading-none">
-            Bank Rock AI Oracle &amp; MCP Server
-          </h1>
-
-          <p className="text-xl md:text-2xl text-neutral-600 font-normal leading-relaxed max-w-3xl">
-            Physical Bank Rocks can be inspected, analyzed, and managed by any autonomous AI agent using the open{" "}
-            <span className="text-black font-medium">Model Context Protocol</span>. Connect Claude, Cursor, Windsurf, or custom LLMs directly to cryptographic hardware state and automated Aqua liquidity strategies.
+    <main className="flex w-full flex-1 flex-col">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-16 py-6">
+        <section className="flex flex-col gap-5">
+          <span className="w-fit rounded-full bg-muted px-3 py-1 text-label text-ink-3">
+            Model Context Protocol
+          </span>
+          <h1 className="text-h1 font-extrabold text-ink">Bank Rock for AI agents</h1>
+          <p className="max-w-prose text-lead text-ink-2">
+            A rock can be inspected by any agent that speaks the Model Context Protocol. Connect
+            Claude, Cursor or your own client to a rock&rsquo;s state and its history.
           </p>
 
-          <div className="flex flex-wrap items-center gap-4 pt-2">
-            <button
-              onClick={handleCopyPrompt}
-              className="group flex items-center gap-2.5 bg-black text-white px-7 py-3.5 rounded-full font-semibold text-sm hover:bg-neutral-800 transition-all shadow-md active:scale-95 cursor-pointer"
+          <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
+            <Button size="lg" onClick={copyPrompt}>
+              {copiedPrompt ? <Check aria-hidden /> : <Copy aria-hidden />}
+              {copiedPrompt ? "Prompt copied" : "Copy the starter prompt"}
+            </Button>
+            {demoMode ? (
+              <Button size="lg" variant="outline" render={<Link href="/rock/1" />}>
+                Open a rock
+                <ArrowRight aria-hidden />
+              </Button>
+            ) : null}
+            <Button
+              size="lg"
+              variant="ghost"
+              render={<a href={REPO_URL} target="_blank" rel="noreferrer" />}
             >
-              {copiedPrompt ? (
-                <>
-                  <Check className="w-4 h-4 text-green-400" />
-                  Copied Agent Prompt!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  Copy Quick Start Prompt
-                </>
-              )}
-            </button>
-
-            <Link
-              href="/rock/1"
-              className="flex items-center gap-2 px-6 py-3.5 rounded-full border border-black/15 font-semibold text-sm hover:bg-neutral-50 transition-colors"
-            >
-              Inspect Rock #1 Live
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-
-            <a
-              href="https://github.com/lucaguglielmi/bankrock-ethglobal/tree/main/mcp"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-4 py-3.5 text-neutral-500 hover:text-black font-medium text-sm transition-colors"
-            >
-              GitHub Server Source
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+              Server source
+              <ExternalLink aria-hidden />
+            </Button>
           </div>
         </section>
 
-        {/* Quick Start Agent Prompt Card */}
         <section className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Terminal className="w-5 h-5 text-black" />
-              <h2 className="text-2xl font-bold tracking-tight">Quick Start Agent Prompt</h2>
-            </div>
-            <span className="text-xs font-mono text-neutral-400 uppercase tracking-wider">Ready to paste into Claude or Cursor</span>
+          <h2 className="flex items-center gap-2 text-h2 font-bold text-ink">
+            <Terminal aria-hidden className="size-5 shrink-0" />
+            Starter prompt
+          </h2>
+          <p className="max-w-prose text-sm text-ink-2">
+            Paste this into your client after connecting the server.
+          </p>
+          <CodeBlock>{AGENT_PROMPT}</CodeBlock>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <h2 className="text-h2 font-bold text-ink">Connecting a client</h2>
+
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(CONFIGS) as ConfigTab[]).map((id) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={tab === id}
+                onClick={() => setTab(id)}
+                className={cn(
+                  "min-h-11 rounded-full border px-4 text-sm font-medium motion-safe:transition-colors",
+                  tab === id
+                    ? "border-ink bg-ink text-background"
+                    : "border-border bg-background text-ink-2 hover:bg-muted",
+                )}
+              >
+                {CONFIGS[id].label}
+              </button>
+            ))}
           </div>
 
-          <div className="relative border border-neutral-200 rounded-3xl bg-neutral-900 text-neutral-100 p-6 md:p-8 shadow-xl overflow-hidden group">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-800 mb-5">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-500/80"></span>
-                <span className="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-                <span className="w-3 h-3 rounded-full bg-green-500/80"></span>
-                <span className="ml-2 text-xs font-mono text-neutral-400">system-prompt.txt</span>
-              </div>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-label text-ink-3">Where it goes</h3>
+            <CodeBlock breakAll>{config.path}</CodeBlock>
+          </div>
 
-              <button
-                onClick={handleCopyPrompt}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-medium transition-all text-neutral-200 hover:text-white cursor-pointer"
-              >
-                {copiedPrompt ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-green-400" />
-                    <span className="text-green-400 font-semibold">Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Copy Prompt</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            <pre className="font-mono text-xs md:text-sm text-neutral-300 leading-relaxed whitespace-pre-wrap select-all overflow-x-auto">
-              {agentPrompt}
-            </pre>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-label text-ink-3">What to put in it</h3>
+            <CodeBlock>{config.snippet}</CodeBlock>
           </div>
         </section>
 
-        {/* Configuration Setup Card */}
-        <section className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <Code className="w-5 h-5 text-black" />
-              <h2 className="text-2xl font-bold tracking-tight">Client Integration Configuration</h2>
-            </div>
-            <p className="text-neutral-500 text-sm">
-              Add Bank Rock to your desktop client or IDE to grant the model context protocol capabilities.
-            </p>
-          </div>
+        <section className="flex flex-col gap-4">
+          <h2 className="flex items-center gap-2 text-h2 font-bold text-ink">
+            <Cpu aria-hidden className="size-5 shrink-0" />
+            The tools
+          </h2>
 
-          <div className="border border-neutral-200 rounded-3xl bg-neutral-50/70 p-6 md:p-8">
-            {/* Tabs */}
-            <div className="flex items-center justify-between border-b border-neutral-200 pb-4 mb-5 flex-wrap gap-4">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setActiveConfigTab("claude")}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                    activeConfigTab === "claude"
-                      ? "bg-black text-white shadow-sm"
-                      : "text-neutral-600 hover:text-black bg-neutral-100"
-                  }`}
-                >
-                  Claude Desktop
-                </button>
-                <button
-                  onClick={() => setActiveConfigTab("cursor")}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                    activeConfigTab === "cursor"
-                      ? "bg-black text-white shadow-sm"
-                      : "text-neutral-600 hover:text-black bg-neutral-100"
-                  }`}
-                >
-                  Cursor &amp; Windsurf
-                </button>
-                <button
-                  onClick={() => setActiveConfigTab("cli")}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                    activeConfigTab === "cli"
-                      ? "bg-black text-white shadow-sm"
-                      : "text-neutral-600 hover:text-black bg-neutral-100"
-                  }`}
-                >
-                  CLI Stdio Run
-                </button>
-              </div>
+          <UnavailableState reason="These tools do not read live rock data yet, so an agent cannot rely on what they return." />
 
-              <button
-                onClick={() => handleCopyConfig(activeConfigContent)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-neutral-300 hover:border-black text-xs font-medium transition-colors bg-white cursor-pointer"
-              >
-                {copiedConfig ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-green-600" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Copy Config</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Path Helper */}
-            <div className="text-xs text-neutral-500 font-mono mb-3">
-              {activeConfigTab === "claude" && (
-                <>Target: <span className="text-neutral-800 font-semibold">~/Library/Application Support/Claude/claude_desktop_config.json</span></>
-              )}
-              {activeConfigTab === "cursor" && (
-                <>Target: <span className="text-neutral-800 font-semibold">.cursor/mcp.json</span> or Windsurf MCP Settings</>
-              )}
-              {activeConfigTab === "cli" && (
-                <>Run directly via terminal from the repository</>
-              )}
-            </div>
-
-            <div className="bg-white border border-neutral-200 rounded-2xl p-5 overflow-x-auto">
-              <pre className="font-mono text-xs text-neutral-800 leading-relaxed select-all">
-                {activeConfigContent}
-              </pre>
-            </div>
-          </div>
-        </section>
-
-        {/* Available MCP Tools Catalog */}
-        <section className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <Cpu className="w-5 h-5 text-black" />
-              <h2 className="text-2xl font-bold tracking-tight">Available MCP Tools</h2>
-            </div>
-            <p className="text-neutral-500 text-sm">
-              Standardized JSON-RPC 2.0 tools exposed by the Bank Rock MCP server for autonomous agents.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {tools.map((tool) => (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {TOOLS.map((tool) => (
               <div
                 key={tool.name}
-                className="p-6 rounded-3xl border border-neutral-200 bg-white hover:border-black/30 hover:shadow-lg transition-all flex flex-col justify-between gap-4"
+                className="flex flex-col gap-3 rounded-2xl border border-border p-4"
               >
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-base text-black">{tool.name}</span>
-                    <span className="text-[11px] font-semibold tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200">
-                      {tool.badge}
-                    </span>
-                  </div>
-                  <div className="text-xs font-mono text-neutral-500 bg-neutral-50 px-2 py-1 rounded border border-neutral-100 inline-block w-fit">
-                    args: {tool.signature}
-                  </div>
-                  <p className="text-sm text-neutral-600 leading-relaxed">
-                    {tool.description}
-                  </p>
-                </div>
-
-                <div className="pt-3 border-t border-neutral-100">
-                  <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-wider block mb-1">
-                    Mock Sample Response:
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-ink">{tool.name}</span>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-label text-ink-3">
+                    {tool.badge}
                   </span>
-                  <div className="text-xs font-mono text-neutral-700 bg-neutral-50 p-2 rounded-lg border border-neutral-100 truncate">
-                    {tool.output}
-                  </div>
                 </div>
+                <CodeBlock breakAll>{tool.signature}</CodeBlock>
+                <p className="max-w-prose text-sm text-ink-2">{tool.description}</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* Physical to Agent Architecture Pipeline */}
-        <section className="flex flex-col gap-6 border-t border-neutral-100 pt-16">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <Layers className="w-5 h-5 text-black" />
-              <h2 className="text-2xl font-bold tracking-tight">How Tangible DeFi Meets Agentic MCP</h2>
-            </div>
-            <p className="text-neutral-500 text-sm">
-              From Florentine riverbed stones to autonomous cross-chain execution.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 rounded-3xl bg-neutral-50 border border-neutral-100 flex flex-col gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center font-bold">
-                1
+        <section className="flex flex-col gap-4">
+          <h2 className="flex items-center gap-2 text-h2 font-bold text-ink">
+            <Layers aria-hidden className="size-5 shrink-0" />
+            How a stone reaches an agent
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {[
+              {
+                step: "1",
+                title: "Tap",
+                body: "The chip in the stone signs a one-time message that proves you are holding it.",
+              },
+              {
+                step: "2",
+                title: "Account",
+                body: "The stone has its own account. It holds two tokens and anyone may trade against them.",
+              },
+              {
+                step: "3",
+                title: "Ask",
+                body: "An agent reads that state over MCP and explains it back to you.",
+              },
+            ].map((item) => (
+              <div
+                key={item.step}
+                className="flex flex-col gap-2 rounded-2xl border border-border p-4"
+              >
+                <span className="flex size-10 items-center justify-center rounded-2xl bg-ink text-base font-semibold text-background">
+                  {item.step}
+                </span>
+                <h3 className="text-h3 font-semibold text-ink">{item.title}</h3>
+                <p className="max-w-prose text-sm text-ink-2">{item.body}</p>
               </div>
-              <h3 className="font-bold text-lg">Physical Attestation</h3>
-              <p className="text-sm text-neutral-600 leading-relaxed">
-                Tapping the rock generates an AES-128 cryptographic SUN token via the NTAG 424 DNA chip, verifying physical custody on-chain.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-3xl bg-neutral-50 border border-neutral-100 flex flex-col gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center font-bold">
-                2
-              </div>
-              <h3 className="font-bold text-lg">Smart Account &amp; Aqua AMM</h3>
-              <p className="text-sm text-neutral-600 leading-relaxed">
-                ERC-4337 Account Abstraction automatically provisions gasless accounts, deploying capital into Aqua AMM liquidity pools for automated yield.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-3xl bg-neutral-50 border border-neutral-100 flex flex-col gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center font-bold">
-                3
-              </div>
-              <h3 className="font-bold text-lg">Open MCP Oracle</h3>
-              <p className="text-sm text-neutral-600 leading-relaxed">
-                Any LLM or autonomous agent queries the rock&apos;s state via JSON-RPC tools, orchestrating rebalances and auditing yields programmatically.
-              </p>
-            </div>
+            ))}
           </div>
         </section>
 
-        {/* Action Banner */}
-        <section className="rounded-3xl bg-black text-white p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="flex flex-col gap-2">
-            <h3 className="text-3xl font-bold tracking-tight">Experience Bank Rock</h3>
-            <p className="text-neutral-400 max-w-md">
-              Check out the live rock dashboard or order your own Tuscan riverbed rock with embedded cryptographic authentication.
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/rock/1"
-              className="bg-white text-black px-6 py-3.5 rounded-full font-bold text-sm hover:bg-neutral-200 transition-colors shadow-lg whitespace-nowrap"
-            >
-              View Rock #1
+        <footer className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-8 text-sm text-ink-2">
+          <Link href="/" className="hover:text-ink">
+            Home
+          </Link>
+          <Link href="/shop" className="hover:text-ink">
+            Shop
+          </Link>
+          <Link href="/alerts" className="hover:text-ink">
+            Alerts
+          </Link>
+          {demoMode ? (
+            <Link href="/rock/1" className="hover:text-ink">
+              Open a rock
             </Link>
-            <Link
-              href="/shop"
-              className="border border-white/20 text-white px-6 py-3.5 rounded-full font-bold text-sm hover:bg-white/10 transition-colors whitespace-nowrap"
-            >
-              Order a Rock
-            </Link>
-          </div>
-        </section>
+          ) : null}
+        </footer>
       </div>
-
-      {/* Footer */}
-      <footer className="w-full bg-black text-white py-16 px-6 md:px-12 border-t border-neutral-900 mt-auto">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
-          <div>
-            <div className="text-2xl font-black tracking-tighter mb-1">Bank Rock</div>
-            <p className="text-xs text-neutral-500 font-mono">Tuscany, IT — 43.7696° N, 11.2558° E</p>
-          </div>
-          <div className="flex gap-8 text-neutral-400 font-medium text-sm">
-            <Link href="/" className="hover:text-white transition-colors">Home</Link>
-            <Link href="/shop" className="hover:text-white transition-colors">Shop</Link>
-            <Link href="/mcp" className="hover:text-white transition-colors">AI Oracle (MCP)</Link>
-            <Link href="/rock/1" className="hover:text-white transition-colors">Rock #1 Demo</Link>
-          </div>
-        </div>
-      </footer>
     </main>
   );
 }

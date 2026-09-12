@@ -1,124 +1,133 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ShieldAlert, Activity, DollarSign, Database, Server, RefreshCw } from "lucide-react";
+/**
+ * Operator dashboard (spec 15 N-7; spec 17 Part 5 "Admin").
+ *
+ * It was a `setTimeout` returning $1,254,300 TVL, 42 rocks, 8 Gelato tasks and three invented
+ * feed rows. It now reads `GET /api/admin/stats`, which counts what the database holds, and
+ * renders the reason when there is nothing to count — a zero TVL would be a measurement claim,
+ * so the route returns null for it and this page says so instead.
+ */
 
-export default function SentinelDashboard() {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
+import { Amount } from "@/components/ui/amount";
+import { Button } from "@/components/ui/button";
+import { UnavailableState } from "@/components/ui/unavailable-state";
+import { formatDateTime } from "@/components/rock/util";
 
-  useEffect(() => {
-    // In a real app we would fetch from /api/admin/stats which reads from D1 rock_events
-    setTimeout(() => {
-      setData({
-        globalTvl: 1254300.45,
-        activeRocks: 42,
-        gelatoTasks: 8,
-        totalGasSaved: 4.25,
-        recentEvents: [
-          { id: 1, rockId: "12", type: "REBALANCE", status: "SUCCESS", time: "2 mins ago" },
-          { id: 2, rockId: "8", type: "REBALANCE", status: "FAILED", time: "1 hour ago" },
-          { id: 3, rockId: "42", type: "AWAKEN", status: "SUCCESS", time: "3 hours ago" },
-        ]
-      });
-      setLoading(false);
-    }, 1000);
-  }, []);
+interface AdminStats {
+  state?: string;
+  reason?: string;
+  rocks?: number;
+  events?: number;
+  yieldSnapshots?: number;
+  subscribers?: number;
+  contactRequests?: number;
+  tvlUsdc?: number | null;
+  tvlMeasuredAt?: string | null;
+  generatedAt?: string;
+}
+
+interface StatsResult {
+  stats?: AdminStats;
+  reason?: string;
+  needsSignIn?: boolean;
+}
+
+async function fetchStats(): Promise<StatsResult> {
+  const res = await fetch("/api/admin/stats");
+  if (res.status === 401 || res.status === 403) {
+    return { reason: "This dashboard needs an operator session.", needsSignIn: true };
+  }
+  const data = (await res.json()) as AdminStats;
+  if (!res.ok || data.state !== "REAL") {
+    return { reason: data.reason ?? "The statistics could not be read right now." };
+  }
+  return { stats: data };
+}
+
+export default function AdminDashboardPage() {
+  const router = useRouter();
+  const query = useQuery({ queryKey: ["admin-stats"], queryFn: fetchStats, retry: false });
+
+  const isLoading = query.isPending || query.isFetching;
+  const result = query.data;
+  const reason = query.isError
+    ? "The statistics could not be reached right now."
+    : (result?.reason ?? null);
+  const stats = result?.stats;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-6 md:p-12 font-sans selection:bg-blue-500/30">
-      <div className="max-w-6xl mx-auto space-y-8">
-        
-        {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-800 pb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Sentinel Command</h1>
-            <p className="text-neutral-500 font-mono text-sm">Global Bank Rock Fleet Monitoring</p>
+    <main className="flex w-full flex-1 flex-col">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 py-6">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-h1 font-extrabold text-ink">Operations</h1>
+            <p className="max-w-prose text-sm text-ink-2">
+              What the application database currently holds.
+            </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-mono font-medium">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              All Systems Operational
-            </div>
-          </div>
+          <Button variant="outline" onClick={() => query.refetch()} disabled={isLoading}>
+            <RefreshCw className={isLoading ? "motion-safe:animate-spin" : ""} />
+            Refresh
+          </Button>
         </header>
 
-        {loading ? (
-          <div className="h-64 flex items-center justify-center">
-            <RefreshCw className="w-6 h-6 animate-spin text-neutral-600" />
-          </div>
-        ) : (
+        {isLoading && !result ? (
+          <p className="text-base text-ink-3">Reading the database…</p>
+        ) : reason ? (
+          <UnavailableState
+            reason={reason}
+            action={
+              result?.needsSignIn
+                ? { label: "Sign in", onClick: () => router.push("/admin/login") }
+                : undefined
+            }
+          />
+        ) : stats ? (
           <>
-            {/* KPI Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-2xl">
-                <div className="flex items-center gap-3 text-neutral-400 mb-4">
-                  <DollarSign className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Global TVL</span>
-                </div>
-                <div className="text-3xl font-mono font-bold tracking-tighter">${data.globalTvl.toLocaleString()}</div>
-                <div className="text-xs text-green-500 font-medium mt-2">+2.4% 24h</div>
-              </div>
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard label="Rocks" value={stats.rocks ?? 0} />
+              <StatCard label="Recorded events" value={stats.events ?? 0} />
+              <StatCard label="Snapshots" value={stats.yieldSnapshots ?? 0} />
+              <StatCard label="Subscribers" value={stats.subscribers ?? 0} />
+            </section>
 
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-2xl">
-                <div className="flex items-center gap-3 text-neutral-400 mb-4">
-                  <Database className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Active Rocks</span>
-                </div>
-                <div className="text-3xl font-mono font-bold tracking-tighter">{data.activeRocks}</div>
-                <div className="text-xs text-neutral-500 mt-2 font-mono">Secured by NXP</div>
-              </div>
+            <section className="flex flex-col gap-2 rounded-2xl border border-border p-4 sm:p-6">
+              <h2 className="text-label text-ink-3">Reserve across all rocks</h2>
+              {typeof stats.tvlUsdc === "number" ? (
+                <>
+                  <Amount size="lg" value={stats.tvlUsdc} symbol="USDC" />
+                  <p className="text-sm text-ink-3">
+                    Measured {formatDateTime(stats.tvlMeasuredAt) ?? "at an unknown time"}.
+                  </p>
+                </>
+              ) : (
+                <UnavailableState reason="Nothing has been snapshotted yet, so there is no figure to show." />
+              )}
+            </section>
 
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-2xl">
-                <div className="flex items-center gap-3 text-neutral-400 mb-4">
-                  <Activity className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Gelato Tasks</span>
-                </div>
-                <div className="text-3xl font-mono font-bold tracking-tighter">{data.gelatoTasks}</div>
-                <div className="text-xs text-neutral-500 mt-2 font-mono">Monitoring deviation</div>
-              </div>
-
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-2xl">
-                <div className="flex items-center gap-3 text-neutral-400 mb-4">
-                  <Server className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Gas Sponsored</span>
-                </div>
-                <div className="text-3xl font-mono font-bold tracking-tighter">{data.totalGasSaved} ETH</div>
-                <div className="text-xs text-neutral-500 mt-2 font-mono">via Pimlico 4337</div>
-              </div>
-            </div>
-
-            {/* Live Feed */}
-            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-              <div className="px-6 py-5 border-b border-neutral-800 flex justify-between items-center">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Live Global Feed</h3>
-                <span className="text-xs text-neutral-500 font-mono">D1 Database Sync</span>
-              </div>
-              <div className="divide-y divide-neutral-800/50">
-                {data.recentEvents.map((event: any) => (
-                  <div key={event.id} className="p-4 px-6 flex items-center justify-between hover:bg-neutral-800/30 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${event.status === 'SUCCESS' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                        {event.status === 'SUCCESS' ? <ShieldAlert className="w-4 h-4 opacity-0" /> : <ShieldAlert className="w-4 h-4" />}
-                        {event.status === 'SUCCESS' && <div className="w-2 h-2 rounded-full bg-green-400" />}
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-neutral-200">Rock #{event.rockId} <span className="text-neutral-500 mx-2">•</span> {event.type}</div>
-                        <div className="text-xs text-neutral-500 font-mono mt-1">{event.time}</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className={`text-xs font-mono font-bold px-2 py-1 rounded-md ${event.status === 'SUCCESS' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                        {event.status}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <section className="flex flex-col gap-2 rounded-2xl border border-border p-4 sm:p-6">
+              <h2 className="text-label text-ink-3">Contact requests</h2>
+              <Amount size="md" value={stats.contactRequests ?? 0} />
+              <p className="text-sm text-ink-3">
+                Read {formatDateTime(stats.generatedAt) ?? "just now"}.
+              </p>
+            </section>
           </>
-        )}
+        ) : null}
       </div>
+    </main>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl border border-border p-4">
+      <span className="text-label text-ink-3">{label}</span>
+      <Amount size="lg" value={value} maxFractionDigits={0} />
     </div>
   );
 }

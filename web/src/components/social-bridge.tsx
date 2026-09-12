@@ -1,113 +1,131 @@
 "use client";
 
-import React, { useState } from "react";
-import { usePrivy } from "@privy-io/react-auth";
-import { Mail, Link, ChevronRight, Check } from "lucide-react";
+/**
+ * Naming a rock (spec 15 S-7; spec 17 Part 5 "Social bridge").
+ *
+ * "Claim your vanity URL" used to be an 800 ms `setTimeout` that saved nothing and then said
+ * "Claimed!". It now posts to `/api/rocks/[id]/vanity` with the Privy access token the route
+ * requires, and reports what the route actually answered — including a refusal.
+ *
+ * The Privy `linkEmail` / `linkTwitter` buttons are gone with it: they came from `usePrivy()`,
+ * which throws when no Privy app is configured (A-2), and the page must render in that case.
+ * Whatever the session already carries is shown; nothing is invented.
+ */
+
+import { useState } from "react";
+import { Check, Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { UnavailableState } from "@/components/ui/unavailable-state";
+import { useAuth } from "@/context/auth-context";
+import { appUrl } from "@/lib/chain";
+
+type ClaimState = "idle" | "saving" | "saved" | "error";
 
 export function SocialBridge({ rockId }: { rockId: string }) {
-  const { user, linkEmail, linkTwitter } = usePrivy();
+  const { authenticated, user, getAccessToken, login, unavailable, unavailableReason } = useAuth();
   const [vanityName, setVanityName] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [claimState, setClaimState] = useState<ClaimState>("idle");
+  const [error, setError] = useState<string | null>(null);
 
-  const hasTwitter = !!user?.twitter;
-  const hasEmail = !!user?.email;
+  const email = user?.email?.address;
 
-  const handleSaveVanity = async () => {
-    setIsSaving(true);
-    // In a real app we'd POST to /api/rocks/[id]/vanity
-    // which would update the Drizzle database `rocks.vanityName`
-    setTimeout(() => {
-      setIsSaving(false);
-      setSaved(true);
-    }, 800);
+  const handleClaim = async () => {
+    setClaimState("saving");
+    setError(null);
+
+    const token = await getAccessToken();
+    if (!token) {
+      setClaimState("error");
+      setError("Sign in again to claim a name.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/rocks/${encodeURIComponent(rockId)}/vanity`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ vanityName: vanityName.trim().toLowerCase() }),
+      });
+      const data = (await res.json()) as { state?: string; reason?: string; error?: string };
+
+      if (!res.ok || data.state === "UNAVAILABLE") {
+        setClaimState("error");
+        setError(data.error ?? data.reason ?? "That name could not be saved.");
+        return;
+      }
+
+      setClaimState("saved");
+    } catch {
+      setClaimState("error");
+      setError("That name could not be saved.");
+    }
   };
 
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-neutral-100 mt-6 relative overflow-hidden">
-      <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-        <Link className="w-32 h-32" />
+    <section className="flex w-full flex-col gap-6 rounded-3xl border border-border p-4 sm:p-6">
+      <div className="flex flex-col gap-1">
+        <h3 className="text-h3 font-semibold text-ink">Name this rock</h3>
+        <p className="max-w-prose text-sm text-ink-2">
+          Give Rock #{rockId} a short name so it is easy to share.
+        </p>
       </div>
-      
-      <h3 className="text-lg font-bold tracking-tight mb-1 relative z-10">Web2.5 Social Bridge</h3>
-      <p className="text-sm text-neutral-500 mb-6 max-w-md relative z-10">
-        Attach your digital identity to this physical artifact. Claim your vanity URL and receive weekly Gelato yield reports.
-      </p>
 
-      <div className="grid sm:grid-cols-2 gap-6 relative z-10">
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Identity Providers</h4>
-          
-          <button
-            onClick={() => { if (!hasTwitter) linkTwitter(); }}
-            disabled={hasTwitter}
-            className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
-              hasTwitter 
-                ? "bg-neutral-50 border-neutral-100 text-neutral-500" 
-                : "bg-white border-neutral-200 hover:border-[#1DA1F2] hover:shadow-md cursor-pointer group"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasTwitter ? "bg-neutral-200" : "bg-[#1DA1F2]/10 text-[#1DA1F2] group-hover:bg-[#1DA1F2] group-hover:text-white transition-colors"}`}>
-                <Link className="w-5 h-5" />
-              </div>
-              <div className="text-left">
-                <div className="text-sm font-bold text-neutral-900">{hasTwitter ? (user?.twitter?.username || "Linked") : "Link Link / X"}</div>
-                <div className="text-xs text-neutral-500">{hasTwitter ? "Verified Identity" : "Connect your social profile"}</div>
-              </div>
-            </div>
-            {hasTwitter ? <Check className="w-5 h-5 text-green-500" /> : <ChevronRight className="w-5 h-5 text-neutral-300 group-hover:text-[#1DA1F2]" />}
-          </button>
-
-          <button
-            onClick={() => { if (!hasEmail) linkEmail(); }}
-            disabled={hasEmail}
-            className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
-              hasEmail 
-                ? "bg-neutral-50 border-neutral-100 text-neutral-500" 
-                : "bg-white border-neutral-200 hover:border-black hover:shadow-md cursor-pointer group"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasEmail ? "bg-neutral-200" : "bg-neutral-100 text-neutral-700 group-hover:bg-black group-hover:text-white transition-colors"}`}>
-                <Mail className="w-5 h-5" />
-              </div>
-              <div className="text-left">
-                <div className="text-sm font-bold text-neutral-900">{hasEmail ? (user?.email?.address || "Linked") : "Link Email"}</div>
-                <div className="text-xs text-neutral-500">{hasEmail ? "Receiving Yield Reports" : "For Gelato alerts & reports"}</div>
-              </div>
-            </div>
-            {hasEmail ? <Check className="w-5 h-5 text-green-500" /> : <ChevronRight className="w-5 h-5 text-neutral-300 group-hover:text-black" />}
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Claim Vanity URL</h4>
-          <div className="bg-neutral-50 rounded-2xl p-4 border border-neutral-100">
-            <div className="flex items-center text-sm font-mono text-neutral-500 mb-2">
-              bankrock.xyz/
-              <input
-                type="text"
-                placeholder="your-name"
-                value={vanityName}
-                onChange={(e) => setVanityName(e.target.value)}
-                className="bg-transparent border-b border-dashed border-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent text-black px-1 pb-0.5 w-32 ml-1"
-                disabled={saved}
-              />
-            </div>
-            <p className="text-xs text-neutral-400 mb-4">
-              Bind a human-readable name to Rock #{rockId}.
+      {unavailable ? (
+        <UnavailableState reason={unavailableReason ?? "Sign-in is not configured."} />
+      ) : !authenticated ? (
+        <UnavailableState
+          reason="Sign in to name this rock."
+          action={{ label: "Sign in", onClick: () => void login() }}
+        />
+      ) : (
+        <div className="flex flex-col gap-4">
+          {email ? (
+            <p className="flex min-w-0 items-center gap-2 text-sm text-ink-3">
+              <Mail aria-hidden className="size-4 shrink-0" />
+              <span className="truncate">{email}</span>
             </p>
-            <button
-              onClick={handleSaveVanity}
-              disabled={isSaving || saved || vanityName.length < 3}
-              className="w-full bg-black text-white text-sm font-bold py-2.5 rounded-xl hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isSaving ? "Minting..." : saved ? "Claimed!" : "Claim URL"}
-            </button>
+          ) : null}
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="vanity-name" className="text-label text-ink-3">
+              {appUrl}/r/
+            </label>
+            <input
+              id="vanity-name"
+              type="text"
+              value={vanityName}
+              onChange={(changed) => {
+                setVanityName(changed.target.value);
+                setClaimState("idle");
+              }}
+              placeholder="your-name"
+              autoComplete="off"
+              spellCheck={false}
+              disabled={claimState === "saved"}
+              className="h-12 w-full rounded-xl border border-border bg-background px-4 text-base text-ink placeholder:text-ink-4"
+            />
+            <p className="max-w-prose text-sm text-ink-3">
+              Three to thirty-two characters: lowercase letters, digits and hyphens.
+            </p>
           </div>
+
+          <Button
+            className="w-full sm:w-auto"
+            onClick={handleClaim}
+            disabled={claimState === "saving" || claimState === "saved" || vanityName.trim().length < 3}
+          >
+            {claimState === "saving" ? "Saving…" : claimState === "saved" ? "Name claimed" : "Claim this name"}
+          </Button>
+
+          {claimState === "saved" ? (
+            <p className="flex items-center gap-2 text-sm text-positive">
+              <Check aria-hidden className="size-4 shrink-0" />
+              Saved
+            </p>
+          ) : null}
+          {error ? <p className="text-sm text-danger">{error}</p> : null}
         </div>
-      </div>
-    </div>
+      )}
+    </section>
   );
 }

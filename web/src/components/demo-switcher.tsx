@@ -1,142 +1,102 @@
 "use client";
 
+/**
+ * The judge scenario switcher (spec 15 D-013 / F-7; spec 17 Part 5).
+ *
+ * What it used to do: it rendered on every rock page in every environment and set
+ * `verificationResult = { isAuthentic: true }`, which painted the green "Verified Physical"
+ * badge with no verifier involved. One scenario also set the reserve to 1,250 USDC and fees to
+ * 12.4.
+ *
+ * What it does now: nothing but choose which `SIMULATED`-badged sample view is displayed, and
+ * only when `NEXT_PUBLIC_DEMO_MODE=true`. It cannot touch the attestation state and it cannot
+ * touch a balance — it has no callback that could. It lives in the one `BottomDock` (§4.9), so
+ * it can no longer sit on top of the page's primary action.
+ */
+
 import { useState } from "react";
-import { ShieldCheck, ShieldAlert, Sparkles, RefreshCw, ChevronDown, ChevronUp, Sliders } from "lucide-react";
+import { ChevronDown, ChevronUp, Sliders } from "lucide-react";
+import { BottomDockSlot } from "@/components/ui/bottom-dock";
+import { IconButton } from "@/components/ui/icon-button";
+import { cn } from "@/lib/ui/cn";
+import { isDemoMode } from "@/lib/demo";
 
-export type DemoScenario = "dormant" | "verified_nfc" | "cloned_nfc" | "active_maker";
+/** Which sample view is displayed. Not a rock state, not a verification result. */
+export type DemoScenario = "dormant" | "awake" | "handover" | "archived";
 
-interface DemoSwitcherProps {
+const SCENARIOS: Array<{ id: DemoScenario; label: string; hint: string }> = [
+  { id: "dormant", label: "Dormant", hint: "Before anyone takes it" },
+  { id: "awake", label: "Awake", hint: "Holding two tokens" },
+  { id: "handover", label: "Handover", hint: "Given, not yet collected" },
+  { id: "archived", label: "Retired", hint: "History only" },
+];
+
+export interface DemoSwitcherProps {
   currentScenario: DemoScenario;
   onSelectScenario: (scenario: DemoScenario) => void;
-  onReset: () => void;
 }
 
-export function DemoSwitcher({
-  currentScenario,
-  onSelectScenario,
-  onReset,
-}: DemoSwitcherProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+export function DemoSwitcher({ currentScenario, onSelectScenario }: DemoSwitcherProps) {
+  const [isExpanded, setExpanded] = useState(false);
+
+  if (!isDemoMode()) return null;
+
+  const current = SCENARIOS.find((scenario) => scenario.id === currentScenario);
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 max-w-xl w-[calc(100%-2rem)] transition-all">
-      <div className="bg-black/90 text-white backdrop-blur-md rounded-2xl shadow-2xl border border-white/10 p-2.5 sm:p-3">
-        {/* Toggle Bar */}
-        <div className="flex items-center justify-between px-2 cursor-pointer select-none" onClick={() => setIsExpanded(!isExpanded)}>
-          <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-xs font-mono font-semibold uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-neutral-400" />
-              Judge Demo Controls
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-neutral-400 hidden sm:inline">
-              Scenario: <strong className="text-white capitalize">{currentScenario.replace("_", " ")}</strong>
-            </span>
-            <button
-              type="button"
-              className="text-neutral-400 hover:text-white p-1 transition-colors"
-              aria-label={isExpanded ? "Collapse demo controls" : "Expand demo controls"}
-            >
-              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-            </button>
-          </div>
+    <BottomDockSlot>
+      <div className="mx-auto w-full max-w-3xl rounded-2xl border border-border bg-background shadow-lg">
+        <div className="flex min-h-11 items-center justify-between gap-2 px-3 py-1">
+          <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-ink-2">
+            <Sliders aria-hidden className="size-4 shrink-0" />
+            <span className="truncate">Sample view: {current?.label ?? "None"}</span>
+          </span>
+          <IconButton
+            aria-label={isExpanded ? "Hide sample views" : "Choose a sample view"}
+            aria-expanded={isExpanded}
+            onClick={() => setExpanded((open) => !open)}
+          >
+            {isExpanded ? <ChevronDown /> : <ChevronUp />}
+          </IconButton>
         </div>
 
-        {/* Expanded Panel */}
-        {isExpanded && (
-          <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <button
-              onClick={() => {
-                onSelectScenario("dormant");
-              }}
-              className={`flex flex-col items-start p-2.5 rounded-xl text-left transition-all cursor-pointer border ${
-                currentScenario === "dormant"
-                  ? "bg-white text-black border-white"
-                  : "bg-white/5 hover:bg-white/10 text-neutral-300 border-white/5"
-              }`}
-            >
-              <div className="text-xs font-bold font-sans">1. Dormant</div>
-              <div className="text-[10px] opacity-70 leading-tight mt-0.5">
-                Pre-awakening & faucet seed
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                onSelectScenario("verified_nfc");
-              }}
-              className={`flex flex-col items-start p-2.5 rounded-xl text-left transition-all cursor-pointer border ${
-                currentScenario === "verified_nfc"
-                  ? "bg-white text-black border-white"
-                  : "bg-white/5 hover:bg-white/10 text-neutral-300 border-white/5"
-              }`}
-            >
-              <div className="text-xs font-bold font-sans flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-green-500" />
-                2. Real Tap
-              </div>
-              <div className="text-[10px] opacity-70 leading-tight mt-0.5">
-                NTAG 424 SDM verified
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                onSelectScenario("cloned_nfc");
-              }}
-              className={`flex flex-col items-start p-2.5 rounded-xl text-left transition-all cursor-pointer border ${
-                currentScenario === "cloned_nfc"
-                  ? "bg-white text-black border-white"
-                  : "bg-white/5 hover:bg-white/10 text-neutral-300 border-white/5"
-              }`}
-            >
-              <div className="text-xs font-bold font-sans flex items-center gap-1">
-                <ShieldAlert className="w-3 h-3 text-amber-500" />
-                3. Clone Test
-              </div>
-              <div className="text-[10px] opacity-70 leading-tight mt-0.5">
-                Spoof defense triggered
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                onSelectScenario("active_maker");
-              }}
-              className={`flex flex-col items-start p-2.5 rounded-xl text-left transition-all cursor-pointer border ${
-                currentScenario === "active_maker"
-                  ? "bg-white text-black border-white"
-                  : "bg-white/5 hover:bg-white/10 text-neutral-300 border-white/5"
-              }`}
-            >
-              <div className="text-xs font-bold font-sans flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-blue-400" />
-                4. Live Maker
-              </div>
-              <div className="text-[10px] opacity-70 leading-tight mt-0.5">
-                Aqua liquidity & yield
-              </div>
-            </button>
-
-            <div className="col-span-2 sm:col-span-4 mt-1 flex justify-between items-center text-[10px] text-neutral-400 font-mono px-1">
-              <span>Tests full physical-to-digital path</span>
-              <button
-                onClick={onReset}
-                className="inline-flex items-center gap-1 text-neutral-300 hover:text-white transition-colors cursor-pointer py-1"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Reset Defaults
-              </button>
+        {isExpanded ? (
+          <div className="flex flex-col gap-2 border-t border-border p-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+              {SCENARIOS.map((scenario) => {
+                const isActive = scenario.id === currentScenario;
+                return (
+                  <button
+                    key={scenario.id}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => onSelectScenario(scenario.id)}
+                    className={cn(
+                      "flex min-h-12 flex-col justify-center rounded-xl border px-3 py-2 text-left motion-safe:transition-colors",
+                      isActive
+                        ? "border-ink bg-ink text-background"
+                        : "border-border bg-background text-ink-2 hover:bg-muted",
+                    )}
+                  >
+                    <span className="text-sm font-semibold">{scenario.label}</span>
+                    <span
+                      className={cn(
+                        "text-caption",
+                        isActive ? "text-background/80" : "text-ink-3",
+                      )}
+                    >
+                      {scenario.hint}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
+            <p className="text-caption text-ink-3">
+              Chooses which sample view is shown. It cannot verify a tap or set a balance.
+            </p>
           </div>
-        )}
+        ) : null}
       </div>
-    </div>
+    </BottomDockSlot>
   );
 }

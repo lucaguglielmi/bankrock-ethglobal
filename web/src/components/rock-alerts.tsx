@@ -1,547 +1,348 @@
 "use client";
-import { toast } from "sonner";
 
-import { useState, useEffect } from "react";
+/**
+ * Alert preferences for one rock (spec 15 N-9, SA-1, SA-5; spec 17 Part 5 "Alerts").
+ *
+ *  - both reads and writes now carry the Privy access token, because the route requires it:
+ *    anyone could previously read back the owner's stored email address for any rock (SA-5);
+ *  - the "Send test email" button is gone. That endpoint was an open relay and is now
+ *    admin-only (SA-1); a visitor pressing it could only ever have been refused;
+ *  - the card states plainly that nothing is dispatched yet. Preferences persist; delivery does
+ *    not exist (spec 15 Part 3, "Alerts delivery: UNAVAILABLE");
+ *  - notification permission is requested only when the person presses the button (spec 14).
+ *
+ * Descriptions are `text-sm`, badges `text-label`, the input `text-base`, every control at least
+ * 44 px — the 9 px category badges and 11 px topic descriptions are gone (T-5).
+ */
+
+import { useState, useSyncExternalStore } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   Bell,
-  Mail,
-  Smartphone,
+  Bot,
   Check,
-  Send,
-  Loader2,
+  Fuel,
+  KeyRound,
+  Package,
   ShieldAlert,
   TrendingUp,
-  AlertTriangle,
-  Bot,
-  KeyRound,
-  Fuel,
-  Package,
-  Share2,
-  PlusSquare,
-  ChevronDown,
-  Info,
 } from "lucide-react";
-import { AlertTopicsConfig, DEFAULT_ALERT_TOPICS } from "@/lib/alerts";
+import { Button } from "@/components/ui/button";
+import { UnavailableState } from "@/components/ui/unavailable-state";
+import { DEFAULT_ALERT_TOPICS, type AlertTopicsConfig } from "@/lib/alerts";
+import { useAuth } from "@/context/auth-context";
 import { useAudio } from "@/context/audio-context";
-
-interface RockAlertsProps {
-  rockId: string | number;
-}
+import { cn } from "@/lib/ui/cn";
 
 interface TopicMeta {
   id: keyof AlertTopicsConfig;
   title: string;
   description: string;
-  category: "danger" | "warning" | "profit" | "automation" | "security" | "system" | "hardware";
-  categoryLabel: string;
+  badge: string;
   icon: typeof Bell;
 }
 
-const TOPICS_META: TopicMeta[] = [
+const TOPICS: TopicMeta[] = [
   {
     id: "loss_warning",
-    title: "Impermanent Loss & Volatility Warning",
-    description: "Alerts if pool inventory diverges significantly (> 15% skew) due to rapid price volatility.",
-    category: "danger",
-    categoryLabel: "High Risk",
+    title: "Value swings",
+    description: "When the two balances in this rock move far apart after a price swing.",
+    badge: "Risk",
     icon: AlertTriangle,
   },
   {
     id: "dangerous_trade",
-    title: "Large Whale Swap & Liquidity Drain",
-    description: "Triggers when an incoming trade absorbs more than 20% of your rock's active reserve in a single transaction.",
-    category: "warning",
-    categoryLabel: "Trade Hazard",
+    title: "Large trade",
+    description: "When one trade takes a big share of what this rock holds.",
+    badge: "Trade",
     icon: ShieldAlert,
   },
   {
     id: "profit_milestone",
-    title: "Fee Distribution & Profit Spike",
-    description: "Notifies you when accumulated 1inch Aqua maker fees cross fee harvesting thresholds (+10 / 50 / 100 USDC).",
-    category: "profit",
-    categoryLabel: "Profit Harvest",
+    title: "Fees earned",
+    description: "When the fees this rock has earned pass a round number.",
+    badge: "Earnings",
     icon: TrendingUp,
   },
   {
     id: "keeper_rebalance",
-    title: "Autonomous Keeper Action Report",
-    description: "Real-time dispatch whenever the AI keeper re-centers your maker inventory and captures 5 bps fees.",
-    category: "automation",
-    categoryLabel: "AI Automation",
+    title: "Keeper action",
+    description: "When the automated keeper rebalances this rock.",
+    badge: "Automation",
     icon: Bot,
   },
   {
     id: "custody_transfer",
-    title: "NFC Possession & Custody Transfer",
-    description: "Instant cryptographic alert if the physical stone is tapped by an unverified device or control is transferred.",
-    category: "security",
-    categoryLabel: "Hardware Security",
+    title: "Tap and handover",
+    description: "When someone taps this rock, or its ownership changes.",
+    badge: "Security",
     icon: KeyRound,
   },
   {
     id: "gas_depletion",
-    title: "Safe Account Health & Gas Alerts",
-    description: "Monitors Pimlico Paymaster gas sponsorship allowances and underlying Safe reserve thresholds.",
-    category: "system",
-    categoryLabel: "Account Health",
+    title: "Account health",
+    description: "When the account behind this rock needs attention.",
+    badge: "Health",
     icon: Fuel,
   },
   {
     id: "genesis_drop",
-    title: "Genesis Batch Drop & Convention Coordinates",
-    description: "VIP notifications with exact dates, locations, and booth booth numbers for upcoming global Ethereum drops.",
-    category: "hardware",
-    categoryLabel: "VIP Hardware",
+    title: "New batches",
+    description: "When a new batch of rocks is released.",
+    badge: "News",
     icon: Package,
   },
 ];
 
-export function RockAlerts({ rockId }: RockAlertsProps) {
+const DELIVERY_NOTE =
+  "Nothing is sent yet. Preferences are stored, but there is no delivery pipeline behind them.";
+
+type SaveState = "idle" | "saving" | "saved" | "error";
+
+interface AlertPreferencesResponse {
+  state?: string;
+  reason?: string;
+  delivery?: { reason?: string };
+  preferences?: { email?: string; pushEnabled?: boolean; topics?: Partial<AlertTopicsConfig> };
+}
+
+/** `Notification` support, read the way a browser API should be read from React. */
+function subscribeNothing() {
+  return () => {};
+}
+function notificationSupported() {
+  return typeof window !== "undefined" && "Notification" in window;
+}
+function notificationSupportedOnServer() {
+  return false;
+}
+
+export function RockAlerts({ rockId }: { rockId: string | number }) {
+  const { authenticated, getAccessToken, login, unavailable, unavailableReason } = useAuth();
   const { playTap, playSuccess, playError } = useAudio();
 
-  const [email, setEmail] = useState("");
-  const [topics, setTopics] = useState<AlertTopicsConfig>({ ...DEFAULT_ALERT_TOPICS });
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const pushSupported = useSyncExternalStore(
+    subscribeNothing,
+    notificationSupported,
+    notificationSupportedOnServer,
+  );
 
-  // Test email state
-  const [selectedTestTopic, setSelectedTestTopic] = useState<string>("profit_milestone");
-  const [isSendingTest, setIsSendingTest] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-
-  // Platform detection
-  const [platform, setPlatform] = useState<"ios" | "android" | "desktop">("desktop");
-  const [isStandalonePwa, setIsStandalonePwa] = useState(false);
-  const [pushSupported, setPushSupported] = useState(false);
-
-  useEffect(() => {
-    // Detect device platform
-    if (typeof window !== "undefined") {
-      const ua = navigator.userAgent || "";
-      const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      const isAndroid = /Android/.test(ua);
-
-      if (isIOS) setPlatform("ios");
-      else if (isAndroid) setPlatform("android");
-      else setPlatform("desktop");
-
-      // Check if installed as PWA (standalone)
-      const isStandalone = window.matchMedia("(display-mode: standalone)").matches || (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-      setIsStandalonePwa(isStandalone);
-
-      // Check Notification API
-      setPushSupported("Notification" in window);
-      if ("Notification" in window && Notification.permission === "granted") {
-        setPushEnabled(true);
+  const preferencesQuery = useQuery({
+    queryKey: ["alert-preferences", String(rockId)],
+    enabled: authenticated,
+    retry: false,
+    queryFn: async (): Promise<AlertPreferencesResponse> => {
+      const token = await getAccessToken();
+      if (!token) return { state: "UNAVAILABLE", reason: "Sign in again to read your alerts." };
+      const res = await fetch(`/api/alerts?rockId=${encodeURIComponent(String(rockId))}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = (await res.json()) as AlertPreferencesResponse;
+      if (!res.ok && !data.reason) {
+        return { ...data, state: "UNAVAILABLE", reason: "Alert preferences could not be read." };
       }
+      return data;
+    },
+  });
 
-      // Load saved preferences from API / localStorage
-      fetch(`/api/alerts?rockId=${rockId}`)
-        .then((res) => res.json() as Promise<any>)
-        .then((data) => {
-          if (data.preferences) {
-            if (data.preferences.email) setEmail(data.preferences.email);
-            if (data.preferences.topics) setTopics(data.preferences.topics);
-          }
-        })
-        .catch(() => {
-          // Fallback to local storage
-          try {
-            const saved = localStorage.getItem(`bankrock_alerts_${rockId}`);
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              if (parsed.email) setEmail(parsed.email);
-              if (parsed.topics) setTopics(parsed.topics);
-            }
-          } catch {
-            // ignore
-          }
-        });
-    }
-  }, [rockId]);
+  const stored = preferencesQuery.data;
+  const loadReason =
+    preferencesQuery.isError
+      ? "Alert preferences could not be reached right now."
+      : stored && stored.state !== "REAL"
+        ? (stored.reason ?? "Alert preferences could not be read right now.")
+        : null;
+  const deliveryNote = stored?.delivery?.reason ?? DELIVERY_NOTE;
 
-  const handleToggleTopic = (topicKey: keyof AlertTopicsConfig) => {
+  // Edits are overrides on top of what was stored, so nothing has to be copied into state by an
+  // effect and the form can never drift from the last read.
+  const [emailEdit, setEmailEdit] = useState<string | null>(null);
+  const [topicEdits, setTopicEdits] = useState<Partial<AlertTopicsConfig>>({});
+  const [pushEdit, setPushEdit] = useState<boolean | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  const email = emailEdit ?? stored?.preferences?.email ?? "";
+  const topics: AlertTopicsConfig = {
+    ...DEFAULT_ALERT_TOPICS,
+    ...(stored?.preferences?.topics ?? {}),
+    ...topicEdits,
+  };
+  const pushEnabled = pushEdit ?? Boolean(stored?.preferences?.pushEnabled);
+
+  const toggleTopic = (id: keyof AlertTopicsConfig) => {
     playTap();
-    setTopics((prev) => ({
-      ...prev,
-      [topicKey]: !prev[topicKey],
-    }));
-    setSaveSuccess(false);
+    setSaveState("idle");
+    setTopicEdits((previous) => ({ ...previous, [id]: !topics[id] }));
   };
 
-  const handleSavePreferences = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    setSaveSuccess(false);
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaveState("saving");
+    setError(null);
+
+    const token = await getAccessToken();
+    if (!token) {
+      setSaveState("error");
+      setError("Sign in again to save these preferences.");
+      return;
+    }
 
     try {
       const res = await fetch("/api/alerts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rockId,
-          email,
-          pushEnabled,
-          topics,
-        }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ rockId, email, pushEnabled, topics }),
       });
+      const data = (await res.json()) as { state?: string; reason?: string; error?: string };
 
-      if (res.ok) {
-        playSuccess();
-        setSaveSuccess(true);
-        try {
-          localStorage.setItem(
-            `bankrock_alerts_${rockId}`,
-            JSON.stringify({ email, topics, pushEnabled })
-          );
-        } catch {
-          // ignore
-        }
-        setTimeout(() => setSaveSuccess(false), 3000);
-      } else {
+      if (!res.ok || data.state === "UNAVAILABLE") {
+        setSaveState("error");
+        setError(data.reason ?? data.error ?? "These preferences could not be saved.");
         playError();
+        return;
       }
+
+      setSaveState("saved");
+      playSuccess();
     } catch {
+      setSaveState("error");
+      setError("These preferences could not be saved.");
       playError();
-    } finally {
-      setIsSaving(false);
     }
   };
 
-  const handleSendTestEmail = async () => {
-    if (!email || !email.includes("@")) {
-      playError();
-      setTestResult({
-        success: false,
-        message: "Please enter a valid email address first.",
-      });
-      return;
-    }
-
-    setIsSendingTest(true);
-    setTestResult(null);
-
-    try {
-      const res = await fetch("/api/alerts/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: email,
-          rockId,
-          topic: selectedTestTopic,
-        }),
-      });
-
-      const data = await res.json() as any as any;
-
-      if (res.ok && data.success) {
-        playSuccess();
-        setTestResult({
-          success: true,
-          message: data.result.message || "Test alert email sent successfully.",
-        });
-      } else {
-        playError();
-        setTestResult({
-          success: false,
-          message: data.error || "Failed to send test alert.",
-        });
-      }
-    } catch {
-      playError();
-      setTestResult({
-        success: false,
-        message: "Network error sending test alert.",
-      });
-    } finally {
-      setIsSendingTest(false);
-    }
-  };
-
-  const handleRequestPush = async () => {
+  const handleEnablePush = async () => {
     playTap();
     if (!pushSupported) {
-      toast.error("Web Push notifications are not supported in this browser.");
+      setError("This browser cannot show notifications.");
       return;
     }
-
-    try {
-      const perm = await Notification.requestPermission();
-      if (perm === "granted") {
-        setPushEnabled(true);
-        playSuccess();
-        new Notification(`Bank Rock #${rockId} Sentinel Active`, {
-          body: "Push alerts successfully enabled for this stone.",
-          icon: "/icon-192.png",
-        });
-      } else {
-        setPushEnabled(false);
-      }
-    } catch {
-      // Permission request error
+    const permission = await Notification.requestPermission();
+    setPushEdit(permission === "granted");
+    if (permission !== "granted") {
+      setError("Notifications are blocked for this site.");
     }
   };
 
   return (
-    <div className="w-full bg-white border border-neutral-200 rounded-3xl p-6 md:p-8 shadow-sm mb-8 animate-in fade-in duration-300">
-      {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-100">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center shadow-md">
-            <Bell className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black tracking-tight text-neutral-950 flex items-center gap-2">
-              Sentinel Alert Hub
-              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold">
-                Automated
-              </span>
-            </h3>
-            <p className="text-xs text-neutral-500 font-medium">
-              Configure real-time email telemetry and push alerts for Rock #{rockId}.
-            </p>
-          </div>
-        </div>
-
-        {/* Platform Badge */}
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100 text-[11px] font-mono text-neutral-600 self-start sm:self-auto">
-          <Smartphone className="w-3.5 h-3.5" />
-          <span>
-            {platform === "ios" ? "Apple iOS Detected" : platform === "android" ? "Android Detected" : "Desktop Browser"}
-          </span>
-        </div>
+    <section className="flex w-full flex-col gap-6 rounded-3xl border border-border p-4 sm:p-6">
+      <div className="flex flex-col gap-1">
+        <h3 className="flex items-center gap-2 text-h3 font-semibold text-ink">
+          <Bell aria-hidden className="size-5 shrink-0" />
+          Alerts
+        </h3>
+        <p className="max-w-prose text-sm text-ink-2">
+          Choose what is worth telling you about Rock #{rockId}.
+        </p>
+        <p className="max-w-prose text-sm text-warning">{deliveryNote}</p>
       </div>
 
-      {/* Form: Email & Save */}
-      <form onSubmit={handleSavePreferences} className="mt-6 space-y-6">
-        {/* Email Input & Send Test */}
-        <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-100 space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <label className="text-xs font-bold uppercase tracking-wider text-neutral-700 flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-black" />
-              Automated Email Destination
+      {unavailable ? (
+        <UnavailableState reason={unavailableReason ?? "Sign-in is not configured."} />
+      ) : !authenticated ? (
+        <UnavailableState
+          reason="Sign in to set up alerts for this rock."
+          action={{ label: "Sign in", onClick: () => void login() }}
+        />
+      ) : (
+        <form onSubmit={handleSave} className="flex flex-col gap-6">
+          {loadReason ? <UnavailableState reason={loadReason} /> : null}
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="alert-email" className="text-label text-ink-3">
+              Where to write to you
             </label>
-            <span className="text-[11px] text-neutral-400 font-medium">
-              Powered by Resend.com
-            </span>
+            <input
+              id="alert-email"
+              type="email"
+              value={email}
+              onChange={(changed) => {
+                setEmailEdit(changed.target.value);
+                setSaveState("idle");
+              }}
+              placeholder="you@example.com"
+              autoComplete="email"
+              className="h-12 w-full rounded-xl border border-border bg-background px-4 text-base text-ink placeholder:text-ink-4"
+            />
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="satoshi@bankrock.xyz"
-                className="w-full bg-white border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 text-sm font-medium rounded-xl px-4 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent transition-all"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="bg-black text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-neutral-800 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 disabled:opacity-50"
+          <div className="flex flex-col gap-3">
+            <h4 className="text-label text-ink-3">What to tell you about</h4>
+            <ul className="flex flex-col gap-2">
+              {TOPICS.map((topic) => {
+                const Icon = topic.icon;
+                const isOn = Boolean(topics[topic.id]);
+                return (
+                  <li key={topic.id}>
+                    <label
+                      className={cn(
+                        "flex min-h-11 cursor-pointer items-start gap-3 rounded-2xl border p-3 motion-safe:transition-colors",
+                        isOn ? "border-ink" : "border-border hover:bg-muted",
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isOn}
+                        onChange={() => toggleTopic(topic.id)}
+                        className="mt-0.5 size-6 shrink-0 accent-ink"
+                      />
+                      <span className="flex min-w-0 flex-1 flex-col gap-1">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <Icon aria-hidden className="size-4 shrink-0 text-ink-3" />
+                          <span className="text-sm font-semibold text-ink">{topic.title}</span>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-label text-ink-3">
+                            {topic.badge}
+                          </span>
+                        </span>
+                        <span className="max-w-prose text-sm text-ink-2">{topic.description}</span>
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <h4 className="text-label text-ink-3">On this device</h4>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={handleEnablePush}
+              disabled={pushEnabled}
             >
-              {isSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : saveSuccess ? (
+              {pushEnabled ? (
                 <>
-                  <Check className="w-4 h-4 text-green-400" />
-                  <span>Saved!</span>
+                  <Check aria-hidden />
+                  Notifications allowed
                 </>
               ) : (
-                <span>Save Alerts</span>
+                "Allow notifications"
               )}
-            </button>
+            </Button>
+            <p className="max-w-prose text-sm text-ink-3">
+              Allowing notifications only sets a permission on this device. Nothing is sent until
+              delivery exists.
+            </p>
           </div>
 
-          {/* Test Email Bar */}
-          <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-neutral-200/60">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-neutral-500 font-medium">Test template:</span>
-              <div className="relative">
-                <select
-                  value={selectedTestTopic}
-                  onChange={(e) => setSelectedTestTopic(e.target.value)}
-                  className="appearance-none bg-white border border-neutral-200 rounded-lg px-3 py-1.5 pr-7 text-xs font-medium text-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 focus-visible:border-transparent cursor-pointer"
-                >
-                  <option value="profit_milestone">💰 Profit Milestone (+14.85 USDC)</option>
-                  <option value="loss_warning">🚨 High Volatility Warning (16.4%)</option>
-                  <option value="dangerous_trade">⚠️ Whale Swap Alert (24.2%)</option>
-                  <option value="keeper_rebalance">🤖 Keeper Action Report</option>
-                  <option value="custody_transfer">🛡️ NFC Tap Verification (#43)</option>
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSendTestEmail}
-              disabled={isSendingTest}
-              className="px-4 py-1.5 bg-white border border-neutral-300 hover:border-black rounded-lg text-xs font-semibold text-neutral-800 hover:text-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              {isSendingTest ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Send className="w-3.5 h-3.5" />
-              )}
-              <span>Send Test Email</span>
-            </button>
-          </div>
-
-          {testResult && (
-            <div
-              className={`p-3 rounded-xl text-xs font-medium animate-in fade-in duration-200 flex items-start gap-2 ${
-                testResult.success
-                  ? "bg-green-50 text-green-800 border border-green-200"
-                  : "bg-red-50 text-red-800 border border-red-200"
-              }`}
-            >
-              <Info className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{testResult.message}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Configurable Thickbox Topics Grid */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
-              Configurable Alert Topics ({Object.values(topics).filter(Boolean).length} Active)
-            </h4>
-            <span className="text-[11px] text-neutral-400">Toggle to subscribe</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {TOPICS_META.map((t) => {
-              const Icon = t.icon;
-              const isChecked = Boolean(topics[t.id]);
-
-              return (
-                <div
-                  key={t.id}
-                  onClick={() => handleToggleTopic(t.id)}
-                  className={`p-4 rounded-2xl border transition-all cursor-pointer select-none flex items-start gap-3 relative ${
-                    isChecked
-                      ? "bg-white border-black shadow-sm"
-                      : "bg-neutral-50/70 border-neutral-200 opacity-60 hover:opacity-90"
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-                      isChecked
-                        ? "bg-black border-black text-white"
-                        : "bg-white border-neutral-300"
-                    }`}
-                  >
-                    {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <Icon className="w-3.5 h-3.5 text-neutral-900" />
-                        <span className="text-xs font-bold text-neutral-900">{t.title}</span>
-                      </div>
-                      <span
-                        className={`text-[9px] font-mono uppercase font-bold px-1.5 py-0.5 rounded ${
-                          t.category === "danger"
-                            ? "bg-red-100 text-red-700"
-                            : t.category === "warning"
-                            ? "bg-orange-100 text-orange-700"
-                            : t.category === "profit"
-                            ? "bg-green-100 text-green-700"
-                            : t.category === "automation"
-                            ? "bg-purple-100 text-purple-700"
-                            : t.category === "security"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-neutral-200 text-neutral-700"
-                        }`}
-                      >
-                        {t.categoryLabel}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-neutral-500 leading-relaxed">
-                      {t.description}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Web Push & Mobile OS Guide */}
-        <div className="p-5 rounded-2xl border border-neutral-200 bg-white space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Smartphone className="w-4 h-4 text-black" />
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-900">
-                  Instant Web Push Notifications
-                </h4>
-                <p className="text-[11px] text-neutral-500">
-                  Receive low-latency native banner alerts on your phone or desktop.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleRequestPush}
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                pushEnabled
-                  ? "bg-green-100 text-green-800 border border-green-200"
-                  : "bg-black text-white hover:bg-neutral-800"
-              }`}
-            >
-              {pushEnabled ? "✓ Push Enabled" : "Enable Push"}
-            </button>
-          </div>
-
-          {/* Platform Specific Instructions */}
-          {platform === "ios" && (
-            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200/80 text-xs text-neutral-700 space-y-2">
-              <div className="font-bold text-neutral-900 flex items-center gap-1.5">
-                <span>🍎 Apple iOS Requirement</span>
-                <span className="text-[10px] font-mono bg-neutral-200 px-1.5 py-0.5 rounded text-neutral-600">
-                  {isStandalonePwa ? "PWA Mode Active" : "Action Required"}
-                </span>
-              </div>
-              <p className="text-neutral-500 leading-relaxed text-[11px]">
-                Apple iOS only permits Web Push notifications for web apps installed to your Home Screen:
+          <div className="flex flex-col gap-2">
+            <Button type="submit" className="w-full sm:w-auto" disabled={saveState === "saving"}>
+              {saveState === "saving" ? "Saving…" : "Save preferences"}
+            </Button>
+            {saveState === "saved" ? (
+              <p className="flex items-center gap-2 text-sm text-positive">
+                <Check aria-hidden className="size-4 shrink-0" />
+                Saved
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-medium text-[11px]">
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-white border border-neutral-200">
-                  <Share2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span>1. Tap Safari Share</span>
-                </div>
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-white border border-neutral-200">
-                  <PlusSquare className="w-3.5 h-3.5 text-black shrink-0" />
-                  <span>2. Add to Home Screen</span>
-                </div>
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-white border border-neutral-200">
-                  <Bell className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                  <span>3. Enable Push in App</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {platform === "android" && (
-            <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-600">
-              <strong className="text-neutral-900">🤖 Android Push:</strong> Supported natively in Chrome and Firefox. Tap &quot;Enable Push&quot; above and select &quot;Allow&quot; when prompted by Android.
-            </div>
-          )}
-
-          {platform === "desktop" && (
-            <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-600">
-              <strong className="text-neutral-900">💻 Desktop Notifications:</strong> Supported in Chrome, Brave, Edge, and Safari. Receive native system notifications when market anomalies occur.
-            </div>
-          )}
-        </div>
-      </form>
-    </div>
+            ) : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
+          </div>
+        </form>
+      )}
+    </section>
   );
 }
