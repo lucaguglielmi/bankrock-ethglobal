@@ -1,0 +1,80 @@
+name: Rehearse on Sepolia
+
+# Manual only. This workflow spends real Sepolia ETH, moves USDC and WETH, and writes to the
+# deployed registry — it must never be triggered by a push, a pull request or a schedule
+# (spec 20 WP-2).
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and assert everything up to the first broadcast, then stop"
+        type: boolean
+        default: false
+
+# One rehearsal at a time: two concurrent runs would both fund accounts from the same key and
+# fight over its nonce.
+concurrency:
+  group: rehearse-sepolia
+  cancel-in-progress: false
+
+jobs:
+  rehearse:
+    name: Live rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ./web
+
+    # Every value comes from a repository secret; none is committed (spec 16). The funder is the
+    # only one that has to hold tokens — the three people in the story (owner, taker, recipient)
+    # are fresh keys the script generates per run.
+    env:
+      SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+      PIMLICO_API_KEY: ${{ secrets.PIMLICO_API_KEY }}
+      ATTESTATION_SIGNER_PRIVATE_KEY: ${{ secrets.ATTESTATION_SIGNER_PRIVATE_KEY }}
+      RELAYER_PRIVATE_KEY: ${{ secrets.RELAYER_PRIVATE_KEY }}
+      REHEARSAL_FUNDER_PRIVATE_KEY: ${{ secrets.REHEARSAL_FUNDER_PRIVATE_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # Named, not valued: a missing secret must stop the run before it half-executes a rehearsal,
+      # and the check itself must never echo what it found.
+      - name: Fail early if a secret is missing
+        run: |
+          missing=""
+          for name in SEPOLIA_RPC_URL PIMLICO_API_KEY ATTESTATION_SIGNER_PRIVATE_KEY \
+                      RELAYER_PRIVATE_KEY REHEARSAL_FUNDER_PRIVATE_KEY; do
+            if [ -z "${!name}" ]; then missing="${missing} ${name}"; fi
+          done
+          if [ -n "${missing}" ]; then
+            echo "Missing repository secret(s):${missing}"
+            echo "See specs/16-environment-and-secrets.md for what each one is."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rehearse
+        run: npm run rehearse:sepolia ${{ inputs.dry_run && '-- --dry-run' || '' }}
+
+      # The script writes contracts/deployments/rehearsal-<date>.md on a successful live run. It is
+      # uploaded rather than committed: a workflow that pushes to the repository is a write
+      # credential this job has no other reason to hold. Commit it by hand from the artifact.
+      - name: Upload the run report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rehearsal-report
+          path: contracts/deployments/rehearsal-*.md
+          if-no-files-found: warn

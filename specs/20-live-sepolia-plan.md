@@ -41,33 +41,60 @@ dependencies allow:
 **Acceptance:** every line in DEMO-STATE §3 and §4 except K-9 (email) is deleted per the file's
 own rule (condition actually met, not code written).
 
-**Agent work inside WP-1:** a `scripts/check-live.sh` that curls the live routes and reads the
-registry, app and taker addresses from the deployed site's `/api/version` (extend it to report
-the configured addresses and their `eth_getCode` sizes), so the operator sees green/red per
-DEMO-STATE line without opening a dashboard.
+**Agent work inside WP-1 — delivered.** `scripts/check-live.sh` (run `bash scripts/check-live.sh`,
+optionally with another origin as its first argument) curls `/`, `/r/1`, `/rock/1`, `/api/version`,
+`/sw.js` and `/manifest.webmanifest` on the apex, follows `https://www.bank-rock.com` and requires
+it to end at a 200 on the apex, then reads the configured chain out of `/api/version`. One
+green/red line per check, non-zero exit on any red.
 
-### WP-2 · Live rehearsal script (agent) — DEMO-STATE §5 P-2…P-5
+`web/src/app/api/version/route.ts` now reports, alongside the build stamp, the chain id, all six
+contract addresses with the variable behind each one and the size of the code the RPC has at it
+(read server-side per request), and the two deploy blocks. Public configuration only: no secret,
+no key, no RPC URL, and an address that is unset or has no code is `UNAVAILABLE` with the reason.
 
-`web/scripts/rehearse-sepolia.mjs`: drives the whole acceptance path against the deployed
-contracts **with local test keys instead of Privy** (Privy cannot be scripted; the on-chain and
-Pimlico paths are identical). Steps, each printing a tx hash and asserting on-chain state:
+Until the Worker's variables are set and the `www` redirect rule is deleted, the address lines and
+the `www` line are red, which is the point of the script.
 
-1. Sign an attestation locally with the attester key for a synthetic tag (`uidHash`, counter n+1)
-   naming subject A and A's per-tag Safe → sponsored UserOp `awakenRock` from that Safe → assert
-   `getRock` owner and account.
-2. Fund the Rock Account with USDC/WETH from the operator wallet → `shipStrategy` batch → assert
-   `safeBalances` and the `Shipped` event.
-3. From taker B's personal Safe: approve + `XYCSwapTaker.swapExactIn` → assert both balances
-   moved and the `Pushed` fee slice.
-4. A initiates a named handover to C with the pre-signed owner swap stored via the app's route →
-   C's attestation → the app's relayed claim route (owner swap first, then claim) → assert the
-   Safe's owner is C and the registry owner is C.
-5. C archives → the same synthetic tag awakens rock N+1 with the same Rock Account address.
-6. Print a table: step, tx hash, gas sponsor, elapsed. Exit non-zero on any assertion.
+### WP-2 · Live rehearsal script (agent) — DEMO-STATE §5 P-2…P-5 — delivered
 
-Runs from CI on `workflow_dispatch` only (needs funded keys as repository secrets) and by hand
-after every deploy. **Acceptance:** one green run on Sepolia; its output committed under
-`contracts/deployments/rehearsal-<date>.md`; DEMO-STATE P-2…P-5 deleted.
+`web/scripts/rehearse-sepolia.ts`, run from `web/` as
+
+```
+npm run rehearse:sepolia -- --dry-run      # reads only; nothing is broadcast
+npm run rehearse:sepolia                   # the live run
+```
+
+or from `.github/workflows/rehearse.yml` (`workflow_dispatch` only, never on push; it takes
+`SEPOLIA_RPC_URL`, `PIMLICO_API_KEY`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY` and
+`REHEARSAL_FUNDER_PRIVATE_KEY` from repository secrets and uploads the report as an artifact).
+
+It drives the whole acceptance path — awaken, fund and ship, visitor swap, named gift, archive and
+re-awaken — with local test keys in place of Privy, reusing the app's own code throughout — `computeRockAccountAddress`, `signAttestation`, `encodeAwaken`, `buildShipCalls`,
+`buildSwapCall`, `readStrategy`, `readAmountOutFromLogs`, `verifyAttestation`,
+`submitSignedUserOp`, `submitClaimHandover` — so what is proven is the path the app takes.
+Contract addresses come from `contracts/deployments/*.json`, never from a literal. Each step
+prints its UserOperation and transaction hashes, asserts the state back off the chain, and the run
+ends with the step/hash/sponsor/elapsed table; the first failed assertion exits non-zero. A
+successful live run writes `contracts/deployments/rehearsal-<date>.md`.
+
+Two deviations the script states in its own output rather than hiding:
+
+- **the claim is driven through the library, not the route.** `POST /api/rocks/[id]/claim` needs a
+  Privy bearer token to store the pre-signed owner swap and a D1 binding for it and for the daily
+  spend cap. The script calls the same functions the route calls, in the same order — owner swap
+  first, then `claimHandover` (D-032). The route's own guards (rate limits, cap reservation, the
+  refusal of open gifts) stay unit-tested only, and DEMO-STATE P-10 stays open;
+- **step 5 is Flow K after a gift, and the app cannot follow it.** `useBankRock` sends owner
+  actions from the Rock Account and refuses to act when the account it derives from (wallet, tag)
+  is not the one the registry holds. After a gift that is false by construction: the account was
+  derived for the giver, and the new owner derives a different address (D-029). The script
+  archives from C's own wallet — which the registry accepts — prints the mismatch as a FINDING, and
+  asserts what the code actually guarantees: the Rock Account is a deterministic function of (tag,
+  owner), so the tag awakens rock N+1 into the account its owner derives, unchanged for that owner.
+
+**Acceptance (unchanged):** one green run on Sepolia; its report committed under
+`contracts/deployments/rehearsal-<date>.md`; DEMO-STATE P-2…P-5 deleted. Not met yet — this
+sandbox has no funded keys and no Pimlico key, so only the dry run has been executed.
 
 ### WP-3 · The physical rock (operator) — DEMO-STATE P-1, W-1
 
