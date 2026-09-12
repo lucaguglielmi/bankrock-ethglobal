@@ -347,13 +347,13 @@ These are dashboard or DNS actions, not env vars:
 
 1. **Privy dashboard** — create the app; add `https://bank-rock.com` (and the `pages.dev` preview
    origin if you use it) to allowed origins; enable email, Google, Apple, wallet; enable Sepolia.
-   The app id itself goes in the GitHub repository *variable* (§2.3.1), not the dashboard.
+   The app id itself is committed in `wrangler.jsonc` `vars` (D-034 as amended), not the dashboard.
 2. **Pimlico dashboard** — create the API key; create a sponsorship policy for chain 11155111;
    restrict the public key by origin.
 3. ~~**Cloudflare dashboard** — remove or fix the `www` redirect rule~~ — there was no such rule; the
-   literal `:path*` was the app's own redirect on the empty path, fixed in `web/next.config.ts` (2026-09-12).
-   rule is evaluated first, so the broken one must go. Create the API token (§2.3.1) and set the
-   Worker's secrets (§2.3.2). **Do not add anything to the Worker's *Variables* pane** — a deploy
+   literal `:path*` was the app's own redirect on the empty path, fixed in `web/next.config.ts`
+   (2026-09-12). Create the API token (§2.3.1) and set the Worker's secrets (§2.3.2) — **done
+   2026-09-12** with `wrangler secret bulk` (nine secrets). **Do not add anything to the Worker's *Variables* pane** — a deploy
    deletes it.
 4. **Resend** — add `bank-rock.com`; publish the SPF, DKIM and MX records it gives you; wait for
    verification.

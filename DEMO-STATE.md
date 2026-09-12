@@ -60,16 +60,18 @@ what the WP-2 live run proves, and that is the line that gets deleted when it do
 
 ## 4. Unavailable until a secret is set
 
+**2026-09-12 evening:** nine secrets were set on the Worker `web` with `wrangler secret bulk`
+(`ADMIN_*`, `CRON_SECRET`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RELAYER_PRIVATE_KEY`,
+`FAUCET_PRIVATE_KEY`, `SEPOLIA_RPC_URL`). K-3, K-4, K-7 and K-8 are deleted: attester set and equal
+to the registry's, relayer set and funded with the cap committed, RPC set, D1 live with migrations
+applied. What remains needs something other than a secret.
+
 | # | What | Spec | Becomes real when |
 | --- | --- | --- | --- |
 | K-1 | Sign-in and any wallet address on screen | 16 #1 | `NEXT_PUBLIC_PRIVY_APP_ID` is set and the origin and chain are configured in the Privy dashboard. |
 | K-2 | The "Verified Physical" badge | 16 #18, 06 | `NXP_MASTER_KEY` matches the key written to the tags. |
-| K-3 | An attestation for a verified tap | 16 #17, 09 D-026 | `ATTESTATION_SIGNER_PRIVATE_KEY` is set and its address is the registry's attester. A tap can verify without it; only the on-chain step is blocked. |
-| K-4 | Gift claims | 16 #30, #34, 09 D-027, D-032 | `RELAYER_PRIVATE_KEY` is set on the Worker (its address `0x767D…5430` is funded with 0.045 ETH since 2026-09-12), **and** `RELAYER_DAILY_CAP_WEI` is non-zero (committed as 0.05 ETH/day in `wrangler.jsonc`, D-034). Either unset means claims are unavailable, never free and never uncapped. |
 | K-5 | Any gas-sponsored operation | 16 #15 | A Pimlico key **and** a sponsorship policy for chain 11155111. Without the policy every UserOp is rejected. |
 | K-6 | The ETH faucet | 16 #16 | `FAUCET_PRIVATE_KEY` is set and funded. There is no default key. |
-| K-7 | Provenance, the fee log scan, Rock Account derivation | 16 #4, 09 D-036 | `SEPOLIA_RPC_URL` is set on the Worker. `https://ethereum-sepolia-rpc.publicnode.com` is a measured, working value (D-036); a keyed provider is the recommendation for demo day, not a condition. |
-| K-8 | Admin figures, contact and vanity forms, counters, rate limits | 12 | The D1 binding is live and `drizzle/` migrations are applied to production. |
 | K-9 | Any email at all | 16 #19, #33 | `RESEND_API_KEY` plus SPF/DKIM verification of `bank-rock.com`. Until then the sandbox sender reaches only the account owner's inbox. |
 
 ## 5. Real in code, unproven in the world
