@@ -21,8 +21,7 @@ export default function Home() {
           <AnimatedText text="Tangible DeFi." className="mb-8 text-display font-extrabold text-ink" />
 
           <p className="mb-12 max-w-prose text-lead text-ink-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-1000 motion-safe:delay-500 motion-safe:fill-mode-forwards">
-            A physical interface to your self-custodial liquidity. Tap your Bank Rock to put idle capital into agentic
-            trading strategies that earn a share of the trading fees they generate.
+            Not a Bank, just a rock.
           </p>
 
           <div className="flex w-full flex-col gap-4 pointer-events-auto motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-1000 motion-safe:delay-700 motion-safe:fill-mode-forwards sm:w-auto sm:flex-row">
