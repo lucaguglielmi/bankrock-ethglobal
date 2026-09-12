@@ -10,14 +10,30 @@
  */
 
 import { createPublicClient, http, fallback, isAddress, getAddress, type Address } from "viem";
-import { sepolia } from "viem/chains";
+import { sepolia, baseSepolia } from "viem/chains";
 import { env, optionalEnv, unavailable, real, type Capability } from "@/lib/demo";
 import { publicReasonWith } from "@/lib/errors";
 
 export const SEPOLIA_CHAIN_ID = 11155111;
 
+/** Validates the configured chain id. Unset is accepted and defaults to Sepolia. */
+export function parseChainIdEnv(value: string | undefined): number {
+  const trimmed = (value ?? "").trim();
+  if (trimmed === "") return SEPOLIA_CHAIN_ID;
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed)) {
+    throw new Error(
+      `NEXT_PUBLIC_CHAIN_ID must be an integer; got "${trimmed}"`,
+    );
+  }
+  return parsed;
+}
+
+/** Validated at module load — a malformed value fails the process, it never degrades silently. */
+export const chainId = parseChainIdEnv(env.chainId);
+
 /** The one chain this application targets. */
-export const chain = sepolia;
+export const chain = chainId === 84532 ? baseSepolia : sepolia;
 
 /**
  * Parses an address from configuration.
@@ -35,21 +51,6 @@ export function parseAddressEnv(name: string, value: string | undefined): Addres
   return getAddress(trimmed);
 }
 
-/** Validates the configured chain id. Unset is accepted and defaults to Sepolia. */
-export function parseChainIdEnv(value: string | undefined): number {
-  const trimmed = (value ?? "").trim();
-  if (trimmed === "") return SEPOLIA_CHAIN_ID;
-  const parsed = Number(trimmed);
-  if (!Number.isInteger(parsed) || parsed !== SEPOLIA_CHAIN_ID) {
-    throw new Error(
-      `NEXT_PUBLIC_CHAIN_ID must be ${SEPOLIA_CHAIN_ID} (Ethereum Sepolia); got "${trimmed}"`,
-    );
-  }
-  return parsed;
-}
-
-/** Validated at module load — a malformed value fails the process, it never degrades silently. */
-export const chainId = parseChainIdEnv(env.chainId);
 
 /**
  * Every address the application knows about. `undefined` means "not deployed / not configured".

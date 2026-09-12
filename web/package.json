@@ -45,6 +45,7 @@
     "lucide-react": "^1.45.0",
     "next": "16.3.5",
     "node-aes-cmac": "^0.1.1",
+    "ox": "^1.7.4",
     "permissionless": "^0.2.57",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -81,5 +82,6 @@
     "typescript": "^5",
     "vitest": "^3.2.4",
     "wrangler": "^4.131.1"
-  }
+  },
+  "packageManager": "pnpm@9.15.0+sha512.76e2379760a4328ec4415815bcd6628dee727af3779aaa4c914e3944156c4299921a89f976381ee107d41f12cfa4b66681ca9c718f0668fa0831ed4c6d8ba56c"
 }
