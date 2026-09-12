@@ -1,21 +1,49 @@
 "use client";
 
-import { useState } from "react";
-import { Check, BellRing, Mail, Smartphone, Info } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, BellRing, Mail, Smartphone, Info, Edit2 } from "lucide-react";
+import { usePrivy } from "@privy-io/react-auth";
+
+function maskEmail(email: string) {
+  if (!email || !email.includes("@")) return email;
+  const [name, domain] = email.split("@");
+  if (name.length <= 3) {
+    return `${name}***@${domain}`;
+  }
+  return `${name.substring(0, 3)}***@${domain}`;
+}
 
 export default function AlertsPage() {
+  const { user, ready } = usePrivy();
+  
   const [email, setEmail] = useState("");
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [topics, setTopics] = useState({
     dangerousTrade: true,
     highSlippage: true,
     profitLoss: false,
   });
-  const [subscribed, setSubscribed] = useState(false);
+  
+  const [gdprConsent, setGdprConsent] = useState(false);
+  const [step, setStep] = useState<"edit" | "confirm" | "success">("edit");
 
-  const handleSubscribe = async (e: React.FormEvent) => {
+  // Sync Privy email on load
+  useEffect(() => {
+    if (ready && user?.email?.address && !email) {
+      setEmail(user.email.address);
+    }
+  }, [ready, user, email]);
+
+  const handleSubscribeClick = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
+    if (!gdprConsent) return;
     
+    // Move to double confirmation step
+    setStep("confirm");
+  };
+
+  const handleConfirmSubscription = async () => {
     try {
       const activeTopics = Object.entries(topics)
         .filter(([_, isActive]) => isActive)
@@ -28,8 +56,8 @@ export default function AlertsPage() {
       });
 
       if (res.ok) {
-        setSubscribed(true);
-        setTimeout(() => setSubscribed(false), 3000);
+        setStep("success");
+        setTimeout(() => setStep("edit"), 5000); // reset after 5s
       }
     } catch (err) {
       console.error("Failed to subscribe:", err);
@@ -39,6 +67,8 @@ export default function AlertsPage() {
   const toggleTopic = (key: keyof typeof topics) => {
     setTopics((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+
+  const displayEmail = (!isEditingEmail && email) ? maskEmail(email) : email;
 
   return (
     <main className="flex min-h-screen flex-col bg-white text-black font-sans pt-24 px-6 pb-24">
@@ -65,19 +95,43 @@ export default function AlertsPage() {
             <h2 className="text-2xl font-bold tracking-tight">Email Alerts</h2>
           </div>
           
-          <form onSubmit={handleSubscribe} className="space-y-8">
+          <form onSubmit={handleSubscribeClick} className="space-y-8">
             <div className="space-y-4">
-              <label className="block text-sm font-bold uppercase tracking-wider text-neutral-500">
-                Email Address
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full bg-white border border-neutral-200 rounded-2xl px-5 py-4 text-lg font-medium focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all"
-              />
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-bold uppercase tracking-wider text-neutral-500">
+                  Email Address
+                </label>
+                {!isEditingEmail && (
+                  <button 
+                    type="button" 
+                    onClick={() => setIsEditingEmail(true)}
+                    className="text-sm font-bold flex items-center gap-1 hover:text-neutral-600 transition-colors"
+                  >
+                    <Edit2 className="w-3 h-3" /> Change
+                  </button>
+                )}
+              </div>
+
+              {isEditingEmail ? (
+                <div>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full bg-white border border-neutral-200 rounded-2xl px-5 py-4 text-lg font-medium focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all"
+                  />
+                  <p className="text-xs text-neutral-500 mt-2 flex items-start gap-1">
+                    <Info className="w-4 h-4 shrink-0" />
+                    Changing your email here only updates where alerts are sent. It does not affect your main Bank Rock account login.
+                  </p>
+                </div>
+              ) : (
+                <div className="w-full bg-white border border-neutral-200 rounded-2xl px-5 py-4 text-lg font-medium text-neutral-600 cursor-not-allowed">
+                  {displayEmail || "Loading..."}
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -85,7 +139,6 @@ export default function AlertsPage() {
                 Alert Topics
               </label>
               <div className="space-y-3">
-                
                 <button
                   type="button"
                   onClick={() => toggleTopic("dangerousTrade")}
@@ -127,22 +180,64 @@ export default function AlertsPage() {
                     {topics.profitLoss && <Check className="w-4 h-4" />}
                   </div>
                 </button>
-
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="w-full bg-black text-white py-4 rounded-full font-bold text-lg hover:bg-black/90 transition-all flex items-center justify-center gap-2"
-            >
-              {subscribed ? (
-                <>
-                  <Check className="w-5 h-5" /> Saved Preferences
-                </>
-              ) : (
-                "Save Email Preferences"
-              )}
-            </button>
+            {/* GDPR Consent */}
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <div className={`w-5 h-5 mt-0.5 rounded flex items-center justify-center shrink-0 border transition-colors ${gdprConsent ? "bg-black border-black text-white" : "border-neutral-300 group-hover:border-black"}`}>
+                {gdprConsent && <Check className="w-3.5 h-3.5" />}
+              </div>
+              <input 
+                type="checkbox" 
+                className="hidden" 
+                checked={gdprConsent} 
+                onChange={(e) => setGdprConsent(e.target.checked)} 
+                required 
+              />
+              <span className="text-sm text-neutral-500 leading-relaxed">
+                I consent to Bank Rock storing my email address to send automated alerts. I understand this data is handled in accordance with GDPR and I can unsubscribe at any time.
+              </span>
+            </label>
+
+            {/* Actions / Double Confirmation */}
+            {step === "edit" && (
+              <button
+                type="submit"
+                disabled={!email || !gdprConsent}
+                className="w-full bg-black text-white py-4 rounded-full font-bold text-lg hover:bg-black/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Continue
+              </button>
+            )}
+
+            {step === "confirm" && (
+              <div className="p-4 bg-white border-2 border-black rounded-2xl space-y-4">
+                <p className="font-bold text-center">Are you absolutely sure you want to subscribe {displayEmail} to these alerts?</p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep("edit")}
+                    className="flex-1 bg-neutral-100 text-black py-3 rounded-full font-bold hover:bg-neutral-200 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmSubscription}
+                    className="flex-1 bg-black text-white py-3 rounded-full font-bold hover:bg-black/90 transition-all"
+                  >
+                    Yes, Subscribe
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {step === "success" && (
+              <div className="w-full bg-green-500 text-white py-4 rounded-full font-bold text-lg flex items-center justify-center gap-2">
+                <Check className="w-5 h-5" /> Preferences Saved
+              </div>
+            )}
           </form>
         </section>
 
