@@ -174,7 +174,7 @@ secret you create locally (`openssl rand -hex 32`). *Output* = produced by a dep
 | 5 | `ADMIN_PASSWORD` | Generate | `/api/admin/login` | Phase 0 | |
 | 6 | `ADMIN_JWT_SECRET` | Generate, 32 bytes | `lib/auth.ts`, `middleware.ts` | Phase 0 | Must be set; the fallback string makes admin sessions forgeable (SA-8). |
 | 7 | `CRON_SECRET` | Generate | `/api/cron/snapshot` | Phase 1 | Moves from query string to header in Phase 5. |
-| 8 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | You — Cloudflare dashboard, token with Pages + D1 edit | GitHub Actions secrets for `deploy.yml` | Phase 0 | `deploy.yml` must be rewritten first (B-5). |
+| 8 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | You — Cloudflare dashboard, token scoped as in §2.3.1 (Workers Scripts, D1, Workers Routes, DNS — **not** Pages) | GitHub Actions secrets for `deploy.yml` | Phase 0 | `deploy.yml` must be rewritten first (B-5). |
 | 9 | `CLOUDFLARE_DATABASE_ID`, `CLOUDFLARE_D1_TOKEN` | You — same token; ID is `f0a28d6f-0a36-46aa-b711-8b5297913d2e` | `drizzle.config.ts` (migrations / studio only) | Phase 1 | Not needed at runtime; the Worker uses the `DB` binding. |
 | 10 | `DEPLOYER_PRIVATE_KEY` | Wallet — fresh, funded | `contracts/scripts/deploy.js`, `contracts/scripts/deploy-aqua-app.js` — the operator's shell only, never a file | Phase 2 | Deploys the registry and becomes its administrator (pause, rotate attester). Also deploys XYCSwap + XYCSwapTaker, **neither of which has an owner**, so it keeps no privilege there. |
 | 11 | `REGISTRY_ADDRESS` / `NEXT_PUBLIC_REGISTRY_ADDRESS` → `NEXT_PUBLIC_REGISTRY_ADDRESS` | Output of registry deploy | chain module, MCP | Phase 2 | Startup must assert code exists at it (D-015). |
