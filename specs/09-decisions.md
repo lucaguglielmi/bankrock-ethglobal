@@ -566,6 +566,24 @@ unaffected: it is a generic operational-alert delivery route, not the keeper, an
 `mcp/config.ts` (`run_aqua_keeper` tool and its `noKeeper` reason removed);
 `scripts/spec-checks.sh` (D-022 check no longer walks `web3-functions/`).
 
+### D-036 — A public RPC is acceptable for the demo; a keyed provider is recommended, not required
+
+**Decision:** `SEPOLIA_RPC_URL` must be set (unset keeps the indexer `UNAVAILABLE`, D-015), but its
+value may be a public endpoint. `https://ethereum-sepolia-rpc.publicnode.com` is reachable from
+the Worker, from GitHub Actions and from the agent sandbox, reports chain 11155111, and on
+2026-09-12 served filtered `eth_getLogs` over 2,000-block (129 ms) and 10,000-block (521 ms)
+ranges against the registry address, which is what `lib/indexer.ts` asks for in 2,000-block
+chunks. It refused an *unfiltered* 2,000-block query, which nothing in the app issues.
+
+**Consequence:** spec 16 #4 and DEMO-STATE K-7 no longer say "public RPCs reject the log ranges
+the indexer needs" as a fact about every public RPC; they say that a keyed provider (Alchemy,
+Infura) is recommended for demo day because a public endpoint's rate limit is shared with
+strangers, and that the public endpoint above is a working default. The MCP process reads the
+same variable (spec 11) and was proven against the deployed registry with it.
+
+**Files:** `specs/16-environment-and-secrets.md` (#4); `specs/18-demo-readiness.md` (Part 2.2, "RPC");
+`DEMO-STATE.md` (K-7).
+
 ## Open product questions
 
 1. **Is the hackathon's main story gifting, a public micro-exchange, or both?** Gifting is the core product journey; public tap-to-trade is the primary demonstration of the liquidity.

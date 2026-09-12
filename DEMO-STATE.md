@@ -75,7 +75,7 @@ surface still renders `UNAVAILABLE` naming the variable, because that is what th
 | K-4 | Gift claims | 16 #30, #34, 09 D-027, D-032 | `RELAYER_PRIVATE_KEY` is set **and funded**, **and** `RELAYER_DAILY_CAP_WEI` is set to a non-zero whole number of wei. Either unset means claims are unavailable, never free and never uncapped. |
 | K-5 | Any gas-sponsored operation | 16 #15 | A Pimlico key **and** a sponsorship policy for chain 11155111. Without the policy every UserOp is rejected. |
 | K-6 | The ETH faucet | 16 #16 | `FAUCET_PRIVATE_KEY` is set and funded. There is no default key. |
-| K-7 | Provenance, the fee log scan, Rock Account derivation | 16 #4 | `SEPOLIA_RPC_URL` points at a real provider. Public RPCs reject the log ranges the indexer needs. |
+| K-7 | Provenance, the fee log scan, Rock Account derivation | 16 #4, 09 D-036 | `SEPOLIA_RPC_URL` is set on the Worker. `https://ethereum-sepolia-rpc.publicnode.com` is a measured, working value (D-036); a keyed provider is the recommendation for demo day, not a condition. |
 | K-8 | Admin figures, contact and vanity forms, counters, rate limits | 12 | The D1 binding is live and `drizzle/` migrations are applied to production. |
 | K-9 | Any email at all | 16 #19, #33 | `RESEND_API_KEY` plus SPF/DKIM verification of `bank-rock.com`. Until then the sandbox sender reaches only the account owner's inbox. |
 
