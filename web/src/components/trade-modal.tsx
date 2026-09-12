@@ -45,6 +45,7 @@ function TradeModalInner({
   currentReserve,
   onTradeSuccess,
 }: Omit<TradeModalProps, "isOpen">) {
+  const { hapticError, hapticLight } = useHaptics();
   const { playTap, playSuccess, playError, playSwipe } = useAudio();
   const [fromToken, setFromToken] = useState<TokenType>("USDC");
   const [toToken, setToToken] = useState<TokenType>("WETH");
