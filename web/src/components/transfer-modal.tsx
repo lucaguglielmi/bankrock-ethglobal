@@ -8,10 +8,16 @@
  * `` `0x${string}` `` for viem to choke on (X-3), rendered a synthesized hash with an
  * explorer link built from it (D-014), and narrated a Safe/paymaster route that does not exist.
  *
- * What it is now: the pending handover Flow E always specified. The owner names a recipient — or
- * nobody, for "whoever taps the rock and claims it" — picks an expiry, optionally writes a
- * message, and creates a handover. The rock does not move until the recipient taps the tag and
- * claims it (`ClaimHandoverSheet`). There is no immediate-transfer path any more.
+ * What it is now: the pending handover Flow E always specified. The owner names the recipient,
+ * picks an expiry, optionally writes a message, and creates a handover. The rock does not move
+ * until that recipient taps the tag and claims it (`ClaimHandoverSheet`). There is no
+ * immediate-transfer path any more.
+ *
+ * The recipient is **required**. An unnamed gift ("whoever taps it") cannot carry the
+ * pre-signed Rock Account owner swap — there is no address to sign it for — and after the
+ * contract audit the giver's Safe loses authority the moment the rock changes owner. Whoever
+ * claimed such a gift would own a rock whose account nobody could drive under sponsorship. So
+ * the address is asked for up front, where the mistake is still cheap.
  */
 
 import * as React from "react";
@@ -50,13 +56,12 @@ export interface TransferModalProps {
   currentOwner: string;
   /**
    * Compatibility callback. It now means "a handover was created", not "ownership moved":
-   * nothing moves until the recipient taps the rock and claims it. `newOwner` is the named
-   * recipient, or `""` when the gift is open to whoever taps and claims.
+   * nothing moves until the named recipient taps the rock and claims it.
    */
   onTransferSuccess?: (newOwner: string, txHash?: string) => void;
-  /** Precise form of the callback above. */
+  /** Precise form of the callback above. The recipient is always a real address. */
   onHandoverInitiated?: (
-    recipient: string | null,
+    recipient: `0x${string}`,
     result: HandoverResult,
   ) => void;
 }
@@ -102,23 +107,24 @@ export function TransferModal({
   const [submitError, setSubmitError] = React.useState<string | null>(null);
 
   const trimmedRecipient = recipient.trim();
-  const isOpenGift = trimmedRecipient === "";
+  const isEmpty = trimmedRecipient === "";
   const looksLikeEns = /\.eth$/i.test(trimmedRecipient);
-  const isValidAddress = !isOpenGift && isAddress(trimmedRecipient, { strict: false });
+  const isValidAddress = !isEmpty && isAddress(trimmedRecipient, { strict: false });
   const isSelf =
     isValidAddress &&
     Boolean(currentOwner) &&
     trimmedRecipient.toLowerCase() === currentOwner.toLowerCase();
 
+  // Empty is not an error while the field is untouched — it is simply not ready yet.
   const recipientError = looksLikeEns
     ? "ENS names are not supported yet. Paste the recipient's address, starting with 0x."
-    : !isOpenGift && !isValidAddress
+    : !isEmpty && !isValidAddress
       ? "That is not an Ethereum address. Paste the full address, starting with 0x."
       : isSelf
         ? "That is your own address. Give the rock to someone else."
         : null;
 
-  const canReview = recipientError === null;
+  const canReview = isValidAddress && recipientError === null;
 
   const handlePaste = React.useCallback(async () => {
     try {
@@ -134,9 +140,7 @@ export function TransferModal({
     setSubmitError(null);
 
     const expiresAt = Math.floor(Date.now() / 1000) + expiryDays * DAY_SECONDS;
-    const namedRecipient = isValidAddress
-      ? (getAddress(trimmedRecipient) as `0x${string}`)
-      : null;
+    const namedRecipient = getAddress(trimmedRecipient) as `0x${string}`;
     const trimmedMessage = message.trim();
 
     try {
@@ -150,7 +154,7 @@ export function TransferModal({
       setStep("done");
       onHandoverInitiated?.(namedRecipient, capability);
       if (capability.state === "REAL") {
-        onTransferSuccess?.(namedRecipient ?? "", capability.value.txHash);
+        onTransferSuccess?.(namedRecipient, capability.value.txHash);
       }
     } catch (error) {
       setSubmitError(
@@ -163,7 +167,6 @@ export function TransferModal({
     canReview,
     acknowledged,
     expiryDays,
-    isValidAddress,
     trimmedRecipient,
     message,
     initiateHandover,
@@ -171,10 +174,6 @@ export function TransferModal({
     onHandoverInitiated,
     onTransferSuccess,
   ]);
-
-  const recipientLine = isOpenGift
-    ? "Whoever taps this rock and claims it"
-    : trimmedRecipient;
 
   let footer: React.ReactNode;
   if (step === "form") {
@@ -258,7 +257,8 @@ export function TransferModal({
                   inputMode="text"
                   autoComplete="off"
                   spellCheck={false}
-                  placeholder="0x… (leave empty for anyone)"
+                  placeholder="0x…"
+                  required
                   value={recipient}
                   onChange={(event) => setRecipient(event.target.value)}
                   aria-describedby="give-recipient-hint"
@@ -281,7 +281,8 @@ export function TransferModal({
                 </p>
               ) : (
                 <p id="give-recipient-hint" className="text-sm text-ink-2">
-                  Leave this empty and the rock goes to whoever taps it and claims it first.
+                  The person you name will be able to claim the rock and its account when they
+                  tap it.
                 </p>
               )}
             </div>
@@ -337,11 +338,7 @@ export function TransferModal({
 
               <dt className="text-ink-3">To</dt>
               <dd className="justify-self-end">
-                {isOpenGift ? (
-                  <span className="text-ink">Whoever taps and claims</span>
-                ) : (
-                  <Address value={trimmedRecipient} />
-                )}
+                <Address value={trimmedRecipient} />
               </dd>
 
               <dt className="text-ink-3">They have</dt>
@@ -373,7 +370,7 @@ export function TransferModal({
                 className="size-6 shrink-0 rounded border-border accent-primary"
               />
               <span>
-                I want to give rock #{rockId} to {isOpenGift ? "whoever claims it" : "this address"}.
+                I want to give rock #{rockId} to this address.
               </span>
             </label>
           </>
@@ -390,19 +387,13 @@ export function TransferModal({
                   {result.state === "DEMO" ? <SimulatedBadge /> : null}
                 </div>
                 <p className="max-w-prose text-base text-ink-2">
-                  {isOpenGift
-                    ? "Whoever taps this rock next can claim it."
-                    : "They can claim it the next time they tap this rock."}{" "}
-                  The rock stays in your account until they do.
+                  They can claim it the next time they tap this rock. The rock stays in your
+                  account until they do.
                 </p>
                 <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 text-sm">
                   <dt className="text-ink-3">To</dt>
                   <dd className="justify-self-end">
-                    {isOpenGift ? (
-                      <span className="text-ink">{recipientLine}</span>
-                    ) : (
-                      <Address value={trimmedRecipient} />
-                    )}
+                    <Address value={trimmedRecipient} />
                   </dd>
                   <dt className="text-ink-3">Transaction</dt>
                   <dd className="justify-self-end">
