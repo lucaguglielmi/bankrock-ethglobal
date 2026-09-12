@@ -49,3 +49,4 @@ Working line: **Liquidity you can hold.**
   answering "what's next?", and add a line to it before merging any new simulated surface.
   [`15-exit-demo-mode.md`](./15-exit-demo-mode.md) §1.3 is the frozen audit baseline that file
   replaced, and is kept as history rather than updated.
+| [20-live-sepolia-plan.md](./20-live-sepolia-plan.md) | The next batch: deploy and configure, live rehearsal script, physical tag test, demo rehearsal, and the parallel polish packages | Active |
