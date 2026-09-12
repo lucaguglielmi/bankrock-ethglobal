@@ -24,6 +24,29 @@
  * And P-2: no failure reason here is built from an exception. viem puts the RPC URL — which
  * carries the provider's API key — into its error text, and this endpoint is unauthenticated.
  * Reasons come from a fixed set; the detail goes to telemetry, which redacts before it buffers.
+ *
+ * ## Ordering, after contract review N-1
+ *
+ * The re-review found that a giver who still controls the Rock Account's Safe can add the
+ * recipient as a signer for one batched transaction, use the registry as its controller, and
+ * remove them again — archiving or re-gifting the rock the recipient just received. The Safe's
+ * owner set is writable by the Safe, so "ask the account who its owners are" is a question the
+ * giver answers. The scope is the open-gift path, and the named-gift path *when the pre-signed
+ * owner swap does not land*.
+ *
+ * So this route closes both halves off chain:
+ *
+ *   1. **open gifts are refused.** Nobody's address is known at the time they are opened, so no
+ *      owner swap can be pre-signed for them, and the registry claim would hand over a rock whose
+ *      account still belongs to the giver;
+ *   2. **the Safe moves first.** The pre-signed owner swap is submitted and its receipt checked
+ *      *before* `claimHandover` is broadcast. If it does not land, nothing is claimed and the cap
+ *      reservation is released — the recipient is left exactly where they started rather than
+ *      owning a rock whose account is someone else's.
+ *
+ * `claimHandover` rebinds `rock.smartAccount` to `att.smartAccount`, and for a named gift the
+ * verifier signs the rock's existing account — which, after step 2, is the claimant's. This route
+ * checks that the attestation names that same account before it does anything at all.
  */
 
 import { NextResponse } from "next/server";
@@ -99,7 +122,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   // The registry decides whether this claim can succeed — ask it before paying for the attempt.
-  const claimable = await isClaimable(id, verified.value.subject);
+  const claimable = await isClaimable(id, verified.value.subject, attestation);
   if (claimable.state === "UNAVAILABLE") {
     logger.warn("Refused a relayed claim that the registry would reject", {
       action: "HANDOVER_CLAIM_NOT_CLAIMABLE",
@@ -118,28 +141,46 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  const claim = await submitClaimHandover(id, attestation);
-  if (claim.state !== "REAL") {
-    // Nothing was broadcast, so nothing was spent.
+  // The Rock Account moves before the rock does (review N-1). A claim whose owner swap did not
+  // land would leave the recipient owning a rock whose account is still the giver's — which is
+  // exactly the authority the review found a giver can use to archive or re-gift it.
+  const ownerSwap = await submitOwnerSwap(id, verified.value.subject);
+  if (ownerSwap.state === "UNAVAILABLE") {
     await releaseRelayerSpend(reservation.value.day, reservation.value.reservedWei);
+    logger.warn("Refused a claim whose Rock Account hand-over did not land", {
+      action: "HANDOVER_CLAIM_SWAP_FAILED",
+      rockId: id,
+      reason: ownerSwap.reason,
+    });
     return NextResponse.json(
       {
         state: "UNAVAILABLE",
-        reason: claim.state === "UNAVAILABLE" ? claim.reason : "The claim was not broadcast",
+        reason: `The Rock Account was not handed over, so the rock was not claimed: ${ownerSwap.reason}`,
+        rockAccountHandover: { state: "UNAVAILABLE", reason: ownerSwap.reason },
       },
       { status: 503 },
     );
   }
 
-  const ownerSwap = await submitOwnerSwap(id, verified.value.subject);
+  const claim = await submitClaimHandover(id, attestation);
+  if (claim.state !== "REAL") {
+    // The relayer never broadcast, so its ledger is released. The owner swap did land, and saying
+    // so is the honest report: the account is the claimant's, the registry record is not.
+    await releaseRelayerSpend(reservation.value.day, reservation.value.reservedWei);
+    return NextResponse.json(
+      {
+        state: "UNAVAILABLE",
+        reason: claim.state === "UNAVAILABLE" ? claim.reason : "The claim was not broadcast",
+        rockAccountHandover: { state: "REAL", txHash: ownerSwap.value.txHash },
+      },
+      { status: 503 },
+    );
+  }
 
   return NextResponse.json({
     state: "REAL",
     txHash: claim.value.txHash,
-    rockAccountHandover:
-      ownerSwap.state === "UNAVAILABLE"
-        ? { state: "UNAVAILABLE", reason: ownerSwap.reason }
-        : { state: "REAL", txHash: ownerSwap.value.txHash },
+    rockAccountHandover: { state: "REAL", txHash: ownerSwap.value.txHash },
   });
 }
 
@@ -153,13 +194,27 @@ function limitResponse(limit: { status?: 429 | 503; reason?: string }) {
 }
 
 /**
- * Whether the registry would accept this claim.
+ * Whether the registry would accept this claim, and whether the app is willing to relay it.
  *
- * Three ways it would not, each of which would burn gas on a reverting transaction: the rock has
- * no outstanding handover, the handover has expired, or it names someone other than the tap's
- * subject. The reasons are written here, never derived from an exception (audit P-2).
+ * Five ways it is not, each of which would otherwise burn gas on a reverting transaction or hand
+ * over a rock whose account stays behind:
+ *
+ *  - the rock has no outstanding handover, or it has expired;
+ *  - the gift is **open** (`recipient == address(0)`). The app no longer supports those: a
+ *    recipient who is unknown when the gift is opened cannot have an owner swap pre-signed for
+ *    them, and a claim without one leaves the Safe with the giver (review N-1);
+ *  - the gift names someone other than the tap's subject;
+ *  - the attestation names a different Rock Account than the registry holds. `claimHandover`
+ *    rebinds `rock.smartAccount` to `att.smartAccount`, so a mismatch would rebind the rock to an
+ *    account nobody checked.
+ *
+ * Every reason is written here, never derived from an exception (audit P-2).
  */
-async function isClaimable(rockId: string, subject: string): Promise<Capability<true>> {
+async function isClaimable(
+  rockId: string,
+  subject: string,
+  attestation: SignedAttestation,
+): Promise<Capability<true>> {
   const rock = await readRock(rockId);
   if (rock.state === "UNAVAILABLE") {
     return unavailable("The registry could not be read, so this claim was not attempted");
@@ -172,8 +227,16 @@ async function isClaimable(rockId: string, subject: string): Promise<Capability<
   if (handover.expiresAt * 1000 <= Date.now()) {
     return unavailable("This gift has expired");
   }
-  if (handover.recipient && handover.recipient.toLowerCase() !== subject.toLowerCase()) {
+  if (!handover.recipient) {
+    return unavailable("open gifts are not supported by the app");
+  }
+  if (handover.recipient.toLowerCase() !== subject.toLowerCase()) {
     return unavailable("This gift was offered to a different wallet");
+  }
+  if (
+    attestation.message.smartAccount.toLowerCase() !== rock.value.smartAccount.toLowerCase()
+  ) {
+    return unavailable("This tap names a different Rock Account than the registry holds");
   }
 
   return real(true);
@@ -203,12 +266,14 @@ async function submitOwnerSwap(
 
   if (!row) {
     return unavailable(
-      "The Rock Account hand-over requires a named recipient: this gift was open, so its Safe owner was not pre-signed",
+      "no pre-signed Rock Account hand-over is stored for this rock — ask the giver to open the gift again",
     );
   }
 
-  if (row.recipient && row.recipient.toLowerCase() !== subject.toLowerCase()) {
-    return unavailable("The stored Rock Account hand-over names a different recipient");
+  // Required, not optional (review N-1): a stored operation that names someone else would hand the
+  // account to the wrong wallet, and one with no recipient at all cannot be checked.
+  if (!row.recipient || row.recipient.toLowerCase() !== subject.toLowerCase()) {
+    return unavailable("the stored Rock Account hand-over names a different recipient");
   }
 
   const result = await submitSignedUserOp(row.userOp as unknown as SerializedUserOperation);

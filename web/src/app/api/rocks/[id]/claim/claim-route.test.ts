@@ -46,9 +46,15 @@ vi.mock("@/lib/rate-limit", () => ({
   requireRateLimit: (...args: unknown[]) => requireRateLimit(...args),
 }));
 
+let storedSwap: Record<string, unknown> | null = null;
+const deletedSwap = vi.fn();
+
 vi.mock("@/lib/db", () => ({
-  getDb: () => null,
   NO_DATABASE_REASON: "no database",
+  getDb: () => ({
+    select: () => ({ from: () => ({ where: () => ({ get: async () => storedSwap }) }) }),
+    delete: () => ({ where: async () => deletedSwap() }),
+  }),
 }));
 
 const attestation = {
@@ -64,6 +70,7 @@ const attestation = {
     counter: 7,
     deadline: Math.floor(Date.now() / 1000) + 600,
     subject: RELAYER_SUBJECT,
+    // `claimHandover` rebinds the rock to this account, so it must be the one the registry holds.
     smartAccount: OTHER_WALLET,
   },
 };
@@ -79,7 +86,8 @@ function rock(overrides: Record<string, unknown> = {}) {
       state: "handover_pending",
       lost: false,
       handover: {
-        recipient: null,
+        // Named, always: open gifts are refused outright now (review N-1).
+        recipient: RELAYER_SUBJECT,
         expiresAt: Math.floor(Date.now() / 1000) + 3600,
         initiatedAt: Math.floor(Date.now() / 1000) - 60,
         initiatedBy: OTHER_WALLET,
@@ -118,6 +126,19 @@ beforeEach(() => {
     fn.mockReset();
   }
 
+  storedSwap = {
+    rockId: "1",
+    kind: "swap_owner",
+    creatorDid: "did:privy:giver",
+    recipient: RELAYER_SUBJECT,
+    userOp: { sender: OTHER_WALLET, signature: `0x${"11".repeat(65)}` },
+  };
+  deletedSwap.mockReset();
+  submitSignedUserOp.mockResolvedValue({
+    state: "REAL",
+    value: { txHash: `0x${"ef".repeat(32)}`, userOpHash: `0x${"ab".repeat(32)}` },
+  });
+
   requireIpRateLimit.mockResolvedValue({ ok: true });
   requireRateLimit.mockResolvedValue({ ok: true });
   verifyAttestation.mockResolvedValue({
@@ -137,30 +158,35 @@ afterEach(() => {
 });
 
 describe("the happy path", () => {
-  it("broadcasts once every gate has passed", async () => {
+  it("hands over the account, then claims the rock", async () => {
     const { status, body } = await post();
     expect(status).toBe(200);
     expect(body.state).toBe("REAL");
     expect(body.txHash).toBe(`0x${"cd".repeat(32)}`);
+    expect(body.rockAccountHandover).toEqual({ state: "REAL", txHash: `0x${"ef".repeat(32)}` });
     expect(submitClaimHandover).toHaveBeenCalledTimes(1);
-    // The open handover has no pre-signed owner swap, and the response says so rather than
-    // implying the Rock Account moved.
-    expect(body.rockAccountHandover.state).toBe("UNAVAILABLE");
+    expect(submitSignedUserOp).toHaveBeenCalledTimes(1);
   });
 
-  it("reserves the spend before broadcasting, not after", async () => {
+  it("orders the three steps: reserve, swap the Safe, then claim (review N-1)", async () => {
     const order: string[] = [];
     reserveRelayerSpend.mockImplementation(async () => {
       order.push("reserve");
       return { state: "REAL", value: { day: "2026-09-12", reservedWei: BigInt(1) } };
     });
+    submitSignedUserOp.mockImplementation(async () => {
+      order.push("swap");
+      return { state: "REAL", value: { txHash: `0x${"ef".repeat(32)}`, userOpHash: "0x" } };
+    });
     submitClaimHandover.mockImplementation(async () => {
-      order.push("broadcast");
+      order.push("claim");
       return { state: "REAL", value: { txHash: `0x${"cd".repeat(32)}` } };
     });
 
     await post();
-    expect(order).toEqual(["reserve", "broadcast"]);
+    // The Safe must belong to the claimant before the registry says the rock does: a rock whose
+    // account is still the giver's is one she can archive or re-gift.
+    expect(order).toEqual(["reserve", "swap", "claim"]);
   });
 });
 
@@ -190,6 +216,69 @@ describe("refusals before any gas is spent (P-1)", () => {
     expect(status).toBe(409);
     expect(body.reason).toMatch(/expired/i);
     expect(submitClaimHandover).not.toHaveBeenCalled();
+  });
+
+  it("refuses an open gift outright (review N-1)", async () => {
+    readRock.mockResolvedValue(
+      rock({
+        handover: {
+          recipient: null,
+          expiresAt: Math.floor(Date.now() / 1000) + 3600,
+          initiatedAt: 0,
+          initiatedBy: OTHER_WALLET,
+          messageHash: `0x${"00".repeat(32)}`,
+        },
+      }),
+    );
+    const { status, body } = await post();
+    expect(status).toBe(409);
+    expect(body.reason).toBe("open gifts are not supported by the app");
+    expect(submitSignedUserOp).not.toHaveBeenCalled();
+    expect(submitClaimHandover).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the attestation names a different Rock Account", async () => {
+    readRock.mockResolvedValue(rock({ smartAccount: "0x4444444444444444444444444444444444444444" }));
+    const { status, body } = await post();
+    expect(status).toBe(409);
+    expect(body.reason).toMatch(/different Rock Account/i);
+    expect(submitSignedUserOp).not.toHaveBeenCalled();
+    expect(submitClaimHandover).not.toHaveBeenCalled();
+  });
+
+  it("refuses when no owner swap is stored for the rock", async () => {
+    storedSwap = null;
+    const { status, body } = await post();
+    expect(status).toBe(503);
+    expect(body.reason).toMatch(/no pre-signed Rock Account hand-over/i);
+    expect(submitClaimHandover).not.toHaveBeenCalled();
+    expect(releaseRelayerSpend).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses when the stored owner swap names a different recipient", async () => {
+    storedSwap = {
+      rockId: "1",
+      kind: "swap_owner",
+      recipient: OTHER_WALLET,
+      userOp: { sender: OTHER_WALLET, signature: "0x11" },
+    };
+    const { status, body } = await post();
+    expect(status).toBe(503);
+    expect(body.reason).toMatch(/names a different recipient/i);
+    expect(submitClaimHandover).not.toHaveBeenCalled();
+  });
+
+  it("does not claim when the owner swap fails to land, and releases the reservation", async () => {
+    submitSignedUserOp.mockResolvedValue({
+      state: "UNAVAILABLE",
+      reason: "the bundler rejected the stored operation: internal error",
+    });
+
+    const { status, body } = await post();
+    expect(status).toBe(503);
+    expect(submitClaimHandover).not.toHaveBeenCalled();
+    expect(releaseRelayerSpend).toHaveBeenCalledWith("2026-09-12", BigInt(2_000_000_000_000_000));
+    expect(body.rockAccountHandover.state).toBe("UNAVAILABLE");
   });
 
   it("refuses when the gift names someone else", async () => {
@@ -284,5 +373,7 @@ describe("when the broadcast itself fails", () => {
     expect(releaseRelayerSpend).toHaveBeenCalledWith("2026-09-12", BigInt(2_000_000_000_000_000));
     // P-2: the reason is from the fixed set, with no URL in it.
     expect(body.reason).not.toMatch(/http/i);
+    // The swap did land, and the response says so rather than implying nothing happened.
+    expect(body.rockAccountHandover).toEqual({ state: "REAL", txHash: `0x${"ef".repeat(32)}` });
   });
 });
