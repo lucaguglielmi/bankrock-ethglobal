@@ -57,17 +57,41 @@ export default function SecurityPage() {
           </Accordion>
         </section>
 
-        {/* Future Ideas Voting */}
-        <section className="flex flex-col gap-6 bg-ink-4/10 p-8 rounded-3xl border border-black/5">
-          <h3 className="text-xl font-bold">Vote on the future</h3>
-          <p className="text-ink-2">
-            We are planning to implement AWS Nitro Enclaves to generate uniquely encrypted, rotating NFC payloads on-the-fly, making URL cloning impossible. 
-          </p>
-          <div className="flex items-center gap-4 mt-2">
-            <span className="text-sm font-semibold">What do you think?</span>
-            <Button variant="outline" size="sm" className="rounded-full">👍 Good idea</Button>
-            <Button variant="outline" size="sm" className="rounded-full">😐 Neutral</Button>
-            <Button variant="outline" size="sm" className="rounded-full">👎 Dislike</Button>
+        {/* Future Ideas Voting & Plans */}
+        <section className="flex flex-col gap-8 bg-ink-4/10 p-6 sm:p-8 rounded-3xl border border-black/5">
+          <div className="flex flex-col gap-4">
+            <h3 className="text-xl font-bold">How do you feel?</h3>
+            <p className="text-ink-2">
+              Do you think Bank Rock is secure enough as it is? Would you trust it to hold 20% of your portfolio in its current status?
+            </p>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2">
+              <Button variant="outline" size="sm" className="rounded-full">👍 Absolutely</Button>
+              <Button variant="outline" size="sm" className="rounded-full">😐 Maybe</Button>
+              <Button variant="outline" size="sm" className="rounded-full">👎 No way</Button>
+            </div>
+          </div>
+
+          <hr className="border-black/5" />
+
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl font-bold">Future Plans</h3>
+              <span className="rounded-full bg-blue-100 px-3 py-0.5 text-xs font-semibold text-blue-700 uppercase tracking-widest">Coming soon</span>
+            </div>
+            <ul className="flex flex-col gap-4 text-base text-ink-2 mt-2">
+              <li className="flex gap-3">
+                <span className="text-ink font-bold mt-0.5">•</span>
+                <span><strong>Hardware Wallet Integration:</strong> Ledger-level login to secure large holdings with physical device approval.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-ink font-bold mt-0.5">•</span>
+                <span><strong>Transaction PINs:</strong> Require a secret code or biometric approval on your device for high-value operations.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-ink font-bold mt-0.5">•</span>
+                <span><strong>Dynamic NFC Payloads:</strong> Implementing AWS Nitro Enclaves to generate uniquely encrypted, rotating NFC URLs on-the-fly, making URL cloning impossible.</span>
+              </li>
+            </ul>
           </div>
         </section>
 
