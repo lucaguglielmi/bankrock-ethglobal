@@ -677,6 +677,33 @@ export function nextFreeRockId(awakenedIds: readonly string[]): string {
   return (highest + BigInt(1)).toString();
 }
 
+/** How many consecutive ids the registry is asked about before giving up (2026-09-13). */
+export const NEXT_FREE_PROBE_LIMIT = 256;
+
+/**
+ * The first dormant rock id at or after `start`, asked of the registry one id at a time.
+ *
+ * The indexed events are a *suggestion* (they exist only once a rock's activity has been viewed
+ * and mirrored); the registry is the truth. Starting from the suggestion and walking forward
+ * until `getRock` reports `dormant` makes the answer correct even with an empty mirror — an
+ * archived or awakened id is skipped, never offered. `readState` is injected so the walk is
+ * testable without a chain. Returns null when the RPC could not answer or the limit is hit.
+ */
+export async function findNextDormantRockId(
+  start: string,
+  readState: (rockId: string) => Promise<Capability<{ state: string }>>,
+  limit: number = NEXT_FREE_PROBE_LIMIT,
+): Promise<string | null> {
+  const first = parseRockId(start) ?? BigInt(1);
+  for (let i = BigInt(0); i < BigInt(limit); i++) {
+    const id = (first + i).toString();
+    const record = await readState(id);
+    if (record.state === "UNAVAILABLE") return null;
+    if (record.value.state === "dormant") return id;
+  }
+  return null;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Safe owner rotation                                                         */
 /* -------------------------------------------------------------------------- */

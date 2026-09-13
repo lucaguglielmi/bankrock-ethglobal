@@ -16,7 +16,7 @@ import { desc, eq } from "drizzle-orm";
 import { getDb, NO_DATABASE_REASON } from "@/lib/db";
 import { rockEvents } from "@/lib/db/schema";
 import { consumeIpRateLimit } from "@/lib/rate-limit";
-import { nextFreeRockId } from "@/lib/rock-account";
+import { findNextDormantRockId, nextFreeRockId, readRock } from "@/lib/rock-account";
 import { logger } from "@/lib/telemetry";
 
 export async function GET(req: Request) {
@@ -44,12 +44,21 @@ export async function GET(req: Request) {
       .orderBy(desc(rockEvents.timestamp))
       .limit(1000);
 
-    const rockId = nextFreeRockId(rows.map((row) => row.rockId));
+    // The mirror suggests; the registry decides (see `nextFreeId` in lib/nfc/rock-resolution.ts).
+    const suggestion = nextFreeRockId(rows.map((row) => row.rockId));
+    const rockId = await findNextDormantRockId(suggestion, readRock);
+    if (rockId === null) {
+      return NextResponse.json(
+        { state: "UNAVAILABLE", reason: "The registry could not be asked which id is free" },
+        { status: 503 },
+      );
+    }
 
     return NextResponse.json({
       state: "REAL",
       rockId,
       basedOnAwakenedCount: rows.length,
+      confirmedOnChain: true,
     });
   } catch (error) {
     logger.error("Failed to compute the next rock id", error, { action: "NEXT_ROCK_ID_FAILED" });

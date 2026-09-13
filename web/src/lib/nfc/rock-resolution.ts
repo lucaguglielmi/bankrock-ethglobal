@@ -19,6 +19,7 @@ import { getDb } from "@/lib/db";
 import { rockEvents } from "@/lib/db/schema";
 import {
   computeRockAccountAddress,
+  findNextDormantRockId,
   nextFreeRockId,
   parseRockId,
   readRock,
@@ -127,7 +128,13 @@ export async function resolveEffectiveRock(
 }
 
 async function nextFreeId(): Promise<string> {
-  return nextFreeRockId(await awakenedRockIds());
+  // The mirror only says where to start looking; the registry says which id is actually free
+  // (2026-09-13: the mirror is filled by viewing a rock's activity, so on a fresh Worker or right
+  // after an archive it can lag the chain, and offering an archived id would make `awakenRock`
+  // revert on stage).
+  const suggestion = nextFreeRockId(await awakenedRockIds());
+  const onChain = await findNextDormantRockId(suggestion, readRock);
+  return onChain ?? suggestion;
 }
 
 /* -------------------------------------------------------------------------- */
