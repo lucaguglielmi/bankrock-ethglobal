@@ -53,7 +53,13 @@ export function Header() {
       style={{ height: "var(--header-h)", zIndex: "var(--z-header)" }}
     >
       <nav aria-label="Main navigation" className="flex h-[calc(var(--header-h)-var(--safe-top))] items-center justify-between px-[var(--gutter)]">
-        <Link href="/" aria-label="Bank Rock home" className="min-w-0 shrink hover:opacity-70 motion-safe:transition-opacity">
+        {/* Every header link is a 44 px-tall target (spec 17 item 3); the underline that marks
+            the active inline link sits on an inner span so the box stays that tall. */}
+        <Link
+          href="/"
+          aria-label="Bank Rock home"
+          className="flex h-11 min-w-0 shrink items-center hover:opacity-70 motion-safe:transition-opacity"
+        >
           <Image
             src="/brand/logo-animated.svg"
             alt="Bank Rock"
@@ -72,26 +78,33 @@ export function Header() {
               key={link.href}
               href={link.href}
               className={cn(
-                "text-sm motion-safe:transition-opacity",
+                "flex h-11 items-center text-sm motion-safe:transition-opacity",
                 isLinkActive(link.href)
-                  ? "border-b border-ink pb-0.5 font-semibold text-ink"
+                  ? "font-semibold text-ink"
                   : "font-medium text-ink-2 hover:opacity-70"
               )}
             >
-              {link.label}
+              <span className={isLinkActive(link.href) ? "border-b border-ink pb-0.5" : undefined}>
+                {link.label}
+              </span>
             </Link>
           ))}
           <Link
             href={LIVE_ROCK_LINK.href}
             className={cn(
-              "flex items-center gap-1 text-sm motion-safe:transition-colors",
-              isRockActive
-                ? "border-b border-ink pb-0.5 font-semibold text-ink"
-                : "font-medium text-ink-3 hover:text-ink"
+              "flex h-11 items-center text-sm motion-safe:transition-colors",
+              isRockActive ? "font-semibold text-ink" : "font-medium text-ink-3 hover:text-ink"
             )}
           >
-            {LIVE_ROCK_LINK.label}
-            <ArrowRight className="size-3.5" />
+            <span
+              className={cn(
+                "flex items-center gap-1",
+                isRockActive ? "border-b border-ink pb-0.5" : undefined
+              )}
+            >
+              {LIVE_ROCK_LINK.label}
+              <ArrowRight className="size-3.5" />
+            </span>
           </Link>
           <IconButton aria-label={soundLabel} onClick={toggleMute}>
             {isMuted ? <VolumeX /> : <Volume2 />}

@@ -146,6 +146,15 @@ async function assertSheetReachable(page: Page, check: SheetCheck): Promise<void
     : dialog.getByRole("button", { name: "Close" }).first();
   await expect(primary, "the sheet's primary action was not found inside it").toBeVisible();
 
+  // On phone widths the sheet slides up from the bottom edge (`Sheet`: a 200 ms transform
+  // transition from `translate-y-full`) and `toBeVisible` is already satisfied mid-slide. Item 8's
+  // claim is that the action ends up wholly inside the viewport, so wait for exactly that — it
+  // retries until the transition has finished — and only then measure the sheet at rest.
+  await expect(
+    primary,
+    "the sheet's primary action never came fully into the viewport",
+  ).toBeInViewport({ ratio: 1 });
+
   const [box, viewport, pageScrollY, hasScrollRegion] = await Promise.all([
     primary.boundingBox(),
     Promise.resolve(page.viewportSize()),
@@ -193,7 +202,7 @@ test.describe("sheets are reachable without sign-in — item 8", () => {
     await gotoAndSettle(page, "/shop");
     await assertSheetReachable(page, {
       triggerName: "Convince Us",
-      sheetTitle: "Claim an OG Rock",
+      sheetTitle: "Claim a Testnet Rock",
       primaryButtonName: "Send message",
     });
   });
@@ -202,7 +211,7 @@ test.describe("sheets are reachable without sign-in — item 8", () => {
     await gotoAndSettle(page, "/");
     await assertSheetReachable(page, {
       triggerName: "More about the rocks",
-      sheetTitle: "The physical bearer",
+      sheetTitle: "The stone itself",
       primaryButtonName: "Close",
     });
   });
@@ -216,14 +225,8 @@ test.describe("sheets are reachable without sign-in — item 8", () => {
     });
   });
 
-  test("Aqua explainer sheet, from /", async ({ page }) => {
-    await gotoAndSettle(page, "/");
-    await assertSheetReachable(page, {
-      triggerName: "What is Aqua?",
-      sheetTitle: "Understanding Aqua",
-      // No footer: it is tabs-only by design (spec 17 Part 5, L-10). Falls back to Close.
-    });
-  });
+  // The Aqua explainer is no longer a sheet: "What is Aqua?" on the landing page is a link to
+  // /learn/defi (components/how-it-works.tsx), and a page is covered by items 1-6 and 9 above.
 
   test("add funds sheet, from /rock/420", async ({ page }) => {
     // The demo rock's "Add funds" opens its own badged sheet (src/demo/rock-420/demo-fund-sheet)
