@@ -35,7 +35,7 @@ export function LoginButton() {
   } = useAuth();
   const [accountOpen, setAccountOpen] = React.useState(false);
   const [loggingOut, setLoggingOut] = React.useState(false);
-  // "Request change of ownership" (B1, Flow E): the code is collapsed by default so the account
+  // "Gift the rock to someone" (B1, Flow E): the code is collapsed by default so the account
   // sheet stays one screen, and reset whenever the sheet closes so it never reopens showing a
   // code nobody asked for.
   const [showCode, setShowCode] = React.useState(false);
@@ -134,7 +134,7 @@ export function LoginButton() {
                 onClick={() => setShowCode((open) => !open)}
               >
                 <QrCode aria-hidden />
-                {showCode ? "Hide code" : "Request change of ownership"}
+                {showCode ? "Hide code" : "Gift the rock to someone"}
               </Button>
               {showCode ? <MyAddressQr address={address} className="mt-1" /> : null}
 
