@@ -139,7 +139,7 @@ export const alertPreferences = sqliteTable('alert_preferences', {
   ownerDid: text('owner_did').notNull(),
   email: text('email'),
   pushEnabled: integer('push_enabled', { mode: 'boolean' }).notNull().default(false),
-  topics: text('topics', { mode: 'json' }).$type<Record<string, boolean>>(),
+  topics: text('topics', { mode: 'json' }).$type<Record<string, { push: boolean; email: boolean } | boolean>>(),
   updatedAt: integer('updated_at').notNull(),
 });
 

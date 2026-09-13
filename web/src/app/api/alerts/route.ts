@@ -13,6 +13,9 @@
  * recorded rather than fixed here; the fix is checking the DID against the registry's owner, which
  * needs the DID→wallet link the token does not carry.
  *
+ * `topics` is `{ [topic]: { push: boolean, email: boolean } }`, every topic optional. A malformed
+ * topic is a 400, an unknown topic key is ignored (`parseTopicsInput`).
+ *
  * Preferences persist; delivery does not exist. Spec 15 Part 6 cuts the delivery pipeline, so the
  * response states plainly that no alert can currently be dispatched.
  */
@@ -22,8 +25,8 @@ import { requirePrivyIdentity } from "@/lib/auth/privy";
 import {
   DEFAULT_ALERT_TOPICS,
   getAlertPreferences,
+  parseTopicsInput,
   saveAlertPreferences,
-  type AlertTopicsConfig,
 } from "@/lib/alerts";
 import { logger } from "@/lib/telemetry";
 
@@ -75,7 +78,7 @@ export async function POST(req: Request) {
     rockId?: string | number;
     email?: string;
     pushEnabled?: boolean;
-    topics?: Partial<AlertTopicsConfig>;
+    topics?: unknown;
   };
 
   const rockId = rockIdFrom(body.rockId);
@@ -88,12 +91,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "email must be an address or empty" }, { status: 400 });
   }
 
+  const topics = parseTopicsInput(body.topics);
+  if (!topics.ok) {
+    return NextResponse.json({ error: topics.error }, { status: 400 });
+  }
+
   const result = await saveAlertPreferences(
     rockId,
     auth.identity.did,
     email,
     Boolean(body.pushEnabled),
-    body.topics ?? {},
+    topics.topics,
   );
 
   if (result.state === "UNAVAILABLE") {
