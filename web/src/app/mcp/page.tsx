@@ -3,113 +3,138 @@
 /**
  * The MCP page (spec 17 Part 5 "MCP page"; spec 11 §5; D-004, D-008, D-013, D-019).
  *
- * What it says is what `mcp/index.ts` does: ten read-only tools, each of which either reads
- * Ethereum Sepolia or the Bank Rock API or answers `unavailable` with a reason. The per-tool
- * "Mock Sample Response" blocks of an earlier revision are gone — they presented invented
- * figures as measurements — and so is the banner that said the tools did not read live data,
- * which stopped being true when the contracts were deployed (D-034).
+ * The lead is the hosted endpoint, `/api/mcp`: a URL a person pastes into ChatGPT, claude.ai,
+ * the Claude apps, Claude Code or Cursor, with nothing to install. A phone can only ever reach a
+ * hosted server, which is why the stdio server in `mcp/` — still here, under "Run it yourself" —
+ * was never enough on its own. Both offer the same read-only tools; the stdio one adds the two
+ * operator tools, because only a process the operator starts can hold ADMIN_API_KEY.
  *
- * The server needs two things the client's config must pass in `env`: an RPC URL and the
- * registry address. The address in the snippet is read from `lib/chain` (D-015); nothing here is
- * typed by hand. Long paths and snippets go through `<CodeBlock>` so they wrap or scroll instead
- * of pushing the page sideways (L-7).
+ * The starter prompt is the exact text the hosted server sends as its `instructions` on connect
+ * (`lib/mcp/prompt.ts`), so a client that honours instructions needs nothing pasted and a person
+ * can still read what the agent was told. It names the endpoint: a prompt cannot open a
+ * connection, but an agent that knows the URL can say what is missing.
+ *
+ * The registry address in the stdio snippet is read from `lib/chain` (D-015); the endpoint URL
+ * from the canonical origin (D-022). Nothing here is typed by hand. Long paths and snippets go
+ * through `<CodeBlock>` so they wrap or scroll instead of pushing the page sideways (L-7).
  */
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Copy, Check, Cpu, ExternalLink, Layers, Terminal } from "lucide-react";
+import { ArrowRight, Copy, Check, Cpu, ExternalLink, Layers, Plug, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CodeBlock } from "@/components/ui/code-block";
 import { Term } from "@/components/ui/term";
-import { addresses } from "@/lib/chain";
+import { addresses, appPath } from "@/lib/chain";
 import { isDemoMode } from "@/lib/demo";
+import { agentInstructions, DEMO_ROCK_ID, MCP_ENDPOINT_PATH } from "@/lib/mcp/prompt";
 import { cn } from "@/lib/ui/cn";
 
 const REPO_URL = "https://github.com/lucaguglielmi/bankrock-ethglobal/tree/main/mcp";
 
 /** The rock the demo opens. Rock 1 is retired; rock 3 is the live one. */
-const DEMO_ROCK_HREF = "/rock/3";
+const DEMO_ROCK_HREF = `/rock/${DEMO_ROCK_ID}`;
 
-const AGENT_PROMPT = `You are connected to the Bank Rock MCP server. It is read-only.
+/** The hosted endpoint, on the canonical origin (D-022). */
+const ENDPOINT_URL = appPath(MCP_ENDPOINT_PATH);
 
-A Bank Rock is a real stone with an NTAG 424 DNA chip inside. Tapping it with a phone opens its
-page. Each rock has its own on-chain account (a Safe) that holds USDC and WETH on Ethereum Sepolia,
-and it offers those tokens for trading through 1inch Aqua. The tokens never leave the account;
-every trade leaves a small fee inside it.
+/** The same words the endpoint sends as its instructions on connect. */
+const AGENT_PROMPT = agentInstructions(ENDPOINT_URL);
 
-Tools:
-1. get_rock_status({ rockId }) — state (dormant, awake, gift waiting, retired), owner, account, balances.
-2. get_strategy_fees({ rockId }) — each live strategy: fee rate, what it may trade, what it can trade now, fees so far.
-3. explain_recent_fees({ rockId }) — the same fee figures in plain language, with how far back the scan went.
-4. get_strategy_volume({ rockId }) — how many trades each strategy has seen (a count, not a currency amount).
-5. trace_transaction({ hash }) — the receipt for a transaction hash.
-6. get_server_metrics() — whether the RPC, the registry and the API can be reached.
+const REGISTRY_FOR_SNIPPET =
+  addresses.registry ?? "<the registry address from contracts/deployments/sepolia.json>";
 
-Start by reading the rock's state, then say what you can and cannot tell from it. Never state a
-figure a tool did not return, and never quote a rate of return: the only rate is the fee.`;
-
-function envBlock(indent: string): string {
-  const registry = addresses.registry ?? "<the registry address from contracts/deployments/sepolia.json>";
-  return [
-    `${indent}"SEPOLIA_RPC_URL": "https://ethereum-sepolia-rpc.publicnode.com",`,
-    `${indent}"REGISTRY_ADDRESS": "${registry}"`,
-  ].join("\n");
+interface ClientGuide {
+  label: string;
+  /** One or two sentences on where this client runs and what it needs. */
+  intro: string;
+  /** Numbered steps, for a client that is configured through its own settings screens. */
+  steps?: string[];
+  /** A file or a place, for a client that is configured with text. */
+  path?: string;
+  snippet?: string;
 }
 
-const CONFIGS = {
+const CLIENTS = {
+  chatgpt: {
+    label: "ChatGPT",
+    intro:
+      "ChatGPT calls remote MCP servers from OpenAI's cloud once Developer mode is on. It needs a Plus, Pro, Business, Enterprise or Edu plan, and the switch lives in the web app; the connector then belongs to your account, not the browser.",
+    steps: [
+      "On chatgpt.com, open Settings and turn on Developer mode. OpenAI keeps the toggle under Apps & Connectors › Advanced settings on some versions and under Security and login on others.",
+      "Under Apps & Connectors, choose Create. Name it Bank Rock, paste the endpoint above as the MCP server URL, choose No authentication, confirm you trust it, and save.",
+      `Open the ChatGPT app on your phone, start a chat, open the tools menu and switch Bank Rock on. Ask it about rock ${DEMO_ROCK_ID}.`,
+    ],
+  },
   claude: {
-    label: "Claude Desktop",
-    path: "~/Library/Application Support/Claude/claude_desktop_config.json",
-    snippet: `{
+    label: "Claude",
+    intro:
+      "Claude reaches the endpoint from Anthropic's cloud, so one connector serves claude.ai, Claude Desktop and the Claude app for iPhone and Android. Custom connectors are available on every plan, free included.",
+    steps: [
+      "On claude.ai (or in Claude Desktop), open Settings › Connectors and choose Add custom connector.",
+      "Name it Bank Rock, paste the endpoint above as the remote MCP server URL, leave the OAuth fields empty, and add it.",
+      `In any chat, on the web or on your phone, open the tools menu and turn Bank Rock on. Ask it about rock ${DEMO_ROCK_ID}.`,
+    ],
+  },
+  code: {
+    label: "Claude Code, Cursor",
+    intro:
+      "Command-line and editor clients take the endpoint directly. No checkout, no environment variables.",
+    path: "Claude Code: one command. Cursor: .cursor/mcp.json in your project",
+    snippet: `# Claude Code
+claude mcp add --transport http bankrock ${ENDPOINT_URL}
+
+# Cursor — .cursor/mcp.json
+{
   "mcpServers": {
-    "bankrock": {
-      "command": "npx",
-      "args": ["-y", "ts-node", "/path/to/bankrock-ethglobal/mcp/index.ts"],
-      "env": {
-${envBlock("        ")}
-      }
-    }
+    "bankrock": { "url": "${ENDPOINT_URL}" }
   }
 }`,
   },
-  cursor: {
-    label: "Cursor and Windsurf",
-    path: ".cursor/mcp.json",
-    snippet: `{
-  "mcpServers": {
-    "bankrock": {
-      "command": "npx",
-      "args": ["-y", "ts-node", "./mcp/index.ts"],
-      "transport": "stdio",
-      "env": {
-${envBlock("        ")}
-      }
-    }
-  }
-}`,
-  },
-  cli: {
-    label: "Terminal",
-    path: "Run it from a checkout of the repository",
+  local: {
+    label: "Run it yourself",
+    intro:
+      "The same tools as a stdio process from a checkout of the repository. This is the only way to reach the two operator tools, which need ADMIN_API_KEY, and it is what an operator runs on a laptop that must not depend on the site being up.",
+    path: "Build once, then point Claude Desktop at the built file (claude_desktop_config.json)",
     snippet: `git clone https://github.com/lucaguglielmi/bankrock-ethglobal.git
 cd bankrock-ethglobal/mcp
-npm install
-SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com \\
-REGISTRY_ADDRESS=${addresses.registry ?? "<registry address>"} \\
-npm start`,
-  },
-} as const;
+npm ci && npm run build
 
-type ConfigTab = keyof typeof CONFIGS;
+# Try it in the terminal (Ctrl-C to stop):
+SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com \\
+REGISTRY_ADDRESS=${REGISTRY_FOR_SNIPPET} \\
+node dist/index.js
+
+# Claude Desktop — claude_desktop_config.json
+{
+  "mcpServers": {
+    "bankrock": {
+      "command": "node",
+      "args": ["/path/to/bankrock-ethglobal/mcp/dist/index.js"],
+      "env": {
+        "SEPOLIA_RPC_URL": "https://ethereum-sepolia-rpc.publicnode.com",
+        "REGISTRY_ADDRESS": "${REGISTRY_FOR_SNIPPET}",
+        "ADMIN_API_KEY": "<the operator key, only if you have it>"
+      }
+    }
+  }
+}`,
+  },
+} as const satisfies Record<string, ClientGuide>;
+
+type ClientTab = keyof typeof CLIENTS;
 
 interface Tool {
   name: string;
   badge: string;
   signature: string;
   description: string;
-  /** Set when the tool needs something the public server does not have, or never answers. */
+  /** Set when the tool needs something the hosted endpoint does not have, or never answers. */
   note?: string;
 }
+
+const OPERATOR_NOTE =
+  "Only on a server you run yourself, with the operator's ADMIN_API_KEY. The hosted endpoint is anonymous and does not offer it.";
 
 const TOOLS: Tool[] = [
   {
@@ -151,21 +176,21 @@ const TOOLS: Tool[] = [
     name: "get_server_metrics",
     badge: "Health",
     signature: "—",
-    description: "Whether this server can reach the RPC, the registry and the Bank Rock API right now.",
+    description: "Whether the server can reach the RPC, the registry and the Bank Rock API right now.",
   },
   {
     name: "query_logs",
     badge: "Operator",
     signature: "level: string, limit: number, rockId?: string",
     description: "Recent server-side events, with personal data removed before they are stored.",
-    note: "Needs the operator's ADMIN_API_KEY; without it the tool answers unavailable.",
+    note: OPERATOR_NOTE,
   },
   {
     name: "get_waitlist_stats",
     badge: "Operator",
     signature: "—",
     description: "How many people have joined the waitlist.",
-    note: "Needs the operator's ADMIN_API_KEY; without it the tool answers unavailable.",
+    note: OPERATOR_NOTE,
   },
   {
     name: "simulate_cross_chain_intent",
@@ -184,21 +209,21 @@ const TOOLS: Tool[] = [
 ];
 
 export default function McpPage() {
-  const [tab, setTab] = useState<ConfigTab>("claude");
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [tab, setTab] = useState<ClientTab>("chatgpt");
+  const [copied, setCopied] = useState<"endpoint" | "prompt" | null>(null);
   const demoMode = isDemoMode();
 
-  const copyPrompt = async () => {
+  const copy = async (what: "endpoint" | "prompt") => {
     try {
-      await navigator.clipboard.writeText(AGENT_PROMPT);
-      setCopiedPrompt(true);
-      setTimeout(() => setCopiedPrompt(false), 2500);
+      await navigator.clipboard.writeText(what === "endpoint" ? ENDPOINT_URL : AGENT_PROMPT);
+      setCopied(what);
+      setTimeout(() => setCopied(null), 2500);
     } catch {
-      // Clipboard access denied — the prompt is on screen and selectable.
+      // Clipboard access denied — both texts are on screen and selectable.
     }
   };
 
-  const config = CONFIGS[tab];
+  const client: ClientGuide = CLIENTS[tab];
 
   return (
     <main className="flex w-full flex-1 flex-col">
@@ -212,19 +237,32 @@ export default function McpPage() {
             Any <Term k="agent" /> that speaks <Term k="mcp" /> can read a rock: who owns it, what
             its <Term k="rockAccount" /> holds, which <Term k="strategy">strategies</Term> it runs
             and what <Term k="fee">fees</Term> they have kept. Bank Rock runs no AI of its own;
-            you connect the one you already use.
+            you connect the one you already use, on your laptop or on your phone.
           </p>
           <p className="max-w-prose text-base text-ink-2">
             The server is read-only by decision. It holds no key, so it cannot start or stop a
             strategy, move a token or sign anything. Every tool either reads <Term k="sepolia" />{" "}
-            or the Bank Rock API, or answers <em>unavailable</em> with the reason. It never
-            estimates and never invents a number.
+            or answers <em>unavailable</em> with the reason. It never estimates and never invents
+            a number.
           </p>
 
+          <div className="flex flex-col gap-2">
+            <h2 className="text-label text-ink-3">The endpoint</h2>
+            <CodeBlock breakAll>{ENDPOINT_URL}</CodeBlock>
+            <p className="max-w-prose text-sm text-ink-2">
+              Hosted with the site, no sign-in, no key. Paste it into your client as a custom
+              connector; the steps for each client are below.
+            </p>
+          </div>
+
           <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
-            <Button size="lg" onClick={copyPrompt}>
-              {copiedPrompt ? <Check aria-hidden /> : <Copy aria-hidden />}
-              {copiedPrompt ? "Prompt copied" : "Copy the starter prompt"}
+            <Button size="lg" onClick={() => copy("endpoint")}>
+              {copied === "endpoint" ? <Check aria-hidden /> : <Plug aria-hidden />}
+              {copied === "endpoint" ? "Endpoint copied" : "Copy the endpoint"}
+            </Button>
+            <Button size="lg" variant="outline" onClick={() => copy("prompt")}>
+              {copied === "prompt" ? <Check aria-hidden /> : <Copy aria-hidden />}
+              {copied === "prompt" ? "Prompt copied" : "Copy the starter prompt"}
             </Button>
             {demoMode ? (
               <Button size="lg" variant="outline" render={<Link href={DEMO_ROCK_HREF} />}>
@@ -299,13 +337,13 @@ export default function McpPage() {
         <section className="flex flex-col gap-4">
           <h2 className="text-h2 font-bold text-ink">Connecting a client</h2>
           <p className="max-w-prose text-sm text-ink-2">
-            The server runs on your own machine from a checkout of the repository. It needs an RPC
-            endpoint for Sepolia and the <Term k="registry" /> address; the snippets below carry
-            the ones this site is deployed against.
+            ChatGPT and the Claude apps connect to the hosted endpoint from their own cloud, so
+            the same connector works on a phone. Command-line clients take the URL directly. The
+            server you run yourself is for operators.
           </p>
 
           <div className="flex flex-wrap gap-2">
-            {(Object.keys(CONFIGS) as ConfigTab[]).map((id) => (
+            {(Object.keys(CLIENTS) as ClientTab[]).map((id) => (
               <button
                 key={id}
                 type="button"
@@ -318,20 +356,39 @@ export default function McpPage() {
                     : "border-border bg-background text-ink-2 hover:bg-muted",
                 )}
               >
-                {CONFIGS[id].label}
+                {CLIENTS[id].label}
               </button>
             ))}
           </div>
 
-          <div className="flex flex-col gap-2">
-            <h3 className="text-label text-ink-3">Where it goes</h3>
-            <CodeBlock breakAll>{config.path}</CodeBlock>
-          </div>
+          <p className="max-w-prose text-sm text-ink-2">{client.intro}</p>
 
-          <div className="flex flex-col gap-2">
-            <h3 className="text-label text-ink-3">What to put in it</h3>
-            <CodeBlock>{config.snippet}</CodeBlock>
-          </div>
+          {client.steps ? (
+            <div className="flex flex-col gap-2">
+              <h3 className="text-label text-ink-3">The endpoint</h3>
+              <CodeBlock breakAll>{ENDPOINT_URL}</CodeBlock>
+              <h3 className="mt-2 text-label text-ink-3">The steps</h3>
+              <ol className="flex max-w-prose list-decimal flex-col gap-2 pl-5 text-sm text-ink-2">
+                {client.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+
+          {client.path ? (
+            <div className="flex flex-col gap-2">
+              <h3 className="text-label text-ink-3">Where it goes</h3>
+              <CodeBlock breakAll>{client.path}</CodeBlock>
+            </div>
+          ) : null}
+
+          {client.snippet ? (
+            <div className="flex flex-col gap-2">
+              <h3 className="text-label text-ink-3">What to put in it</h3>
+              <CodeBlock>{client.snippet}</CodeBlock>
+            </div>
+          ) : null}
         </section>
 
         <section className="flex flex-col gap-4">
@@ -340,8 +397,10 @@ export default function McpPage() {
             Starter prompt
           </h2>
           <p className="max-w-prose text-sm text-ink-2">
-            Paste this into your client after connecting the server. It tells the agent what a rock
-            is and what the tools can and cannot say.
+            The hosted endpoint sends exactly this to your client the moment it connects, so
+            usually there is nothing to paste. It is here to read, and to paste into a client that
+            ignores server instructions. It names the endpoint on purpose: a prompt cannot open a
+            connection, but an agent that knows the URL can tell you what is missing.
           </p>
           <CodeBlock>{AGENT_PROMPT}</CodeBlock>
         </section>
@@ -352,8 +411,9 @@ export default function McpPage() {
             The tools
           </h2>
           <p className="max-w-prose text-sm text-ink-2">
-            Ten tools. Six read the chain and the public API. Two need an operator key. Two exist
-            only to say, honestly, that a feature is not built.
+            Ten tools. The hosted endpoint offers eight: six read the chain, and two exist only to
+            say, honestly, that a feature is not built. The other two need an operator key and
+            exist only on a server you run yourself.
           </p>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

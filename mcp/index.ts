@@ -28,7 +28,7 @@ import { hasCode, publicClient, readRock, readTokenBalance } from "./chain.js";
  * here that makes a tool answer with a simulated value.
  */
 
-const SERVER_VERSION = "2.0.0";
+const SERVER_VERSION = "2.1.0";
 
 type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -425,6 +425,8 @@ async function getServerMetrics(): Promise<ToolResult> {
 }
 
 async function getWaitlistStats(): Promise<ToolResult> {
+  if (config.adminApiKey === undefined) return unavailable(REASONS.noAdminKey);
+
   const result = await newsletterStats();
   if (!result.ok) return unavailable(result.reason);
   return json({
@@ -619,9 +621,20 @@ async function getStrategyVolume(args: Record<string, unknown> | undefined): Pro
 // Server wiring
 // ---------------------------------------------------------------------------
 
+/**
+ * Sent to the client in the initialize result. Clients that honour server instructions (Claude,
+ * ChatGPT, Claude Code, Cursor) are briefed the moment they connect; the same text, for the
+ * hosted endpoint, is `web/src/lib/mcp/prompt.ts`, and bank-rock.com/mcp shows it as a prompt.
+ */
+const INSTRUCTIONS = `You are connected to the Bank Rock MCP server (stdio, run from a checkout). It is read-only: it holds no key and cannot start or stop a strategy, move a token or sign anything.
+
+A Bank Rock is a real stone with an NTAG 424 DNA chip inside. Tapping it with a phone opens its page. Each rock has its own on-chain account (a Safe) that holds USDC and WETH on Ethereum Sepolia, and it offers those tokens for trading through 1inch Aqua. The tokens never leave the account; every trade leaves a small fee inside it. The live demo rock is rock 3.
+
+Start by reading the rock's state with get_rock_status, then say what you can and cannot tell from it. Never state a figure a tool did not return, and never quote a rate of return: the only rate is the fee. When a tool answers "unavailable", relay its reason instead of guessing. query_logs and get_waitlist_stats need the operator's ADMIN_API_KEY and answer unavailable without it.`;
+
 const server = new Server(
   { name: "bankrock-oracle-mcp", version: SERVER_VERSION },
-  { capabilities: { tools: {} } },
+  { capabilities: { tools: {} }, instructions: INSTRUCTIONS },
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));

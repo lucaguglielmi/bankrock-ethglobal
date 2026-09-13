@@ -44,8 +44,29 @@ This document defines the list of required MCP servers and connectors to interac
 ## 5. Bank Rock Oracle MCP (The "Master" Server)
 
 **Purpose:** The single, unified interface exposed to the user's external AI client (e.g., ChatGPT, Claude Desktop, Antigravity). Rather than the client AI managing the complexity of Web3, Privy, and the DB individually, this Master MCP orchestrates the underlying Connectors to provide high-level, domain-specific tools. *Note: Bank Rock does NOT host its own in-app AI agent; it only provides the MCP server for the user's preferred agent to connect to.*
-**Implementation:** A bespoke TypeScript MCP Server (`mcp/index.ts`) hosted as part of our backend
-infrastructure.
+**Implementation:** one tool set, two transports.
+
+- **Hosted (Streamable HTTP): `https://bank-rock.com/api/mcp`** — `web/src/lib/mcp/` mounted at
+  `web/src/app/api/mcp/route.ts`, inside the same Cloudflare Worker as the site. Stateless (no
+  `Mcp-Session-Id`; a Worker isolate remembers nothing between requests), JSON responses rather
+  than SSE, anonymous, metered per client address like the other public reads. `GET` and `DELETE`
+  answer 405, which the protocol allows for a server that opens no stream and issues no session.
+  It reads the chain in-process through the modules the rock page uses (`readRock`,
+  `readReserves`, `readRockStrategyView` — the latter shared with `GET /api/rocks/{id}/strategy`),
+  never over HTTP: `global_fetch_strictly_public` stops a Worker from fetching its own hostname.
+  It sends the starter prompt (`web/src/lib/mcp/prompt.ts`) as its `instructions` on connect, and
+  every tool carries `readOnlyHint`, so a client that honours annotations need not ask the
+  person before each call. This is the transport a phone needs: ChatGPT (Developer mode → custom
+  connector, no authentication) and the Claude apps (Settings → Connectors → Add custom
+  connector) connect from their own cloud; Claude Code and Cursor take the URL directly.
+- **Local (stdio): `mcp/index.ts`**, run from a checkout (`npm ci && npm run build && node
+  dist/index.js`) with `SEPOLIA_RPC_URL` and `REGISTRY_ADDRESS` in the client's `env`. The only
+  transport that can carry `ADMIN_API_KEY`, so the only one with the two operator tools.
+
+The two are kept to the same names, arguments and wording; the hosted one omits `query_logs` and
+`get_waitlist_stats` (an anonymous endpoint has nothing to hold a key in) and validates schemas
+with the SDK's eval-free provider (`@cfworker/json-schema`), because workerd forbids the code
+generation the default Ajv validator relies on.
 
 **Key Tools**, as actually implemented — every one either reads a real source or returns
 `{ "status": "unavailable", "reason": "..." }` (D-019), and none of them writes anything:

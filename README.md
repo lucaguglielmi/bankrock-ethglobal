@@ -60,7 +60,7 @@ version, in the order a judge sees it:
 | 7 | **Trade.** A second person, from a second phone, swaps against the rock and pays no gas. | Their personal Safe approves the taker and calls `XYCSwapTaker.swapExactIn`. Tokens move between the two accounts; the fee stays in the rock. The page reads the result back from the chain. |
 | 8 | **Gift.** The owner names the recipient — by scanning a QR the recipient's phone shows — and signs once. | `initiateHandover` on the registry plus a pre-signed change of owner on the Safe, stored until the claim. |
 | 9 | **Claim.** The recipient taps the stone, signs in on a fresh account with no ETH, and the rock is theirs. | The stored owner swap lands first; then the server relays `claimHandover`. The Rock Account keeps its address and its tokens. |
-| 10 | **Ask an AI.** Claude Desktop, connected to the MCP server, says who owns the rock, what it holds and what it earned. | Ten read-only tools that read the same contracts the page reads. The server holds no key. |
+| 10 | **Ask an AI.** ChatGPT or Claude on a phone, with `bank-rock.com/api/mcp` added as a connector, says who owns the rock, what it holds and what it earned. | Read-only MCP tools, hosted in the same Worker as the site, reading the same contracts the page reads. The server holds no key. |
 
 ---
 
@@ -247,24 +247,35 @@ WETH, one Wide stream live — read from the registry and Aqua on 2026-09-13).
 
 ### 7. The MCP endpoint
 
-`mcp/index.ts` is a stdio [Model Context Protocol](https://modelcontextprotocol.io) server that an
-AI client (Claude Desktop, Cursor, a CLI) runs from a checkout. It is **read-only by decision**
-(D-008, D-019): every tool either reads Sepolia over RPC or calls the Bank Rock API, or returns
-`{ status: "unavailable", reason }`. It holds no key and cannot sign.
+Any AI client that speaks the [Model Context Protocol](https://modelcontextprotocol.io) can read
+a rock. There are two servers, with the same read-only tools (D-008, D-019); neither holds a key,
+and every tool either reads Sepolia or returns `{ status: "unavailable", reason }`.
 
-| Tool | Reads |
-| --- | --- |
-| `get_rock_status(rockId)` | the registry: state, owner, Rock Account, tag hash, lost flag, pending gift, USDC/WETH balances |
-| `get_strategy_fees(rockId)` | `GET /api/rocks/{id}/strategy`: reserve, each live stream's virtual and executable amounts, fee rate, fees realised |
-| `explain_recent_fees(rockId)` | the same, narrated per stream, with the scanned block range |
-| `get_strategy_volume(rockId)` | swap count per stream (a count, not a currency volume) |
-| `trace_transaction(hash)` | `eth_getTransactionReceipt` |
-| `get_server_metrics()` | reachability of RPC, registry and API |
-| `query_logs(...)`, `get_waitlist_stats()` | operator routes; need `ADMIN_API_KEY`, otherwise `unavailable` |
-| `simulate_cross_chain_intent`, `optimize_idle_yield` | always `unavailable` — no bridge, no idle yield (cut, spec 15 Part 6) |
+- **Hosted: `https://bank-rock.com/api/mcp`.** A Streamable HTTP endpoint inside the site's own
+  Cloudflare Worker (`web/src/lib/mcp/`, `web/src/app/api/mcp/route.ts`). Public, anonymous,
+  stateless. This is what a phone needs: ChatGPT (Developer mode → custom connector) and the
+  Claude apps (Settings → Connectors → Add custom connector) connect to it from their own cloud,
+  and Claude Code (`claude mcp add --transport http bankrock https://bank-rock.com/api/mcp`) and
+  Cursor take the URL directly. It reads the chain in-process through the same modules the rock
+  page uses, and sends the starter prompt as its `instructions` on connect.
+- **Local: `mcp/index.ts`**, a stdio server run from a checkout (`cd mcp && npm ci && npm run
+  build && node dist/index.js`) with `SEPOLIA_RPC_URL` and `REGISTRY_ADDRESS` in its `env`. It
+  adds the two operator tools, which need `ADMIN_API_KEY` and therefore cannot exist on an
+  anonymous endpoint.
 
-Configuration snippets and a starter prompt are on [bank-rock.com/mcp](https://bank-rock.com/mcp).
-The server needs `SEPOLIA_RPC_URL` and `REGISTRY_ADDRESS` in its `env`.
+| Tool | Reads | Hosted |
+| --- | --- | --- |
+| `get_rock_status(rockId)` | the registry: state, owner, Rock Account, tag hash, lost flag, pending gift, USDC/WETH balances | yes |
+| `get_strategy_fees(rockId)` | the same read as `GET /api/rocks/{id}/strategy`: reserve, each live stream's virtual and executable amounts, fee rate, fees realised | yes |
+| `explain_recent_fees(rockId)` | the same, narrated per stream, with the scanned block range | yes |
+| `get_strategy_volume(rockId)` | swap count per stream (a count, not a currency volume) | yes |
+| `trace_transaction(hash)` | `eth_getTransactionReceipt` | yes |
+| `get_server_metrics()` | reachability of RPC, registry and API | yes |
+| `simulate_cross_chain_intent`, `optimize_idle_yield` | always `unavailable` — no bridge, no idle yield (cut, spec 15 Part 6) | yes |
+| `query_logs(...)`, `get_waitlist_stats()` | operator routes; need `ADMIN_API_KEY`, otherwise `unavailable` | no — stdio only |
+
+Per-client steps, the config snippets and the starter prompt are on
+[bank-rock.com/mcp](https://bank-rock.com/mcp).
 
 ---
 
@@ -309,7 +320,7 @@ source — every state, error and event has a plain-English `@notice`.
 | NFC | **NTAG 424 DNA** SDM: AES-128, RFC 4493 AES-CMAC, NXP session-key derivation, per-UID monotonic counter in D1 | `web/src/lib/nfc/`; pinned to FIPS 197 / SP 800-38A / AN12196 vectors |
 | Liquidity | **1inch Aqua** (canonical) + reference **XYCSwap** app + `XYCSwapTaker` periphery | `web/src/lib/aqua/`, `contracts/contracts/aqua/` |
 | Contracts | **Solidity** 0.8.24 (registry) / 0.8.30 (vendored Aqua, taker), **Hardhat 3** with Solidity tests, OpenZeppelin 5 | `contracts/` |
-| AI | **Model Context Protocol** server (`@modelcontextprotocol/sdk`), stdio | `mcp/` |
+| AI | **Model Context Protocol** servers (`@modelcontextprotocol/sdk`): a hosted Streamable HTTP endpoint at `/api/mcp` inside the Worker, and a stdio server for operators | `web/src/lib/mcp/`, `mcp/` |
 | Tests | **Vitest** (unit), **Playwright** + axe (viewport × route matrix), Hardhat/Forge-style `.t.sol` suites (unit + fuzz) | plus 21 static spec checks in `scripts/spec-checks.sh` |
 | PWA | Serwist service worker built by `web/scripts/build-sw.mjs` as a `prebuild` step | Web Push optional |
 
@@ -345,7 +356,8 @@ source — every state, error and event has a plain-English `@notice`.
 │   ├── drizzle/              D1 migrations
 │   ├── scripts/              rehearse-sepolia.ts, build-sw.mjs, export-public-vars.mjs
 │   └── wrangler.jsonc        the committed non-secret configuration (addresses, blocks, caps)
-├── mcp/                      ← the read-only MCP server (index.ts, chain.ts, api.ts, config.ts)
+├── mcp/                      ← the read-only stdio MCP server (index.ts, chain.ts, api.ts, config.ts);
+│                                the hosted endpoint is web/src/lib/mcp + web/src/app/api/mcp
 ├── scripts/
 │   ├── spec-checks.sh        the 21 static definition-of-done checks (blocking in CI)
 │   ├── check-live.sh         is the deployed site up and pointed at contracts that exist?

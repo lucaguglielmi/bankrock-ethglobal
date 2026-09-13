@@ -373,7 +373,7 @@ export const GLOSSARY = {
   agent: {
     term: "agent",
     definition:
-      "An AI assistant such as Claude Desktop that a person connects to the Bank Rock endpoint to ask about a rock.",
+      "An AI assistant such as ChatGPT or Claude, on a laptop or a phone, that a person connects to the Bank Rock endpoint to ask about a rock.",
   },
 } as const satisfies Record<string, GlossaryEntry>;
 

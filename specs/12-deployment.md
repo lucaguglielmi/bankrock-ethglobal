@@ -15,12 +15,15 @@ To achieve an automated "push to main and go live" workflow, we utilize the foll
 - **Service worker (Fact, spec 14 §4 / spec 15 R-6):** `public/sw.js` is **not** produced by a Next.js bundler plugin. `@serwist/next`'s webpack plugin does not run under Turbopack, which is Next 16's default and what this app builds with, so nothing ever wrote the file and `/sw.js` returned 404. It is now built independently by `web/scripts/build-sw.mjs`, wired in as the **`prebuild`** npm script: esbuild bundles `src/sw.ts` and `@serwist/build`'s `injectManifest` writes the result to `public/sw.js` before Next starts. Because it is `prebuild`, every path that runs `next build` — CI, `deploy`, `deploy:pages`, a local build — gets the worker without remembering to ask for it.
 
 ### 2. Master Oracle MCP Server
-- **Provider:** Cloudflare Workers
-- **Framework:** Node.js / TypeScript
-- **Pipeline:** Cloudflare's native GitHub integration (Wrangler Action).
-- **Workflow:**
-  - Auto-deploys on pushes to `main`.
-- **Configuration:** Deploy the MCP server as a Cloudflare Worker since it synergizes perfectly with the Cloudflare D1 database.
+- **Provider:** Cloudflare Workers — **the same Worker as the site**, not a second one. The hosted
+  endpoint is the Next.js route `web/src/app/api/mcp/route.ts` (`web/src/lib/mcp/`), so it ships
+  with every deploy of `web` and reads the Worker's own variables (`NEXT_PUBLIC_REGISTRY_ADDRESS`,
+  `SEPOLIA_RPC_URL`, `AQUA_APP_DEPLOY_BLOCK`). Nothing to configure separately.
+- **URL:** `https://bank-rock.com/api/mcp` (Streamable HTTP, stateless, anonymous; spec 11 §5).
+- **Pipeline:** the `web` deploy (`.github/workflows/deploy.yml`) on pushes to `main`.
+- **Check after a deploy:** `POST /api/mcp` with an `initialize` request returns `200` and a
+  `serverInfo` of `bankrock-oracle-mcp`; `GET /api/mcp` returns `405`.
+- **The stdio server (`mcp/`)** is not deployed anywhere; it is run from a checkout by an operator.
 
 ### 3. Database
 - **Provider:** Cloudflare D1 — database `bankrock-db`, id `f0a28d6f-0a36-46aa-b711-8b5297913d2e`, bound to the Worker as **`DB`** with `migrations_dir: drizzle` (`web/wrangler.jsonc`).
