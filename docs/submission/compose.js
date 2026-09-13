@@ -52,12 +52,27 @@ function slide({ eyebrow, title, sub, left, right, chips = [] }) {
 </div>`;
 }
 
+
+function photoSlide({ eyebrow, title, sub, big, small, chips = [] }) {
+  return `<style>${css}</style><div class="page"><div class="bg"></div>
+  <div style="position:absolute; left:96px; top:88px; width:720px;">
+    <img class="logo" src="${A('logo.svg')}" style="height:52px; width:auto;">
+    <div class="eyebrow" style="margin-top:110px;">${eyebrow}</div>
+    <h1 style="font-size:88px; margin-top:20px;">${title}</h1>
+    <div class="sub" style="font-size:28px; margin-top:30px;">${sub}</div>
+    <div class="chips" style="margin-top:40px;">${chips.map(c => `<span class="chip">${c}</span>`).join('')}</div>
+  </div>
+  <div style="position:absolute; left:880px; top:110px; width:560px; height:747px; border-radius:36px; overflow:hidden; box-shadow:0 40px 80px -20px rgba(0,0,0,.35), 0 12px 24px -8px rgba(0,0,0,.2);"><img src="${A(big)}" style="width:100%; height:100%; object-fit:cover;"></div>
+  <div style="position:absolute; left:1370px; top:330px; width:500px; height:667px; border-radius:36px; overflow:hidden; box-shadow:0 40px 80px -20px rgba(0,0,0,.4), 0 12px 24px -8px rgba(0,0,0,.25); border:6px solid #fff;"><img src="${A(small)}" style="width:100%; height:100%; object-fit:cover;"></div>
+</div>`;
+}
+
 const pages = {
   'cover-1920x1080': cover(),
   'slide-1-tap': slide({ eyebrow: 'Tap the rock', title: 'A rock with its own account.', sub: 'Tap it with a phone. Anyone can see what it holds, which streams it runs and who owned it. Sign in with Privy, no seed phrase.', left: 'h-phone-reduced', right: 'p02-rock3-liquidity', chips: ['Privy embedded wallet', 'Safe smart account', 'Gas sponsored'] }),
   'slide-2-onchain': slide({ eyebrow: 'Provenance', title: 'Every tap, gift and trade is on chain.', sub: 'Awakened, gifted, claimed by a physical tap, retired. Read back from Sepolia Etherscan. The registry holds no tokens, ever.', left: 'r1-provenance-2', right: 'p05-rock3-contracts', chips: ['BankRockRegistry', '1inch Aqua', 'Ethereum Sepolia'] }),
   'slide-3-agent': slide({ eyebrow: 'MCP server', title: 'Ask your rock anything.', sub: 'Connect Claude or Cursor to a rock. The agent reads live chain state and never invents a number. Read-only by design.', left: 'p11-mcp', right: 'p10-learn-security', chips: ['Model Context Protocol', 'Read-only tools', 'Self-custody first'] }),
-  'slide-4-object': slide({ eyebrow: 'The physical object', title: 'Handmade, forged in Florence.', sub: 'A real pebble from a riverbed near Florence with an NTAG 424 DNA chip inside. The tag proves the object. It never holds a key.', left: 'p08-learn-rock', right: 's-how-it-works', chips: ['NTAG 424 DNA', 'Signed URL on every tap', 'Copy-proof'] }),
+  'slide-4-object': photoSlide({ eyebrow: 'The physical object', title: 'Handmade, forged in Florence.', sub: 'Real river pebbles, each with a resin-set NTAG 424 DNA tag. The tag proves the object. It never holds a key.', big: 'photo_rock_family.jpg', small: 'photo_nfc_tag_on_finger.jpg', chips: ['NTAG 424 DNA', 'Signed URL on every tap', 'Copy-proof'] }),
 };
 
 (async () => {
