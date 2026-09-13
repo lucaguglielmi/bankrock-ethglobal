@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  *
  * The contract under test: nothing is reported sent that the provider did not accept; the two
  * sends are independent; every value from the form is escaped before it reaches an HTML body;
- * and a provider's own rejection text — which for a sandbox sender names the account owner's
- * inbox — never reaches a result's `reason`.
+ * and a provider's own rejection text - which for a sandbox sender names the account owner's
+ * inbox - never reaches a result's `reason`.
  */
 
 const send = vi.fn();
@@ -140,7 +140,7 @@ describe("with a key and a notify address", () => {
 
     const ack = callTo("ada@example.com");
     expect(ack.from).toBe("Bank Rock <hello@bank-rock.com>");
-    expect(ack.subject).toBe("We got your message — Bank Rock");
+    expect(ack.subject).toBe("We got your message - Bank Rock");
     expect(ack.replyTo).toBeUndefined();
     const html = String(ack.html);
     expect(html).toContain("Sponsor Bank Rock");
@@ -232,7 +232,7 @@ describe("the notify address", () => {
     ]);
   });
 
-  it("reports the notification not sent, naming the variable, when neither is set — and still acknowledges", async () => {
+  it("reports the notification not sent, naming the variable, when neither is set - and still acknowledges", async () => {
     const result = await sendContactEmails(input());
 
     expect(result.operator).toMatchObject({ success: false, mode: "not_sent" });

@@ -4,7 +4,7 @@
  *  - preferences live in D1, not in a per-isolate `Map`. The old store lost every preference on
  *    the next isolate while telling the user it had saved them (R-4);
  *  - a rock's preferences belong to the Privy DID that first wrote them. Anyone else reading or
- *    writing them gets a refusal — the previous route let any anonymous caller read back the
+ *    writing them gets a refusal - the previous route let any anonymous caller read back the
  *    owner's stored email address for any rockId (SA-5);
  *  - with no database, saving is UNAVAILABLE. A success state is never shown for something that
  *    was not persisted;
@@ -133,7 +133,7 @@ export function parseTopicsInput(input: unknown): TopicsInputResult {
   return { ok: true, topics };
 }
 
-/** Number of topics with the given channel on — the figure the save log records. */
+/** Number of topics with the given channel on - the figure the save log records. */
 function countOn(topics: AlertTopicsConfig, channel: AlertChannel): number {
   return ALERT_TOPIC_IDS.filter((id) => topics[id][channel]).length;
 }

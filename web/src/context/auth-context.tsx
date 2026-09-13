@@ -4,13 +4,13 @@
  * Authentication state (A-1, A-2, D-013).
  *
  * What was here: with no valid NEXT_PUBLIC_PRIVY_APP_ID, `login()` did not fail. It activated a
- * fabricated embedded wallet — `0x71C8…1b47`, `collector@bankrock.eth` — persisted the session in
+ * fabricated embedded wallet - `0x71C8…1b47`, `collector@bankrock.eth` - persisted the session in
  * localStorage and presented it in the header as a Privy embedded wallet. The console called it a
  * "high-fidelity Demo Embedded Wallet". It was indistinguishable from a real session.
  *
  * That entire path is deleted: the address, the localStorage session, the fabricated user, and
  * the second implicit demo flag it derived. With no configured Privy app, sign-in is
- * UNAVAILABLE — `unavailable: true` with a reason the UI renders — and no address is ever shown.
+ * UNAVAILABLE - `unavailable: true` with a reason the UI renders - and no address is ever shown.
  *
  * There is no demo flag here, implicit or otherwise: "Privy is not configured" is `unavailable`
  * and nothing else.
@@ -71,7 +71,7 @@ export interface BankRockAuthContextType {
   address?: string;
   isEmbedded: boolean;
   lastLoginMethod: string | null;
-  /** True when sign-in cannot work at all — render an UNAVAILABLE state, not a login button. */
+  /** True when sign-in cannot work at all - render an UNAVAILABLE state, not a login button. */
   unavailable: boolean;
   unavailableReason?: string;
   login: () => Promise<void>;
@@ -88,7 +88,7 @@ const BankRockAuthContext = createContext<BankRockAuthContextType | undefined>(u
 /* Last login method (STEERING.md: surface the method last used to sign in)    */
 /*                                                                             */
 /* It is an external store read through useSyncExternalStore rather than state */
-/* hydrated in an effect. Only ever a method name — never an address, never a  */
+/* hydrated in an effect. Only ever a method name - never an address, never a  */
 /* credential, and it is not a session: it cannot authenticate anything.       */
 /* -------------------------------------------------------------------------- */
 
@@ -138,14 +138,14 @@ function writeLastLoginMethod(method: string | null): void {
     if (method) localStorage.setItem(LAST_LOGIN_METHOD_KEY, method);
     else localStorage.removeItem(LAST_LOGIN_METHOD_KEY);
   } catch {
-    // Storage restricted — the last login method is a convenience, never a credential.
+    // Storage restricted - the last login method is a convenience, never a credential.
   }
   lastLoginCache = method;
   lastLoginListeners.forEach((listener) => listener());
 }
 
 /**
- * The real provider. Must be rendered inside PrivyProvider and WagmiProvider — which only exist
+ * The real provider. Must be rendered inside PrivyProvider and WagmiProvider - which only exist
  * when a valid app id is configured.
  */
 export function BankRockAuthProvider({ children }: { children: React.ReactNode }) {
@@ -210,7 +210,7 @@ export function BankRockAuthProvider({ children }: { children: React.ReactNode }
 }
 
 /**
- * The provider used when sign-in cannot work — no valid NEXT_PUBLIC_PRIVY_APP_ID.
+ * The provider used when sign-in cannot work - no valid NEXT_PUBLIC_PRIVY_APP_ID.
  *
  * It renders no Privy SDK, holds no session and exposes no address. `login()` resolves without
  * doing anything; the UI is expected to render the UNAVAILABLE state instead of a login control.

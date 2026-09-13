@@ -26,15 +26,15 @@ function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
  * The inline shape `HelpTerm` gives both of its triggers. The term is ordinary
  * inline text with the dotted underline in an `inline-block`, so a sentence
  * wraps and spaces around it exactly as it would around a plain word (and, as
- * a flex item — the header's "Sign-in unavailable" chip — it can still shrink
+ * a flex item - the header's "Sign-in unavailable" chip - it can still shrink
  * and wrap its own words at 320 px), and the `<button>` is a transparent hit
  * area laid over it: absolutely positioned, centred on the word and never
  * smaller than 44 × 44 px (spec 17 Part 7 item 3). Padding with
- * a matching negative margin used to do this, but it could only add height —
+ * a matching negative margin used to do this, but it could only add height -
  * a short word such as "tap" stayed narrower than 44 px, and widening it would
  * have opened up the sentence. The text is hidden from assistive tech and
  * names the button instead (`aria-labelledby`), so a screen reader meets one
- * button, in place, named by the word — as when the word was its content.
+ * button, in place, named by the word - as when the word was its content.
  */
 const termTextClassName =
   "relative inline-block underline decoration-dotted decoration-ink-3 underline-offset-4";

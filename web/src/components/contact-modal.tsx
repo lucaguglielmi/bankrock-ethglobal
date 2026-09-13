@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Contact sheet — the shop's "Claim an OG Rock" and "Become a Sponsor" forms (spec 15 S-6,
+ * Contact sheet - the shop's "Claim an OG Rock" and "Become a Sponsor" forms (spec 15 S-6,
  * spec 17 L-5).
  *
  * What this file used to be: `handleSubmit` was two `setTimeout`s. It showed "Message Sent!" and
@@ -9,11 +9,11 @@
  * 640 px phone, and further below it with the keyboard open (L-5).
  *
  * What it is now: a real `POST /api/contact`. Success is shown only for a 2xx. A 503 renders the
- * route's own reason — the request was not stored, so it was not received. The submit button
+ * route's own reason - the request was not stored, so it was not received. The submit button
  * lives in the sheet's sticky footer and is reachable without scrolling.
  *
  * The route also emails the submitter a copy. The success copy says so only when the response
- * reports that email as sent; otherwise it says what is true — the message is stored.
+ * reports that email as sent; otherwise it says what is true - the message is stored.
  */
 
 import * as React from "react";
@@ -60,7 +60,7 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
   const [email, setEmail] = React.useState("");
   const [message, setMessage] = React.useState("");
   // Only asked for the OG-rock / barter form (ported from main's contact form, folded into the
-  // stored `message` with a label rather than becoming new columns — both are free text and
+  // stored `message` with a label rather than becoming new columns - both are free text and
   // neither needs to be queried on its own).
   const [skill, setSkill] = React.useState("");
   const [link, setLink] = React.useState("");
@@ -125,7 +125,7 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
       } catch {
         setStatus({
           state: "error",
-          message: "The message was not sent — the network did not answer.",
+          message: "The message was not sent - the network did not answer.",
         });
       }
     },

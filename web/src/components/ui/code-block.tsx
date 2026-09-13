@@ -14,7 +14,7 @@ const COPIED_RESET_MS = 2000;
  */
 export interface CodeBlockProps {
   children: string;
-  /** Wrap at any character instead of scrolling — for single long tokens (e.g. a file path). */
+  /** Wrap at any character instead of scrolling - for single long tokens (e.g. a file path). */
   breakAll?: boolean;
   className?: string;
 }
@@ -32,7 +32,7 @@ function CodeBlock({ children, breakAll = false, className }: CodeBlockProps) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => setCopied(false), COPIED_RESET_MS);
     } catch {
-      // Clipboard access denied or unavailable — nothing to fall back to.
+      // Clipboard access denied or unavailable - nothing to fall back to.
     }
   }, [children]);
 

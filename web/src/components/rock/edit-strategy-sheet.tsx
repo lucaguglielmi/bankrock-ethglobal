@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Edit a live stream — which, on Aqua, means making more of the rock available to it
+ * Edit a live stream - which, on Aqua, means making more of the rock available to it
  * (`contracts/aqua/NOTES.md` §4, §7; `Aqua.sol` `push`).
  *
  * A strategy is immutable: its fee is part of its hash, and a docked stream can never be revived.
@@ -10,7 +10,7 @@
  * says three things plainly and offers nothing else:
  *
  *  - the fee is fixed;
- *  - saving raises what Aqua may trade from the rock's account on this strategy. No tokens move —
+ *  - saving raises what Aqua may trade from the rock's account on this strategy. No tokens move -
  *    the rock keeps them, exactly as when the stream started;
  *  - making *less* available is not an edit. It is Stop, one tap away.
  *
@@ -58,7 +58,7 @@ export interface EditStrategySheetProps {
   rockId: string;
   /** The live stream being edited, as the page last read it. */
   stream: ParsedStream;
-  /** The rock's real balances — the ceiling on what can be added. */
+  /** The rock's real balances - the ceiling on what can be added. */
   reserves: Capability<{ usdc: bigint; weth: bigint }>;
   /** Called once the push has really gone through. */
   onSaved: () => void;

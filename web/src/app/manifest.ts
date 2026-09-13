@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Bank Rock — Liquidity you can hold",
+    name: "Bank Rock - Liquidity you can hold",
     short_name: "Bank Rock",
     // After the hackathon: agent-driven strategies through scoped session keys (D-010) are planned; not built, so not claimed.
     description: "A physical interface to a self-custodial liquidity account.",

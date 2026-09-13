@@ -1,12 +1,12 @@
 /**
- * Rock #420 — the stage demo rock (DEMO-STATE.md S-5).
+ * Rock #420 - the stage demo rock (DEMO-STATE.md S-5).
  *
  * Rock 420 does not exist on chain. Every surface of its page is a badged pretend that lives in
  * the browser: there is no build flag; the id is the only gate, so it is served on the production
  * deployment too. Nothing in this directory reads the registry, Aqua, an RPC or the application database
  * for this id, and nothing in it ever produces a transaction hash (D-014).
  *
- * The mock addresses are derived at runtime from labels — never written as literals (D-015) —
+ * The mock addresses are derived at runtime from labels - never written as literals (D-015) -
  * and they are used only where a type demands an address. None of them is ever offered as a
  * place to send tokens.
  */
@@ -16,7 +16,7 @@ import { addresses } from "@/lib/chain";
 
 export const DEMO_ROCK_ID = "420";
 
-/** The one gate. `"420"` exactly — not `"0420"`, not `" 420"`. */
+/** The one gate. `"420"` exactly - not `"0420"`, not `" 420"`. */
 export function isDemoRockId(rockId: string | undefined | null): boolean {
   return rockId === DEMO_ROCK_ID;
 }
@@ -39,7 +39,7 @@ function derivedAddress(label: string): Address {
  * The rock's account, the previous owner and the visitor's account are always derived. The
  * protocol and token addresses prefer the configured ones (so the strategy hashes the demo shows
  * are the ones this deployment would really compute for rock 420) and fall back to derived
- * values when the deployment has none — the demo must render on a machine with no `.env`.
+ * values when the deployment has none - the demo must render on a machine with no `.env`.
  */
 export const DEMO_ADDRESSES = {
   /** The Rock Account the mock pretends to hold its reserve in. Never a destination for tokens. */

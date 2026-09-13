@@ -3,8 +3,8 @@
 /**
  * Rock lifecycle actions (Flow A awakening, Flow E handover, archiving).
  *
- * Every action runs as a sponsored ERC-4337 UserOperation from the rock's own Safe — the Rock
- * Account — so a user with an empty wallet can awaken and give a rock (spec 03, spec 05, D-012).
+ * Every action runs as a sponsored ERC-4337 UserOperation from the rock's own Safe - the Rock
+ * Account - so a user with an empty wallet can awaken and give a rock (spec 03, spec 05, D-012).
  * The Safe's single owner is the user's Privy embedded wallet; its address is counterfactual, so
  * the first operation both deploys it and does the work.
  *
@@ -99,7 +99,7 @@ export interface UseRockActions {
    * Flow E steps 1-3. One interaction, two things: the handover on chain, and the pre-signed Safe
    * owner swap the recipient cannot produce for themselves.
    *
-   * `handoverKey` is the second one, confirmed against the server rather than assumed — a gift
+   * `handoverKey` is the second one, confirmed against the server rather than assumed - a gift
    * whose key was not stored is refused by the claim route forever, so it is part of the success
    * condition and never a silent side effect.
    */
@@ -133,10 +133,10 @@ export interface UseRockActions {
       streamIndex?: number;
     },
   ): Promise<Capability<{ txHash: Hex; strategyHash: Hex }>>;
-  /** Closes one. Also moves no tokens — docking *is* the withdrawal (NOTES.md §4). */
+  /** Closes one. Also moves no tokens - docking *is* the withdrawal (NOTES.md §4). */
   dockStrategy(rockId: string, streamIndex: number): Promise<Capability<{ txHash: Hex }>>;
   /**
-   * Makes more of the rock available to a live stream — the only edit Aqua allows. `Aqua.push`
+   * Makes more of the rock available to a live stream - the only edit Aqua allows. `Aqua.push`
    * from the rock's own account: the virtual balance rises, no token moves, the fee is untouched.
    * Making *less* available is `dockStrategy`. UNAVAILABLE when the stream is not live.
    */
@@ -181,11 +181,11 @@ async function buildSmartAccountClient(params: {
   /** `rockAccountSaltFor(uidHash)`: one account per physical rock, per owner. */
   saltNonce: bigint;
   /**
-   * The account's address when it is already known — the registry's, for a rock that has been
+   * The account's address when it is already known - the registry's, for a rock that has been
    * awakened (D-037). Given it, `toSafeSmartAccount` stops predicting an address from the salt and
    * uses this one, which is the whole point: after a gift the Safe is the giver's derivation and
    * the recipient's wallet would predict a different, empty address. The factory arguments it
-   * still computes are never used, because viem omits them for an account that has code — and an
+   * still computes are never used, because viem omits them for an account that has code - and an
    * awakened rock's account has executed at least its own awakening.
    */
   address?: Address;
@@ -260,7 +260,7 @@ function serialiseUserOp(userOp: Record<string, unknown>, signature: Hex): Recor
 
 /**
  * The demo rock's seam (`web/src/demo/rock-420`, DEMO-STATE.md S-5). Inside `DemoRockProvider`
- * for rock #420 every action mutates the browser's demo state and answers `DEMO` — no Safe is
+ * for rock #420 every action mutates the browser's demo state and answers `DEMO` - no Safe is
  * built, no UserOperation is sent, no hash is returned. Everywhere else this is exactly
  * `useChainRockActions`. Both hooks run on every render, so hook order never changes.
  */
@@ -283,7 +283,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
   }, []);
 
   // The relayer key is server-side; this asks the server whether relaying is configured. The
-  // endpoint discloses only the capability state and a reason — never the key or its address.
+  // endpoint discloses only the capability state and a reason - never the key or its address.
   const relayerQuery = useQuery({
     queryKey: ["relayer-availability"],
     enabled,
@@ -319,7 +319,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
    * user in general (spec 03, D-005, D-029). This is the awakening path and only the awakening
    * path: it predicts an account that does not exist yet, which is exactly what the attestation
    * names. For a rock that is already on chain the account is read from the registry instead
-   * (D-037) — see `ownerClientFor`.
+   * (D-037) - see `ownerClientFor`.
    */
   const derivedAccountFor = useCallback(
     async (uidHash: `0x${string}`): Promise<Capability<SmartAccountClient>> => {
@@ -351,8 +351,8 @@ function useChainRockActions(enabled: boolean): UseRockActions {
    * own derivation is a different, empty address. An app that insisted on the derived address made
    * every owner action unreachable for the new owner of every gifted rock.
    *
-   * Authority is established by asking that account whether this wallet is one of its owners —
-   * the same `isOwner` staticcall the registry's `_accountAnswersTo` makes — and by checking the
+   * Authority is established by asking that account whether this wallet is one of its owners -
+   * the same `isOwner` staticcall the registry's `_accountAnswersTo` makes - and by checking the
    * wallet against the owner the registry records. Both refusals carry the reason; neither
    * invents a state.
    */
@@ -459,10 +459,10 @@ function useChainRockActions(enabled: boolean): UseRockActions {
         if (!authenticated || !activeWallet) return unavailable(SIGNED_OUT_REASON);
 
         // The attestation names the wallet the tap authorises. If it does not name the wallet
-        // that is signed in, the rock would be credited to someone else — refuse rather than
+        // that is signed in, the rock would be credited to someone else - refuse rather than
         // send a transaction whose outcome contradicts what the user was shown.
         // The salt is the tag, so the account this builds is the one that tag maps to for this
-        // owner — the same derivation the verifier ran when it signed `att.smartAccount`.
+        // owner - the same derivation the verifier ran when it signed `att.smartAccount`.
         const clientCapability = await derivedAccountFor(attestation.message.uidHash);
         if (clientCapability.state === "UNAVAILABLE") return unavailable(clientCapability.reason);
         const client = clientCapability.value;
@@ -473,7 +473,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
         // wallet than the one signed in.
         if (smartAccount !== getAddress(attestation.message.smartAccount)) {
           return unavailable(
-            "This tap names a different Rock Account than this wallet derives — tap the rock again while signed in",
+            "This tap names a different Rock Account than this wallet derives - tap the rock again while signed in",
           );
         }
 
@@ -497,7 +497,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
 
           // Record the tag -> rock binding so a later tap can be routed without a chain read.
           // Best effort, and never awaited: the tag→rock binding is a routing hint the next tap
-          // can live without, while `getAccessToken` can prompt Privy on the phone — awaiting it
+          // can live without, while `getAccessToken` can prompt Privy on the phone - awaiting it
           // here left the button on "Awakening…" after the rock was already awake (2026-09-13).
           void getAccessToken()
             .then((token) => bindTag(rockId, attestation.message.uidHash, token))
@@ -526,7 +526,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
           if (!authenticated || !activeWallet) return unavailable(SIGNED_OUT_REASON);
 
           // One client for both halves of the gift. It is the account the registry names, checked
-          // against this wallet (D-037) — and re-reading it between the two halves would ask the
+          // against this wallet (D-037) - and re-reading it between the two halves would ask the
           // registry about a rock whose state the first half has just changed.
           const owner = await ownerClientFor(rockId);
           if (owner.state === "UNAVAILABLE") return unavailable(owner.reason);
@@ -546,7 +546,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
 
           const token = await getAccessToken();
 
-          // The gift message itself never goes on chain — only its hash does. Store the plaintext
+          // The gift message itself never goes on chain - only its hash does. Store the plaintext
           // so the recipient can read it. Bookkeeping: the gift is already on chain, and a failed
           // note must not be reported as a failed gift.
           if (message && message.trim() !== "") {
@@ -555,7 +555,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
 
           // Flow E step 3: pre-sign the Safe owner swap now, while the giver is online and still
           // owns the Safe. This is the one moment that signature can exist, and a gift without it
-          // is refused by the claim route forever — so it is awaited, confirmed, and reported.
+          // is refused by the claim route forever - so it is awaited, confirmed, and reported.
           const handoverKey = recipient
             ? await storeAndConfirmHandoverKey({
                 rockId,
@@ -583,7 +583,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
   /**
    * Repairs a gift whose hand-over key was never stored, without touching the registry.
    *
-   * The handover itself is on chain and must not be opened twice — `initiateHandover` again would
+   * The handover itself is on chain and must not be opened twice - `initiateHandover` again would
    * be a second transaction for an event that has already happened, and on a rock that is already
    * `handover_pending` the registry would refuse it anyway. This re-prepares, re-signs and
    * re-stores only the Safe owner swap, and confirms it the same way.
@@ -702,7 +702,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
    * Opens a liquidity stream (spec 04, Phase 3).
    *
    * One sponsored batch from the Rock Account: the two approvals Aqua needs, then `ship`. Nothing
-   * is deposited — after this the tokens are still in the rock's own wallet and what exists on
+   * is deposited - after this the tokens are still in the rock's own wallet and what exists on
    * Aqua is an allowance keyed by `keccak256(strategy)` (NOTES.md §4).
    *
    * The approvals are allowance-aware because Circle's USDC reverts on a non-zero to non-zero
@@ -775,7 +775,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
    *
    * It returns nothing, because nothing was ever taken: docking zeroes the virtual balances and
    * the reserve was in the Rock Account the whole time. The UI must not promise an incoming
-   * transfer (NOTES.md §4, §8.1). Docking is final — the strategy hash is burned.
+   * transfer (NOTES.md §4, §8.1). Docking is final - the strategy hash is burned.
    */
   const dockStrategy = useCallback(
     (rockId: string, streamIndex: number) =>
@@ -825,7 +825,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
    * fee cannot change and an allowance cannot be lowered short of `dock`. What can change is the
    * virtual balance, upwards: `Aqua.push(maker, app, strategyHash, token, amount)` may be called
    * by anyone and only ever adds. Called by the Rock Account itself its transfer is from the rock
-   * to the rock — nothing moves — but it is a `transferFrom` with Aqua as spender, so it spends
+   * to the rock - nothing moves - but it is a `transferFrom` with Aqua as spender, so it spends
    * the rock's allowance to Aqua, and the approvals in front of it are sized for that.
    *
    * One sponsored batch: allowance-aware approvals to Aqua, then one `push` per token added.
@@ -974,7 +974,7 @@ async function buildApprovals(params: {
 }
 
 /**
- * The live strategy at one stream index, found by probing — there is no stored hash anywhere
+ * The live strategy at one stream index, found by probing - there is no stored hash anywhere
  * (NOTES.md §3).
  */
 async function findShippedStream(params: {
@@ -1010,7 +1010,7 @@ async function findShippedStream(params: {
 /* -------------------------------------------------------------------------- */
 /* Side-channel writes                                                         */
 /*                                                                             */
-/* Bookkeeping — the tag binding, the gift note — cannot fail the on-chain      */
+/* Bookkeeping - the tag binding, the gift note - cannot fail the on-chain      */
 /* action that preceded it: the rock has already changed state on chain, and a  */
 /* failed bookkeeping write must not be reported as a failed transaction.       */
 /*                                                                             */
@@ -1079,8 +1079,8 @@ async function discardOwnerSwapUserOp(rockId: string, token: string | null) {
  * (Flow E step 3, defect A2).
  *
  * This used to be `void`-ed and to swallow every failure in a bare `catch {}`. Everything it can
- * fail at — no Pimlico key, a paymaster that will not sponsor, a wallet that will not sign, a 503
- * from the store — ended with the giver reading "The gift is waiting" and the claim route
+ * fail at - no Pimlico key, a paymaster that will not sponsor, a wallet that will not sign, a 503
+ * from the store - ended with the giver reading "The gift is waiting" and the claim route
  * refusing that gift forever, with the one person who could re-sign it already gone.
  *
  * So it is awaited, and "stored" is not taken on trust: the POST's 200 says the row was written,
@@ -1155,8 +1155,8 @@ async function confirmHandoverKey(
  * The note the giver left with a gift (Flow E step 2, defect B2).
  *
  * Only `keccak256(message)` is on chain; the text is stored off chain against that hash. It was
- * stored and then shown nowhere — the only component that rendered it was a sheet that is mounted
- * on no page — so every gift message written in this app has so far been invisible to the person
+ * stored and then shown nowhere - the only component that rendered it was a sheet that is mounted
+ * on no page - so every gift message written in this app has so far been invisible to the person
  * it was written for.
  *
  * Reading it needs a Privy token, so this asks only when someone is signed in. An empty answer
@@ -1246,7 +1246,7 @@ export interface OnchainIndexedEvent {
  * A rock's indexed provenance.
  *
  * An empty list with no reason means the chain holds no events for this rock. A reason means the
- * history could not be read at all — the two are never conflated (D-013).
+ * history could not be read at all - the two are never conflated (D-013).
  */
 export interface UseRockOnchainEventsResult {
   events: OnchainIndexedEvent[];

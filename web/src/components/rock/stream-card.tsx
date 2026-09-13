@@ -5,17 +5,17 @@
  *
  * The three quantities this card keeps apart, because spec 04 forbids conflating them:
  *
- *   held        `ERC20.balanceOf(rockAccount)` — one reserve, shared by every stream. It is the
+ *   held        `ERC20.balanceOf(rockAccount)` - one reserve, shared by every stream. It is the
  *               headline above the cards, not repeated here;
- *   available   per stream, `min(virtual, held, allowance)` — what a visitor can trade *now*;
- *   allowed     per stream, the virtual balance Aqua tracks — an allowance, not a deposit.
+ *   available   per stream, `min(virtual, held, allowance)` - what a visitor can trade *now*;
+ *   allowed     per stream, the virtual balance Aqua tracks - an allowance, not a deposit.
  *
  * Two streams' allowances may sum to more than the rock holds, so they are never added together
  * and no total is rendered across cards (NOTES §7).
  *
  * Fees are the rate (`feeBps`, authenticated by the strategy hash) plus the cumulative figure the
  * route summed from Aqua's own `Pushed` events. When the RPC could not serve that log range the
- * rate still shows and the cumulative figure is UNAVAILABLE — it is never inferred from balance
+ * rate still shows and the cumulative figure is UNAVAILABLE - it is never inferred from balance
  * deltas, which are inventory P&L, not fees (NOTES §6). Nothing here is annualised.
  *
  * Fees sit in the rock's own balance: there is nothing to collect, and the copy says so.
@@ -32,14 +32,14 @@ import { tokens } from "@/lib/chain";
 export interface StreamCardProps {
   stream: ParsedStream;
   /**
-   * Owner-only controls for the header row — the quiet "Edit" and "Stop" buttons. Edit can only
+   * Owner-only controls for the header row - the quiet "Edit" and "Stop" buttons. Edit can only
    * make more of the rock available (a strategy's fee is fixed and its allowance never lowered
    * short of docking); Stop is the way to make less available.
    */
   action?: ReactNode;
 }
 
-/** The stream's name — its preset label, or its index when the reader had none. */
+/** The stream's name - its preset label, or its index when the reader had none. */
 export function streamName(stream: Pick<ParsedStream, "label" | "streamIndex">): string {
   return stream.label ?? `Stream ${Number(stream.streamIndex) + 1}`;
 }
@@ -95,7 +95,7 @@ export function StreamCard({ stream, action }: StreamCardProps) {
             <span className="max-w-prose text-caption text-ink-3">
               From {fees.swapCount} {fees.swapCount === 1 ? "trade" : "trades"}
               {fees.complete ? "" : ` since block ${fees.fromBlock.toString()}`}. They sit in the
-              rock&rsquo;s own balance — there is nothing to collect.
+              rock&rsquo;s own balance - there is nothing to collect.
             </span>
           </>
         ) : (

@@ -10,8 +10,8 @@ import {
 import { appUrl } from "@/lib/chain";
 
 /**
- * The give link (B1). Address literals are fine in a test — the repository-wide "no address
- * literal outside lib/chain" check (D-015) excludes `*.test.ts` — and a checksum fixture has to
+ * The give link (B1). Address literals are fine in a test - the repository-wide "no address
+ * literal outside lib/chain" check (D-015) excludes `*.test.ts` - and a checksum fixture has to
  * be written out to be a fixture at all.
  */
 const LOWERCASE = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed";

@@ -3,7 +3,7 @@
  *
  * `lib/indexer.ts` has always mirrored decoded registry events into D1 and never read the mirror
  * back, so every fifteen-second poll re-scanned `REGISTRY_DEPLOY_BLOCK` to the head in
- * 2,000-block chunks — work that grows without bound while the demo is running, against an RPC
+ * 2,000-block chunks - work that grows without bound while the demo is running, against an RPC
  * whose rate limit is shared with strangers (D-036). This module stores how far the scan has got
  * so the next one starts there.
  *
@@ -17,7 +17,7 @@
  *     at it.
  *
  * With no D1 binding every function here reports "no cursor", and the indexer falls back to the
- * full scan it did before — slower, never wrong.
+ * full scan it did before - slower, never wrong.
  *
  * Raw D1 statements rather than Drizzle, for the same reason `lib/nfc/counter-store.ts` uses
  * them: the conditional update has to be one statement, and a thin `prepare`/`bind`/`run` surface
@@ -86,7 +86,7 @@ export function parseCursorValue(value: unknown): bigint | null {
 }
 
 /**
- * The last block already scanned for this scope, or null when there is none — including when the
+ * The last block already scanned for this scope, or null when there is none - including when the
  * read fails. A cursor that cannot be read is indistinguishable, for the caller, from a cursor
  * that does not exist yet: both mean "scan the whole range", which is correct, just slower.
  */
@@ -104,7 +104,7 @@ export async function readIndexerCursor(
 }
 
 /**
- * Advances the cursor to `lastBlock`. Returns true when the row now names that block — including
+ * Advances the cursor to `lastBlock`. Returns true when the row now names that block - including
  * the case where another isolate had already moved it further, which is not a failure.
  */
 export async function advanceIndexerCursor(

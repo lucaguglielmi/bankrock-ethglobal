@@ -1,14 +1,14 @@
 /**
- * The Aqua integration — the sponsor integration, and the reason this project exists.
+ * The Aqua integration - the sponsor integration, and the reason this project exists.
  *
  * A rock is a **maker**: its tokens stay in its own Rock Account and it grants Aqua an allowance
  * per strategy. A visitor is a **taker**: they swap against one of those strategies and the
  * tokens move wallet-to-wallet, never into a pool.
  *
  *   strategy.ts  the exact bytes `Aqua.ship` hashes, the rock-id salt that makes a rock's
- *                strategies recomputable without an indexer, and `DEFAULT_STREAMS` — the
+ *                strategies recomputable without an indexer, and `DEFAULT_STREAMS` - the
  *                catalogue of `(streamIndex, feeBps)` presets every reader probes
- *   calls.ts     calldata for ship, dock, push (top up) and swap — bytes only, no signing and no
+ *   calls.ts     calldata for ship, dock, push (top up) and swap - bytes only, no signing and no
  *                submission
  *   quote.ts     the constant-product maths, mirrored from the contract, for previews
  *   read.ts      actual, virtual and executable balances, and fees read from Aqua's events
@@ -16,7 +16,7 @@
  *   config.ts    the two addresses this integration deploys, read from the environment
  *
  * Contracts, the upstream provenance and the full protocol walk-through are in
- * `contracts/aqua/` — `NOTES.md` is the reference for everything above.
+ * `contracts/aqua/` - `NOTES.md` is the reference for everything above.
  */
 
 export {

@@ -35,7 +35,7 @@ export interface EmailDispatchResult {
   /** True only when the provider accepted the message for delivery. */
   success: boolean;
   id?: string;
-  /** `sent` — accepted by Resend. `not_sent` — nothing left this process. */
+  /** `sent` - accepted by Resend. `not_sent` - nothing left this process. */
   mode: "sent" | "not_sent";
   /** Why it was not sent, when it was not. */
   reason?: string;
@@ -108,7 +108,7 @@ export function generateAlertEmailHtml(payload: AlertEmailPayload): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(topicTitle)} — Bank Rock #${safeRockId}</title>
+  <title>${escapeHtml(topicTitle)} - Bank Rock #${safeRockId}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #fafafa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
   <div style="max-width: 580px; margin: 40px auto; background-color: #ffffff; border: 1px solid #e5e5e5; border-radius: 20px; overflow: hidden;">

@@ -10,8 +10,8 @@ import {
  * A2: "The gift is waiting" was printed on the `initiateHandover` receipt alone.
  *
  * The pre-signed owner swap was stored fire-and-forget (`void storeOwnerSwapUserOp(...)`, and a
- * bare `catch {}` inside it), so every way that could fail — no Pimlico key, a rejected paymaster,
- * a 503 from the store — ended with the giver being told the gift was waiting and the claim route
+ * bare `catch {}` inside it), so every way that could fail - no Pimlico key, a rejected paymaster,
+ * a 503 from the store - ended with the giver being told the gift was waiting and the claim route
  * refusing it forever. These cases pin the only answer that may be read as "waiting".
  */
 
@@ -24,7 +24,7 @@ describe("handoverKeyFromPendingResponse", () => {
     expect(result.state).toBe("REAL");
   });
 
-  it("refuses when no operation is stored — the defect's own case", () => {
+  it("refuses when no operation is stored - the defect's own case", () => {
     const result = handoverKeyFromPendingResponse(true, { state: "REAL", pending: null });
     expect(result.state).toBe("UNAVAILABLE");
     if (result.state === "UNAVAILABLE") expect(result.reason).toBe(NO_HANDOVER_KEY_REASON);

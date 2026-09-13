@@ -1,6 +1,6 @@
 /**
  * Pure formatting helpers shared by the `Amount`, `Address` and `TxHash`
- * primitives. No React, no DOM — safe to unit test in isolation.
+ * primitives. No React, no DOM - safe to unit test in isolation.
  */
 
 /** Default `maxFractionDigits` for `<Amount>` by token symbol (spec 17 §3.3). */

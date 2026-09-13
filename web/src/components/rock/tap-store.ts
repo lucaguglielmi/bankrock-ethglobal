@@ -3,7 +3,7 @@
  *
  * Verifying a tap consumes its counter, so it can happen exactly once. When the verifier reports
  * that the tag actually belongs to a different rock than the URL claimed, the page navigates
- * there — and the result has to survive that navigation without the SDM parameters travelling in
+ * there - and the result has to survive that navigation without the SDM parameters travelling in
  * the new URL, where they could be copied, shared or replayed.
  *
  * Module scope, not `sessionStorage`: this must die with the tab, never be readable later, and

@@ -181,7 +181,7 @@ describe("decodeRegistryLog", () => {
         previousOwner: PREVIOUS,
         newOwner: OWNER,
         // `claimHandover` rebinds the rock's account to the claimant's, and the event now carries
-        // it — non-indexed, so it lands in `data` alongside the counter.
+        // it - non-indexed, so it lands in `data` alongside the counter.
         smartAccount: SAFE,
         counter: 9,
       }),

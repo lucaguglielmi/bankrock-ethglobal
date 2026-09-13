@@ -112,7 +112,7 @@ export function DemoFundSheet({
       open={open}
       onOpenChange={onOpenChange}
       title="Add funds"
-      description={`Rock #${rockId} is a demo. This credits it in your browser — no wallet, no transfer.`}
+      description={`Rock #${rockId} is a demo. This credits it in your browser - no wallet, no transfer.`}
       headerAccessory={<SimulatedBadge />}
       footer={footer}
     >

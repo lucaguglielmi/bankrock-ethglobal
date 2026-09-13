@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Term } from "@/components/ui/term";
 
 /**
- * "The DeFi position" — how a rock's money is offered for trading without ever leaving the rock.
+ * "The DeFi position" - how a rock's money is offered for trading without ever leaving the rock.
  *
  * The facts here are the ones the code enforces (spec 04, `contracts/contracts/aqua/NOTES.md`):
  * Aqua holds nothing; starting a strategy moves no tokens; three fee tiers; several strategies
@@ -15,7 +15,7 @@ import { Term } from "@/components/ui/term";
  */
 
 export const metadata = {
-  title: "The DeFi position — Bank Rock",
+  title: "The DeFi position - Bank Rock",
   description:
     "How a rock offers its tokens for trading through 1inch Aqua while the tokens stay in the rock's own account.",
 };
@@ -220,7 +220,7 @@ export default function DefiPage() {
             <p className="text-base text-ink-2">
               To <Term k="cashIn">cash in</Term>, the owner stops a stream. Aqua calls this{" "}
               <Term k="dock">docking</Term>. No tokens come back, because none ever left; the
-              offer simply closes. A stopped stream can never be restarted — a new one is started
+              offer simply closes. A stopped stream can never be restarted - a new one is started
               instead. Sending the tokens somewhere else afterwards is an ordinary transfer from the
               Rock Account, unrelated to Aqua.
             </p>

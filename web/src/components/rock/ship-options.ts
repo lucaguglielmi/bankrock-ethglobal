@@ -1,9 +1,9 @@
 /**
- * The streams the ship sheet may offer — and nothing else.
+ * The streams the ship sheet may offer - and nothing else.
  *
  * A strategy's identity is `(rockId, streamIndex, feeBps, maker, tokens)`: change the fee by one
  * basis point and the hash changes, so the stream has no balances and **no reader can find it**.
- * Every reader in the app probes exactly `DEFAULT_STREAMS` — `lib/aqua/read.ts` (`readRockStreams`),
+ * Every reader in the app probes exactly `DEFAULT_STREAMS` - `lib/aqua/read.ts` (`readRockStreams`),
  * `GET /api/rocks/[id]/strategy`, and `findShippedStream` in `hooks/useBankRock.ts`, which the
  * position card, the Trade button, the quote route and Cash in all sit behind.
  *
@@ -14,7 +14,7 @@
  * together.
  *
  * The owner-facing words come from the preset itself (`forWhom`, `description`), so a preset
- * added to the catalogue arrives here already described — there is no second table to update.
+ * added to the catalogue arrives here already described - there is no second table to update.
  */
 
 import { DEFAULT_STREAMS, type StreamPreset } from "@/lib/aqua/strategy";
@@ -24,11 +24,11 @@ export interface ShipOption {
   streamIndex: number;
   /** The strategy's immutable fee, in basis points. */
   feeBps: number;
-  /** Short name — "Wide", "Tight", "Patient". */
+  /** Short name - "Wide", "Tight", "Patient". */
   label: string;
   /** What the fee means for the rock, in the owner's words. The preset's `forWhom`. */
   hint: string;
-  /** The fee and what it is, in a phrase: "0.30% — the everyday curve". */
+  /** The fee and what it is, in a phrase: "0.30% - the everyday curve". */
   description: string;
   /** The catalogue entry this option was derived from. */
   preset: StreamPreset;

@@ -1,7 +1,7 @@
 /**
  * The gift message that accompanies a handover (Flow E).
  *
- * Only `keccak256(message)` goes on chain — a gift note is not public record. The plaintext is
+ * Only `keccak256(message)` goes on chain - a gift note is not public record. The plaintext is
  * stored here so the recipient can read it after claiming.
  *
  * POST is self-verifying rather than ownership-checked: the message is accepted only if it hashes
@@ -13,7 +13,7 @@
  * deliberately not restricted to the recipient's own DID: Privy tokens carry a DID, not a wallet
  * address, so "is this the named recipient" is not a question this route can answer honestly. A
  * signed-in reader who already knows the rock id can read a gift note; nothing more sensitive
- * than that is stored here, and the alternative — pretending to check — would be worse.
+ * than that is stored here, and the alternative - pretending to check - would be worse.
  */
 
 import { NextResponse } from "next/server";

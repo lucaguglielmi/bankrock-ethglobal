@@ -4,7 +4,7 @@ import { Term } from "@/components/ui/term";
 import { ActivationFlowDiagram } from "@/components/activation-flow-diagram";
 
 /**
- * "The physical" — what a Bank Rock is, what the chip inside it does, and what one tap sets in
+ * "The physical" - what a Bank Rock is, what the chip inside it does, and what one tap sets in
  * motion. Written for someone who has never held a crypto wallet: every unfamiliar word is a
  * glossary `Term`, and the page claims nothing DEMO-STATE lists as simulated or unavailable.
  *
@@ -13,7 +13,7 @@ import { ActivationFlowDiagram } from "@/components/activation-flow-diagram";
  */
 
 export const metadata = {
-  title: "The physical rock — Bank Rock",
+  title: "The physical rock - Bank Rock",
   description:
     "What a Bank Rock is made of, what the chip inside it does, and what happens when you tap it.",
 };
@@ -60,8 +60,8 @@ export default function RockPage() {
                 About the hackathon demo. There is one prototype rock, and rock 3 on this site is
                 its real record on <Term k="sepolia" />. Until the chip is programmed, a private
                 demo link plays the part of the chip and hands the rest of the flow the same signed
-                code a real tap would; everything after that point — the check, the counter, the{" "}
-                <Term k="attestation" />, the on-chain awakening — is the real path. Rock 3 was
+                code a real tap would; everything after that point - the check, the counter, the{" "}
+                <Term k="attestation" />, the on-chain awakening - is the real path. Rock 3 was
                 awakened through that link with the synthetic tag 04DE3057A11E80; its on-chain
                 counter (367523) is minutes since 2026-01-01, not a chip read count. No physical
                 chip has been tapped yet. Rock 420 is a
@@ -186,7 +186,7 @@ export default function RockPage() {
             <h2 className="text-h2 font-bold">A short history of liquidity</h2>
             <div className="flex flex-col gap-4 text-base text-ink-2">
               <p>
-                In the 15th century, <strong className="font-medium text-ink">Lorenzo de&rsquo; Medici</strong> and his family revolutionised the global banking system right here in Florence. They scaled the use of double-entry bookkeeping, letters of credit, and holding companies — effectively inventing modern finance as we know it.
+                In the 15th century, <strong className="font-medium text-ink">Lorenzo de&rsquo; Medici</strong> and his family revolutionised the global banking system right here in Florence. They scaled the use of double-entry bookkeeping, letters of credit, and holding companies - effectively inventing modern finance as we know it.
               </p>
               <p>
                 Exactly 530 years later, the very first Bank Rock was gathered from the rocky bed of the Arno river near Florence, ready to launch the next great financial revolution: Decentralised Finance. 

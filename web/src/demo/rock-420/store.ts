@@ -5,7 +5,7 @@
  * subscription so every hook that reads it re-renders when it changes.
  *
  * A reload keeps the demo where it was; "Reset demo" (`resetDemoRock`) puts the seed back and
- * forgets the key. Storage that is blocked or full is not an error — the demo simply lives for the
+ * forgets the key. Storage that is blocked or full is not an error - the demo simply lives for the
  * page's lifetime.
  */
 
@@ -28,7 +28,7 @@ function load(): DemoRockState {
       if (parsed) return parsed;
     }
   } catch {
-    // Storage unavailable — start from the seed.
+    // Storage unavailable - start from the seed.
   }
   return seedDemoRock();
 }
@@ -38,7 +38,7 @@ function persist(state: DemoRockState): void {
   try {
     window.localStorage.setItem(DEMO_STORAGE_KEY, serializeDemoRock(state));
   } catch {
-    // Storage unavailable or full — the in-memory copy still drives the page.
+    // Storage unavailable or full - the in-memory copy still drives the page.
   }
 }
 

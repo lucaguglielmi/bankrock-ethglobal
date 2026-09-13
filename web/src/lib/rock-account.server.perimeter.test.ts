@@ -4,7 +4,7 @@
  * This file began as the audit's evidence: it demonstrated P-1 (a captured attestation is a bearer
  * token for its whole TTL, with no per-rock limit and no spend cap) and P-2 (an RPC failure
  * returned `SEPOLIA_RPC_URL`, API key included, to an unauthenticated caller). Both are fixed, so
- * the file now asserts the fixed behaviour instead — the demonstrations are preserved in the audit
+ * the file now asserts the fixed behaviour instead - the demonstrations are preserved in the audit
  * document, and what lives here is what must not come back.
  */
 
@@ -81,7 +81,7 @@ describe("P-2: an RPC failure must not disclose the provider URL or its key", ()
 });
 
 describe("P-1: the relayer's daily spend cap", () => {
-  it("is UNAVAILABLE when unset — 'no cap' must not be the permissive branch", async () => {
+  it("is UNAVAILABLE when unset - 'no cap' must not be the permissive branch", async () => {
     delete process.env.RELAYER_DAILY_CAP_WEI;
     const { relayerDailyCapWei } = await import("@/lib/rock-account.server");
     const cap = relayerDailyCapWei();
@@ -121,7 +121,7 @@ describe("P-1: the relayer's daily spend cap", () => {
 
   it("fails closed when the spend ledger is unreachable", async () => {
     process.env.RELAYER_DAILY_CAP_WEI = "50000000000000000";
-    // No Cloudflare context in a unit test, so `getDb()` is null — the cap cannot be enforced.
+    // No Cloudflare context in a unit test, so `getDb()` is null - the cap cannot be enforced.
     const { reserveRelayerSpend } = await import("@/lib/rock-account.server");
     const reservation = await reserveRelayerSpend();
     expect(reservation.state).toBe("UNAVAILABLE");
@@ -195,7 +195,7 @@ describe("the relayed claim's fee ceiling", () => {
  * A pre-signed hand-over is stored only if the bundler says it validates.
  *
  * Without that, the store route's only check on a submitted operation was that its `sender` is the
- * rock's Rock Account — a public value — so any signed-in account could squat the row and make the
+ * rock's Rock Account - a public value - so any signed-in account could squat the row and make the
  * gift permanently unclaimable.
  */
 describe("simulateSignedUserOp", () => {
@@ -252,7 +252,7 @@ describe("simulateSignedUserOp", () => {
     vi.unstubAllGlobals();
   });
 
-  it("says the bundler could not be asked when it cannot be reached — not that it said no", async () => {
+  it("says the bundler could not be asked when it cannot be reached - not that it said no", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {

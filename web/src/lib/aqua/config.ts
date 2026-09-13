@@ -2,8 +2,8 @@
  * Addresses for the Aqua path, and nothing else.
  *
  * `lib/chain` is the single source of truth for every address the rest of the app knows about
- * (D-015), and it owns Aqua, USDC and WETH. The two contracts this integration deploys itself —
- * the `XYCSwap` app and the `XYCSwapTaker` periphery — are read here, in the same shape: one
+ * (D-015), and it owns Aqua, USDC and WETH. The two contracts this integration deploys itself -
+ * the `XYCSwap` app and the `XYCSwapTaker` periphery - are read here, in the same shape: one
  * literal `process.env.NEXT_PUBLIC_*` member access so Next.js can inline it, format-validated,
  * and returned as a `Capability` so an unset variable renders UNAVAILABLE rather than breaking.
  *
@@ -21,11 +21,11 @@ import { real, unavailable, type Capability } from "@/lib/demo";
  * lines to paste into the Cloudflare Pages environment.
  */
 export const aquaEnv = {
-  /** NEXT_PUBLIC_AQUA_APP_ADDRESS — our XYCSwap deployment (the AquaApp strategies are shipped to). */
+  /** NEXT_PUBLIC_AQUA_APP_ADDRESS - our XYCSwap deployment (the AquaApp strategies are shipped to). */
   appAddress: process.env.NEXT_PUBLIC_AQUA_APP_ADDRESS || "",
-  /** NEXT_PUBLIC_AQUA_TAKER_ADDRESS — the periphery a visitor's wallet calls to swap. */
+  /** NEXT_PUBLIC_AQUA_TAKER_ADDRESS - the periphery a visitor's wallet calls to swap. */
   takerAddress: process.env.NEXT_PUBLIC_AQUA_TAKER_ADDRESS || "",
-  /** AQUA_APP_DEPLOY_BLOCK — server-side only; the first block a strategy could exist in. */
+  /** AQUA_APP_DEPLOY_BLOCK - server-side only; the first block a strategy could exist in. */
   deployBlock: process.env.AQUA_APP_DEPLOY_BLOCK || "",
 } as const;
 
@@ -45,7 +45,7 @@ export function getAquaAppAddress(): Capability<Address> {
   return parse("NEXT_PUBLIC_AQUA_APP_ADDRESS", aquaEnv.appAddress);
 }
 
-/** The periphery a taker calls. A swap is impossible without it — see lib/aqua/calls.ts. */
+/** The periphery a taker calls. A swap is impossible without it - see lib/aqua/calls.ts. */
 export function getAquaTakerAddress(): Capability<Address> {
   return parse("NEXT_PUBLIC_AQUA_TAKER_ADDRESS", aquaEnv.takerAddress);
 }
@@ -56,7 +56,7 @@ export function getAquaAddress(): Capability<Address> {
 }
 
 export interface PairAddresses {
-  /** token0 of every Bank Rock strategy, by role — not by address order. */
+  /** token0 of every Bank Rock strategy, by role - not by address order. */
   usdc: Address;
   /** token1. */
   weth: Address;

@@ -17,12 +17,12 @@ import {
 const hex = (value: string) => Buffer.from(value.replace(/\s/g, ""), "hex");
 
 /* -------------------------------------------------------------------------- */
-/* EXTERNAL VECTOR — NXP AN12196                                               */
+/* EXTERNAL VECTOR - NXP AN12196                                               */
 /* -------------------------------------------------------------------------- */
 
 /**
  * NXP AN12196, "NTAG 424 DNA and NTAG 424 DNA TagTamper features and hints",
- * Secure Dynamic Messaging section — the worked SDM example whose URL is
+ * Secure Dynamic Messaging section - the worked SDM example whose URL is
  *
  *   https://ntag.nxp.com/424?e=EF963FF7828658A599F3041510671E88&c=94EED9EE65337086
  *

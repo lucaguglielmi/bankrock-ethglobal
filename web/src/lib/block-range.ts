@@ -7,8 +7,8 @@
  * 2,000-block query. 2,000 is therefore the chunk every scan in this application uses: it is the
  * size that was actually proven, on the endpoint the demo may well run on.
  *
- * This module exists because the same arithmetic was needed by two scanners — the registry
- * indexer and the Aqua fee scan — and one of them did not have it.
+ * This module exists because the same arithmetic was needed by two scanners - the registry
+ * indexer and the Aqua fee scan - and one of them did not have it.
  */
 
 /** Maximum span of a single `eth_getLogs` call. */

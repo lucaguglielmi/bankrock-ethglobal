@@ -1,5 +1,5 @@
 /**
- * GET /api/version — the build stamp, and what this deployment is actually pointed at.
+ * GET /api/version - the build stamp, and what this deployment is actually pointed at.
  *
  * `scripts/check-live.sh` reads this after every deploy: the point of the second half is that an
  * operator can tell, without opening a dashboard, whether the Worker's variables name contracts
@@ -10,7 +10,7 @@
  *
  * What may appear here, and what may not:
  *
- *  - **public** configuration only — the chain id, the six `NEXT_PUBLIC_*` addresses, and the two
+ *  - **public** configuration only - the chain id, the six `NEXT_PUBLIC_*` addresses, and the two
  *    deploy blocks. The blocks are read from server-side variables, but a block number is a public
  *    fact: both are recorded in `contracts/deployments/*.json` in git and either is recoverable
  *    from the chain by anyone. They are here so a reader can see that the Worker agrees with the

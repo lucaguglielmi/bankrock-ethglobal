@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Add funds — the honest funding surface on an awake rock (Flow B step 9, spec 16 Part 3).
+ * Add funds - the honest funding surface on an awake rock (Flow B step 9, spec 16 Part 3).
  *
  * Funding a rock on Sepolia is an ordinary transfer to the Rock Account: no bridge, no route, no
- * quote. So the sheet is the four real things an operator needs — the account to send to (as a QR
+ * quote. So the sheet is the four real things an operator needs - the account to send to (as a QR
  * a wallet can scan and as text with a copy button), what it holds right now, the two token
  * contracts that say *which* USDC and *which* WETH, and a link to watch the transfer land. There
  * is no amount field and no "confirm": this app does not move a visitor's tokens, a wallet does.
@@ -16,7 +16,7 @@
  * itself, which every wallet's scanner accepts.
  *
  * Every address here comes from `fund-data.ts`, capability-shaped: a rock with no account, or a
- * deployment with no token address configured, shows the reason — never a placeholder.
+ * deployment with no token address configured, shows the reason - never a placeholder.
  */
 
 import { useMemo, useState } from "react";

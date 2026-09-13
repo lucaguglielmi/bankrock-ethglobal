@@ -4,8 +4,8 @@ import { cn } from "@/lib/ui/cn";
 
 /**
  * Shared shell for `/privacy` and `/terms` (spec 17 Part 5 "Legal pages").
- * Replaces the old per-page `sticky top-0` sub-header (L-3) — which sat
- * permanently hidden behind the global fixed header anyway — with an
+ * Replaces the old per-page `sticky top-0` sub-header (L-3) - which sat
+ * permanently hidden behind the global fixed header anyway - with an
  * in-page contents list under the title. Both pages rely on the root
  * `<main>` element's global frame padding (spec 17 §4.2) for clearance
  * below the fixed header; neither adds its own top padding.

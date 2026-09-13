@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Retire sheet — the terminal lifecycle state on the registry (`archiveRock`).
+ * Retire sheet - the terminal lifecycle state on the registry (`archiveRock`).
  *
  * Archiving cannot be undone, so the consequence is spelled out in plain language and the
  * confirmation is typed, not tapped: a destructive 56 px button that only wakes up once the

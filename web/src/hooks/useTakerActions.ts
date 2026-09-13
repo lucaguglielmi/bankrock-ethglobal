@@ -9,11 +9,11 @@
  *     it, and the callback must answer by pushing the input into Aqua. An EOA cannot answer it and
  *     a plain Safe would push nothing (§5). So the visitor transacts through `XYCSwapTaker`, the
  *     periphery, and does it from a smart account of their own.
- *  2. **The approval goes to the periphery**, not to Aqua and not to the app — the periphery is
+ *  2. **The approval goes to the periphery**, not to Aqua and not to the app - the periphery is
  *     what pulls the input from the taker. That is the opposite of the maker's rule, where the
  *     approval goes to Aqua (§1), and getting it backwards is a revert, not a silent loss.
  *  3. **The swap is two calls**, `approve` then `swapExactIn`, which is exactly one sponsored
- *     batch from a smart account — so a visitor with no ETH can trade.
+ *     batch from a smart account - so a visitor with no ETH can trade.
  *
  * The account here is the visitor's *personal* Safe: salt `PERSONAL_ACCOUNT_SALT`, owner their
  * Privy wallet, not tied to any tag. A visitor who swaps against three rocks uses one account.
@@ -24,8 +24,8 @@
  * balances are REAL reads of the same two ERC-20s the rock page reads, or UNAVAILABLE with a reason.
  *
  * Everything degrades to UNAVAILABLE with a reason (D-013): signed out, no Pimlico key, no app or
- * periphery address, no live strategy. `amountOut` is read from the chain — the app's return value
- * in the receipt's `Pushed`/`Pulled` events — never from the preview the user was shown (D-014).
+ * periphery address, no live strategy. `amountOut` is read from the chain - the app's return value
+ * in the receipt's `Pushed`/`Pulled` events - never from the preview the user was shown (D-014).
  */
 
 import { useCallback, useMemo, useState } from "react";
@@ -72,7 +72,7 @@ import { useDemoTakerActions } from "@/demo/rock-420/hooks";
 
 export interface SwapParams {
   rockId: string;
-  /** The rock's Rock Account — the maker whose reserve is being traded against. */
+  /** The rock's Rock Account - the maker whose reserve is being traded against. */
   maker: Address;
   streamIndex: number;
   tokenIn: "USDC" | "WETH";
@@ -85,7 +85,7 @@ export interface SwapParams {
 export interface UseTakerActions {
   /** The visitor's personal smart account. UNAVAILABLE when signed out or AA is unconfigured. */
   account: Capability<Address>;
-  /** That account's USDC and WETH balances — what it can actually pay a swap with. */
+  /** That account's USDC and WETH balances - what it can actually pay a swap with. */
   balances: Capability<RockReserves>;
   swap(params: SwapParams): Promise<Capability<{ txHash: Hex; amountOut: bigint }>>;
   isPending: boolean;

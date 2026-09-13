@@ -2,11 +2,11 @@
  * The Rock Account and the registry record: everything that is safe in a browser bundle.
  *
  * The Rock Account is a Safe 1.4.1 smart account on EntryPoint 0.7 whose owner is the user's
- * Privy embedded wallet (spec 03). Its address is counterfactual — derived deterministically from
- * (owner, salt) — so a rock has an address before anything is deployed, and the first sponsored
+ * Privy embedded wallet (spec 03). Its address is counterfactual - derived deterministically from
+ * (owner, salt) - so a rock has an address before anything is deployed, and the first sponsored
  * UserOperation deploys it (spec 05, D-012).
  *
- * Server-only work — the relayer, the attestation signature check, submitting a stored UserOp —
+ * Server-only work - the relayer, the attestation signature check, submitting a stored UserOp -
  * lives in `rock-account.server.ts`. Nothing here reads a private key.
  *
  * D-014 applies throughout: a transaction hash is only ever returned when a bundler or an RPC
@@ -48,8 +48,8 @@ import { publicReasonWith } from "@/lib/errors";
  *
  * This mirrors the `state: "SIGNED"` branch of the NFC verifier's response
  * (`lib/nfc/attestation.ts`, `GET /api/nfc/verify?rockId&e&c&subject=`). It is re-declared
- * rather than imported because the verifier module is server-only — it reaches for `node:crypto`
- * and `Buffer` — and this type is needed in the browser.
+ * rather than imported because the verifier module is server-only - it reaches for `node:crypto`
+ * and `Buffer` - and this type is needed in the browser.
  *
  * The EIP-712 struct is
  * `Attestation(uint256 rockId,bytes32 uidHash,uint32 counter,uint256 deadline,address subject,address smartAccount)`.
@@ -67,7 +67,7 @@ export interface SignedAttestation {
     verifyingContract: Address;
   };
   message: {
-    /** Decimal string — the struct field is a uint256. */
+    /** Decimal string - the struct field is a uint256. */
     rockId: string;
     uidHash: Hex;
     counter: number;
@@ -120,8 +120,8 @@ export function toContractAttestation(attestation: SignedAttestation) {
  *
  * This is the client-side half of the registry's own rules. The registry credits `att.subject`
  * rather than `msg.sender` and requires `att.smartAccount` to equal the account being bound, so
- * an attestation that names someone else would succeed on chain and hand the rock — or its
- * account — to that someone else. Refusing here means the user never sends a transaction whose
+ * an attestation that names someone else would succeed on chain and hand the rock - or its
+ * account - to that someone else. Refusing here means the user never sends a transaction whose
  * outcome contradicts what they were shown.
  *
  * Pure, so the rule is stated once and is testable.
@@ -142,7 +142,7 @@ export function checkAwakenAttestation(
   const subject = attestation.message.subject?.toLowerCase();
   if (!subject || subject !== params.signedInAddress.toLowerCase()) {
     return unavailable(
-      "This tap authorises a different wallet than the one signed in — tap the rock again while signed in",
+      "This tap authorises a different wallet than the one signed in - tap the rock again while signed in",
     );
   }
 
@@ -152,12 +152,12 @@ export function checkAwakenAttestation(
   const attested = attestation.message.smartAccount?.toLowerCase();
   if (!attested || attested !== params.smartAccount.toLowerCase()) {
     return unavailable(
-      "This tap authorises a different Rock Account — tap the rock again from this device",
+      "This tap authorises a different Rock Account - tap the rock again from this device",
     );
   }
 
   if (attestation.message.deadline * 1000 <= Date.now()) {
-    return unavailable("This tap has expired — tap the rock again");
+    return unavailable("This tap has expired - tap the rock again");
   }
 
   return real(true);
@@ -263,7 +263,7 @@ export function parseRockId(rockId: string): bigint | null {
 }
 
 export const REGISTRY_UNAVAILABLE_REASON =
-  "NEXT_PUBLIC_REGISTRY_ADDRESS is not configured — the rock registry is not deployed yet";
+  "NEXT_PUBLIC_REGISTRY_ADDRESS is not configured - the rock registry is not deployed yet";
 
 /** The registry address, or UNAVAILABLE with the reason. */
 export function registryAddress(): Capability<Address> {
@@ -353,7 +353,7 @@ export async function readReserves(
 /**
  * Which rock a tag is bound to *right now*, straight from the registry.
  *
- * `uidHash` comes from a SIGNED attestation's `message.uidHash` — the verifier never discloses
+ * `uidHash` comes from a SIGNED attestation's `message.uidHash` - the verifier never discloses
  * the raw UID, and the hash is what the registry indexes by, so nothing privacy-sensitive has to
  * travel for this to work. A null rockId means the tag is unbound: either it has never awakened a
  * rock, or the rock it awakened has since been archived (archiving releases the tag).
@@ -408,7 +408,7 @@ export const SIGNED_OUT_REASON = "Sign in to act on this rock";
 /** The rock exists but its record names no account to act from. */
 export const NOT_AWAKENED_REASON = "This rock has not been awakened yet";
 
-/** The registry answered, but with no account — only possible off a chain matching this ABI. */
+/** The registry answered, but with no account - only possible off a chain matching this ABI. */
 export const NO_REGISTRY_ACCOUNT_REASON = "The registry holds no Rock Account for this rock";
 
 /** Archiving is terminal: the registry refuses every owner action afterwards (D-028). */
@@ -420,7 +420,7 @@ export const NOT_ROCK_OWNER_REASON = "This rock is owned by a different wallet";
 /** `isOwner` returned false: the account belongs to someone else now. */
 export const ACCOUNT_ANSWERS_ELSEWHERE_REASON = "This account answers to a different wallet";
 
-/** No code at the address, so it can answer for nobody — the `code.length` half of the gate. */
+/** No code at the address, so it can answer for nobody - the `code.length` half of the gate. */
 export const ACCOUNT_NOT_DEPLOYED_REASON =
   "This rock's account has not executed anything yet, so it answers to nobody";
 
@@ -452,7 +452,7 @@ export function interpretAccountAnswer(params: {
 }
 
 /**
- * Asks a Rock Account whether a wallet is one of its owners — the same staticcall the registry's
+ * Asks a Rock Account whether a wallet is one of its owners - the same staticcall the registry's
  * `_accountAnswersTo` makes before it admits an owner action from that account.
  *
  * UNAVAILABLE means the question could not be put (no address, no wallet, unreachable RPC). A REAL
@@ -548,9 +548,9 @@ export function planRockAccount(params: {
  * The two conditions are the registry's own, restated where the user can be told about them
  * before a transaction is built rather than after one reverts:
  *
- *  1. the wallet is the owner the registry records — `_requireRockController` admits nobody
+ *  1. the wallet is the owner the registry records - `_requireRockController` admits nobody
  *     else's Safe; and
- *  2. the Rock Account answers to that wallet — the `isOwner` staticcall `_accountAnswersTo`
+ *  2. the Rock Account answers to that wallet - the `isOwner` staticcall `_accountAnswersTo`
  *     makes, which is what lets the action be sent from the account and sponsored.
  *
  * Pure. `answer` is what `readAccountAnswersTo` returned for the registry's account.
@@ -642,7 +642,7 @@ export function encodeArchiveRock(rockId: bigint): Hex {
  *
  * Informational only: on chain it freezes nothing, blocks no handover and gates nothing. It exists
  * so a reader of the registry can see what the owner said. The UI must not present it as a
- * security control — possession was never the authorisation for spending in the first place.
+ * security control - possession was never the authorisation for spending in the first place.
  */
 export function encodeMarkLost(rockId: bigint): Hex {
   return encodeFunctionData({
@@ -665,7 +665,7 @@ export function encodeClearLost(rockId: bigint): Hex {
  *
  * Pure, so the rule is testable and stated once: one above the highest id that has ever been
  * awakened, and 1 when none has. Ids that are not positive integers are ignored rather than
- * guessed at, and gaps are never reused — an archived rock keeps its id forever, so reissuing it
+ * guessed at, and gaps are never reused - an archived rock keeps its id forever, so reissuing it
  * would make one number mean two objects in the provenance history.
  */
 export function nextFreeRockId(awakenedIds: readonly string[]): string {
@@ -685,7 +685,7 @@ export const NEXT_FREE_PROBE_LIMIT = 256;
  *
  * The indexed events are a *suggestion* (they exist only once a rock's activity has been viewed
  * and mirrored); the registry is the truth. Starting from the suggestion and walking forward
- * until `getRock` reports `dormant` makes the answer correct even with an empty mirror — an
+ * until `getRock` reports `dormant` makes the answer correct even with an empty mirror - an
  * archived or awakened id is skipped, never offered. `readState` is injected so the walk is
  * testable without a chain. Returns null when the RPC could not answer or the limit is hit.
  */
@@ -756,7 +756,7 @@ export interface Call {
 /**
  * The approval calls needed to move an allowance from `currentAllowance` to `amount`.
  *
- * Circle's USDC — the Sepolia token every rock trades — inherits the original USDT-era guard and
+ * Circle's USDC - the Sepolia token every rock trades - inherits the original USDT-era guard and
  * **reverts on a non-zero to non-zero `approve`**. An approval sequence that ignores this works on
  * WETH and fails on USDC, which is the worst possible shape for a bug: it passes every test that
  * uses a plain ERC-20 and breaks on the one token the product is about.
@@ -818,7 +818,7 @@ export async function readAllowance(
 /* -------------------------------------------------------------------------- */
 
 export const PIMLICO_UNAVAILABLE_REASON =
-  "NEXT_PUBLIC_PIMLICO_API_KEY is not configured — no bundler or paymaster is reachable";
+  "NEXT_PUBLIC_PIMLICO_API_KEY is not configured - no bundler or paymaster is reachable";
 
 /** The browser-visible Pimlico key. Restrict it by origin in the Pimlico dashboard. */
 export function pimlicoApiKey(): Capability<string> {
@@ -835,8 +835,8 @@ export function pimlicoRpcUrl(apiKey: string): string {
 /**
  * Salt for the counterfactual Safe address: the tag's own identity.
  *
- * One Rock Account per physical rock, per owner (spec 03, D-005). The salt is `keccak256(uid)` —
- * the same `uidHash` the registry binds and the attestation signs — read as a uint256, so:
+ * One Rock Account per physical rock, per owner (spec 03, D-005). The salt is `keccak256(uid)` -
+ * the same `uidHash` the registry binds and the attestation signs - read as a uint256, so:
  *
  *  - two rocks held by the same person have two accounts, and their balances never pool;
  *  - the account address is derivable by anyone who knows the tag hash and the owner, which is
@@ -844,14 +844,14 @@ export function pimlicoRpcUrl(apiKey: string): string {
  *    transaction exists;
  *  - the address follows the *tag*, not the rock id. A tag whose rock was archived awakens a new
  *    rock id into the same account for the same owner, which is the behaviour the archive-and-
- *    rehearse flow needs — for the owner who derived it. After a gift the rock's account is the
+ *    rehearse flow needs - for the owner who derived it. After a gift the rock's account is the
  *    giver's derivation (D-032, D-037), so the recipient's next awakening lands in a different
  *    account and the retired rock's reserve stays where it is.
  *
  * It deliberately does not include the rock id: the id is not settled at the moment of the tap
  * (an archived rock's tag awakens a different one), and the attestation must name the account.
  *
- * Throws on a malformed hash rather than salting with a coerced value — a wrong salt is a
+ * Throws on a malformed hash rather than salting with a coerced value - a wrong salt is a
  * different account, and that failure would surface much later as "your rock is empty".
  */
 export function rockAccountSaltFor(uidHash: `0x${string}`): bigint {
@@ -865,7 +865,7 @@ export function rockAccountSaltFor(uidHash: `0x${string}`): bigint {
  * Derives a Rock Account address without deploying anything and without a signer.
  *
  * Counterfactual: the address is a CREATE2 prediction from (owner, salt), so it exists and can be
- * quoted — to the verifier, to a faucet, to a UI — long before the first UserOperation deploys it.
+ * quoted - to the verifier, to a faucet, to a UI - long before the first UserOperation deploys it.
  *
  * Server-safe: it takes an owner *address*, not a wallet, so the NFC verifier can derive exactly
  * the address the client will build and sign it into the attestation. Nothing here can sign or
@@ -926,7 +926,7 @@ export async function computeRockAccountAddress(params: {
  * Salt for a visitor's *personal* Safe.
  *
  * Zero, deliberately: a taker's account is not tied to any tag. A visitor who swaps against three
- * different rocks uses one account, because it is their wallet's smart-account twin — it exists
+ * different rocks uses one account, because it is their wallet's smart-account twin - it exists
  * so the swap can be a sponsored batch (approve + swap) and so the periphery has a contract to
  * call back into (`contracts/aqua/NOTES.md` §5), not because it belongs to a rock.
  *

@@ -7,7 +7,7 @@ import { cn } from "@/lib/ui/cn";
  * The account sheet's invitation to tap (Flow A, the physical half of Bank Rock): a rock, a
  * phone that glides in and rests against it, and NFC rings leaving the contact point.
  *
- * All motion is CSS — the `--animate-tap-*` tokens in `globals.css` — applied under
+ * All motion is CSS - the `--animate-tap-*` tokens in `globals.css` - applied under
  * `motion-safe:` only. The SVG's rest state *is* the touching frame (phone against the rock,
  * rings visible), so under `prefers-reduced-motion: reduce` nothing moves and nothing is
  * missing. No JavaScript runs after render.

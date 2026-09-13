@@ -1,5 +1,5 @@
 /**
- * GET|POST /api/alerts — a rock's alert preferences (SA-5, N-9).
+ * GET|POST /api/alerts - a rock's alert preferences (SA-5, N-9).
  *
  * Both verbs were anonymous: anyone could read back the owner's stored email address for any
  * rockId, or overwrite it. Both now require a verified Privy access token
@@ -7,7 +7,7 @@
  *
  * Scoping, verified for the perimeter audit (P-13): preferences are stored per rock and owned by
  * the Privy DID that first wrote them (`lib/alerts.ts`). A read by any other DID is refused, and so
- * is a write — an email address stored here is never returned to another account. The residual
+ * is a write - an email address stored here is never returned to another account. The residual
  * weakness is squatting, not disclosure: because a Privy token proves an account rather than the
  * rock's owner, a stranger can claim a rock's row before its owner does and hold it. That is
  * recorded rather than fixed here; the fix is checking the DID against the registry's owner, which
@@ -18,7 +18,7 @@
  *
  * Preferences persist; delivery does not exist. Spec 15 Part 6 cuts the delivery pipeline, so the
  * response states plainly that no alert can currently be dispatched. That is intentional: alert
- * delivery stays sandboxed until the project is on mainnet — a decision, not a missing feature
+ * delivery stays sandboxed until the project is on mainnet - a decision, not a missing feature
  * (DEMO-STATE N-2).
  */
 

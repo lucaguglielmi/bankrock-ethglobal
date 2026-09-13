@@ -172,7 +172,7 @@ describe("resolveCounterStore", () => {
     vi.resetModules();
   });
 
-  it("is unavailable with no D1 binding — there is no fallback (D-017, R-4)", async () => {
+  it("is unavailable with no D1 binding - there is no fallback (D-017, R-4)", async () => {
     // A unit test has no Cloudflare context, which is exactly the production failure this
     // guards: nothing in the environment can turn an absent D1 into a non-durable store.
     await expect(resolveCounterStore()).resolves.toEqual({

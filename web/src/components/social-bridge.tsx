@@ -5,7 +5,7 @@
  *
  * "Claim your vanity URL" used to be an 800 ms `setTimeout` that saved nothing and then said
  * "Claimed!". It now posts to `/api/rocks/[id]/vanity` with the Privy access token the route
- * requires, and reports what the route actually answered — including a refusal.
+ * requires, and reports what the route actually answered - including a refusal.
  *
  * The Privy `linkEmail` / `linkTwitter` buttons are gone with it: they came from `usePrivy()`,
  * which throws when no Privy app is configured (A-2), and the page must render in that case.

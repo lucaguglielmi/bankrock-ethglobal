@@ -9,7 +9,7 @@ import { cn } from "@/lib/ui/cn";
  */
 export interface IconButtonProps
   extends Omit<ButtonPrimitive.Props, "children"> {
-  /** Required — this control has no visible label. */
+  /** Required - this control has no visible label. */
   "aria-label": string;
   variant?: "ghost" | "outline" | "solid";
   /** The icon element, e.g. `<Copy />` from lucide-react. Sized to 20 px automatically. */

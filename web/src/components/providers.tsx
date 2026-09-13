@@ -8,7 +8,7 @@
  *    would initialise, which is what made the fabricated session indistinguishable from a real
  *    one. Without a valid app id the tree gets `UnavailableAuthProvider` and the UI renders an
  *    UNAVAILABLE sign-in state;
- *  - the chain list leads with Sepolia and `defaultChain` is Sepolia — Privy connects embedded
+ *  - the chain list leads with Sepolia and `defaultChain` is Sepolia - Privy connects embedded
  *    wallets to the first listed chain (D-023, spec 16 §1.4);
  *  - the modal logo comes from NEXT_PUBLIC_APP_URL; the preview-domain literal is gone (D-022).
  */

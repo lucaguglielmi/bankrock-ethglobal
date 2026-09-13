@@ -9,11 +9,11 @@
  *   - say what the thing *is* for a rock, not what it is in general, unless the general meaning
  *     is the whole point;
  *   - never a yield, rate of return or annualised figure (D-004); the only rate is the fee;
- *   - never "deposit" for shipping a strategy — nothing is deposited (spec 04, D-030);
+ *   - never "deposit" for shipping a strategy - nothing is deposited (spec 04, D-030);
  *   - state what a thing cannot do when that is the point (the chip holds no key, the registry
  *     holds no tokens, the relayer cannot choose a recipient).
  *
- * Rendered by `<Term k="…">` (`components/ui/term.tsx`), which wraps `HelpTerm` — a tooltip on
+ * Rendered by `<Term k="…">` (`components/ui/term.tsx`), which wraps `HelpTerm` - a tooltip on
  * a pointer, a tappable popover on touch. Plain TypeScript here so the text can also be read by a
  * test or a script; no React.
  */
@@ -379,5 +379,5 @@ export const GLOSSARY = {
 
 export type GlossaryKey = keyof typeof GLOSSARY;
 
-/** Every key, in the order they are declared — for a glossary page or a test. */
+/** Every key, in the order they are declared - for a glossary page or a test. */
 export const GLOSSARY_KEYS = Object.keys(GLOSSARY) as GlossaryKey[];

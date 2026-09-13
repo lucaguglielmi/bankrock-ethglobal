@@ -5,7 +5,7 @@
  * needs: "Reset demo". Never fixed, never dismissible; it sits in the page's own flow above the
  * identity row, so a screenshot of the demo carries it.
  *
- * Reset is confirmed in a `Sheet` — the only overlay primitive — because a mis-tap on stage would
+ * Reset is confirmed in a `Sheet` - the only overlay primitive - because a mis-tap on stage would
  * throw away the state the presenter has just built up.
  */
 
@@ -27,7 +27,7 @@ export function DemoRockBanner({ onReset }: { onReset: () => void }) {
         <p className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-ink">
           <SimulatedBadge />
           <span>
-            Demo rock. Everything here is pretend and lives in this browser — nothing is on chain.
+            Demo rock. Everything here is pretend and lives in this browser - nothing is on chain.
           </span>
         </p>
         <Button
@@ -75,7 +75,7 @@ export function DemoRockBanner({ onReset }: { onReset: () => void }) {
       >
         <SheetBody className="flex flex-col gap-3">
           <p className="max-w-prose text-base text-ink-2">
-            25,000 USDC and 12.5 WETH held, the Wide and Tight streams live, the seeded history —
+            25,000 USDC and 12.5 WETH held, the Wide and Tight streams live, the seeded history -
             and everything you have done since is forgotten.
           </p>
           <p className="max-w-prose text-sm text-ink-3">
@@ -92,7 +92,7 @@ export function DemoRockLine() {
   return (
     <p className="flex items-center gap-2 text-sm text-ink-3">
       <FlaskConical aria-hidden className="size-4 shrink-0" />
-      Demo rock — no tap to verify, nothing on chain
+      Demo rock - no tap to verify, nothing on chain
     </p>
   );
 }

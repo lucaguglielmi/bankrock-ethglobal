@@ -8,7 +8,7 @@
  * with the reason the UI should render.
  *
  * `isLoading` is true for the first read. While it is true the capabilities are UNAVAILABLE with
- * a "reading" reason — check `isLoading` before rendering a reason, or the first frame will
+ * a "reading" reason - check `isLoading` before rendering a reason, or the first frame will
  * explain that something is missing when it is merely in flight. Subsequent refetches keep the
  * last successful value, so a 15-second poll does not flash an empty state.
  */

@@ -1,5 +1,5 @@
 /**
- * The strategy bytes — the exact encoding `XYCSwap` decodes and `Aqua` hashes.
+ * The strategy bytes - the exact encoding `XYCSwap` decodes and `Aqua` hashes.
  *
  * Read out of the vendored source at `contracts/aqua/`, written up in
  * `contracts/aqua/NOTES.md` §3, and cross-checked against Solidity: `XYCSwapStrategy.t.sol`
@@ -38,7 +38,7 @@ export const SALT_DOMAIN: Hex = keccak256(stringToHex("bankrock.aqua.strategy.v1
 /** XYCSwap's basis-point base: 10,000 = 100%. */
 export const BPS_BASE = BigInt(10_000);
 
-/** The ABI type of `XYCSwap.Strategy`, as a tuple — this is what `abi.encode(strategy)` produces. */
+/** The ABI type of `XYCSwap.Strategy`, as a tuple - this is what `abi.encode(strategy)` produces. */
 const STRATEGY_TUPLE = parseAbiParameters(
   "(address maker, address token0, address token1, uint256 feeBps, bytes32 salt)",
 );
@@ -47,7 +47,7 @@ const SALT_TUPLE = parseAbiParameters("bytes32 domain, uint256 rockId, uint256 s
 
 /** A rock's identity within one strategy: which rock, and which of its streams. */
 export interface StreamIdentity {
-  /** The public rock id. A positive integer — the registry's `uint256`. */
+  /** The public rock id. A positive integer - the registry's `uint256`. */
   rockId: bigint | number | string;
   /** Which stream of that rock. Several streams share one reserve (spec 04). Defaults to 0. */
   streamIndex?: bigint | number;
@@ -56,9 +56,9 @@ export interface StreamIdentity {
 export interface StrategyParams extends StreamIdentity {
   /** The maker: the rock's Rock Account (a Safe). */
   maker: Address;
-  /** token0 — USDC, by role. */
+  /** token0 - USDC, by role. */
   token0: Address;
-  /** token1 — WETH, by role. */
+  /** token1 - WETH, by role. */
   token1: Address;
   /** The swap fee in basis points. 30 = 0.30%. */
   feeBps: bigint | number;
@@ -77,7 +77,7 @@ export interface NormalisedStrategyParams {
 /** A strategy, and everything derived from it. */
 export interface EncodedStrategy {
   params: NormalisedStrategyParams;
-  /** The `strategy` argument of `Aqua.ship` — 160 bytes. */
+  /** The `strategy` argument of `Aqua.ship` - 160 bytes. */
   strategy: Hex;
   /** `keccak256(strategy)`. The key every balance and every event is filed under. */
   strategyHash: Hex;
@@ -99,7 +99,7 @@ function toBigInt(value: bigint | number | string, label: string): bigint {
 /**
  * `salt = keccak256(abi.encode(SALT_DOMAIN, rockId, streamIndex))`.
  *
- * Deterministic and reproducible by anyone holding the rock id — which is the point: it is the
+ * Deterministic and reproducible by anyone holding the rock id - which is the point: it is the
  * link between a physical rock and an on-chain strategy, not a secret.
  */
 export function deriveSalt({ rockId, streamIndex = 0 }: StreamIdentity): Hex {
@@ -129,7 +129,7 @@ export function encodeStrategy(params: StrategyParams): Hex {
   ]);
 }
 
-/** `keccak256(strategy)` — literally what `Aqua.ship` returns and files balances under. */
+/** `keccak256(strategy)` - literally what `Aqua.ship` returns and files balances under. */
 export function strategyHash(strategy: Hex): Hex {
   return keccak256(strategy);
 }
@@ -153,11 +153,11 @@ export function buildStrategy(params: StrategyParams): EncodedStrategy {
 }
 
 /**
- * Decode strategy bytes back into their fields — for a `Shipped` event, or to check that an
+ * Decode strategy bytes back into their fields - for a `Shipped` event, or to check that an
  * address someone handed us really is the strategy we think it is.
  *
  * The rock id is *not* recoverable from the salt (it is a hash). To prove a strategy belongs to a
- * rock, re-derive the salt from the rock id and compare — that is `strategyBelongsToRock`.
+ * rock, re-derive the salt from the rock id and compare - that is `strategyBelongsToRock`.
  */
 export function decodeStrategy(strategy: Hex): {
   maker: Address;
@@ -182,7 +182,7 @@ export function strategyBelongsToRock(strategy: Hex, identity: StreamIdentity): 
 }
 
 /**
- * A liquidity strategy the dashboard can offer — one entry of the catalogue.
+ * A liquidity strategy the dashboard can offer - one entry of the catalogue.
  *
  * `XYCSwap` is a fixed constant-product curve, so the only thing a strategy can vary is its fee.
  * A "strategy" in this product is therefore a `(streamIndex, feeBps)` preset, and the fields
@@ -194,9 +194,9 @@ export interface StreamPreset {
   readonly streamIndex: number;
   /** The immutable swap fee, in basis points (30 = 0.30%). Part of the hash too. */
   readonly feeBps: number;
-  /** One or two words — the name a card is headed with. */
+  /** One or two words - the name a card is headed with. */
   readonly label: string;
-  /** The fee and what it is, in a phrase: "0.30% — the everyday curve". */
+  /** The fee and what it is, in a phrase: "0.30% - the everyday curve". */
   readonly description: string;
   /** One calm sentence: who should pick this and what happens. */
   readonly forWhom: string;
@@ -208,7 +208,7 @@ export interface StreamPreset {
  * Spec 04: *"The demo should ship at least two strategies from the same Rock Account and
  * overlapping token balance… a simple AMM-like strategy [and] a fixed-price offer or second
  * pricing curve using the same reserve."* `XYCSwap` has one curve shape, so the streams differ
- * only in fee — the same reserve, offered at several prices, which is exactly the shared-liquidity
+ * only in fee - the same reserve, offered at several prices, which is exactly the shared-liquidity
  * point spec 04 wants made.
  *
  * These are also what a reader probes: given a rock id and its Rock Account, every hash here is
@@ -217,7 +217,7 @@ export interface StreamPreset {
  * call per read. Ordered by `streamIndex`, not by fee.
  *
  * Rules, pinned by `strategy.test.ts`:
- *   - stream 0 (Wide, 30 bps) and stream 1 (Tight, 5 bps) never change — they are live on
+ *   - stream 0 (Wide, 30 bps) and stream 1 (Tight, 5 bps) never change - they are live on
  *     Sepolia, and a changed fee is a different hash that would make them invisible;
  *   - stream indexes are unique and contiguous from 0; fees are unique;
  *   - a fee tier is never edited. To change one, add a preset at the next index.
@@ -232,21 +232,21 @@ export const DEFAULT_STREAMS: readonly StreamPreset[] = [
     streamIndex: 0,
     feeBps: 30,
     label: "Wide",
-    description: "0.30% — the everyday curve",
+    description: "0.30% - the everyday curve",
     forWhom: "Trades steadily and keeps a fair slice of each one; the middle of the road.",
   },
   {
     streamIndex: 1,
     feeBps: 5,
     label: "Tight",
-    description: "0.05% — the same reserve, priced finer",
+    description: "0.05% - the same reserve, priced finer",
     forWhom: "Trades most often and earns a little each time; for a rock that likes to be busy.",
   },
   {
     streamIndex: 2,
     feeBps: 100,
     label: "Patient",
-    description: "1.00% — the same reserve, priced for rare trades",
+    description: "1.00% - the same reserve, priced for rare trades",
     forWhom: "Trades rarely and earns the most each time; for a rock content to wait.",
   },
 ];

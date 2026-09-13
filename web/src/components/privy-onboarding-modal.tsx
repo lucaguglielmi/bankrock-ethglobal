@@ -5,12 +5,12 @@
  *
  * What this file used to be: `useEffect` was called **after** `if (!isOpen) return null`, so the
  * hook count changed 1 → 2 the moment the modal opened and React threw "Rendered more hooks than
- * during the previous render" — on the primary login path (X-1). It also promised a Safe on Base
+ * during the previous render" - on the primary login path (X-1). It also promised a Safe on Base
  * Sepolia and a "Live Yield" reserve.
  *
  * What it is now: a `Sheet` that is always rendered and simply passed `open`, so every hook runs
- * on every render, in the same order, always. When sign-in cannot work at all — no configured
- * Privy app — it renders the UNAVAILABLE state with the reason instead of a button that would do
+ * on every render, in the same order, always. When sign-in cannot work at all - no configured
+ * Privy app - it renders the UNAVAILABLE state with the reason instead of a button that would do
  * nothing (A-1: there is no fabricated wallet to fall back to any more).
  */
 

@@ -1,5 +1,5 @@
 /**
- * GET /api/rocks/next-id — the next rock id nobody has awakened.
+ * GET /api/rocks/next-id - the next rock id nobody has awakened.
  *
  * The awakening beat needs a number to awaken *into*, and reusing one would make a single id mean
  * two objects in the provenance history: an archived rock keeps its id forever. So this is one

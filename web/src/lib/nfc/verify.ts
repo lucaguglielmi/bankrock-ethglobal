@@ -27,13 +27,13 @@ export type VerifyFailureReason =
   | "malformed_request"
   /** `NXP_MASTER_KEY` is not set. Fails closed (D-017/D-018). */
   | "unconfigured"
-  /** PICCData decrypted to an unsupported PICCDataTag — wrong key or forged `e`. */
+  /** PICCData decrypted to an unsupported PICCDataTag - wrong key or forged `e`. */
   | "invalid_picc_data"
   /** The truncated SDM CMAC did not match. */
   | "invalid_cmac"
   /** No durable counter store; replay protection is impossible, so fail closed. */
   | "counter_store_unavailable"
-  /** The counter did not exceed the last accepted value for this UID — a replay. */
+  /** The counter did not exceed the last accepted value for this UID - a replay. */
   | "stale_counter"
   /** Over the per-IP limit. HTTP 429. */
   | "rate_limited"
@@ -59,7 +59,7 @@ export interface VerifyTapInput {
    * Client-supplied, and that is acceptable: the physical tap is the
    * authorisation. `subject` only names who the person holding the rock is
    * giving it to, which is a choice that person already has. It is never a
-   * substitute for the tap — an invalid CMAC or a stale counter produces no
+   * substitute for the tap - an invalid CMAC or a stale counter produces no
    * attestation no matter what `subject` says.
    *
    * Absent: verification runs and the attestation is `UNAVAILABLE`.

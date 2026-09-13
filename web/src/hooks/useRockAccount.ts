@@ -6,7 +6,7 @@
  * Two different questions, answered here so the rest of the app never has to guess at either:
  *
  *  - **which account** holds this rock's money. For a rock that has been awakened that is
- *    whatever the registry reports as `rock.smartAccount` — read, never re-derived (D-037). Before
+ *    whatever the registry reports as `rock.smartAccount` - read, never re-derived (D-037). Before
  *    the awakening there is no record to read, so it is the counterfactual address this wallet and
  *    this tag derive: a Safe 1.4.1 on EntryPoint 0.7 salted with `keccak256(uid)`, one account per
  *    physical rock per owner (D-029). That address is what the NFC verifier signs into the
@@ -17,7 +17,7 @@
  *    owner is now the recipient, and a recipient who re-derived would compute an empty stranger.
  *
  * Every answer is capability-shaped. An account that answers to somebody else is UNAVAILABLE with
- * that stated plainly — never a fabricated address and never a silent "no" (D-013).
+ * that stated plainly - never a fabricated address and never a silent "no" (D-013).
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -46,7 +46,7 @@ export interface UseRockAccountResult {
   /** Where that address came from. `null` while there is no address at all. */
   source: RockAccountSource | null;
   /**
-   * REAL — carrying the account to send from — when the signed-in wallet may send this rock's
+   * REAL - carrying the account to send from - when the signed-in wallet may send this rock's
    * owner actions. UNAVAILABLE carries the reason to show instead of the buttons.
    */
   authority: Capability<Address>;

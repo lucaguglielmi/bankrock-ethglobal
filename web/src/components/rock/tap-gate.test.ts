@@ -6,7 +6,7 @@ import { tapGateFor, tapNeedsSubject } from "./tap-gate";
  *
  * The gate covered `dormant` only, so a signed-out visitor landing on a `handover_pending` rock
  * went straight to `verify`. The verifier advanced the tag's counter and then returned
- * `missing_subject`, because there was no wallet to name in the attestation — so the gift beat
+ * `missing_subject`, because there was no wallet to name in the attestation - so the gift beat
  * always cost a second tap, which spec 08 (2:10) does not have room for.
  *
  * These cases are that gate's contract. The signed-out `handover_pending` row is the defect.

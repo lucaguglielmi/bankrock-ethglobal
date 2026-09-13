@@ -6,7 +6,7 @@
  * and mixing them is why every D1 read failed in production (R-2, R-3, R-4).
  *
  * This module never throws and never throws at import time. When there is no `DB` binding it
- * returns `null`, and the caller renders UNAVAILABLE (D-013) — it never falls back to an
+ * returns `null`, and the caller renders UNAVAILABLE (D-013) - it never falls back to an
  * in-memory Map that resets per isolate.
  */
 
@@ -72,7 +72,7 @@ export function getDb(env?: MaybeEnv | null): Db | null {
 
 /**
  * Async variant. Next requires the async form of `getCloudflareContext` where the context is not
- * on the global scope yet — static routes and the top level of a route module.
+ * on the global scope yet - static routes and the top level of a route module.
  */
 export async function getDbAsync(): Promise<Db | null> {
   return wrap((await envFromContextAsync())?.DB);

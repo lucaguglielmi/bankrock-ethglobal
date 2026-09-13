@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Registers `public/sw.js` (spec 14 §4). Nothing renders — this is a mount-only side effect.
+ * Registers `public/sw.js` (spec 14 §4). Nothing renders - this is a mount-only side effect.
  *
  * Guarded on feature detection (`"serviceWorker" in navigator`) and `NODE_ENV === "production"`:
  * `public/sw.js` is only ever produced by the `prebuild` script (`scripts/build-sw.mjs`) ahead of

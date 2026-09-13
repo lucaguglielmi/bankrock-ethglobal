@@ -4,7 +4,7 @@ import { buildStrategy, DEFAULT_STREAMS } from "./strategy";
 
 /**
  * The fee scan (B6): chunked at 2,000 blocks, resumed from what has already been scanned, and
- * UNAVAILABLE — never a short total — when a chunk fails.
+ * UNAVAILABLE - never a short total - when a chunk fails.
  *
  * Addresses are built rather than written out, so the repository-wide "no address literal outside
  * lib/chain" check (D-015) stays true of the test suite too.
@@ -162,7 +162,7 @@ beforeEach(async () => {
  * The catalogue probe: one `safeBalances` per preset, live streams in catalogue order, docked
  * ones told apart from never-shipped ones, and virtual balances never summed.
  */
-describe("readRockStreams — probing the catalogue", () => {
+describe("readRockStreams - probing the catalogue", () => {
   const ROCK_ID = "42";
 
   function hashFor(preset: { streamIndex: number; feeBps: number }) {
@@ -178,7 +178,7 @@ describe("readRockStreams — probing the catalogue", () => {
 
   it("asks Aqua once per catalogue preset, whatever the catalogue's length", async () => {
     const result = await readModule.readRockStreams({ rockId: ROCK_ID, maker: MAKER, app: APP });
-    // Nothing shipped is a REAL, empty answer — not an error — so the owner's way in stays on
+    // Nothing shipped is a REAL, empty answer - not an error - so the owner's way in stays on
     // screen (main, 2026-09-13).
     expect(result.state).toBe("REAL");
     if (result.state !== "REAL") return;
@@ -230,7 +230,7 @@ describe("readRockStreams — probing the catalogue", () => {
       first.streamIndex,
     ]);
     expect(result.value.stopped).toEqual([BigInt(second.streamIndex)]);
-    // The never-shipped presets are in neither list — they are what "Add another strategy" offers.
+    // The never-shipped presets are in neither list - they are what "Add another strategy" offers.
     for (const preset of rest) {
       expect(result.value.stopped).not.toContain(BigInt(preset.streamIndex));
     }
@@ -287,7 +287,7 @@ describe("planFeeScan", () => {
   });
 });
 
-describe("readAccruedFees — chunking (D-036)", () => {
+describe("readAccruedFees - chunking (D-036)", () => {
   it("never asks for more than 2,000 blocks in one call", async () => {
     state.head = BigInt(1000 + 9_999);
     const result = await readFees();
@@ -322,7 +322,7 @@ describe("readAccruedFees — chunking (D-036)", () => {
   });
 });
 
-describe("readAccruedFees — resuming", () => {
+describe("readAccruedFees - resuming", () => {
   it("fetches only the new blocks on the next poll", async () => {
     state.head = BigInt(3_000);
     await readFees();
@@ -411,7 +411,7 @@ describe("readAccruedFees — resuming", () => {
     }
   });
 
-  it("does not count a push with no pull in its transaction — the owner's top-up is not a trade", async () => {
+  it("does not count a push with no pull in its transaction - the owner's top-up is not a trade", async () => {
     state.pushed = [
       {
         // The owner made more USDC available to the strategy (Edit → `Aqua.push`). No `Shipped`
@@ -490,7 +490,7 @@ describe("readAccruedFees — resuming", () => {
   });
 });
 
-describe("readAccruedFees — failure", () => {
+describe("readAccruedFees - failure", () => {
   it("is UNAVAILABLE when a chunk fails, and reports no total", async () => {
     state.head = BigInt(1000 + 5_000);
     state.failFrom = BigInt(4_000);

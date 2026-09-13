@@ -4,7 +4,7 @@
  * One place for sound and haptics (STEERING.md: "a strong, centralized audio library for
  * site-wide haptics and sounds").
  *
- * The primitives call this — `Button` on press, `Sheet` on open — so no surface has to remember
+ * The primitives call this - `Button` on press, `Sheet` on open - so no surface has to remember
  * to, and muting stays in one place: the header's mute toggle drives `AudioProvider`, which is
  * what decides whether a sound plays at all.
  *

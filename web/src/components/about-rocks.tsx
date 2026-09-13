@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "More about the rocks" — the photo sheet on the landing page (spec 17 §4.4, L-5).
+ * "More about the rocks" - the photo sheet on the landing page (spec 17 §4.4, L-5).
  *
  * Was a hand-rolled overlay with no Escape handler that locked page scroll by writing to the
  * body's inline style (L-14). It is now a `Sheet` at `size="lg"`; Escape, the backdrop and the
@@ -53,7 +53,7 @@ export function AboutRocks() {
           <p className="max-w-prose text-base text-ink-2">
             These are ordinary rocks, picked out of the riverbeds near Florence, then polished and
             sorted. The best ones get a tiny <Term k="nfcTag" /> and a splash of coloured resin
-            over it. The chip holds a web link and nothing else — no key, no money — which is what
+            over it. The chip holds a web link and nothing else - no key, no money - which is what
             makes a rock safe to hand to another person.
           </p>
 

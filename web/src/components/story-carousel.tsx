@@ -4,7 +4,7 @@
  * The landing page's two-slide story section (spec 17 Part 5, "Landing sections"): the origin
  * story (Florence map) and a short mechanics explainer main added ("What is this, exactly?").
  * Restyled from the version merged in from `main`: tokens only (no arbitrary pixel text sizes, no
- * low-contrast neutral-400 on real copy — the SVG map's own decorative pins keep their `fill-*`
+ * low-contrast neutral-400 on real copy - the SVG map's own decorative pins keep their `fill-*`
  * colours, which are illustration, not text), the map's captions as HTML text over the SVG rather
  * than `<text>` inside its viewBox (`MapLabel`), 44 px prev/next controls at every width (not
  * `hidden md:block`), a touch swipe in addition to the buttons, and `prefers-reduced-motion`
@@ -33,7 +33,7 @@ interface MapLabelProps {
   /** Which side of the pin the caption sits on. */
   side?: "left" | "right";
   /**
-   * `aside` is one of the grey jokes, shown only from `lg` up — below that the map is a phone's
+   * `aside` is one of the grey jokes, shown only from `lg` up - below that the map is a phone's
    * width and they would run into each other; `place` is the bold blue name that always shows.
    */
   kind?: "aside" | "place";
@@ -46,8 +46,8 @@ const MAP_LABEL_KIND: Record<NonNullable<MapLabelProps["kind"]>, string> = {
 };
 
 /**
- * A pin's caption, laid over the map as HTML text. SVG `<text>` scales with the viewBox — the old
- * `fontSize="2"` came out at 3 px on a phone — which fails the 12 px floor (spec 17 Part 7 item 2)
+ * A pin's caption, laid over the map as HTML text. SVG `<text>` scales with the viewBox - the old
+ * `fontSize="2"` came out at 3 px on a phone - which fails the 12 px floor (spec 17 Part 7 item 2)
  * and cannot be read anyway; here the caption is `text-label` at real size, positioned at the pin's
  * viewBox coordinates as percentages so it still follows the map as it resizes. (Classes are joined
  * by hand: `cn()`'s tailwind-merge takes `text-label` for a colour and drops it next to `text-ink-3`.)
@@ -130,7 +130,7 @@ export function StoryCarousel() {
                 <p>
                   When someone trades with the rock, the tokens move straight between the two
                   accounts and a small <Term k="fee" /> stays behind in the rock. The rock can also
-                  lose value when prices move a long way — see{" "}
+                  lose value when prices move a long way - see{" "}
                   <Term k="divergenceLoss" />. Today it all runs on <Term k="sepolia" />, with test
                   tokens that are worth nothing.
                 </p>

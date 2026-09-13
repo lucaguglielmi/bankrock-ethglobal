@@ -4,21 +4,21 @@
  * The trade panel (Flow D; spec 17 §4.5, Part 5 "Trade sheet"; spec 15 Phase 3, SC-4).
  *
  * What this file used to be: a hand-rolled centred modal with its own Escape handler and
- * backdrop, hardcoded trader balances (`USDC: 500, WETH: 0.25` — N-4), an invented price-impact
+ * backdrop, hardcoded trader balances (`USDC: 500, WETH: 0.25` - N-4), an invented price-impact
  * formula (N-6), a hardcoded mainnet pair of token addresses, a receipt naming the wrong network,
  * a synthesized hash in the success state (D-014) and a swipe-to-swap gesture whose knob
  * disappeared under the clip before its 200 px threshold on a 360 px phone (L-6). Then it became
  * a `Sheet`, then three stacked cards.
  *
- * What it is now: `TradePanel`, inline content for the rock dashboard's Trade tab — one card with
+ * What it is now: `TradePanel`, inline content for the rock dashboard's Trade tab - one card with
  * two halves ("Send to the rock" / "Send from the rock"), a flip button riding the divider between
  * them, the deal-quality row always in view, the rest of the quote behind a "Details" disclosure,
  * and the one 56 px button in a footer band whose label morphs with the state (STEERING.md). Every
- * number on screen comes from `GET /api/rocks/[id]/quote` — the amount out, the fee in basis points
- * and the price impact in basis points, all from the same source that will execute the swap — or
+ * number on screen comes from `GET /api/rocks/[id]/quote` - the amount out, the fee in basis points
+ * and the price impact in basis points, all from the same source that will execute the swap - or
  * from a real balance read of the visitor's account. Nothing is computed here except the slippage
  * floor and the per-unit rate, both of which are arithmetic on the quote. The button calls
- * `useTakerActions().swap`, and the receipt is whatever that returns — a real hash, or an honest
+ * `useTakerActions().swap`, and the receipt is whatever that returns - a real hash, or an honest
  * reason.
  *
  * A rock may have several live streams at once. When it does, a "Trading against" chip row above
@@ -27,7 +27,7 @@
  * The panel also shows **the account the swap comes from**: the visitor's personal Safe (D-029,
  * salt 0) and its two balances, in a compact row under the card. Its address sits behind a "Show
  * address" disclosure so no hex is on screen at load, but it is one tap away: an account that
- * holds nothing says so, and blocks the button, before anything is signed — and the visitor can
+ * holds nothing says so, and blocks the button, before anything is signed - and the visitor can
  * see where to send tokens.
  *
  * The `TradeModal` sheet wrapper is gone: the tabbed dashboard renders `TradePanel` inline
@@ -62,7 +62,7 @@ const QUOTE_DEBOUNCE_MS = 350;
 const SLIPPAGE_TOLERANCE_BPS = 50; // 0.50 %
 const BPS_DENOMINATOR = 10_000;
 
-/** Accepts "12", "12.", ".5", "0.0091" — anything a decimal keypad can produce. */
+/** Accepts "12", "12.", ".5", "0.0091" - anything a decimal keypad can produce. */
 const DECIMAL_INPUT = /^(\d+(\.\d*)?|\.\d+)$/;
 
 export const NO_MAKER_REASON =
@@ -72,7 +72,7 @@ const EMPTY_STREAMS: readonly ParsedStream[] = [];
 
 export interface TradePanelProps {
   rockId: string;
-  /** The rock's account — the maker the quote and the swap are aimed at. */
+  /** The rock's account - the maker the quote and the swap are aimed at. */
   maker?: Address;
   /**
    * The rock's live streams. With more than one, a "Trading against" picker chooses which stream
@@ -84,12 +84,12 @@ export interface TradePanelProps {
   authenticated: boolean;
   /** Opens the onboarding sheet. Falls back to `login()` when the page does not supply one. */
   onRequestSignIn?: () => void;
-  /** Called once a swap has really executed — the page refetches what the chain now says. */
+  /** Called once a swap has really executed - the page refetches what the chain now says. */
   onTradeSuccess?: () => void;
   className?: string;
 }
 
-/** `GET /api/rocks/[id]/quote` — `amountOut` is in base units, `amountOutFormatted` is decimal. */
+/** `GET /api/rocks/[id]/quote` - `amountOut` is in base units, `amountOutFormatted` is decimal. */
 interface QuoteValue {
   amountOut: string;
   amountOutFormatted: string;
@@ -153,7 +153,7 @@ function rateFractionDigits(rate: number): number {
 
 /**
  * The token on one side of the swap. It shows which token that side is in, and tapping it
- * switches the pair around — with two tokens, "pay with the other one" is the only other choice.
+ * switches the pair around - with two tokens, "pay with the other one" is the only other choice.
  * Ink-filled on the side the visitor is paying from; outlined on the side the rock pays out.
  */
 function TokenChip({
@@ -465,7 +465,7 @@ export function TradePanel({
       : null;
 
   /**
-   * The per-unit rate of *this* quote — amount out over amount in, nothing else. It is not a
+   * The per-unit rate of *this* quote - amount out over amount in, nothing else. It is not a
    * market price and is not read from anywhere but the quote; it is hidden when there is none.
    */
   const rate =
@@ -543,7 +543,7 @@ export function TradePanel({
 
       <section className="rounded-[24px] border border-border bg-background p-1.5">
         <div className="relative flex flex-col gap-1">
-          {/* Top half — what goes into the rock */}
+          {/* Top half - what goes into the rock */}
           <div className="flex flex-col gap-3 rounded-[20px] bg-neutral-100/70 p-4 pb-4 dark:bg-neutral-900/50">
             <span className="text-sm font-medium text-ink-3">Sell</span>
           <label htmlFor={amountInputId} className="sr-only">Send to the rock</label>
@@ -609,7 +609,7 @@ export function TradePanel({
             </IconButton>
           </div>
 
-          {/* Bottom half — what the rock sends back */}
+          {/* Bottom half - what the rock sends back */}
           <div className="flex flex-col gap-3 rounded-[20px] bg-neutral-100/70 p-4 pb-4 dark:bg-neutral-900/50">
             <span className="text-sm font-medium text-ink-3">Buy</span>
           <span className="sr-only">Send from the rock</span>
@@ -633,7 +633,7 @@ export function TradePanel({
                     quote.status === "loading" && "motion-safe:animate-pulse",
                   )}
                 >
-                  <span aria-hidden>—</span>
+                  <span aria-hidden>-</span>
                   {quote.status === "loading" ? (
                     <span className="sr-only">Getting a quote…</span>
                   ) : null}
@@ -668,7 +668,7 @@ export function TradePanel({
             <span className="text-ink-3">
               <HelpTerm term="How good a deal is this?">
                 Big orders move the price against you: you end up with less than the headline rate
-                suggests. The bar shows how far this order moves it — short and green is a good
+                suggests. The bar shows how far this order moves it - short and green is a good
                 deal. It is measured from the quote that will execute, never guessed.
               </HelpTerm>
             </span>
@@ -698,7 +698,7 @@ export function TradePanel({
                 </span>
               </span>
             ) : (
-              <span className="text-ink-4">—</span>
+              <span className="text-ink-4">-</span>
             )}
           </div>
 
@@ -716,7 +716,7 @@ export function TradePanel({
                 <dd className="justify-self-end text-right font-medium tabular-nums text-ink">
                   {quote.status === "real"
                     ? `${formatBps(quote.value.feeBps)} of what you put in`
-                    : "—"}
+                    : "-"}
                 </dd>
 
                 <dt className="text-ink-3">
@@ -729,7 +729,7 @@ export function TradePanel({
                   {minAmountOut !== null ? (
                     <Amount value={minAmountOut} decimals={decimalsOut} symbol={tokenOut} size="sm" />
                   ) : (
-                    <span className="font-medium text-ink">—</span>
+                    <span className="font-medium text-ink">-</span>
                   )}
                 </dd>
 
@@ -781,7 +781,7 @@ export function TradePanel({
           <div className="flex flex-col gap-1">
             <span className="text-label uppercase text-ink-3">Paying from your account</span>
             <p className="max-w-prose text-sm text-ink-3">
-              Your own account — one per person, not tied to any rock. Sign in to see it.
+              Your own account - one per person, not tied to any rock. Sign in to see it.
             </p>
           </div>
         ) : account.state === "UNAVAILABLE" ? (

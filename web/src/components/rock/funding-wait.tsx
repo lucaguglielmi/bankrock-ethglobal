@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "Waiting for funds" — the Liquidity tab before the first USDC lands.
+ * "Waiting for funds" - the Liquidity tab before the first USDC lands.
  *
  * A freshly awakened rock holds nothing, and Sepolia faucets take minutes. There is no figure to
  * show yet and no strategy to choose, so this state says exactly that and nothing more. It has no

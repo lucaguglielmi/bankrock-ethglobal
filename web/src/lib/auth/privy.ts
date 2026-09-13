@@ -3,7 +3,7 @@
  *
  * The browser sends the Privy access token as `Authorization: Bearer <token>`. It is a JWT signed
  * with ES256 by the app's key pair; the public keys are published at
- * `https://auth.privy.io/api/v1/apps/{appId}/jwks.json`. Verification is local — one cached JWKS
+ * `https://auth.privy.io/api/v1/apps/{appId}/jwks.json`. Verification is local - one cached JWKS
  * fetch, no per-request call to Privy.
  *
  * Fail closed (D-017): when NEXT_PUBLIC_PRIVY_APP_ID is unset there is nothing to verify against,

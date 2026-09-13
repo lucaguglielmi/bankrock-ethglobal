@@ -8,8 +8,8 @@
  *
  * The replacement is `lib/rate-limit.ts`, a D1-backed fixed-window limiter applied inside the
  * route handlers (faucet, contact, vanity, newsletter, admin login). It lives there rather than
- * here because middleware runs in the edge runtime, where the Cloudflare context — and therefore
- * the D1 binding — is not reliably reachable, while a route handler always has it.
+ * here because middleware runs in the edge runtime, where the Cloudflare context - and therefore
+ * the D1 binding - is not reliably reachable, while a route handler always has it.
  *
  * CORS uses NEXT_PUBLIC_APP_URL (D-022); the hardcoded fallback origin is gone.
  */

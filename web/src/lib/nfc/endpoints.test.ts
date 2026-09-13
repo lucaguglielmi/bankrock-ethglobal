@@ -340,7 +340,7 @@ describe("rate limiting (P-4)", () => {
     await expect(response.json()).resolves.toEqual({ verified: false, reason: "rate_limited" });
   });
 
-  it("503s when the limiter store is unreachable — fail closed", async () => {
+  it("503s when the limiter store is unreachable - fail closed", async () => {
     rateLimit.decision = {
       allowed: true,
       enforced: false,
@@ -357,7 +357,7 @@ describe("rate limiting (P-4)", () => {
     });
   });
 
-  it("does no crypto work when refused — a refusal never advances the counter", async () => {
+  it("does no crypto work when refused - a refusal never advances the counter", async () => {
     const { e, c } = tap(7);
 
     rateLimit.decision = { allowed: false, enforced: true, remaining: 0 };
@@ -509,7 +509,7 @@ describe("verifyNtagSignature (server action)", () => {
     expect(result.reason).toBe("malformed_request");
   });
 
-  it("is never authentic for an arbitrary c — the F-1 regression", async () => {
+  it("is never authentic for an arbitrary c - the F-1 regression", async () => {
     const { e } = tap(7);
     for (const c of ["deadbeefdeadbeef", "0000000000000000", "FFFFFFFFFFFFFFFF"]) {
       const result = await verifyNtagSignature({ rockId: "1", e, c });

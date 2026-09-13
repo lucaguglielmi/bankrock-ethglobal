@@ -1,5 +1,5 @@
 /**
- * What the "Fund this rock" sheet puts on screen — addresses only, no numbers.
+ * What the "Fund this rock" sheet puts on screen - addresses only, no numbers.
  *
  * Funding a rock on Sepolia is an ordinary transfer to the Rock Account: no bridge, no route, no
  * quote (Flow B step 9; spec 16 Part 3). The three things an operator needs are the account to
@@ -8,7 +8,7 @@
  * configured or not yet known produces UNAVAILABLE naming what is missing, never a placeholder.
  *
  * It is pure so it can be tested without a browser: the caller passes the addresses it read from
- * `lib/chain`, which stays the only module allowed to hold one (D-015). Balances are *not* here —
+ * `lib/chain`, which stays the only module allowed to hold one (D-015). Balances are *not* here -
  * they are a live read the sheet takes from the page's own `reserves` capability.
  */
 
@@ -36,9 +36,9 @@ export interface FundingTargets {
 export interface FundingTargetsInput {
   /** The Rock Account from the registry. Absent while the rock has none. */
   rockAccount?: string;
-  /** `tokens.USDC.address` — undefined when NEXT_PUBLIC_USDC_ADDRESS is unset. */
+  /** `tokens.USDC.address` - undefined when NEXT_PUBLIC_USDC_ADDRESS is unset. */
   usdc?: string;
-  /** `tokens.WETH.address` — undefined when NEXT_PUBLIC_WETH_ADDRESS is unset. */
+  /** `tokens.WETH.address` - undefined when NEXT_PUBLIC_WETH_ADDRESS is unset. */
   weth?: string;
 }
 
@@ -58,7 +58,7 @@ function tokenTarget(
   }
   return real({
     label: symbol,
-    hint: `The ${symbol} contract on Sepolia — send this token, not one that shares its name`,
+    hint: `The ${symbol} contract on Sepolia - send this token, not one that shares its name`,
     address,
     explorerHref: explorer.address(address),
   });

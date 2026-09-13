@@ -1,5 +1,5 @@
 /**
- * POST /api/rocks/[id]/vanity — claim a rock's vanity name (S-7).
+ * POST /api/rocks/[id]/vanity - claim a rock's vanity name (S-7).
  *
  * "Claim your vanity URL" used to be an 800 ms `setTimeout` that saved nothing and then showed a
  * success state. This writes to D1 and is Privy-authenticated; with no database it answers 503

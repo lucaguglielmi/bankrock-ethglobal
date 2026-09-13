@@ -3,7 +3,7 @@
  *
  * The three literals below are asserted verbatim by
  * `contracts/test/aqua/XYCSwapStrategy.t.sol::testStrategyEncodingMatchesTheTypeScriptLibrary`.
- * If either implementation of the salt or the struct layout drifts, one of the two suites fails —
+ * If either implementation of the salt or the struct layout drifts, one of the two suites fails -
  * which is the point, because a strategy encoded even one byte differently hashes differently and
  * has no balances on Aqua at all.
  */
@@ -76,7 +76,7 @@ describe("encodeStrategy", () => {
     expect(strategyHash(strategy)).toBe(EXPECTED_HASH);
   });
 
-  it("is exactly abi.encode(Strategy) — same bytes as an independent encoder", () => {
+  it("is exactly abi.encode(Strategy) - same bytes as an independent encoder", () => {
     const independent = encodeAbiParameters(
       parseAbiParameters("(address,address,address,uint256,bytes32)"),
       [[MAKER, TOKEN0, TOKEN1, BigInt(30), deriveSalt(params)]],
@@ -141,7 +141,7 @@ describe("the catalogue (DEFAULT_STREAMS)", () => {
     );
   });
 
-  it("uses a unique, priceable fee per stream — a fee is the whole of a strategy's difference", () => {
+  it("uses a unique, priceable fee per stream - a fee is the whole of a strategy's difference", () => {
     const fees = DEFAULT_STREAMS.map((preset) => preset.feeBps);
     expect(new Set(fees).size).toBe(fees.length);
     for (const fee of fees) {
@@ -161,7 +161,7 @@ describe("the catalogue (DEFAULT_STREAMS)", () => {
   it("describes every preset for the owner, each in its own words", () => {
     for (const preset of DEFAULT_STREAMS) {
       expect(preset.label.trim().split(/\s+/).length).toBeLessThanOrEqual(2);
-      expect(preset.description).toMatch(/^\d+\.\d{2}% — /);
+      expect(preset.description).toMatch(/^\d+\.\d{2}% - /);
       // The description opens with the fee it encodes, so the two can never disagree.
       expect(preset.description.startsWith(`${(preset.feeBps / 100).toFixed(2)}%`)).toBe(true);
       expect(preset.forWhom.trim().length).toBeGreaterThan(0);

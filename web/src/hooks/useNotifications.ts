@@ -4,7 +4,7 @@
  * Web Push subscription management (spec 14 §3).
  *
  * The golden rule: never prompt on page load. `Notification.requestPermission()` is called from
- * exactly one place — `subscribe`, itself only ever invoked from a user click — never from an
+ * exactly one place - `subscribe`, itself only ever invoked from a user click - never from an
  * effect that runs on mount. The subscribe call authenticates with the caller's own Privy access
  * token rather than a client-supplied id (SA-5): the server derives whose subscription this is.
  */
@@ -37,7 +37,7 @@ function browserSupportsPush(): boolean {
 
 export function useNotifications(): UseNotificationsResult {
   const { getAccessToken } = useAuth();
-  // Read once, as a lazy initializer — not inside an effect — so there is no synchronous
+  // Read once, as a lazy initializer - not inside an effect - so there is no synchronous
   // `setState` call in an effect body to trigger a second render. `browserSupportsPush()` and the
   // current `Notification.permission` do not change during the component's lifetime; the one
   // thing that legitimately arrives asynchronously (the existing subscription, if any) is fetched
@@ -54,7 +54,7 @@ export function useNotifications(): UseNotificationsResult {
       .then((registration) => registration.pushManager.getSubscription())
       .then(setSubscription)
       .catch(() => {
-        // No existing subscription, or the registration never resolved — nothing to restore.
+        // No existing subscription, or the registration never resolved - nothing to restore.
       });
   }, [isSupported]);
 

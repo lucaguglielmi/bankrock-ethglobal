@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "Gift this rock" sheet — Flow E (spec 02), spec 17 Part 5 "Give sheet", spec 15 SC-5 / X-3.
+ * "Gift this rock" sheet - Flow E (spec 02), spec 17 Part 5 "Give sheet", spec 15 SC-5 / X-3.
  * Opened from the Ownership tab of the rock page.
  *
  * What this file used to be: a hand-rolled modal that called `transferOwnership` immediately and
@@ -17,12 +17,12 @@
  * One signature does **two** things (spec 08, 2:10): it opens the handover on chain, and it
  * pre-signs the Safe owner swap that the recipient cannot produce for themselves. The second one
  * is the one this sheet used to lose. It was stored fire-and-forget, so "The gift is waiting"
- * could be printed over a gift the claim route would refuse forever — and the only person able to
+ * could be printed over a gift the claim route would refuse forever - and the only person able to
  * repair it, the giver, had been told everything was fine. The done step now confirms the stored
  * key with the server and offers to sign it again when it is missing (defect A2).
  *
  * The recipient is **required**. An unnamed gift ("whoever taps it") cannot carry the
- * pre-signed Rock Account owner swap — there is no address to sign it for — and after the
+ * pre-signed Rock Account owner swap - there is no address to sign it for - and after the
  * contract audit the giver's Safe loses authority the moment the rock changes owner. Whoever
  * claimed such a gift would own a rock whose account nobody could drive under sponsorship. So
  * the address is asked for up front, where the mistake is still cheap.
@@ -169,7 +169,7 @@ export function TransferModal({
     Boolean(currentOwner) &&
     trimmedRecipient.toLowerCase() === currentOwner.toLowerCase();
 
-  // Empty is not an error while the field is untouched — it is simply not ready yet.
+  // Empty is not an error while the field is untouched - it is simply not ready yet.
   const recipientError = looksLikeEns
     ? "ENS names are not supported yet. Paste the recipient's address, starting with 0x."
     : !isEmpty && !isValidAddress
@@ -185,7 +185,7 @@ export function TransferModal({
       const text = await navigator.clipboard.readText();
       if (text) setTypedRecipient(text.trim());
     } catch {
-      // Clipboard access denied or unavailable — the field is still typable.
+      // Clipboard access denied or unavailable - the field is still typable.
     }
   }, []);
 
@@ -395,8 +395,8 @@ export function TransferModal({
               {/* After the hackathon: a prompt to re-sign if the bundler refuses the stored operation at claim time; not built, so not claimed. */}
               <p className="text-sm text-ink-2">
                 After that the handover lapses and the rock is simply still yours. That window is
-                how long they have to <em>claim</em> it. The gasless part — the sponsored
-                transaction that hands over the account — is signed now and kept on our server
+                how long they have to <em>claim</em> it. The gasless part - the sponsored
+                transaction that hands over the account - is signed now and kept on our server
                 until they claim, or until you cancel the gift.
               </p>
             </fieldset>
@@ -501,7 +501,7 @@ export function TransferModal({
                     <p className="max-w-prose text-base text-ink-2">
                       The handover is on chain, but the key that hands over the rock&apos;s account
                       is not stored. If they tap the rock now, the claim will be refused. Sign the
-                      key again to finish the handover — this does not open a second one.
+                      key again to finish the handover - this does not open a second one.
                     </p>
                     <UnavailableState
                       reason={
@@ -525,7 +525,7 @@ export function TransferModal({
                         explorerHref={explorer.tx(result.value.txHash)}
                       />
                     ) : (
-                      <span className="text-ink-3">no transaction — simulated</span>
+                      <span className="text-ink-3">no transaction - simulated</span>
                     )}
                   </dd>
                 </dl>

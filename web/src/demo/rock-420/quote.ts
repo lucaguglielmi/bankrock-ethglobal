@@ -34,7 +34,7 @@ export type DemoQuote =
 export interface DemoQuoteParams {
   streamIndex: number;
   tokenIn: DemoToken;
-  /** Decimal token units, as typed — "1.5". */
+  /** Decimal token units, as typed - "1.5". */
   amountIn: string;
 }
 

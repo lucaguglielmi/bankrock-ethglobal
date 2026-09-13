@@ -73,7 +73,7 @@ export async function createRockAccount(
 }
 
 export interface ShipBatchParams {
-  /** The AquaApp the strategy runs in — our SwapVM router, or the reference XYCSwap app. */
+  /** The AquaApp the strategy runs in - our SwapVM router, or the reference XYCSwap app. */
   app: Address;
   /** The strategy bytes. `strategyHash = keccak256(strategy)` and it is immutable once shipped. */
   strategy: Hex;
@@ -89,7 +89,7 @@ export interface ShipBatchParams {
  *   2. WETH.approve(Aqua, wethAmount)
  *   3. Aqua.ship(app, strategy, [USDC, WETH], [usdcAmount, wethAmount])
  *
- * Approvals go to Aqua itself — once, for all strategies — never to the app.
+ * Approvals go to Aqua itself - once, for all strategies - never to the app.
  *
  * Returns UNAVAILABLE, listing the missing variables, rather than encoding against a placeholder.
  */
@@ -165,7 +165,7 @@ interface BatchSender {
 /**
  * Sends the ship batch as one sponsored UserOperation.
  *
- * The returned hash comes from the bundler — it is a real, broadcast transaction or it is an
+ * The returned hash comes from the bundler - it is a real, broadcast transaction or it is an
  * error. There is no fallback value (D-014).
  */
 export async function shipStrategy(

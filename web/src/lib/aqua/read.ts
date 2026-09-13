@@ -1,18 +1,18 @@
 /**
- * Reading a rock's liquidity from the chain — the three numbers spec 04 insists are different.
+ * Reading a rock's liquidity from the chain - the three numbers spec 04 insists are different.
  *
  *   actual      `ERC20.balanceOf(rockAccount)`. One balance, shared by every stream. Real tokens
  *               in the rock's own wallet.
  *   virtual     `Aqua.safeBalances(maker, app, strategyHash, USDC, WETH)`. Per stream. An
  *               allowance, not a deposit. Two streams' virtual balances may sum to more than the
- *               wallet holds, and that sum is not capital — never render it as one.
+ *               wallet holds, and that sum is not capital - never render it as one.
  *   executable  `min(virtual, actual, allowance to Aqua)`. What the stream can settle right now.
  *               A swap on one stream lowers this for the other while leaving its virtual balance
  *               untouched (`contracts/aqua/NOTES.md` §7, `SharedReserve.t.sol`).
  *
  * `safeBalances` reverts for a strategy that was never shipped or has been docked. That revert is
  * the "is this stream live?" probe, so it maps to UNAVAILABLE with a plain reason, never to an
- * error page — and, because a strategy hash is recomputable from the rock id, no stored list of
+ * error page - and, because a strategy hash is recomputable from the rock id, no stored list of
  * strategies is needed to ask the question.
  */
 
@@ -34,7 +34,7 @@ export interface TokenPairAmounts {
 /** One live stream. */
 export interface StrategyBalances {
   strategyHash: Hex;
-  /** The strategy bytes, if the caller built them — useful for a `Shipped` cross-check. */
+  /** The strategy bytes, if the caller built them - useful for a `Shipped` cross-check. */
   strategy?: Hex;
   feeBps: bigint;
   streamIndex: bigint;
@@ -59,7 +59,7 @@ export interface RockStrategyView {
   streams: StrategyBalances[];
   /**
    * Catalogue streams that were shipped and later docked. A docked slot is `0xff`, not `0`, so
-   * the same strategy can never be shipped again (NOTES.md §4) — "Add another strategy" must not
+   * the same strategy can never be shipped again (NOTES.md §4) - "Add another strategy" must not
    * offer these. Read from `rawBalances.tokensCount`; absent when the reader did not probe it.
    */
   stopped?: bigint[];
@@ -100,7 +100,7 @@ export interface StrategyReading {
 /**
  * Virtual, actual and executable balances for one shipped strategy.
  *
- * UNAVAILABLE covers all three honest failures — an unconfigured address, an unreachable RPC, and
+ * UNAVAILABLE covers all three honest failures - an unconfigured address, an unreachable RPC, and
  * a strategy that is not (or is no longer) shipped. None of them produces a number.
  */
 export async function readStrategy(
@@ -168,7 +168,7 @@ export interface ReadRockStreamsParams {
   rockId: bigint | number | string;
   maker: Address;
   /**
-   * Which streams to probe. Defaults to the catalogue, `DEFAULT_STREAMS` — one `safeBalances`
+   * Which streams to probe. Defaults to the catalogue, `DEFAULT_STREAMS` - one `safeBalances`
    * call per preset, so adding a preset costs one more `eth_call` per read.
    */
   streams?: ReadonlyArray<{ streamIndex: number | bigint; feeBps: number | bigint; label?: string }>;
@@ -243,8 +243,8 @@ export async function readRockStreams(
         };
       } catch {
         // Not shipped, or docked. Both are ordinary states; the stream is simply absent from
-        // `streams`. Which of the two it is matters to the owner — a docked stream can never be
-        // shipped again — so `rawBalances.tokensCount` is asked: 0 = never shipped, 0xff = docked.
+        // `streams`. Which of the two it is matters to the owner - a docked stream can never be
+        // shipped again - so `rawBalances.tokensCount` is asked: 0 = never shipped, 0xff = docked.
         try {
           const [, tokensCount] = (await client.readContract({
             address: aqua,
@@ -268,8 +268,8 @@ export async function readRockStreams(
     .filter((entry): entry is { stopped: bigint } => entry !== null && "stopped" in entry)
     .map((entry) => entry.stopped);
 
-  // No stream shipped (or every one docked) is an ordinary, REAL answer — an empty list with the
-  // actual balances — not an error: the owner's "Start earning" control lives behind it
+  // No stream shipped (or every one docked) is an ordinary, REAL answer - an empty list with the
+  // actual balances - not an error: the owner's "Start earning" control lives behind it
   // (2026-09-13: reporting it as UNAVAILABLE hid that control on the live demo rock).
   return real({
     rockId: String(params.rockId),
@@ -317,7 +317,7 @@ const DEFAULT_LOOKBACK_BLOCKS = BigInt(50_000);
  *
  * The fee figure is a running total over a block range, which makes it resumable: the same
  * `Pushed` log never needs reading twice. Before this cache the strategy route issued two
- * `eth_getLogs` per stream, each spanning deploy-block-to-head, every fifteen seconds — one
+ * `eth_getLogs` per stream, each spanning deploy-block-to-head, every fifteen seconds - one
  * unchunked range that grows all demo long and that a public RPC eventually refuses outright
  * (D-036 proved 2,000-block chunks, not a 500,000-block sweep).
  *
@@ -388,8 +388,8 @@ export function planFeeScan(
  *
  * XYCSwap keeps no fee accumulator. The taker's whole `amountIn` is pushed into the maker's
  * reserve while the curve prices only `amountIn * (10000 - feeBps) / 10000`, so the fee is the
- * remainder — `amountIn * feeBps / 10000`, in the input token, per swap
- * (`contracts/aqua/NOTES.md` §6). Each swap's `amountIn` is one `Pushed` event — but not every
+ * remainder - `amountIn * feeBps / 10000`, in the input token, per swap
+ * (`contracts/aqua/NOTES.md` §6). Each swap's `amountIn` is one `Pushed` event - but not every
  * `Pushed` is a swap. Two other things emit it for the same strategy and neither is a trade:
  *
  *  - `ship` emits one per token at launch, in the same transaction as `Shipped`;
@@ -398,8 +398,8 @@ export function planFeeScan(
  *
  * What tells a swap apart is the `Pulled`: `XYCSwap.swapExactIn` pulls the output from the maker
  * and *then* has the taker push the input, in one transaction (NOTES.md §5). So a `Pushed` is
- * counted only when its transaction also carries a `Pulled` for the same strategy, and — belt and
- * braces — never when it shares a transaction with `Shipped`. A top-up counted as a trade would
+ * counted only when its transaction also carries a `Pulled` for the same strategy, and - belt and
+ * braces - never when it shares a transaction with `Shipped`. A top-up counted as a trade would
  * book `topUp · feeBps / 10000` of fees the rock never earned.
  *
  * The scan is chunked at 2,000 blocks (`lib/block-range`, D-036) and resumed from the last block
@@ -411,7 +411,7 @@ export function planFeeScan(
  *
  * When any chunk fails this returns UNAVAILABLE. A short scan is never reported as a total: the
  * whole chunks that did land are kept for the next poll to build on, and the caller is told the
- * figure could not be read. It never falls back to `virtual - shipped` either — that difference
+ * figure could not be read. It never falls back to `virtual - shipped` either - that difference
  * is inventory P&L, not fees, and showing it as fees would be exactly the kind of confident wrong
  * number spec 15 exists to remove.
  */
@@ -514,7 +514,7 @@ export async function readAccruedFees(
       state.swapCount += chunkSwaps;
       state.scannedTo = range.toBlock;
     } catch (err) {
-      // Keep the whole chunks that did land — the next poll resumes from there — and refuse to
+      // Keep the whole chunks that did land - the next poll resumes from there - and refuse to
       // present a short scan as the total.
       if (state.scannedTo >= state.fromBlock) feeScanCache.set(key, state);
       return unavailable(feeFailureReason(err));

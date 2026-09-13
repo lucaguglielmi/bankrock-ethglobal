@@ -18,7 +18,7 @@ import {
 } from "./rock-account";
 
 /**
- * D-037 — for an awakened rock the Rock Account is the registry's, and authority is the account's
+ * D-037 - for an awakened rock the Rock Account is the registry's, and authority is the account's
  * own answer.
  *
  * The four situations below are the ones the live rehearsal walked into. The third of them is the
@@ -69,7 +69,7 @@ const ANSWERS_ELSEWHERE: AccountAnswer = {
   reason: ACCOUNT_ANSWERS_ELSEWHERE_REASON,
 };
 
-describe("planRockAccount — which address is the Rock Account", () => {
+describe("planRockAccount - which address is the Rock Account", () => {
   it("case 1: for the wallet that awakened the rock, the registry's account is the derived one", () => {
     // Nothing changes for the ordinary owner: the registry holds exactly what she derived.
     const plan = planRockAccount({ record: record(), derived: ACCOUNT });
@@ -122,7 +122,7 @@ describe("planRockAccount — which address is the Rock Account", () => {
   });
 });
 
-describe("ownerActionAuthority — who may send this rock's owner actions", () => {
+describe("ownerActionAuthority - who may send this rock's owner actions", () => {
   it("case 1: the wallet that awakened the rock keeps acting from the same account", () => {
     expect(
       ownerActionAuthority({ record: record(), wallet: WALLET_A, answer: ANSWERS }),
@@ -130,7 +130,7 @@ describe("ownerActionAuthority — who may send this rock's owner actions", () =
   });
 
   it("case 2: the gifted recipient acts from the account the registry rebound to her", () => {
-    // The Safe's only owner is C after the claim (D-032), so it answers to her — and the address
+    // The Safe's only owner is C after the claim (D-032), so it answers to her - and the address
     // is unchanged, which is the whole point of a gift moving no assets.
     expect(
       ownerActionAuthority({
@@ -196,7 +196,7 @@ describe("ownerActionAuthority — who may send this rock's owner actions", () =
     ).toEqual({ state: "UNAVAILABLE", reason: SIGNED_OUT_REASON });
   });
 
-  it("matches the owner case-insensitively — a checksum is not an identity", () => {
+  it("matches the owner case-insensitively - a checksum is not an identity", () => {
     expect(
       ownerActionAuthority({
         record: record(),
@@ -207,7 +207,7 @@ describe("ownerActionAuthority — who may send this rock's owner actions", () =
   });
 });
 
-describe("interpretAccountAnswer — the same reading `_accountAnswersTo` makes on chain", () => {
+describe("interpretAccountAnswer - the same reading `_accountAnswersTo` makes on chain", () => {
   it("is true only for a clean true", () => {
     expect(interpretAccountAnswer({ hasCode: true, isOwner: true })).toEqual({ answers: true });
   });
@@ -220,7 +220,7 @@ describe("interpretAccountAnswer — the same reading `_accountAnswersTo` makes 
   });
 
   it("keeps 'not deployed' apart from 'not yours'", () => {
-    // An account that has never executed has no code and can answer for nobody — the case the
+    // An account that has never executed has no code and can answer for nobody - the case the
     // registry's claim gate refuses outright (D-032 consequence 1).
     expect(interpretAccountAnswer({ hasCode: false, isOwner: null })).toEqual({
       answers: false,
@@ -236,7 +236,7 @@ describe("interpretAccountAnswer — the same reading `_accountAnswersTo` makes 
   });
 });
 
-describe("readAccountAnswersTo — the reads it refuses to make", () => {
+describe("readAccountAnswersTo - the reads it refuses to make", () => {
   it("does not ask an account that does not exist", async () => {
     expect(await readAccountAnswersTo(undefined, WALLET_A)).toEqual({
       state: "UNAVAILABLE",

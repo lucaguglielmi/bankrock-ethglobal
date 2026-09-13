@@ -11,8 +11,8 @@ import { uidSuffix, verifyTap } from "./verify";
 /* -------------------------------------------------------------------------- */
 
 /**
- * The verifier fails closed without D1, and a unit test has none. A `MemoryCounterStore` — the
- * atomic in-process double `counter-store.test.ts` covers — is injected explicitly in its place,
+ * The verifier fails closed without D1, and a unit test has none. A `MemoryCounterStore` - the
+ * atomic in-process double `counter-store.test.ts` covers - is injected explicitly in its place,
  * so the replay rules below run against a store that really advances. Nothing in the production
  * module can be talked into this: `resolveCounterStore` itself is what is replaced here.
  * `available = false` makes it answer as production does with no D1.
@@ -141,7 +141,7 @@ const OTHER_KEY = ("0x" + "55".repeat(32)) as Hex;
 const DERIVED_ACCOUNT = privateKeyToAccount(SMART_ACCOUNT_KEY).address;
 /** The account the registry already holds for an awake rock. */
 const EXISTING_ACCOUNT = privateKeyToAccount(REGISTRY_KEY).address;
-/** keccak256 of the raw 7 UID bytes — the attestation field and the Safe salt. */
+/** keccak256 of the raw 7 UID bytes - the attestation field and the Safe salt. */
 const UID_HASH = keccak256(`0x${UID.toString("hex")}`);
 
 /** Forge the (e, c) a provisioned tag would emit. SELF-GENERATED, test-only. */
@@ -235,7 +235,7 @@ describe("fail closed", () => {
     expect(outcome.counterStore).toBeUndefined();
   });
 
-  it("a refusal for want of a store spends nothing — the same tap verifies once one is back", async () => {
+  it("a refusal for want of a store spends nothing - the same tap verifies once one is back", async () => {
     process.env.NXP_MASTER_KEY = MASTER_KEY_HEX;
     const { e, c } = tap(1);
 
@@ -324,7 +324,7 @@ describe("verified taps and replay", () => {
     expect(JSON.stringify(outcome.body)).not.toContain(UID.toString("hex").toUpperCase());
   });
 
-  it("rejects the exact same URL replayed — the D-002 acceptance case", async () => {
+  it("rejects the exact same URL replayed - the D-002 acceptance case", async () => {
     const { e, c } = tap(7);
     await expect(verifyTap({ rockId: "1", e, c })).resolves.toMatchObject({
       body: { verified: true },
@@ -421,7 +421,7 @@ describe("attestation", () => {
     expect(registry.saltNonces).toEqual([]);
   });
 
-  it("ignores a smartAccount in the request — the client cannot name one", async () => {
+  it("ignores a smartAccount in the request - the client cannot name one", async () => {
     configureSigner();
     registry.derived = DERIVED_ACCOUNT;
     const subject = privateKeyToAccount(SUBJECT_KEY).address;
@@ -475,7 +475,7 @@ describe("attestation", () => {
       message: { rockId: "1", subject, smartAccount: DERIVED_ACCOUNT },
     });
     expect(registry.owners).toEqual([subject]);
-    // saltNonce is the uidHash as a uint256 — one Rock Account per rock, per owner.
+    // saltNonce is the uidHash as a uint256 - one Rock Account per rock, per owner.
     expect(registry.saltNonces).toEqual([BigInt(UID_HASH)]);
   });
 
@@ -596,7 +596,7 @@ describe("attestation", () => {
 describe("effective rock id resolution", () => {
   beforeEach(configureVerifier);
 
-  it("bound — the registry's binding wins over the id on the tag", async () => {
+  it("bound - the registry's binding wins over the id on the tag", async () => {
     registry.boundRockId = "9";
     registry.rocks.set("9", { state: "awake", smartAccount: EXISTING_ACCOUNT });
 
@@ -609,7 +609,7 @@ describe("effective rock id resolution", () => {
     });
   });
 
-  it("url — unbound tag whose id is dormant keeps that id", async () => {
+  it("url - unbound tag whose id is dormant keeps that id", async () => {
     registry.boundRockId = null;
     registry.rocks.set("1", { state: "dormant", smartAccount: zeroAddress });
 
@@ -618,7 +618,7 @@ describe("effective rock id resolution", () => {
     expect(outcome.body).toMatchObject({ effectiveRockId: "1", resolution: "url" });
   });
 
-  it("next_free — unbound tag whose id is archived gets the next id", async () => {
+  it("next_free - unbound tag whose id is archived gets the next id", async () => {
     registry.boundRockId = null;
     registry.rocks.set("1", { state: "archived", smartAccount: zeroAddress });
 
@@ -627,7 +627,7 @@ describe("effective rock id resolution", () => {
     expect(outcome.body).toMatchObject({ resolution: "next_free", effectiveRockId: "1" });
   });
 
-  it("next_free — unbound tag whose id is already awake gets the next id", async () => {
+  it("next_free - unbound tag whose id is already awake gets the next id", async () => {
     registry.boundRockId = null;
     registry.rocks.set("1", { state: "awake", smartAccount: EXISTING_ACCOUNT });
 
@@ -636,7 +636,7 @@ describe("effective rock id resolution", () => {
     expect(outcome.body.resolution).toBe("next_free");
   });
 
-  it("next_free — a tag carrying no usable id", async () => {
+  it("next_free - a tag carrying no usable id", async () => {
     registry.boundRockId = null;
 
     const { e, c } = tap(7);
@@ -650,7 +650,7 @@ describe("effective rock id resolution", () => {
     expect(c).toBeDefined();
   });
 
-  it("registry_unavailable — the tag's id is echoed and nothing is claimed", async () => {
+  it("registry_unavailable - the tag's id is echoed and nothing is claimed", async () => {
     registry.boundUnavailable = true;
 
     const { e, c } = tap(7);
@@ -662,7 +662,7 @@ describe("effective rock id resolution", () => {
     });
   });
 
-  it("registry_unavailable — the binding reads but the rock does not", async () => {
+  it("registry_unavailable - the binding reads but the rock does not", async () => {
     registry.boundRockId = null;
     registry.rocks.set("1", "unavailable");
 
@@ -687,7 +687,7 @@ describe("effective rock id resolution", () => {
     });
   });
 
-  it("is absent when the CMAC does not match — nothing is resolved for a forgery", async () => {
+  it("is absent when the CMAC does not match - nothing is resolved for a forgery", async () => {
     const { e } = tap(7);
     const outcome = await verifyTap({ rockId: "1", e, c: "DEADBEEFDEADBEEF" });
     expect(outcome.body.effectiveRockId).toBeUndefined();

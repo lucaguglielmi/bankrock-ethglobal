@@ -168,7 +168,7 @@ describe("reading and advancing the cursor", () => {
     await expect(readIndexerCursor(db, other)).resolves.toBeNull();
   });
 
-  it("degrades to no cursor — a full rescan — when the database throws", async () => {
+  it("degrades to no cursor - a full rescan - when the database throws", async () => {
     const db = brokenD1();
     await expect(readIndexerCursor(db, id)).resolves.toBeNull();
     await expect(advanceIndexerCursor(db, id, BigInt(9_100_000))).resolves.toBe(false);

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 export default function Home() {
   return (
     <main className="flex min-h-dvh flex-col bg-white text-ink selection:bg-black selection:text-white">
-      {/* Hero Section — pulled up by its own height to sit under the transparent header (spec 17 §4.2) */}
+      {/* Hero Section - pulled up by its own height to sit under the transparent header (spec 17 §4.2) */}
       <section className="relative -mx-[var(--gutter)] -mt-[calc(var(--header-h)+var(--safe-top))] flex min-h-dvh flex-col overflow-hidden px-[var(--gutter)] pt-[calc(var(--header-h)+var(--safe-top))] pb-12 sm:pb-24">
         {/* 3D Canvas Background */}
         <div className="pointer-events-auto absolute inset-0 z-0 mix-blend-multiply opacity-80">

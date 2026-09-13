@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * `POST /api/contact` — the shop's two forms.
+ * `POST /api/contact` - the shop's two forms.
  *
  * The row in D1 is what makes a submission a success. The two emails that follow are reported in
  * the 200 body and never turn it into an error: a stored message the modal calls "not sent" is

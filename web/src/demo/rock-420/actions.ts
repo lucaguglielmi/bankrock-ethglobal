@@ -1,15 +1,15 @@
 /**
  * The demo's mutations, as pure functions: `(state, params) -> { state, result }`.
  *
- * Every result is a `Capability` in state `DEMO` or `UNAVAILABLE` — never `REAL` — so the
+ * Every result is a `Capability` in state `DEMO` or `UNAVAILABLE` - never `REAL` - so the
  * components that already render the three states show the SIMULATED badge and the words
- * "no transaction — simulated" on their own (`rock/action-result.tsx`, `sheets/capability-result`).
+ * "no transaction - simulated" on their own (`rock/action-result.tsx`, `sheets/capability-result`).
  * No result carries a `txHash`: there was no transaction (D-014).
  *
  * The maths is the real maths. A swap is priced with `quoteExactIn`, the mirror of
  * `XYCSwap._quoteExactIn`, against the stream's virtual balances; the whole input is pushed into
  * the rock, the output leaves it, the fee is `amountIn * feeBps / 10000` in the input token, and
- * `executable = min(virtual, held, allowance)` caps what a stream can pay out — the same rules
+ * `executable = min(virtual, held, allowance)` caps what a stream can pay out - the same rules
  * `contracts/aqua/NOTES.md` §6–7 describe. A refused action returns the state untouched.
  */
 
@@ -121,7 +121,7 @@ export interface ShipDemoParams {
 
 /**
  * Opens a stream. Moves no tokens: the holdings stay put and the stream gains an allowance. The
- * ERC-20 allowance is raised to the shipped amount when it is lower — `approve` sets, it does not
+ * ERC-20 allowance is raised to the shipped amount when it is lower - `approve` sets, it does not
  * add, which is exactly what `buildApprovals` does in the real hook.
  */
 export function shipDemoStrategy(
@@ -137,7 +137,7 @@ export function shipDemoStrategy(
     return refuse(state, "That is not a stream index");
   }
   if (liveStream(state, params.streamIndex)) {
-    return refuse(state, `Stream ${params.streamIndex + 1} is already live — a strategy is immutable`);
+    return refuse(state, `Stream ${params.streamIndex + 1} is already live - a strategy is immutable`);
   }
   if (state.stopped.includes(params.streamIndex)) {
     return refuse(state, `Stream ${params.streamIndex + 1} was stopped, and a stopped stream cannot be restarted`);
@@ -178,7 +178,7 @@ export function shipDemoStrategy(
     {
       kind: "ship",
       type: "hardware",
-      title: `Started earning — ${stream.label}`,
+      title: `Started earning - ${stream.label}`,
       description: `${fmt(params.usdcAmount, "USDC")} and ${fmt(params.wethAmount, "WETH")} allowed to trade at ${formatFeeRate(params.feeBps)} per trade. Nothing left the account.`,
     },
   );
@@ -194,7 +194,7 @@ export interface TopUpDemoParams {
 }
 
 /**
- * Makes more of the rock available to a live stream — the demo's `Aqua.push` from the rock's own
+ * Makes more of the rock available to a live stream - the demo's `Aqua.push` from the rock's own
  * account. The virtual balances rise and nothing else does: no token moves, the fee is untouched,
  * and the allowance is raised to at least the new virtual balance, as `topUpStrategy` leaves it
  * once the push has spent its share. Making *less* available is `dockDemoStrategy`.
@@ -286,7 +286,7 @@ export function dockDemoStrategy(
     {
       kind: "dock",
       type: "hardware",
-      title: `Stopped — ${stream.label}`,
+      title: `Stopped - ${stream.label}`,
       description: `The stream's allowance is closed. Its ${fmt(stream.fees.usdc, "USDC")} and ${fmt(stream.fees.weth, "WETH")} of fees were already in the rock's balance.`,
     },
   );
@@ -310,7 +310,7 @@ export interface SwapDemoParams {
  * A visitor's swap against one stream, priced by the mirrored curve.
  *
  * Refused, with the reason, when the stream is not live, the visitor's account cannot pay, the
- * quote falls under the accepted floor, or the stream cannot settle the output — the same four
+ * quote falls under the accepted floor, or the stream cannot settle the output - the same four
  * ways the real swap fails, minus the bundler.
  */
 export function swapDemo(

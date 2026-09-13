@@ -99,7 +99,7 @@
 /*
  * Motion tokens for the account sheet's "tap your rock" illustration
  * (components/tap-rock-animation.tsx). Applied only under `motion-safe:`, so with
- * `prefers-reduced-motion: reduce` the illustration is the static touching frame — the
+ * `prefers-reduced-motion: reduce` the illustration is the static touching frame - the
  * phone's rest position and the rings' rest opacity below are that frame. One 3 s cycle:
  * glide in, hold against the rock while two rings leave the contact point, glide out.
  */

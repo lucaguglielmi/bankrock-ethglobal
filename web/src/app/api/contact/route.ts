@@ -1,5 +1,5 @@
 /**
- * POST /api/contact — the shop's "Claim an OG Rock" and "Become a Sponsor" forms (S-6).
+ * POST /api/contact - the shop's "Claim an OG Rock" and "Become a Sponsor" forms (S-6).
  *
  * Both forms used to submit nowhere: the handler was two `setTimeout`s that showed a success
  * state and closed the modal. This persists the request to D1 and returns 503 UNAVAILABLE when

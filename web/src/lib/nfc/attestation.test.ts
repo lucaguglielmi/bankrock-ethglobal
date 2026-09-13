@@ -253,7 +253,7 @@ describe("signAttestation", () => {
     expect(result.message.deadline - now).toBeLessThanOrEqual(ATTESTATION_TTL_SECONDS + 2);
   });
 
-  it("binds every field — changing any one changes the signature", async () => {
+  it("binds every field - changing any one changes the signature", async () => {
     const { subject } = configure();
     const base = {
       rockId: "42",

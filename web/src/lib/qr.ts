@@ -1,5 +1,5 @@
 /**
- * A dependency-free QR encoder — byte mode, error-correction level M, versions 1 to 10.
+ * A dependency-free QR encoder - byte mode, error-correction level M, versions 1 to 10.
  *
  * Why this exists: naming a recipient on stage by pasting a 42-character address is the slowest
  * beat in the demo (spec 02 Flow E, spec 08 beat 2:10). The recipient shows a QR of
@@ -14,7 +14,7 @@
  * Anything longer throws rather than silently truncating.
  *
  * Correctness is not taken on trust. `qr.test.ts` checks this module against fixtures produced
- * by an independent, widely used encoder (the `qrcode` npm package, run once offline — it is not
+ * by an independent, widely used encoder (the `qrcode` npm package, run once offline - it is not
  * a dependency of this project), for every mask of a fixed input and for the auto-masked output
  * of the exact URL shapes the app builds.
  *
@@ -292,7 +292,7 @@ export interface QrMatrix {
   size: number;
   /** The mask pattern that was applied, 0-7. */
   mask: number;
-  /** `modules[row][col]` — true is a dark module. */
+  /** `modules[row][col]` - true is a dark module. */
   modules: boolean[][];
 }
 
@@ -477,7 +477,7 @@ export function maskPenalty(modules: boolean[][]): number {
   const size = modules.length;
   let score = 0;
 
-  // Rule 1 — runs of five or more identical modules in a row or column.
+  // Rule 1 - runs of five or more identical modules in a row or column.
   for (let i = 0; i < size; i++) {
     for (const read of [
       (j: number) => modules[i][j],
@@ -496,7 +496,7 @@ export function maskPenalty(modules: boolean[][]): number {
     }
   }
 
-  // Rule 2 — every 2x2 block of one colour.
+  // Rule 2 - every 2x2 block of one colour.
   for (let row = 0; row < size - 1; row++) {
     for (let col = 0; col < size - 1; col++) {
       const value = modules[row][col];
@@ -510,7 +510,7 @@ export function maskPenalty(modules: boolean[][]): number {
     }
   }
 
-  // Rule 3 — the finder-like 1:1:3:1:1 pattern with four light modules on one side.
+  // Rule 3 - the finder-like 1:1:3:1:1 pattern with four light modules on one side.
   const pattern = [true, false, true, true, true, false, true];
   const light4 = [false, false, false, false];
   const forward = [...pattern, ...light4];
@@ -533,7 +533,7 @@ export function maskPenalty(modules: boolean[][]): number {
     }
   }
 
-  // Rule 4 — deviation of the dark-module share from 50%.
+  // Rule 4 - deviation of the dark-module share from 50%.
   let dark = 0;
   for (let row = 0; row < size; row++) {
     for (let col = 0; col < size; col++) if (modules[row][col]) dark += 1;

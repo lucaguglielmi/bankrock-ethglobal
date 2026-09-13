@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * The Liquidity tab — the tab open on page load (spec 17 Part 5; spec 04; NOTES.md §4, §6, §7).
+ * The Liquidity tab - the tab open on page load (spec 17 Part 5; spec 04; NOTES.md §4, §6, §7).
  *
  * A small state machine over two reads, `reserves` and `strategy`:
  *
  *   reading      neither has arrived: one quiet line, never a reason;
  *   unavailable  the reserve read failed: its reason, and a way to try again;
- *   waiting      the rock holds no USDC yet: "Waiting for funds" and one button — Add funds. The
+ *   waiting      the rock holds no USDC yet: "Waiting for funds" and one button - Add funds. The
  *                reserve poll refetches every 15 seconds, so this flips by itself;
  *   funded       the headline reserve, then either the strategy picker (owner) or one sentence
  *                (visitor), because nothing is trading yet;
@@ -351,7 +351,7 @@ export function LiquidityTab({
 }
 
 /**
- * Stopped streams, if any, as one quiet line — never a card with numbers, because a docked stream
+ * Stopped streams, if any, as one quiet line - never a card with numbers, because a docked stream
  * has no allowance left and can never be revived (`docs/dashboard-strategies.md`).
  */
 function StoppedLine({ names }: { names: string[] }) {

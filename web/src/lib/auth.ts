@@ -19,8 +19,8 @@ export const ADMIN_SESSION_COOKIE = "bankrock_sentinel_session";
 /**
  * How long an admin session lives (audit P-14).
  *
- * Twelve hours, not thirty days. There is no revocation list — a session is a signed cookie and
- * nothing server-side can retire one early — so the lifetime *is* the revocation mechanism, and a
+ * Twelve hours, not thirty days. There is no revocation list - a session is a signed cookie and
+ * nothing server-side can retire one early - so the lifetime *is* the revocation mechanism, and a
  * month of it was the whole exposure of one stolen laptop. Twelve hours covers a working day and
  * expires overnight.
  */

@@ -2,8 +2,8 @@ import { cn } from "@/lib/ui/cn";
 
 /**
  * Marks a `DEMO`-state surface (spec 15 D-013, Part 3; spec 17 Part 5).
- * Persistent and non-dismissible — it is never conditionally hidden by user
- * interaction — and always rendered inline in normal flow, never absolutely
+ * Persistent and non-dismissible - it is never conditionally hidden by user
+ * interaction - and always rendered inline in normal flow, never absolutely
  * positioned or overlaid on top of content.
  */
 export interface SimulatedBadgeProps {

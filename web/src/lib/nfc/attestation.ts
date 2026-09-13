@@ -46,7 +46,7 @@ export interface AttestationDomain {
 }
 
 export interface AttestationMessage {
-  /** Decimal string — the struct field is a `uint256`. */
+  /** Decimal string - the struct field is a `uint256`. */
   rockId: string;
   /** keccak256 of the raw 7-byte UID. */
   uidHash: Hex;
@@ -157,7 +157,7 @@ export function attestationConfigIssue(): AttestationUnavailableReason | null {
   return null;
 }
 
-/** keccak256 of the raw UID bytes — never of a hex string. */
+/** keccak256 of the raw UID bytes - never of a hex string. */
 export function hashUid(uid: Buffer): Hex {
   const hex = `0x${uid.toString("hex")}` as Hex;
   return keccak256(hex);
@@ -182,7 +182,7 @@ function parseRockId(rockId: string): bigint | null {
 
 /**
  * Sign the attestation. Returns `{ state: "UNAVAILABLE", reason }` when the
- * signer key or the registry address is unset — verification itself still
+ * signer key or the registry address is unset - verification itself still
  * succeeds; only the on-chain claim is blocked (D-018 stages attestation
  * separately from verification).
  */
@@ -212,7 +212,7 @@ export async function signAttestation(input: SignAttestationInput): Promise<Atte
 
   // Defence in depth: `verifyTap` already 400s on a malformed value, so this
   // only fires for a direct caller. Absent is legitimate and means "no account
-  // named" — the zero address, never a wildcard.
+  // named" - the zero address, never a wildcard.
   if (input.smartAccount !== undefined && !isAddress(input.smartAccount, { strict: false })) {
     return { state: "UNAVAILABLE", reason: "invalid_smart_account" };
   }

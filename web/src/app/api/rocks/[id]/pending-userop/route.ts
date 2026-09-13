@@ -3,7 +3,7 @@
  *
  * A gift moves two things: the object, in the registry, and control of the Rock Account, in the
  * Safe. The registry half is proven by the recipient's tap. The Safe half can only be authorised
- * by the Safe's current owner — the giver — who is not present when the recipient taps. So the
+ * by the Safe's current owner - the giver - who is not present when the recipient taps. So the
  * giver signs that one operation when they open the gift, and it waits here until the claim.
  *
  * What stops this being a way to plant an operation against someone else's Safe: the stored
@@ -12,11 +12,11 @@
  * choose the sender nor produce the signature.
  *
  * It is one-shot and it is revocable: the claim route deletes it after submitting, and
- * `{ discard: true }` — sent when a handover is cancelled — deletes it too. A cancelled gift whose
+ * `{ discard: true }` - sent when a handover is cancelled - deletes it too. A cancelled gift whose
  * owner-swap operation survived would be a live path to hand the account away.
  *
  * Revocable **by its creator only** (audit P-5). A Privy token proves *an account*, not *this
- * rock's owner*, and Privy sign-up is open — so checking merely that the caller is signed in let
+ * rock's owner*, and Privy sign-up is open - so checking merely that the caller is signed in let
  * any stranger discard or overwrite another rock's pre-signed hand-over, leaving the recipient
  * with the registry claim and no Rock Account. The DID that stored the row is kept with it, and
  * only that DID may replace or delete it. The claim route reads it without a DID, because by then
@@ -26,8 +26,8 @@
  *
  * First-writer-wins plus "the sender is the rock's account" is not enough on its own, and the two
  * combine into a denial of service on the gift itself. Everything the route could check about a
- * submitted operation was public — the rock id is in the URL and the Rock Account is in the
- * registry — so any signed-in Privy account could store a row of nonsense against any rock, take
+ * submitted operation was public - the rock id is in the URL and the Rock Account is in the
+ * registry - so any signed-in Privy account could store a row of nonsense against any rock, take
  * the row's creator DID, and lock the real giver out with the 403 above. The recipient would then
  * be handed a gift the claim route submits and fails on, with the one person who could repair it
  * refused every time they tried.
@@ -47,7 +47,7 @@
  *
  * **What this does not close:** ERC-4337 bundlers deliberately *skip signature validation* during
  * estimation, so a well-formed squatted operation carrying a forged signature still passes step 2.
- * It can no longer be an arbitrary operation — step 1 forces it to be this exact owner swap — but
+ * It can no longer be an arbitrary operation - step 1 forces it to be this exact owner swap - but
  * the giver can still be locked out of their own row by a stranger who gets there first. Closing
  * that needs the caller's *wallet*, and a Privy token carries a DID, not an address. Recorded so
  * it is a known residual rather than an assumed fix.

@@ -8,7 +8,7 @@ import { BottomDockSlot } from "@/components/ui/bottom-dock";
 
 /**
  * Update-available notice. Lives in the root `<BottomDock>` (spec 17 §4.9,
- * L-4) rather than being its own fixed element — it is never `position:
+ * L-4) rather than being its own fixed element - it is never `position:
  * fixed` itself, never `z-[100]`, and never pinned to `bottom-6`.
  */
 export function VersionCheck() {

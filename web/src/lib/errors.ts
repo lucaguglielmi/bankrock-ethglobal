@@ -2,13 +2,13 @@
  * What a failure is allowed to tell a client (audit P-2, P-15).
  *
  * The claim route returned viem's error text verbatim in its `reason`. viem puts the RPC URL in
- * that text, and `SEPOLIA_RPC_URL` carries the provider API key in its path — so an
+ * that text, and `SEPOLIA_RPC_URL` carries the provider API key in its path - so an
  * unauthenticated caller could read a paid credential out of an error message. That is the
  * highest-severity finding of the perimeter audit, and the class of bug is "we passed an internal
  * string outward", not "we formatted one message badly".
  *
  * So the rule is structural: a `reason` that reaches a response body is chosen from a fixed set
- * here, never interpolated from an exception. The detail still exists — it goes to telemetry,
+ * here, never interpolated from an exception. The detail still exists - it goes to telemetry,
  * which redacts before it buffers and is readable only with `ADMIN_API_KEY`.
  *
  * The rule survives reading an error's message, which `publicReason` now does to recognise bundler
@@ -43,7 +43,7 @@ interface KnownMessage {
  * D-034), and no value read from the environment.
  */
 export const SPONSORSHIP_REJECTED_REASON =
-  "gas sponsorship rejected the operation — check the Pimlico policy for Sepolia";
+  "gas sponsorship rejected the operation - check the Pimlico policy for Sepolia";
 
 /**
  * Errors we can name without quoting them.
@@ -78,8 +78,8 @@ const KNOWN_ERRORS: KnownError[] = [
     reason: "the contract answered in an unexpected shape",
   },
   /*
-   * ERC-4337. Every sponsored action in this app — awakening, giving, shipping, docking, and the
-   * stored owner swap a gift depends on — is a UserOperation through Pimlico, so a bundler or
+   * ERC-4337. Every sponsored action in this app - awakening, giving, shipping, docking, and the
+   * stored owner swap a gift depends on - is a UserOperation through Pimlico, so a bundler or
    * paymaster failure is the most likely failure in the whole product. Reported as "internal
    * error" it told the operator nothing; these names are viem's own account-abstraction errors.
    */
@@ -130,21 +130,21 @@ const KNOWN_ERRORS: KnownError[] = [
  *
  * A bundler does not throw a typed error: `eth_sendUserOperation` answers with a JSON-RPC error
  * whose `message` is the only thing that distinguishes "your paymaster policy does not cover this"
- * from "your signature is wrong". So these patterns read the message — and that is the one thing
+ * from "your signature is wrong". So these patterns read the message - and that is the one thing
  * the module's own rule forbids doing carelessly, so the rule is kept exactly:
  *
  *   **the message is an input to a boolean, never a source of output.** Every `reason` below is a
  *   fixed string written here. Nothing is captured, interpolated or echoed, so a message carrying
  *   an RPC URL, an API key or a stack classifies to the same fixed sentence as one that does not.
  *
- * The patterns are deliberately narrow — EntryPoint's `AAxx` codes and bundler vocabulary — so
+ * The patterns are deliberately narrow - EntryPoint's `AAxx` codes and bundler vocabulary - so
  * they cannot capture an ordinary contract-call failure that the name table already classifies
  * better. Order is specific-before-general: `AA32` is a deadline before it is a paymaster.
  */
 const KNOWN_MESSAGES: KnownMessage[] = [
   {
     pattern: /\bAA22\b|\bAA32\b|expired or not due|deadline (?:has )?(?:passed|expired)/i,
-    reason: "the operation's deadline had passed — tap the rock again",
+    reason: "the operation's deadline had passed - tap the rock again",
   },
   {
     pattern: /\bAA31\b|paymaster (?:deposit|stake) too low/i,
@@ -160,11 +160,11 @@ const KNOWN_MESSAGES: KnownMessage[] = [
   },
   {
     pattern: /\bAA24\b|signature error|invalid (?:user ?operation )?signature/i,
-    reason: "the operation's signature was not accepted — sign the hand-over again",
+    reason: "the operation's signature was not accepted - sign the hand-over again",
   },
   {
     pattern: /\bAA25\b|invalid account nonce|nonce too low/i,
-    reason: "the operation's nonce has already been used — prepare it again",
+    reason: "the operation's nonce has already been used - prepare it again",
   },
   {
     pattern: /\bAA2[03]\b|account not deployed|sender not deployed/i,
@@ -180,7 +180,7 @@ const KNOWN_MESSAGES: KnownMessage[] = [
   },
   {
     pattern: /replacement (?:transaction )?underpriced|already known/i,
-    reason: "an operation with the same nonce is already in flight — wait for it and try again",
+    reason: "an operation with the same nonce is already in flight - wait for it and try again",
   },
   {
     // Anything else EntryPoint numbered. Says where it failed, which is what an operator needs.
@@ -220,13 +220,13 @@ function errorMessages(err: unknown, depth = 0): string[] {
  *
  * Known errors map to a short fixed sentence; everything else is `"internal error"`. Every
  * sentence it can return is written in this file, so no value from the environment, a URL, a query
- * string or a stack can escape through it — including from an error type that did not exist when
+ * string or a stack can escape through it - including from an error type that did not exist when
  * this was written.
  *
  * Two tables, and the order between them is deliberate:
  *
  *  1. **messages**, matched against bundler vocabulary only (`AAxx` codes, "paymaster", "prefund").
- *     A bundler has no error *type* — its refusal arrives as a JSON-RPC message — and when viem
+ *     A bundler has no error *type* - its refusal arrives as a JSON-RPC message - and when viem
  *     does wrap one, the wrapper's name (`UserOperationExecutionError`) says far less than the
  *     message inside it. Reading a message to *classify* is safe; the output never quotes it;
  *  2. **names**, viem's stable error names, which is everything else.
@@ -261,7 +261,7 @@ export function publicReason(err: unknown): string {
 /**
  * `prefix`, then a safe reason: "The claim was not broadcast: the network could not be reached".
  *
- * The prefix is written by us at the call site — never taken from the error.
+ * The prefix is written by us at the call site - never taken from the error.
  */
 export function publicReasonWith(prefix: string, err: unknown): string {
   return `${prefix}: ${publicReason(err)}`;

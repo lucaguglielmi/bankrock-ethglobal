@@ -4,7 +4,7 @@ import { decodeFunctionData } from "viem";
 /**
  * The visitor's swap path.
  *
- * The hook itself is not rendered — there is no React test renderer in this project — so what is
+ * The hook itself is not rendered - there is no React test renderer in this project - so what is
  * pinned here is everything the hook composes: the two calls it submits, the receipt decoding that
  * decides what the user is told they received, and the gating that must refuse rather than
  * half-build a transaction.
@@ -63,7 +63,7 @@ afterEach(() => {
 });
 
 describe("the batch a visitor submits", () => {
-  it("approves the periphery — not Aqua, not the app — and then calls it", async () => {
+  it("approves the periphery - not Aqua, not the app - and then calls it", async () => {
     const { buildSwapCall } = await loadAqua();
     const { approvalCalls } = await import("@/lib/rock-account");
     const { XYC_SWAP_TAKER_ABI } = await import("@/lib/chain/abi/aqua-app");
@@ -102,8 +102,8 @@ describe("the batch a visitor submits", () => {
     const swap = decodeFunctionData({ abi: XYC_SWAP_TAKER_ABI, data: batch[1].data });
     expect(swap.functionName).toBe("swapExactIn");
     const args = swap.args as readonly unknown[];
-    // The 2026-09-12 audit removed the caller-supplied `app` argument — the periphery is bound to
-    // one app at deployment now, so nobody can point it at a contract of their own (finding F-6) —
+    // The 2026-09-12 audit removed the caller-supplied `app` argument - the periphery is bound to
+    // one app at deployment now, so nobody can point it at a contract of their own (finding F-6) -
     // and added a trailing `deadline` (finding F-8). Every argument shifted down one.
     expect(args[0]).toMatchObject({ token0: USDC, token1: WETH });
     expect(args[1]).toBe(true); // zeroForOne: selling token0 (USDC)
@@ -197,7 +197,7 @@ describe("what the visitor is told they received", () => {
     expect(readAmountOutFromLogs([log], { aqua: AQUA, strategyHash, tokenOut: WETH })).toBe(paid);
   });
 
-  it("returns null — never a guess — when no matching event is in the receipt", async () => {
+  it("returns null - never a guess - when no matching event is in the receipt", async () => {
     const { readAmountOutFromLogs } = await import("./useTakerActions");
     const strategyHash = sampleHash("ab");
 
@@ -271,7 +271,7 @@ describe("availability gating", () => {
     }
   });
 
-  it("refuses when account abstraction is unconfigured — a visitor cannot pay gas without it", async () => {
+  it("refuses when account abstraction is unconfigured - a visitor cannot pay gas without it", async () => {
     delete process.env.NEXT_PUBLIC_PIMLICO_API_KEY;
     vi.resetModules();
     const { pimlicoApiKey } = await import("@/lib/rock-account");

@@ -5,7 +5,7 @@ import { aesCbcDecrypt, aesCbcEncrypt, aesCmac, aesEncryptBlock, generateCmacSub
 const hex = (value: string) => Buffer.from(value.replace(/\s/g, ""), "hex");
 
 /**
- * EXTERNAL VECTOR — FIPS 197, Appendix C.1 (AES-128).
+ * EXTERNAL VECTOR - FIPS 197, Appendix C.1 (AES-128).
  */
 describe("aesEncryptBlock", () => {
   it("matches the FIPS 197 C.1 AES-128 known answer", () => {
@@ -16,7 +16,7 @@ describe("aesEncryptBlock", () => {
 });
 
 /**
- * EXTERNAL VECTOR — NIST SP 800-38A, F.2.1 / F.2.2 (CBC-AES128.Encrypt/Decrypt).
+ * EXTERNAL VECTOR - NIST SP 800-38A, F.2.1 / F.2.2 (CBC-AES128.Encrypt/Decrypt).
  * This pins the AES-CBC primitive that decrypts the PICCData against a published
  * known answer, independently of anything in this codebase.
  */
@@ -53,7 +53,7 @@ describe("aesCbcEncrypt / aesCbcDecrypt", () => {
 });
 
 /**
- * EXTERNAL VECTORS — RFC 4493, section 4 "Test Vectors" (AES-128 CMAC).
+ * EXTERNAL VECTORS - RFC 4493, section 4 "Test Vectors" (AES-128 CMAC).
  */
 describe("aesCmac (RFC 4493)", () => {
   const key = hex("2b7e151628aed2a6abf7158809cf4f3c");
@@ -70,23 +70,23 @@ describe("aesCmac (RFC 4493)", () => {
     expect(k2.toString("hex")).toBe("f7ddac306ae266ccf90bc11ee46d513b");
   });
 
-  it("example 1 — len 0", () => {
+  it("example 1 - len 0", () => {
     expect(aesCmac(key, Buffer.alloc(0)).toString("hex")).toBe("bb1d6929e95937287fa37d129b756746");
   });
 
-  it("example 2 — len 16", () => {
+  it("example 2 - len 16", () => {
     expect(aesCmac(key, message.subarray(0, 16)).toString("hex")).toBe(
       "070a16b46b4d4144f79bdd9dd04a287c",
     );
   });
 
-  it("example 3 — len 40", () => {
+  it("example 3 - len 40", () => {
     expect(aesCmac(key, message.subarray(0, 40)).toString("hex")).toBe(
       "dfa66747de9ae63030ca32611497c827",
     );
   });
 
-  it("example 4 — len 64", () => {
+  it("example 4 - len 64", () => {
     expect(aesCmac(key, message).toString("hex")).toBe("51f0bebf7e3b9d92fc49741779363cfe");
   });
 });

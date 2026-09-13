@@ -1,5 +1,5 @@
 /**
- * POST /api/alerts/test — operator check that email delivery is configured (SA-1).
+ * POST /api/alerts/test - operator check that email delivery is configured (SA-1).
  *
  * This was an open email relay: any anonymous caller could make the Resend sending domain deliver
  * Bank Rock-branded mail to any address, with `to.includes("@")` as the only validation.
@@ -37,12 +37,12 @@ export async function POST(req: Request) {
 
   const result = await sendAlertEmail({
     to,
-    rockId: "—",
+    rockId: "-",
     topic: "configuration_test",
     topicTitle: "Email delivery test",
     severity: "info",
     summary:
-      "This message confirms that Bank Rock can reach your inbox. It contains no balances, no figures and no transaction — alert delivery itself stays sandboxed on purpose until Bank Rock is on mainnet.",
+      "This message confirms that Bank Rock can reach your inbox. It contains no balances, no figures and no transaction - alert delivery itself stays sandboxed on purpose until Bank Rock is on mainnet.",
   });
 
   logger.info("Operator email delivery test", {

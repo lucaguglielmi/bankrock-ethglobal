@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * `POST /api/rocks/[id]/claim` — the one unauthenticated route that spends money.
+ * `POST /api/rocks/[id]/claim` - the one unauthenticated route that spends money.
  *
  * Audit P-1: a valid attestation is a bearer token for its ten-minute TTL, so every gate in front
  * of the broadcast is what stands between a captured one and the relayer's balance. Each refusal
@@ -360,7 +360,7 @@ describe("refusals before any gas is spent (P-1)", () => {
     expect(submitClaimHandover).not.toHaveBeenCalled();
   });
 
-  it("refuses when the rate-limit ledger cannot be consulted — fail closed (P-11)", async () => {
+  it("refuses when the rate-limit ledger cannot be consulted - fail closed (P-11)", async () => {
     requireIpRateLimit.mockResolvedValue({
       ok: false,
       status: 503,
@@ -383,7 +383,7 @@ describe("refusals before any gas is spent (P-1)", () => {
   it("refuses when today's cap is exhausted", async () => {
     reserveRelayerSpend.mockResolvedValue({
       state: "UNAVAILABLE",
-      reason: "The relayer has reached its daily limit — try again tomorrow",
+      reason: "The relayer has reached its daily limit - try again tomorrow",
     });
     const { status } = await post();
     expect(status).toBe(503);
@@ -427,7 +427,7 @@ describe("when the broadcast itself fails", () => {
  * B4: acceptance by a node is not a claim.
  *
  * `submitClaimHandover` now waits for the receipt, so a revert and a transaction that never mined
- * both reach the route as failures — and both have already spent the relayer's gas, which the
+ * both reach the route as failures - and both have already spent the relayer's gas, which the
  * ledger must keep recording.
  */
 describe("when the claim was broadcast but did not land", () => {

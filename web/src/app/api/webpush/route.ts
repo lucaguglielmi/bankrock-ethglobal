@@ -1,14 +1,14 @@
 /**
- * POST /api/webpush — Web Push subscription management and delivery (spec 14 §4).
+ * POST /api/webpush - Web Push subscription management and delivery (spec 14 §4).
  *
  * What this replaced: a route on the old next-on-pages Cloudflare adapter (`getRequestContext`,
  * D-016), `export const runtime = "edge"`, a raw `PushSubscriptions` table it created no migration for,
- * and a client-supplied `userId` stored verbatim (SA-5) — anyone could subscribe, or unsubscribe,
+ * and a client-supplied `userId` stored verbatim (SA-5) - anyone could subscribe, or unsubscribe,
  * on behalf of any other user's rock.
  *
  * Now: `subscribe` and `unsubscribe` require a verified Privy access token (D-017) and store the
  * DID the token names, never one the client asserts. `send` is a scheduled/operator action gated
- * on `x-cron-secret`. VAPID keys come from `requireEnv` with no defaults — unset means the
+ * on `x-cron-secret`. VAPID keys come from `requireEnv` with no defaults - unset means the
  * capability is `UNAVAILABLE` (503), never a silent no-op (D-013).
  *
  * Delivery is intentionally sandboxed until the project is on mainnet: `send` is an operator
@@ -77,8 +77,8 @@ interface VapidConfig {
 /**
  * Reads the three VAPID env vars, converting a missing one into an UNAVAILABLE reason.
  *
- * The public key is `NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY` — the same name
- * `useNotifications.ts` reads client-side (P-7) — even though this route only ever runs
+ * The public key is `NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY` - the same name
+ * `useNotifications.ts` reads client-side (P-7) - even though this route only ever runs
  * server-side; a public VAPID key is not a secret, and one shared name keeps client and server
  * from silently drifting onto two different key pairs.
  */

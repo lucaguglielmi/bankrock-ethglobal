@@ -12,7 +12,7 @@
  *   5. one or more live streams                             → `TradePanel`
  *
  * Nothing here invents a number: the panel gets its quotes from `/api/rocks/[id]/quote` and its
- * receipt from the real swap. Case 3 is kept apart from case 4 on purpose — a rate-limited RPC or
+ * receipt from the real swap. Case 3 is kept apart from case 4 on purpose - a rate-limited RPC or
  * a missing address must never read as "this rock is idle" (D-013).
  */
 
@@ -26,7 +26,7 @@ import { NO_MAKER_REASON, TradePanel } from "@/components/rock/trade-panel";
 
 export interface TradeTabProps {
   rockId: string;
-  /** The rock's account — the maker the quote and the swap are aimed at. */
+  /** The rock's account - the maker the quote and the swap are aimed at. */
   maker?: Address;
   /** The Aqua position, read once by the page. Live streams are `strategy.value.streams`. */
   strategy: Capability<StrategyView>;
@@ -37,10 +37,10 @@ export interface TradeTabProps {
   onRequestSignIn: () => void;
   /** Called once a swap has really executed. */
   onTradeSuccess: () => void;
-  /** Switches the dashboard to the Liquidity tab (e.g. "not trading yet — start it there"). */
+  /** Switches the dashboard to the Liquidity tab (e.g. "not trading yet - start it there"). */
   onGoToLiquidity: () => void;
   /**
-   * Pins the stream to trade against and hides the "Trade against" picker. Optional — by default
+   * Pins the stream to trade against and hides the "Trade against" picker. Optional - by default
    * the visitor may choose among the live streams, starting from the lowest fee.
    */
   streamIndex?: number;

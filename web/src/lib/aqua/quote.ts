@@ -3,12 +3,12 @@
  *
  * This is a *preview*, never an authority. The authority is `XYCSwap.quoteExactIn(...)`, a view
  * on the app itself, which runs the identical code path `swapExactIn` executes against the same
- * block's balances (spec 04 "Quoting" — with `XYCSwap` in the place of `SwapVMRouter.quote()`,
+ * block's balances (spec 04 "Quoting" - with `XYCSwap` in the place of `SwapVMRouter.quote()`,
  * see `contracts/aqua/NOTES.md` §8.3). Use this to render a number as the user types, and read
  * the app before submitting.
  *
  * Everything is integer arithmetic in token base units, with the same truncating division
- * Solidity performs, so the preview matches the contract exactly — `quote.test.ts` and
+ * Solidity performs, so the preview matches the contract exactly - `quote.test.ts` and
  * `XYCSwapStrategy.t.sol` pin the same two results to prove it.
  *
  * There is no external price source anywhere in this path. The 1inch Swap API serves mainnets
@@ -54,7 +54,7 @@ function requirePositive(value: bigint, label: string): bigint {
 }
 
 /**
- * `amountOut` for an exact input — XYCSwap's `_quoteExactIn`, verbatim:
+ * `amountOut` for an exact input - XYCSwap's `_quoteExactIn`, verbatim:
  *
  *   amountInWithFee = amountIn * (10000 - feeBps) / 10000
  *   amountOut       = amountInWithFee * balanceOut / (balanceIn + amountInWithFee)
@@ -79,20 +79,20 @@ export function quoteExactIn(state: CurveState, amountIn: bigint): QuoteResult {
 }
 
 /**
- * `amountIn` for an exact output — XYCSwap's `_quoteExactOut`, including its `ceilDiv`:
+ * `amountIn` for an exact output - XYCSwap's `_quoteExactOut`, including its `ceilDiv`:
  *
  *   amountOutWithFee = amountOut * 10000 / (10000 - feeBps)
  *   amountIn         = ceil(balanceIn * amountOutWithFee / (balanceOut - amountOutWithFee))
  *
  * **This is not the exact inverse of `quoteExactIn`.** The reference app takes its fee off the
  * *input* when quoting an exact input and grosses up the *output* when quoting an exact output,
- * so a round trip drifts by about `feeBps × (amountIn / balanceIn)` — 0.003% for a trade of 1%
+ * so a round trip drifts by about `feeBps × (amountIn / balanceIn)` - 0.003% for a trade of 1%
  * of the reserve at 30 bps, a second-order effect, not the fee itself (measured 2026-09-13).
- * That asymmetry is upstream's, and it is mirrored here deliberately — this function
+ * That asymmetry is upstream's, and it is mirrored here deliberately - this function
  * exists to predict `swapExactOut`, which behaves exactly this way. Bank Rock's swap path is
  * exact-in only, so the asymmetry never reaches a user.
  *
- * Throws when the output is at or beyond the strategy's virtual balance — which is what the
+ * Throws when the output is at or beyond the strategy's virtual balance - which is what the
  * contract does too, by underflowing. There is no size at which the curve can empty itself.
  */
 export function quoteExactOut(state: CurveState, amountOut: bigint): QuoteResult {
@@ -125,7 +125,7 @@ export function quoteExactOut(state: CurveState, amountOut: bigint): QuoteResult
  * How much worse the executed price is than the curve's marginal price, in basis points.
  *
  * This is a property of the constant-product curve and the trade size, computed from the same
- * reserves the swap will use — not the invented formula the old trade modal carried (N-6).
+ * reserves the swap will use - not the invented formula the old trade modal carried (N-6).
  */
 function priceImpactBps(args: {
   amountIn: bigint;
@@ -147,7 +147,7 @@ function priceImpactBps(args: {
  *
  * The binding constraint is rarely the curve. It is the maker's wallet: the output is transferred
  * out of it, so nothing above `executableOut` can be filled however large the virtual balance is
- * (`contracts/aqua/NOTES.md` §7). This inverts `quoteExactIn` — the path a swap really takes —
+ * (`contracts/aqua/NOTES.md` §7). This inverts `quoteExactIn` - the path a swap really takes -
  * and then walks the last unit or two of integer truncation off, so the returned input is the
  * largest one whose quote still fits inside `executableOut`.
  */

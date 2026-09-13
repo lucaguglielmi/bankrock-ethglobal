@@ -2,24 +2,24 @@
  * Service worker (spec 14 §4).
  *
  * Caching:
- *  - `/api/**` (same-origin): `NetworkOnly`, always — never cached, full stop. Privy sessions and
+ *  - `/api/**` (same-origin): `NetworkOnly`, always - never cached, full stop. Privy sessions and
  *    several routes here authenticate on a cookie, which never appears in `Request.headers`
  *    inside a service worker, so a header check cannot tell an authenticated call from an
  *    anonymous one (a perimeter-audit finding, P-3: header-gated caching was still caching
  *    cookie-authenticated GETs for 24 h). With no reliable way to tell them apart, none of it is
  *    cached.
  *  - `/rock/**` (same-origin): network-first. A request carrying an `Authorization` header is
- *    `NetworkOnly` — its response is scoped to whoever holds that bearer token. Everything else
+ *    `NetworkOnly` - its response is scoped to whoever holds that bearer token. Everything else
  *    under that prefix is `NetworkFirst` with a short-lived cache as the offline fallback.
- *  - Static assets and fonts: `StaleWhileRevalidate` — instant from cache, refreshed in the
+ *  - Static assets and fonts: `StaleWhileRevalidate` - instant from cache, refreshed in the
  *    background.
  *
- * Out of scope (spec 14 §4): the "Offline — showing cached state" UI indicator. This worker
+ * Out of scope (spec 14 §4): the "Offline - showing cached state" UI indicator. This worker
  * serves a cached response when the network fails; painting a banner to say so is a client-side
  * change to every surface that reads through it, not a service-worker concern, and is not made
  * here.
  *
- * `tsconfig.json`'s `lib` is `["dom", "dom.iterable", "esnext"]` for the whole project — it does
+ * `tsconfig.json`'s `lib` is `["dom", "dom.iterable", "esnext"]` for the whole project - it does
  * not include `lib.webworker.d.ts` (the two libs declare conflicting globals, and the rest of the
  * app needs `dom`), so the ambient `ServiceWorkerGlobalScope` / `ExtendableEvent` types are not
  * available here. Rather than `declare const self: any`, this file declares the narrow shape it
@@ -51,8 +51,8 @@ interface CachingMatchOptions {
 /**
  * Local stand-in for `serwist`'s `RuntimeCaching`, narrowed to the fields this file's matchers
  * actually read. `RuntimeCaching["matcher"]` is typed against `RouteMatchCallbackOptions`, which
- * includes `event: ExtendableEvent` — a type `lib.webworker.d.ts` supplies and this project's
- * `lib` does not — so this file builds its own list against a same-shaped-but-resolvable type
+ * includes `event: ExtendableEvent` - a type `lib.webworker.d.ts` supplies and this project's
+ * `lib` does not - so this file builds its own list against a same-shaped-but-resolvable type
  * and hands it to `Serwist` through one cast, rather than importing that type directly.
  */
 interface CachingRule {
@@ -63,7 +63,7 @@ interface CachingRule {
 const runtimeCaching: CachingRule[] = [
   // /api/** is never cached, unconditionally (P-3). Cookie-authenticated requests (several Privy
   // and admin session routes) carry no visible `Authorization` header for a service worker to
-  // key off, so a header check cannot separate an authenticated call from an anonymous one — the
+  // key off, so a header check cannot separate an authenticated call from an anonymous one - the
   // only safe rule is "never cache any of it".
   {
     matcher: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith(API_PREFIX),
@@ -106,7 +106,7 @@ const runtimeCaching: CachingRule[] = [
       plugins: [new ExpirationPlugin({ maxEntries: 8, maxAgeSeconds: YEAR_SECONDS })],
     }),
   },
-  // Static assets — images, scripts, styles — and Next's own static chunks.
+  // Static assets - images, scripts, styles - and Next's own static chunks.
   {
     matcher: /\.(?:js|css|jpg|jpeg|gif|png|svg|ico|webp)$/i,
     handler: new StaleWhileRevalidate({
@@ -151,11 +151,11 @@ const swSelf = self as unknown as ServiceWorkerSelfLike;
 
 /**
  * `@serwist/build`'s `injectManifest` looks for the literal text `self.__SW_MANIFEST` in the
- * bundled output by default (see `scripts/build-sw.mjs`) and replaces it with the precache list —
+ * bundled output by default (see `scripts/build-sw.mjs`) and replaces it with the precache list -
  * empty, on purpose, since the runtime-caching rules above already cover every asset this app
  * needs cached. That means the property access below has to be spelled out as `self.__SW_MANIFEST`
  * verbatim rather than routed through the `swSelf` alias used everywhere else in this file. Typing
- * it needs only this one addition to the ambient (already-present) `Window` interface — not the
+ * it needs only this one addition to the ambient (already-present) `Window` interface - not the
  * full `lib.webworker.d.ts` this file otherwise avoids (see the file header).
  */
 declare global {
@@ -170,7 +170,7 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   // `CachingRule` is structurally identical to `RuntimeCaching` except for the type it uses to
-  // describe `event` in the matcher options (see `CachingRule`'s doc comment) — safe to hand to
+  // describe `event` in the matcher options (see `CachingRule`'s doc comment) - safe to hand to
   // `Serwist` as-is.
   runtimeCaching: runtimeCaching as NonNullable<ConstructorParameters<typeof Serwist>[0]>["runtimeCaching"],
 });
