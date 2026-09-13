@@ -392,9 +392,9 @@ Each further capability is unlocked by exactly one thing, and until then the UI 
 | the ETH faucet | `FAUCET_PRIVATE_KEY` (funded); there is no default key |
 | a local database | `npm run db:migrate:local` (D1 binding `DB` in `wrangler.jsonc`) |
 
-`NEXT_PUBLIC_DEMO_MODE=true` turns on the badged simulation surfaces (the bridge sheet, the judge
-scenario switcher, an in-memory tap counter) for local rehearsal only. Production pins it to
-`false`, and the deploy workflow asserts that.
+There is no demo build flag. The only simulated surfaces are the magic tap link (S-4) and rock
+#420 (S-5), both listed in `DEMO-STATE.md`; the tap verifier fails closed without D1 and has no
+in-memory fallback.
 
 ### Tests and checks
 
@@ -447,8 +447,8 @@ and re-awaken the tag — asserting every step from chain reads. Its last live r
 ## What is real and what is simulated
 
 Every user-visible value is in one of three states, computed and never assumed: **REAL** (a live
-contract, RPC or database answered), **DEMO** (invented, badged, and only under
-`NEXT_PUBLIC_DEMO_MODE=true`) or **UNAVAILABLE** (the backing is unreachable; the UI says what is
+contract, RPC or database answered), **DEMO** (invented and badged; today only rock #420, the
+stage prop, answers it) or **UNAVAILABLE** (the backing is unreachable; the UI says what is
 missing and shows no number). There is no fourth state and no `catch` block that substitutes a
 plausible value. The living list is [`DEMO-STATE.md`](./DEMO-STATE.md); the summary as of this
 README:
@@ -463,13 +463,13 @@ app and taker are deployed, verified and served by the live site.
 (P-1); the honest failure of a deliberately reverting UserOperation (P-7); the relayer's daily cap
 actually refusing a claim (P-10).
 
-**Simulated, and badged as such:** the cross-chain bridge sheet (S-1) and the judge scenario
-switcher's sample views (S-3), both only under the demo flag; the magic tap link that stands in for
-the chip until the tag is programmed (S-4 — everything after the tap is the real path); and
-**rock #420, the stage prop** (S-5): `/rock/420` is a rock that exists only in the browser —
+**Simulated, and badged as such:** the magic tap link that stands in for the chip until the tag
+is programmed (S-4 — everything after the tap is the real path); and **rock #420, the stage
+prop** (S-5): `/rock/420` is a rock that exists only in the browser —
 seeded balances, streams, trades and history in `localStorage`, every action answering a `DEMO`
 capability with no transaction hash, a banner naming it a demo and a *Reset demo* control. It is
-served regardless of the demo flag and never touches the registry, Aqua, an RPC or the database.
+gated by its id alone — there is no demo flag — and never touches the registry, Aqua, an RPC or
+the database.
 **Rock 3 is the real one.**
 
 **Unavailable on purpose, with no path:** AR view; alert delivery and Web Push (preferences

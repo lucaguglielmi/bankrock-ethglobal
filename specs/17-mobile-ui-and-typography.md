@@ -263,8 +263,8 @@ main  { padding-top: calc(var(--header-h) + var(--safe-top));
 
 | Viewport | Left | Right |
 | --- | --- | --- |
-| `< md` | Wordmark (`text-h3`, 700) | Sound toggle (44 px icon button) · auth control · menu (44 px icon button) opening a `Sheet` with Shop, AI Oracle, Live Demo |
-| `≥ md` | Wordmark | Shop · AI Oracle · Live Demo → · sound · auth control |
+| `< md` | Wordmark (`text-h3`, 700) | Sound toggle (44 px icon button) · auth control · menu (44 px icon button) opening a `Sheet` with Shop, AI Oracle, Live rock |
+| `≥ md` | Wordmark | Shop · AI Oracle · Live rock → · sound · auth control |
 
 - Height `var(--header-h)`; `padding-top: var(--safe-top)`; `px-[var(--gutter)]`.
 - Auth control signed out: `Connect` button, 44 px tall, `text-sm` 600. The "last used" hint
@@ -272,8 +272,8 @@ main  { padding-top: calc(var(--header-h) + var(--safe-top));
 - Auth control signed in: one chip, 44 px tall, showing `0x71C8…1b47` in `<Address>` form.
   Tapping opens an account `Sheet` with the full address + copy, the network, `Embedded wallet`
   status and `Log out`. Nothing else lives in the header (L-2).
-- `Live Demo` links to `/rock/1` only while `NEXT_PUBLIC_DEMO_MODE=true` (spec 15 D-013);
-  otherwise the item is absent.
+- `Live rock` links to `/rock/3`, the funded live rock, in every environment. The demo build flag
+  and the flag-only `Live Demo` item were removed on 2026-09-13.
 
 ## 4.4 Sheet — the only overlay primitive
 
@@ -488,7 +488,7 @@ primary action without scrolling and the trade sheet's confirm button without hu
 | Aqua explainer background canvas | `aqua-info-modal.tsx` | A second WebGL context behind a scrolling modal, on the page opened from a tag (L-10). |
 | Hover 3D background on phones | `how-it-works.tsx` | Mouse-only; dead weight on touch. |
 | HDRI environment on the landing canvas below `md` | `rock-canvas.tsx` | Network and GPU cost with no visible benefit at phone size. |
-| Header "Live Demo" link outside demo mode | `header.tsx` | Follows spec 15 D-013. |
+| Header "Live Demo" link and the demo build flag | `header.tsx` | Replaced by an always-visible `Live rock` link to `/rock/3`; the flag is gone. |
 | `text-xs` as a size | theme | Removed so the floor cannot be crossed by habit. |
 | Geist Sans | `layout.tsx` | Never rendered; replaced by Inter (D-024). |
 
