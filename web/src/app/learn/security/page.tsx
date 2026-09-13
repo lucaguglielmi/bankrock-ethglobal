@@ -168,10 +168,7 @@ export default function SecurityPage() {
               it, you never send to it.
             </li>
           </ul>
-          <p className="max-w-prose text-sm text-ink-3">
-            The full list, with what makes each item real, is <span className="font-medium">DEMO-STATE.md</span>{" "}
-            in the repository, and the contract review is specification 19.
-          </p>
+
         </section>
 
         <section className="flex flex-col gap-4">
