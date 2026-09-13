@@ -184,6 +184,44 @@ export default function RockPage() {
             </p>
           </div>
         </section>
+      
+        {/* A Quirky History Lesson */}
+        <section className="grid grid-cols-1 items-center gap-12 pt-8 md:grid-cols-2 lg:gap-24">
+          <div className="order-2 flex flex-col gap-6 md:order-1">
+            <h2 className="text-h2 font-bold">A short history of liquidity</h2>
+            <div className="flex flex-col gap-4 text-base text-ink-2">
+              <p>
+                In the 15th century, <strong className="font-medium text-ink">Lorenzo de&rsquo; Medici</strong> and his family revolutionised the global banking system right here in Florence. They scaled the use of double-entry bookkeeping, letters of credit, and holding companies — effectively inventing modern finance as we know it.
+              </p>
+              <p>
+                Exactly 530 years later, the very first Bank Rock was gathered from the rocky bed of the Arno river near Florence, ready to launch the next great financial revolution: Decentralised Finance. 
+              </p>
+              <p>
+                We like to think Lorenzo would have appreciated the sheer irony of replacing an entire banking empire with an ordinary river stone.
+              </p>
+            </div>
+          </div>
+
+          <div className="order-1 flex justify-center md:order-2">
+            <div className="relative mx-auto aspect-[3/4] w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-muted shadow-xl">
+              <Image
+                src="/infographics/medici.jpg"
+                alt="Portrait of Lorenzo de' Medici"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+              />
+              {/* Comic bubble */}
+              <div className="absolute right-4 top-8 -rotate-6 rounded-2xl border-2 border-ink bg-white px-4 py-2 shadow-lg sm:right-8 sm:top-10">
+                <p className="text-base font-bold text-ink sm:text-lg">
+                  &ldquo;Banks are so 1330&rdquo;
+                </p>
+                {/* Comic bubble tail */}
+                <div className="absolute -bottom-[9px] left-6 h-4 w-4 rotate-45 border-b-2 border-r-2 border-ink bg-white" />
+              </div>
+            </div>
+          </div>
+        </section>
       </article>
     </main>
   );
