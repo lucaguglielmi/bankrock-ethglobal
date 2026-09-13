@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Sheet, SheetBody } from "@/components/ui/sheet";
@@ -35,6 +35,8 @@ export interface OwnerMenuProps {
   ownerActions: Capability<string>;
   handoverPending: boolean;
   lost: boolean;
+  /** Opens the page's "Add funds" sheet. Funding needs no owner authority, so it is never blocked. */
+  onAddFunds?: () => void;
   onChanged: () => void;
 }
 
@@ -43,6 +45,7 @@ export function OwnerMenu({
   ownerActions,
   handoverPending,
   lost,
+  onAddFunds,
   onChanged,
 }: OwnerMenuProps) {
   const { cancelHandover, archiveRock, markLost, clearLost, isPending } = useRockActions();
@@ -95,6 +98,19 @@ export function OwnerMenu({
             <p role="status" className="max-w-prose text-base text-ink-2">
               {blockedReason}
             </p>
+          ) : null}
+
+          {onAddFunds ? (
+            <Button
+              className="w-full"
+              onClick={() => {
+                setMenuOpen(false);
+                onAddFunds();
+              }}
+            >
+              <Wallet aria-hidden />
+              Add funds
+            </Button>
           ) : null}
 
           {handoverPending ? (
