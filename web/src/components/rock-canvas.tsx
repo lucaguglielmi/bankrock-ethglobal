@@ -209,12 +209,12 @@ function RockMesh({ isHovered, isCompact }: RockMeshProps) {
         <mesh ref={rockRef} castShadow receiveShadow>
           <icosahedronGeometry args={[1, 16]} />
           <MeshDistortMaterial ref={rockMaterialRef} color="#f2f2f2" roughness={0.9} metalness={0.05} distort={0.3} speed={0.5} />
-          <Html position={[-1.0, 0.1, 0.8]}>
+          <Html position={[0.8, -0.1, 0.5]}>
             <div
-              className={`${labelClass} flex-row-reverse -translate-x-full ${isHovered ? "translate-y-0 opacity-100 delay-300" : "translate-y-2 opacity-0"}`}
+              className={`${labelClass} ${isHovered ? "translate-y-0 opacity-100 delay-300" : "translate-y-2 opacity-0"}`}
             >
               <div className="size-1.5 rounded-full bg-[#001144]" />
-              <div className="ml-2 h-px w-12 bg-[#001144]/80 md:ml-4 md:w-32" />
+              <div className="mr-2 h-px w-12 bg-[#001144]/80 md:mr-4 md:w-32" />
               a normal rock
             </div>
           </Html>

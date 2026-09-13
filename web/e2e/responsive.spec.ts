@@ -216,6 +216,8 @@ test.describe("sheets are reachable without sign-in — item 8", () => {
 
   test("about-rocks sheet, from /", async ({ page }) => {
     await gotoAndSettle(page, "/");
+    // "More about the rocks" is on the second slide now.
+    await page.getByRole("button", { name: "Next slide" }).click();
     await assertSheetReachable(page, {
       triggerName: "More about the rocks",
       sheetTitle: "The stone itself",
