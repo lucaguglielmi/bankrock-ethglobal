@@ -202,10 +202,10 @@ tooling variables are the operator's shell, and `BANKROCK_API_URL` is the agent'
 | 21 | `ADMIN_API_KEY` | Generate | **[3]** Worker secret | `/api/newsletter` operator view | Phase 5 | |
 | 22 | `ALCHEMY_WEBHOOK_SECRET` | You — Alchemy Notify, only if used | **[3]** Worker secret | `/api/webhooks/alchemy` | Optional | If unset the route must reject, not accept (D-017). |
 | 23 | `BANKROCK_API_URL` | Fixed: `https://bank-rock.com` | The agent's MCP `env` block | `mcp/index.ts` | Phase 1 | |
-| 24 | ~~`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`~~ | — | — | — | — | **Removed.** The counter store is D1 (`nfc_counters`); the in-memory store is used only when `NEXT_PUBLIC_DEMO_MODE=true`. |
+| 24 | ~~`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`~~ | — | — | — | — | **Removed.** The counter store is D1 (`nfc_counters`) and nothing else; without D1 the verifier fails closed. |
 | 25 | ~~`1INCH_API_KEY`~~ | — | — | — | — | **Removed** with `/api/quote`. The API does not serve Sepolia (§1.4); quotes come from `XYCSwap.quoteExactIn` (spec 04). |
 | 26 | `ALERT_API_URL`, `QUOTE_API_URL`, `ROCK_ID` (Gelato secrets) | — | Gelato task secrets | `web3-functions/` | — | `DEMO`; not needed. |
-| 27 | `NEXT_PUBLIC_DEMO_MODE` | Fixed: `false` in production | **[1]** `wrangler.jsonc` `vars` | everywhere, through `lib/demo.ts` | Phase 1 | D-013. Only the literal `"true"` enables simulation; the deploy job sets `"false"` explicitly and a spec check asserts it. |
+| 27 | ~~`NEXT_PUBLIC_DEMO_MODE`~~ | — | — | — | — | **Removed 2026-09-13.** The flag and every surface behind it (bridge sheet, scenario switcher, in-memory counter) are gone; a spec check asserts the name no longer appears anywhere. Rock #420 is gated by its id alone. |
 | 28 | `REGISTRY_DEPLOY_BLOCK` | Output of the registry deploy | **[1]** `wrangler.jsonc` `vars` | `lib/indexer.ts` | Phase 2 | The indexer scans forward from here in 2,000-block chunks. Unset ⇒ provenance is UNAVAILABLE, never scanned from block 0. |
 | 29 | `AQUA_APP_DEPLOY_BLOCK` | Output of `deploy-aqua-app.js` | **[1]** `wrangler.jsonc` `vars` | `lib/chain`, `lib/aqua/read.ts` | Phase 3 | Bounds the `Pushed` log scan the cumulative fee figure is summed from. Unset ⇒ a short recent window, reported as partial. |
 | 30 | `RELAYER_PRIVATE_KEY` | Wallet — fresh, **funded** | **[3]** Worker secret | `lib/rock-account.server.ts`, `POST /api/rocks/[id]/claim` | Phase 2 | Pays gas for `claimHandover` (D-027): a gift recipient has no gas and does not yet control the Rock Account. Safe because the registry credits `att.subject`, not `msg.sender` (D-026). Unset ⇒ claims are UNAVAILABLE, never free. |
@@ -226,7 +226,7 @@ since D-034 is **grouped by home** rather than by subject, so that the file answ
 live in production?" at a glance:
 
 - **[1] in git, `wrangler.jsonc` `vars`:** `NEXT_PUBLIC_APP_URL` (#2), `NEXT_PUBLIC_CHAIN_ID` (#3),
-  `NEXT_PUBLIC_DEMO_MODE` (#27), `NEXT_PUBLIC_AQUA_ADDRESS` (#13), `NEXT_PUBLIC_USDC_ADDRESS` and
+  `NEXT_PUBLIC_AQUA_ADDRESS` (#13), `NEXT_PUBLIC_USDC_ADDRESS` and
   `NEXT_PUBLIC_WETH_ADDRESS` (#14), `NEXT_PUBLIC_REGISTRY_ADDRESS` (#11),
   `REGISTRY_DEPLOY_BLOCK` (#28), `NEXT_PUBLIC_AQUA_APP_ADDRESS` and
   `NEXT_PUBLIC_AQUA_TAKER_ADDRESS` (#12), `AQUA_APP_DEPLOY_BLOCK` (#29),
@@ -341,7 +341,7 @@ is the **Secret** list below.
 | **Secrets — the operator's list** | `SEPOLIA_RPC_URL`, `PIMLICO_API_KEY`, `ADMIN_PASSWORD`, `ADMIN_JWT_SECRET`, `ADMIN_API_KEY`, `CRON_SECRET`, `FAUCET_PRIVATE_KEY`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RESEND_API_KEY`, `ALERT_FROM_ADDRESS`, `ALERT_EMAIL_ADDRESS`, `CONTACT_NOTIFY_EMAIL`, `CONTACT_FROM_ADDRESS`, `ALCHEMY_WEBHOOK_SECRET`, and the two web-push server values `WEB_PUSH_VAPID_PRIVATE_KEY` and `WEB_PUSH_SUBJECT` — all as **Secret**, never Text, never in a file. `wrangler secret put NAME` from `web/` does the same thing as the dashboard. Each unset one makes exactly one capability `UNAVAILABLE` (§2.2, and DEMO-STATE §4) |
 | **Non-secret configuration** | Not set here. It is `web/wrangler.jsonc` `vars` (#2, #3, #11–#14, #27–#29, #34), replaced on every deploy from the file |
 | **Custom domains** | `bank-rock.com` and `www.bank-rock.com`, declared in `wrangler.jsonc` `routes` with `custom_domain: true`. Attaching them is what the token's two Zone scopes are for |
-| **`NEXT_PUBLIC_DEMO_MODE`** | `false`, in `wrangler.jsonc`. The deploy job pins the same value in the job environment *and* refuses to build if the file says anything else, so a simulated production build needs two deliberate changes and a passing CI lie (D-013) |
+| ~~**`NEXT_PUBLIC_DEMO_MODE`**~~ | Removed on 2026-09-13 with every surface behind it; a spec check asserts the name is absent from the configuration, the workflows and the source |
 | **`RELAYER_DAILY_CAP_WEI`** | `50000000000000000` (0.05 ETH/UTC day, about 25 relayed claims at the 0.002 ETH reservation; 0.02 left only ten, which a rehearsal morning can spend), in `wrangler.jsonc`. Must be non-zero for gift claims to work at all (#34); unset is the closed branch. The key it caps, `RELAYER_PRIVATE_KEY`, is a Secret — configuration and credential deliberately split |
 | **Migrations** | Applied **by the deploy job**, before the Worker is published (`wrangler d1 migrations apply bankrock-db --remote`). The same command is `npm run db:migrate:prod` by hand. Consequence, stated because it is a change: **a destructive migration must not be merged to `main`** — merging it applies it (spec 12, Database) |
 
