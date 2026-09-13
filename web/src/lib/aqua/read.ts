@@ -55,8 +55,18 @@ export interface RockStrategyView {
   actual: TokenPairAmounts;
   /** What the rock has approved Aqua to move on its behalf. */
   allowance: TokenPairAmounts;
+  /** The live streams, in catalogue order. */
   streams: StrategyBalances[];
+  /**
+   * Catalogue streams that were shipped and later docked. A docked slot is `0xff`, not `0`, so
+   * the same strategy can never be shipped again (NOTES.md §4) — "Add another strategy" must not
+   * offer these. Read from `rawBalances.tokensCount`; absent when the reader did not probe it.
+   */
+  stopped?: bigint[];
 }
+
+/** `Balance.tokensCount` after `dock`: the slot is marked, not cleared, so it can never be reused. */
+const DOCKED_TOKENS_COUNT = 0xff;
 
 function min(...values: bigint[]): bigint {
   return values.reduce((a, b) => (a < b ? a : b));
@@ -157,7 +167,10 @@ export async function readStrategy(
 export interface ReadRockStreamsParams {
   rockId: bigint | number | string;
   maker: Address;
-  /** Which streams to probe. Defaults to the two the awaken flow ships. */
+  /**
+   * Which streams to probe. Defaults to the catalogue, `DEFAULT_STREAMS` — one `safeBalances`
+   * call per preset, so adding a preset costs one more `eth_call` per read.
+   */
   streams?: ReadonlyArray<{ streamIndex: number | bigint; feeBps: number | bigint; label?: string }>;
   app?: Address;
 }
@@ -166,8 +179,9 @@ export interface ReadRockStreamsParams {
  * Probe a rock's streams and return the live ones.
  *
  * No stream list is stored anywhere: each candidate's hash is recomputed from
- * `(rockId, streamIndex, feeBps, maker, tokens)` and asked of Aqua directly. A rock with nothing
- * shipped comes back UNAVAILABLE, which is the honest empty state, not an error.
+ * `(rockId, streamIndex, feeBps, maker, tokens)` and asked of Aqua directly. The probes run
+ * concurrently and the live streams come back in catalogue order. A rock with nothing shipped
+ * comes back UNAVAILABLE, which is the honest empty state, not an error.
  */
 export async function readRockStreams(
   params: ReadRockStreamsParams,
@@ -195,42 +209,64 @@ export async function readRockStreams(
     return unavailable(`The rock's token balances could not be read: ${reason(err)}`);
   }
 
-  const streams: StrategyBalances[] = [];
-  for (const preset of presets) {
-    const identity: StreamIdentity = { rockId: params.rockId, streamIndex: preset.streamIndex };
-    const encoded = buildStrategy({
-      maker,
-      token0: usdc,
-      token1: weth,
-      feeBps: preset.feeBps,
-      ...identity,
-    });
-
-    try {
-      const balances = (await client.readContract({
-        address: aqua,
-        abi: AQUA_ABI,
-        functionName: "safeBalances",
-        args: [maker, app, encoded.strategyHash, usdc, weth],
-      })) as readonly [bigint, bigint];
-
-      const virtual: TokenPairAmounts = { usdc: balances[0], weth: balances[1] };
-      streams.push({
-        strategyHash: encoded.strategyHash,
-        strategy: encoded.strategy,
-        feeBps: encoded.params.feeBps,
-        streamIndex: encoded.params.streamIndex,
-        label: preset.label,
-        virtual,
-        executable: {
-          usdc: min(virtual.usdc, actual.usdc, allowance.usdc),
-          weth: min(virtual.weth, actual.weth, allowance.weth),
-        },
+  const probed = await Promise.all(
+    presets.map(async (preset): Promise<StrategyBalances | { stopped: bigint } | null> => {
+      const identity: StreamIdentity = { rockId: params.rockId, streamIndex: preset.streamIndex };
+      const encoded = buildStrategy({
+        maker,
+        token0: usdc,
+        token1: weth,
+        feeBps: preset.feeBps,
+        ...identity,
       });
-    } catch {
-      // Not shipped, or docked. Both are ordinary states; the stream is simply absent.
-    }
-  }
+
+      try {
+        const balances = (await client.readContract({
+          address: aqua,
+          abi: AQUA_ABI,
+          functionName: "safeBalances",
+          args: [maker, app, encoded.strategyHash, usdc, weth],
+        })) as readonly [bigint, bigint];
+
+        const virtual: TokenPairAmounts = { usdc: balances[0], weth: balances[1] };
+        return {
+          strategyHash: encoded.strategyHash,
+          strategy: encoded.strategy,
+          feeBps: encoded.params.feeBps,
+          streamIndex: encoded.params.streamIndex,
+          label: preset.label,
+          virtual,
+          executable: {
+            usdc: min(virtual.usdc, actual.usdc, allowance.usdc),
+            weth: min(virtual.weth, actual.weth, allowance.weth),
+          },
+        };
+      } catch {
+        // Not shipped, or docked. Both are ordinary states; the stream is simply absent from
+        // `streams`. Which of the two it is matters to the owner — a docked stream can never be
+        // shipped again — so `rawBalances.tokensCount` is asked: 0 = never shipped, 0xff = docked.
+        try {
+          const [, tokensCount] = (await client.readContract({
+            address: aqua,
+            abi: AQUA_ABI,
+            functionName: "rawBalances",
+            args: [maker, app, encoded.strategyHash, usdc],
+          })) as readonly [bigint, number];
+          return Number(tokensCount) === DOCKED_TOKENS_COUNT
+            ? { stopped: encoded.params.streamIndex }
+            : null;
+        } catch {
+          return null;
+        }
+      }
+    }),
+  );
+  const streams = probed.filter(
+    (entry): entry is StrategyBalances => entry !== null && !("stopped" in entry),
+  );
+  const stopped = probed
+    .filter((entry): entry is { stopped: bigint } => entry !== null && "stopped" in entry)
+    .map((entry) => entry.stopped);
 
   if (streams.length === 0) {
     return unavailable("This rock has no live Aqua strategy");
@@ -244,6 +280,7 @@ export async function readRockStreams(
     actual,
     allowance,
     streams,
+    stopped,
   });
 }
 

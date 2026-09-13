@@ -5,8 +5,9 @@
  * per strategy. A visitor is a **taker**: they swap against one of those strategies and the
  * tokens move wallet-to-wallet, never into a pool.
  *
- *   strategy.ts  the exact bytes `Aqua.ship` hashes, and the rock-id salt that makes a rock's
- *                strategies recomputable without an indexer
+ *   strategy.ts  the exact bytes `Aqua.ship` hashes, the rock-id salt that makes a rock's
+ *                strategies recomputable without an indexer, and `DEFAULT_STREAMS` — the
+ *                catalogue of `(streamIndex, feeBps)` presets every reader probes
  *   calls.ts     calldata for ship, dock and swap — bytes only, no signing and no submission
  *   quote.ts     the constant-product maths, mirrored from the contract, for previews
  *   read.ts      actual, virtual and executable balances, and fees read from Aqua's events
@@ -21,6 +22,7 @@ export {
   SALT_DOMAIN,
   BPS_BASE,
   DEFAULT_STREAMS,
+  streamPresetFor,
   deriveSalt,
   encodeStrategy,
   strategyHash,

@@ -182,29 +182,81 @@ export function strategyBelongsToRock(strategy: Hex, identity: StreamIdentity): 
 }
 
 /**
- * The streams a rock ships at awakening.
+ * A liquidity strategy the dashboard can offer — one entry of the catalogue.
+ *
+ * `XYCSwap` is a fixed constant-product curve, so the only thing a strategy can vary is its fee.
+ * A "strategy" in this product is therefore a `(streamIndex, feeBps)` preset, and the fields
+ * below are everything the UI needs to present one: the two that make its identity, and three
+ * strings written for the owner rather than for the chain.
+ */
+export interface StreamPreset {
+  /** Which of the rock's streams this preset ships. Part of the strategy's salt, hence its hash. */
+  readonly streamIndex: number;
+  /** The immutable swap fee, in basis points (30 = 0.30%). Part of the hash too. */
+  readonly feeBps: number;
+  /** One or two words — the name a card is headed with. */
+  readonly label: string;
+  /** The fee and what it is, in a phrase: "0.30% — the everyday curve". */
+  readonly description: string;
+  /** One calm sentence: who should pick this and what happens. */
+  readonly forWhom: string;
+}
+
+/**
+ * The catalogue: every strategy a rock can run, and the only ones any reader looks for.
  *
  * Spec 04: *"The demo should ship at least two strategies from the same Rock Account and
  * overlapping token balance… a simple AMM-like strategy [and] a fixed-price offer or second
- * pricing curve using the same reserve."* `XYCSwap` has one curve shape, so the second stream is
- * the same curve at a tighter fee — two prices over one reserve.
+ * pricing curve using the same reserve."* `XYCSwap` has one curve shape, so the streams differ
+ * only in fee — the same reserve, offered at several prices, which is exactly the shared-liquidity
+ * point spec 04 wants made.
  *
- * These are also what a reader probes: given a rock id and its Rock Account, the two hashes are
- * computable, so no stream list has to be stored anywhere.
+ * These are also what a reader probes: given a rock id and its Rock Account, every hash here is
+ * computable, so no stream list has to be stored anywhere (`readRockStreams` in `read.ts`). A
+ * preset is discoverable **only** if it is in this list; each entry costs one `safeBalances`
+ * call per read. Ordered by `streamIndex`, not by fee.
+ *
+ * Rules, pinned by `strategy.test.ts`:
+ *   - stream 0 (Wide, 30 bps) and stream 1 (Tight, 5 bps) never change — they are live on
+ *     Sepolia, and a changed fee is a different hash that would make them invisible;
+ *   - stream indexes are unique and contiguous from 0; fees are unique;
+ *   - a fee tier is never edited. To change one, add a preset at the next index.
+ *
+ * The fees are the three tiers a USDC/WETH constant-product pool is conventionally offered at.
+ * 5 bps is the thinnest that pair sustains; 30 bps is the everyday tier; 100 bps is the tier
+ * for a maker content to trade rarely and keep a larger slice each time. Anything below 5 bps
+ * would price a volatile pair like a stable one, so it is not offered.
  */
-export const DEFAULT_STREAMS = [
+export const DEFAULT_STREAMS: readonly StreamPreset[] = [
   {
     streamIndex: 0,
     feeBps: 30,
     label: "Wide",
     description: "0.30% — the everyday curve",
+    forWhom: "Trades steadily and keeps a fair slice of each one; the middle of the road.",
   },
   {
     streamIndex: 1,
     feeBps: 5,
     label: "Tight",
     description: "0.05% — the same reserve, priced finer",
+    forWhom: "Trades most often and earns a little each time; for a rock that likes to be busy.",
   },
-] as const;
+  {
+    streamIndex: 2,
+    feeBps: 100,
+    label: "Patient",
+    description: "1.00% — the same reserve, priced for rare trades",
+    forWhom: "Trades rarely and earns the most each time; for a rock content to wait.",
+  },
+];
 
-export type StreamPreset = (typeof DEFAULT_STREAMS)[number];
+/** The catalogue entry at `streamIndex`, or `undefined` for an index no reader probes. */
+export function streamPresetFor(
+  streamIndex: number | bigint | string | undefined,
+): StreamPreset | undefined {
+  if (streamIndex === undefined) return undefined;
+  const index = Number(streamIndex);
+  if (!Number.isInteger(index)) return undefined;
+  return DEFAULT_STREAMS.find((preset) => preset.streamIndex === index);
+}

@@ -9,13 +9,14 @@
  * This test reproduces that probe against the sheet's own list. It fails if a fee tier is ever
  * added to the sheet that no reader looks for — which is the defect it was written for: stream 0
  * at 5 or 100 bps shipped a real allowance that the position card, the Trade button, the quote
- * route and Cash in all reported as "not trading".
+ * route and Cash in all reported as "not trading". It pins no count: the catalogue may grow,
+ * and the invariants below hold for any length.
  */
 
 import { describe, expect, it } from "vitest";
 import type { Address } from "viem";
 import { buildStrategy, DEFAULT_STREAMS } from "@/lib/aqua/strategy";
-import { SHIP_OPTIONS, shipOptionFor } from "./ship-options";
+import { SHIP_OPTIONS, shipOptionFor, unshippedOptions } from "./ship-options";
 
 const ROCK_ID = "42";
 const MAKER = "0x00000000000000000000000000000000000000A1" as Address;
@@ -81,13 +82,40 @@ describe("the ship sheet's choices", () => {
   });
 
   it("falls back to the first stream rather than an index no reader probes", () => {
-    expect(shipOptionFor(7)).toEqual(SHIP_OPTIONS[0]);
+    expect(shipOptionFor(DEFAULT_STREAMS.length + 4)).toEqual(SHIP_OPTIONS[0]);
   });
 
-  it("gives every option a hint of its own", () => {
+  it("takes every owner-facing word from the preset itself, so a new preset arrives described", () => {
     for (const option of SHIP_OPTIONS) {
       expect(option.hint.trim().length).toBeGreaterThan(0);
+      expect(option.hint).toBe(option.preset.forWhom);
+      expect(option.description).toBe(option.preset.description);
+      expect(option.label).toBe(option.preset.label);
     }
     expect(new Set(SHIP_OPTIONS.map((option) => option.hint)).size).toBe(SHIP_OPTIONS.length);
+  });
+});
+
+describe("what 'Add another strategy' may offer", () => {
+  it("is every preset whose stream is not already live", () => {
+    expect(unshippedOptions([]).map((option) => option.streamIndex)).toEqual(
+      SHIP_OPTIONS.map((option) => option.streamIndex),
+    );
+    const withoutFirst = unshippedOptions([0]).map((option) => option.streamIndex);
+    expect(withoutFirst).not.toContain(0);
+    expect(withoutFirst).toHaveLength(SHIP_OPTIONS.length - 1);
+  });
+
+  it("accepts the bigint indexes the reader returns, and stopped streams alongside live ones", () => {
+    const live = [BigInt(0)];
+    const stopped = [BigInt(1)];
+    const left = unshippedOptions([...live, ...stopped]).map((option) => option.streamIndex);
+    expect(left).not.toContain(0);
+    expect(left).not.toContain(1);
+    expect(left).toHaveLength(SHIP_OPTIONS.length - 2);
+  });
+
+  it("offers nothing once every preset has been used", () => {
+    expect(unshippedOptions(SHIP_OPTIONS.map((option) => option.streamIndex))).toEqual([]);
   });
 });

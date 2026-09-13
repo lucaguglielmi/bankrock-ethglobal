@@ -45,6 +45,12 @@ export interface RockStrategyViewJson {
   actual: TokenPairAmountsJson;
   allowance: TokenPairAmountsJson;
   streams: StrategyBalancesJson[];
+  /**
+   * Stream indexes that were shipped and later docked, as decimal strings. A docked stream can
+   * never be shipped again (NOTES.md §4), so "Add another strategy" must not offer these.
+   * Optional on the wire: an older reader, or one that did not probe, simply omits it.
+   */
+  stopped?: string[];
 }
 
 const toJson = (amounts: TokenPairAmounts): TokenPairAmountsJson => ({
@@ -92,6 +98,7 @@ export function serializeStrategyView(
         ...(fee && typeof fee !== "string" ? { fees: fee } : {}),
       };
     }),
+    ...(view.stopped ? { stopped: view.stopped.map((index) => index.toString()) } : {}),
   };
 }
 
@@ -123,6 +130,8 @@ export function parseStrategyView(json: RockStrategyViewJson): ParsedStrategyVie
         : undefined,
       feesUnavailable: stream.feesUnavailable,
     })),
+    // Absent on the wire means "none known", which the UI treats exactly like none stopped.
+    stopped: (json.stopped ?? []).map((index) => BigInt(index)),
   };
 }
 
@@ -131,6 +140,12 @@ export interface ParsedStream extends StrategyBalances {
   feesUnavailable?: string;
 }
 
-export interface ParsedStrategyView extends Omit<RockStrategyView, "streams"> {
+export interface ParsedStrategyView extends Omit<RockStrategyView, "streams" | "stopped"> {
   streams: ParsedStream[];
+  /**
+   * Stream indexes that were shipped and later docked. Always present after parsing — empty when
+   * the payload carried none — so a picker can pass `[...streams.map(s => s.streamIndex), ...stopped]`
+   * to `unshippedOptions` without a null check.
+   */
+  stopped: bigint[];
 }

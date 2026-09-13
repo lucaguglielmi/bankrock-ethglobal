@@ -18,7 +18,9 @@ import {
   encodeStrategy,
   strategyBelongsToRock,
   strategyHash,
+  BPS_BASE,
   DEFAULT_STREAMS,
+  streamPresetFor,
 } from "./strategy";
 
 const MAKER = "0x00000000000000000000000000000000000000A1" as Address;
@@ -119,18 +121,78 @@ describe("buildStrategy and decodeStrategy", () => {
   });
 });
 
-describe("the default streams", () => {
-  it("are two curves over one reserve, at different fees (spec 04)", () => {
-    expect(DEFAULT_STREAMS).toHaveLength(2);
-    const [wide, tight] = DEFAULT_STREAMS;
-    expect(wide.streamIndex).not.toBe(tight.streamIndex);
-    expect(wide.feeBps).toBeGreaterThan(tight.feeBps);
+describe("the catalogue (DEFAULT_STREAMS)", () => {
+  it("offers between two and four curves over one reserve (spec 04, one eth_call each per read)", () => {
+    expect(DEFAULT_STREAMS.length).toBeGreaterThanOrEqual(2);
+    expect(DEFAULT_STREAMS.length).toBeLessThanOrEqual(4);
   });
 
-  it("hash to two different strategies for the same rock", () => {
+  it("never changes the two presets already live on Sepolia", () => {
+    const [wide, tight] = DEFAULT_STREAMS;
+    expect(wide).toMatchObject({ streamIndex: 0, feeBps: 30, label: "Wide" });
+    expect(tight).toMatchObject({ streamIndex: 1, feeBps: 5, label: "Tight" });
+    // The pinned hash for rock 42, stream 0 at 30 bps is what Solidity computed for "Wide".
+    expect(buildStrategy({ ...params, ...wide }).strategyHash).toBe(EXPECTED_HASH);
+  });
+
+  it("uses unique stream indexes, contiguous from 0, in order", () => {
+    expect(DEFAULT_STREAMS.map((preset) => preset.streamIndex)).toEqual(
+      DEFAULT_STREAMS.map((_, i) => i),
+    );
+  });
+
+  it("uses a unique, priceable fee per stream — a fee is the whole of a strategy's difference", () => {
+    const fees = DEFAULT_STREAMS.map((preset) => preset.feeBps);
+    expect(new Set(fees).size).toBe(fees.length);
+    for (const fee of fees) {
+      expect(Number.isInteger(fee)).toBe(true);
+      expect(fee).toBeGreaterThan(0);
+      expect(BigInt(fee)).toBeLessThan(BPS_BASE);
+    }
+  });
+
+  it("hashes to a different strategy per preset for the same rock", () => {
     const hashes = DEFAULT_STREAMS.map(
       (stream) => buildStrategy({ ...params, ...stream }).strategyHash,
     );
     expect(new Set(hashes).size).toBe(DEFAULT_STREAMS.length);
+  });
+
+  it("describes every preset for the owner, each in its own words", () => {
+    for (const preset of DEFAULT_STREAMS) {
+      expect(preset.label.trim().split(/\s+/).length).toBeLessThanOrEqual(2);
+      expect(preset.description).toMatch(/^\d+\.\d{2}% — /);
+      // The description opens with the fee it encodes, so the two can never disagree.
+      expect(preset.description.startsWith(`${(preset.feeBps / 100).toFixed(2)}%`)).toBe(true);
+      expect(preset.forWhom.trim().length).toBeGreaterThan(0);
+    }
+    for (const field of ["label", "description", "forWhom"] as const) {
+      expect(new Set(DEFAULT_STREAMS.map((preset) => preset[field])).size).toBe(
+        DEFAULT_STREAMS.length,
+      );
+    }
+  });
+
+  it("never mentions an annualised figure (D-004)", () => {
+    for (const preset of DEFAULT_STREAMS) {
+      expect(`${preset.label} ${preset.description} ${preset.forWhom}`).not.toMatch(
+        /\b(APY|APR|annual|yearly|per year)\b/i,
+      );
+    }
+  });
+});
+
+describe("streamPresetFor", () => {
+  it("finds a preset by its stream index, however the index is typed", () => {
+    expect(streamPresetFor(0)).toBe(DEFAULT_STREAMS[0]);
+    expect(streamPresetFor(BigInt(1))).toBe(DEFAULT_STREAMS[1]);
+    expect(streamPresetFor("1")).toBe(DEFAULT_STREAMS[1]);
+  });
+
+  it("answers undefined for an index no reader probes", () => {
+    expect(streamPresetFor(DEFAULT_STREAMS.length)).toBeUndefined();
+    expect(streamPresetFor(undefined)).toBeUndefined();
+    expect(streamPresetFor(1.5)).toBeUndefined();
+    expect(streamPresetFor("wide")).toBeUndefined();
   });
 });

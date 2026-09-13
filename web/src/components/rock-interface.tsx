@@ -3,45 +3,51 @@
 /**
  * The rock page — the page a physical tap opens (spec 17 Part 5, spec 15 Phase 1).
  *
- * Rewritten from scratch. What is gone, and why:
+ * It is a small dashboard with four tabs: Liquidity, Trade, Ownership and Contracts. The default
+ * tab shows no Ethereum address at all; addresses live in the last two tabs, where a visitor goes
+ * looking for them. The header above the tabs says only which rock this is, what state it is in,
+ * and whether the tap that opened it was real.
  *
- *  - `INITIAL_EVENTS`, the hardcoded owner and smart-account literals, `currentApy = 18.4`, the
- *    `Math.random()` faucet hash and its BaseScan link, and the `setTimeout` "stages" that
- *    narrated work nobody was doing (S-1, S-4, C-7, C-8, N-11, D-014);
- *  - the client-side verification state the demo switcher used to set (F-7). The only producer
- *    of `verified` is the server verifier, called once here;
- *  - "Base Sepolia" everywhere. The network is Ethereum Sepolia and every explorer link comes
- *    from `lib/chain` (D-015, D-023).
+ * Every value on the page is one of `REAL` / `DEMO` / `UNAVAILABLE`, read once here and shared
+ * with the tabs (a reserve caption, a trade button and a position card must never disagree). An
+ * `UNAVAILABLE` capability is shown with its reason, after the first read has had its chance to
+ * land.
  *
- * What is left is one of five honest states — dormant, awake, handover pending, retired, or
- * "we cannot read this rock and here is why" — each rendered from `useRock`, with the tap
- * attestation stated above it in every case.
+ * Per rock state:
+ *
+ *  - **dormant**       Liquidity holds the awaken prompt and the account the rock would open;
+ *                      Trade and Ownership are one sentence each; Contracts works as normal.
+ *  - **awake**         all four tabs.
+ *  - **handover**      Ownership opens by default and holds the handover; the other tabs are
+ *                      read-only until the rock changes hands.
+ *  - **archived**      no tabs — the retired rock and its history.
+ *  - **unavailable**   the reason, and under demo mode a badged sample.
  */
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { useRock } from "@/hooks/useRock";
 import { useRockAccount } from "@/hooks/useRockAccount";
 import { useAquaStrategy } from "@/hooks/useAquaStrategy";
-import { isDemoMode } from "@/lib/demo";
-import { tokens } from "@/lib/chain";
-import { toDisplayNumber } from "@/lib/ui/format";
+import { isDemoMode, real, unavailable, type Capability } from "@/lib/demo";
 import { SimulatedBadge } from "@/components/ui/simulated-badge";
 import { UnavailableState } from "@/components/ui/unavailable-state";
+import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 import { DemoSwitcher, type DemoScenario } from "@/components/demo-switcher";
-import { TradeModal } from "@/components/trade-modal";
 import { TransferModal } from "@/components/transfer-modal";
 import { CrossChainModal } from "@/components/cross-chain-modal";
 import { PrivyOnboardingModal } from "@/components/privy-onboarding-modal";
 import { AttestationLine } from "@/components/rock/attestation-line";
 import { RockIdentity } from "@/components/rock/rock-identity";
 import { DormantRock } from "@/components/rock/rock-dormant";
-import { AwakeRock } from "@/components/rock/rock-awake";
-import { HandoverRock } from "@/components/rock/rock-handover";
 import { ArchivedRock } from "@/components/rock/rock-archived";
 import { RockSample } from "@/components/rock/rock-sample";
 import { OwnerMenu } from "@/components/rock/owner-menu";
+import { LiquidityTab } from "@/components/rock/tabs/liquidity-tab";
+import { TradeTab } from "@/components/rock/tabs/trade-tab";
+import { OwnershipTab } from "@/components/rock/tabs/ownership-tab";
+import { ContractsTab } from "@/components/rock/tabs/contracts-tab";
 import { useTapAttestation } from "@/components/rock/use-tap-attestation";
 import { tapGateFor } from "@/components/rock/tap-gate";
 import { sameAddress } from "@/components/rock/util";
@@ -59,6 +65,52 @@ export interface RockInterfaceProps {
   searchParams: RockPageParams;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Tabs                                                                        */
+/* -------------------------------------------------------------------------- */
+
+export const ROCK_TABS = ["liquidity", "trade", "ownership", "contracts"] as const;
+
+export type RockTab = (typeof ROCK_TABS)[number];
+
+const TAB_LABELS: Record<RockTab, string> = {
+  liquidity: "Liquidity",
+  trade: "Trade",
+  ownership: "Ownership",
+  contracts: "Contracts",
+};
+
+function isRockTab(value: string): value is RockTab {
+  return (ROCK_TABS as readonly string[]).includes(value);
+}
+
+function subscribeToHash(onChange: () => void) {
+  window.addEventListener("hashchange", onChange);
+  return () => window.removeEventListener("hashchange", onChange);
+}
+
+function readHashTab(): RockTab | null {
+  const hash = window.location.hash.replace(/^#/, "");
+  return isRockTab(hash) ? hash : null;
+}
+
+/**
+ * The tab a `#trade` / `#ownership` / `#contracts` hash asks for. Null on the server and when
+ * there is none, so the page hydrates on the default tab and moves once the hash is readable.
+ */
+function useHashTab(): RockTab | null {
+  return useSyncExternalStore(subscribeToHash, readHashTab, () => null);
+}
+
+const HANDOVER_READ_ONLY_REASON =
+  "This rock is being handed over. Owner actions come back when it changes hands or the handover is cancelled.";
+
+const NO_ACCOUNT_YET_REASON = "This rock has no account yet. Awakening it opens one.";
+
+/* -------------------------------------------------------------------------- */
+/* Page                                                                        */
+/* -------------------------------------------------------------------------- */
+
 export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
   const router = useRouter();
   const { ready, authenticated, address } = useAuth();
@@ -66,18 +118,13 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
 
   const record = rock.state === "UNAVAILABLE" ? null : rock.value;
 
-  // One strategy read for the whole page: the reserve caption, the trade button, the position
-  // card and the owner's Cash in all describe the same streams and must not disagree.
+  // One strategy read for the whole page: the Liquidity and Trade tabs and the owner menu all
+  // describe the same streams and must not disagree.
   const {
     strategy,
     isLoading: isStrategyLoading,
     refresh: refreshStrategy,
   } = useAquaStrategy(rockId, record?.smartAccount);
-
-  const liveStreamIndex =
-    strategy.state === "UNAVAILABLE" || strategy.value.streams.length === 0
-      ? undefined
-      : Number(strategy.value.streams[0].streamIndex);
 
   const refreshAll = useCallback(() => {
     refresh();
@@ -108,8 +155,7 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
   /*
    * The tag, as the server hashed it. It comes only from a signed attestation, so it cannot be
    * supplied by a URL, and it is the missing half of the Rock Account derivation on a rock that
-   * has not been awakened yet (D-029): without it `useRockAccount` had nothing to derive from and
-   * a dormant rock never showed the account it would open.
+   * has not been awakened yet (D-029).
    */
   const tapUidHash =
     tap.status === "checked" && tap.verified && tap.attestation?.state === "SIGNED"
@@ -121,7 +167,7 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
    *
    *  - `rockAccount` — which account holds the money. For an awakened rock that is the registry's,
    *    read and never re-derived (D-037); before the awakening it is the counterfactual address
-   *    this wallet and this tag derive, which is what a dormant rock now shows so it can be funded
+   *    this wallet and this tag derive, which is what a dormant rock shows so it can be funded
    *    before it is awakened;
    *  - `authority` — whether that account still answers to the signed-in wallet. `isOwner` below is
    *    the other half, object ownership as the registry records it. Asking both means the owner's
@@ -134,12 +180,22 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
 
   const [scenario, setScenario] = useState<DemoScenario>("awake");
   const [isOnboardingOpen, setOnboardingOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<"give" | "trade" | null>(null);
-  const [isTradeOpen, setTradeOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"give" | null>(null);
   const [isGiveOpen, setGiveOpen] = useState(false);
   const [isCrossChainOpen, setCrossChainOpen] = useState(false);
 
   const isOwner = sameAddress(record?.owner, address);
+
+  /*
+   * Which tab is open. The visitor's own choice wins; before that, a hash in the URL; before
+   * that, the tab the rock's state makes most useful — Ownership for a rock waiting to be
+   * claimed, Liquidity for everything else.
+   */
+  const hashTab = useHashTab();
+  const [chosenTab, setChosenTab] = useState<RockTab | null>(null);
+  const defaultTab: RockTab = record?.state === "handover_pending" ? "ownership" : "liquidity";
+  const tab: RockTab = chosenTab ?? hashTab ?? defaultTab;
+  const selectTab = useCallback((next: RockTab) => setChosenTab(next), []);
 
   /* ---------------------------------------------------------------------- */
   /* Tag → rock. A verified tap knows which rock it belongs to; the URL only  */
@@ -154,20 +210,12 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
     router.replace(`/rock/${target}`);
   }, [tap, rockId, router]);
 
-  const requireSignIn = useCallback((action: "give" | "trade" | null) => {
+  const requireSignIn = useCallback((action: "give" | null) => {
     setPendingAction(action);
     setOnboardingOpen(true);
   }, []);
 
-  const handleTrade = useCallback(() => {
-    if (!authenticated) {
-      requireSignIn("trade");
-      return;
-    }
-    setTradeOpen(true);
-  }, [authenticated, requireSignIn]);
-
-  const handleGive = useCallback(() => {
+  const handleChangeOwnership = useCallback(() => {
     if (!authenticated) {
       requireSignIn("give");
       return;
@@ -175,10 +223,18 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
     setGiveOpen(true);
   }, [authenticated, requireSignIn]);
 
-  const usdcReserve =
-    reserves.state === "UNAVAILABLE"
-      ? 0
-      : toDisplayNumber(reserves.value.usdc, tokens.USDC.decimals);
+  /*
+   * What the tabs may let the owner do from the rock's account. While a handover is open the
+   * rock is spoken for, so the tabs are read-only and say so; the owner menu keeps the real
+   * answer, because cancelling the handover is exactly what it is for.
+   */
+  const tabOwnerActions: Capability<string> =
+    record?.state === "handover_pending" ? unavailable(HANDOVER_READ_ONLY_REASON) : authority;
+
+  const contractsAccount: Capability<string> =
+    !record || record.state === "dormant"
+      ? unavailable(NO_ACCOUNT_YET_REASON)
+      : real(record.smartAccount);
 
   const showSamples = isDemoMode() && rock.state === "UNAVAILABLE" && !isLoading;
 
@@ -195,50 +251,95 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         {showSamples ? <RockSample scenario={scenario} /> : null}
       </>
     );
-  } else if (record?.state === "dormant") {
-    body = (
-      <DormantRock
-        rockId={rockId}
-        tap={tap}
-        authenticated={authenticated}
-        address={address}
-        rockAccount={rockAccount}
-        onSignIn={() => requireSignIn(null)}
-        onAwakened={refreshAll}
-      />
-    );
-  } else if (record?.state === "handover_pending") {
-    body = (
-      <HandoverRock
-        rockId={rockId}
-        handover={record.handover}
-        isOwner={isOwner}
-        authenticated={authenticated}
-        address={address}
-        tap={tap}
-        onSignIn={() => requireSignIn(null)}
-        onChanged={refreshAll}
-      />
-    );
-  } else if (record?.state === "archived") {
-    body = <ArchivedRock rockId={rockId} />;
   } else if (record) {
-    body = (
-      <AwakeRock
-        rockId={rockId}
-        smartAccount={record.smartAccount}
-        reserves={reserves}
-        strategy={strategy}
-        isStrategyLoading={isStrategyLoading}
-        isOwner={isOwner}
-        ownerActions={authority}
-        onTrade={handleTrade}
-        onGive={handleGive}
-        onCrossChain={() => setCrossChainOpen(true)}
-        onRefresh={refreshAll}
-        isRefreshing={isLoading}
-      />
-    );
+    const state = record.state;
+
+    if (state === "archived") {
+      body = <ArchivedRock rockId={rockId} />;
+    } else {
+      const isDormant = state === "dormant";
+
+      body = (
+        <Tabs value={tab} onValueChange={selectTab}>
+          <TabsList aria-label="This rock">
+            {ROCK_TABS.map((value) => (
+              <TabsTab key={value} value={value}>
+                {TAB_LABELS[value]}
+              </TabsTab>
+            ))}
+          </TabsList>
+
+          <TabsPanel value="liquidity">
+            {isDormant ? (
+              <DormantRock
+                rockId={rockId}
+                tap={tap}
+                authenticated={authenticated}
+                address={address}
+                rockAccount={rockAccount}
+                onSignIn={() => requireSignIn(null)}
+                onAwakened={refreshAll}
+              />
+            ) : (
+              <LiquidityTab
+                rockId={rockId}
+                smartAccount={record.smartAccount}
+                reserves={reserves}
+                strategy={strategy}
+                isStrategyLoading={isStrategyLoading}
+                isRefreshing={isLoading}
+                isOwner={isOwner}
+                ownerActions={tabOwnerActions}
+                onRefresh={refreshAll}
+                onGoToTrade={() => selectTab("trade")}
+                onCrossChain={isDemoMode() ? () => setCrossChainOpen(true) : undefined}
+              />
+            )}
+          </TabsPanel>
+
+          <TabsPanel value="trade">
+            {isDormant ? (
+              <p className="max-w-prose text-lead text-ink-2">
+                This rock is asleep. Once awakened and funded, anyone can trade with it.
+              </p>
+            ) : (
+              <TradeTab
+                rockId={rockId}
+                maker={record.smartAccount}
+                strategy={strategy}
+                isStrategyLoading={isStrategyLoading}
+                isOwner={isOwner}
+                authenticated={authenticated}
+                onRequestSignIn={() => requireSignIn(null)}
+                onTradeSuccess={refreshAll}
+                onGoToLiquidity={() => selectTab("liquidity")}
+              />
+            )}
+          </TabsPanel>
+
+          <TabsPanel value="ownership">
+            <OwnershipTab
+              rockId={rockId}
+              state={state}
+              owner={isDormant ? undefined : record.owner}
+              handover={record.handover}
+              isOwner={isOwner}
+              authenticated={authenticated}
+              address={address}
+              tap={tap}
+              ownerActions={authority}
+              onSignIn={() => requireSignIn(null)}
+              onChangeOwnership={handleChangeOwnership}
+              onChanged={refreshAll}
+            />
+          </TabsPanel>
+
+          <TabsPanel value="contracts">
+            <ContractsTab smartAccount={contractsAccount} />
+          </TabsPanel>
+        </Tabs>
+      );
+    }
   } else {
     body = null;
   }
@@ -252,8 +353,6 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
       <RockIdentity
         rockId={rockId}
         state={record?.state}
-        owner={record?.owner}
-        smartAccount={record?.smartAccount}
         lost={record?.lost}
         trailing={
           <span className="flex items-center gap-2">
@@ -264,7 +363,6 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
                 ownerActions={authority}
                 handoverPending={record.state === "handover_pending"}
                 lost={record.lost}
-                streamIndex={liveStreamIndex}
                 onChanged={refreshAll}
               />
             ) : null}
@@ -278,17 +376,6 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
 
       <DemoSwitcher currentScenario={scenario} onSelectScenario={setScenario} />
 
-      <TradeModal
-        isOpen={isTradeOpen}
-        onClose={() => setTradeOpen(false)}
-        rockId={rockId}
-        maker={record?.smartAccount}
-        streamIndex={liveStreamIndex ?? 0}
-        currentReserve={usdcReserve}
-        onRequestSignIn={() => requireSignIn(null)}
-        onTradeSuccess={refreshAll}
-      />
-
       <TransferModal
         isOpen={isGiveOpen}
         onClose={() => setGiveOpen(false)}
@@ -297,13 +384,15 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         onTransferSuccess={refreshAll}
       />
 
-      <CrossChainModal
-        isOpen={isCrossChainOpen}
-        onClose={() => setCrossChainOpen(false)}
-        rockId={rockId}
-        smartAccountAddress={record?.smartAccount ?? ""}
-        onDepositSuccess={refreshAll}
-      />
+      {isDemoMode() ? (
+        <CrossChainModal
+          isOpen={isCrossChainOpen}
+          onClose={() => setCrossChainOpen(false)}
+          rockId={rockId}
+          smartAccountAddress={record?.smartAccount ?? ""}
+          onDepositSuccess={refreshAll}
+        />
+      ) : null}
 
       <PrivyOnboardingModal
         isOpen={isOnboardingOpen}
@@ -316,7 +405,6 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
           const action = pendingAction;
           setPendingAction(null);
           if (action === "give") setGiveOpen(true);
-          if (action === "trade") setTradeOpen(true);
         }}
       />
     </div>

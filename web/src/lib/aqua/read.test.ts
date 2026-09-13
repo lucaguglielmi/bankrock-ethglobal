@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Address, Hex } from "viem";
+import { buildStrategy, DEFAULT_STREAMS } from "./strategy";
 
 /**
  * The fee scan (B6): chunked at 2,000 blocks, resumed from what has already been scanned, and
@@ -43,11 +44,44 @@ const state = {
   pushed: [] as PushedLog[],
   shipped: [] as ShippedLog[],
   failFrom: null as bigint | null,
+  /** Strategy hashes `safeBalances` answers for, with their virtual balances. */
+  live: new Map<string, readonly [bigint, bigint]>(),
+  /** Strategy hashes `rawBalances` reports as docked (tokensCount 0xff). */
+  docked: new Set<string>(),
+  /** Every `readContract` made, by function name. */
+  calls: [] as string[],
+  wallet: { usdc: BigInt(0), weth: BigInt(0) },
+  allowance: { usdc: BigInt(0), weth: BigInt(0) },
 };
 
 const client = {
   async getBlockNumber() {
     return state.head;
+  },
+  async readContract({
+    address,
+    functionName,
+    args,
+  }: {
+    address: Address;
+    functionName: string;
+    args: readonly unknown[];
+  }) {
+    state.calls.push(functionName);
+    const token = address.toLowerCase() === USDC.toLowerCase() ? "usdc" : "weth";
+    if (functionName === "balanceOf") return state.wallet[token];
+    if (functionName === "allowance") return state.allowance[token];
+    if (functionName === "safeBalances") {
+      const balances = state.live.get(String(args[2]).toLowerCase());
+      if (!balances) throw new Error("SafeBalancesForTokenNotInActiveStrategy");
+      return balances;
+    }
+    if (functionName === "rawBalances") {
+      return state.docked.has(String(args[2]).toLowerCase())
+        ? ([BigInt(0), 0xff] as const)
+        : ([BigInt(0), 0] as const);
+    }
+    throw new Error(`unexpected read: ${functionName}`);
   },
   async getLogs({
     event,
@@ -105,6 +139,103 @@ beforeEach(async () => {
   state.pushed = [];
   state.shipped = [];
   state.failFrom = null;
+  state.live = new Map();
+  state.docked = new Set();
+  state.calls = [];
+  state.wallet = { usdc: BigInt(0), weth: BigInt(0) };
+  state.allowance = { usdc: BigInt(0), weth: BigInt(0) };
+});
+
+/**
+ * The catalogue probe: one `safeBalances` per preset, live streams in catalogue order, docked
+ * ones told apart from never-shipped ones, and virtual balances never summed.
+ */
+describe("readRockStreams — probing the catalogue", () => {
+  const ROCK_ID = "42";
+
+  function hashFor(preset: { streamIndex: number; feeBps: number }) {
+    return buildStrategy({
+      maker: MAKER,
+      token0: USDC,
+      token1: WETH,
+      feeBps: preset.feeBps,
+      rockId: ROCK_ID,
+      streamIndex: preset.streamIndex,
+    }).strategyHash.toLowerCase();
+  }
+
+  it("asks Aqua once per catalogue preset, whatever the catalogue's length", async () => {
+    const result = await readModule.readRockStreams({ rockId: ROCK_ID, maker: MAKER, app: APP });
+    expect(result.state).toBe("UNAVAILABLE");
+    expect(state.calls.filter((name) => name === "safeBalances")).toHaveLength(
+      DEFAULT_STREAMS.length,
+    );
+  });
+
+  it("returns the live streams in catalogue order, each with its own executable amount", async () => {
+    state.wallet = { usdc: BigInt(1_000), weth: BigInt(10) };
+    state.allowance = { usdc: BigInt(5_000), weth: BigInt(5) };
+    // Every preset live, and each one is allowed more than the wallet holds: virtual balances
+    // over one reserve may sum past it, which is exactly why they are never added up.
+    for (const preset of DEFAULT_STREAMS) {
+      state.live.set(hashFor(preset), [BigInt(4_000), BigInt(8)]);
+    }
+
+    const result = await readModule.readRockStreams({ rockId: ROCK_ID, maker: MAKER, app: APP });
+    expect(result.state).toBe("REAL");
+    if (result.state !== "REAL") return;
+
+    expect(result.value.streams.map((stream) => Number(stream.streamIndex))).toEqual(
+      DEFAULT_STREAMS.map((preset) => preset.streamIndex),
+    );
+    for (const [i, stream] of result.value.streams.entries()) {
+      expect(stream.feeBps).toBe(BigInt(DEFAULT_STREAMS[i].feeBps));
+      expect(stream.label).toBe(DEFAULT_STREAMS[i].label);
+      expect(stream.virtual).toEqual({ usdc: BigInt(4_000), weth: BigInt(8) });
+      // executable = min(virtual, wallet, allowance): USDC is capped by the wallet, WETH by the
+      // allowance to Aqua.
+      expect(stream.executable).toEqual({ usdc: BigInt(1_000), weth: BigInt(5) });
+    }
+    expect(result.value.actual).toEqual({ usdc: BigInt(1_000), weth: BigInt(10) });
+    expect(result.value.stopped).toEqual([]);
+  });
+
+  it("tells a stopped (docked) stream apart from one never shipped", async () => {
+    const [first, second, ...rest] = DEFAULT_STREAMS;
+    state.live.set(hashFor(first), [BigInt(1), BigInt(1)]);
+    state.docked.add(hashFor(second));
+
+    const result = await readModule.readRockStreams({ rockId: ROCK_ID, maker: MAKER, app: APP });
+    expect(result.state).toBe("REAL");
+    if (result.state !== "REAL") return;
+
+    expect(result.value.streams.map((stream) => Number(stream.streamIndex))).toEqual([
+      first.streamIndex,
+    ]);
+    expect(result.value.stopped).toEqual([BigInt(second.streamIndex)]);
+    // The never-shipped presets are in neither list — they are what "Add another strategy" offers.
+    for (const preset of rest) {
+      expect(result.value.stopped).not.toContain(BigInt(preset.streamIndex));
+    }
+    // `rawBalances` is only asked about the presets `safeBalances` refused.
+    expect(state.calls.filter((name) => name === "rawBalances")).toHaveLength(
+      DEFAULT_STREAMS.length - 1,
+    );
+  });
+
+  it("probes only the streams the caller names, when it names them", async () => {
+    const preset = DEFAULT_STREAMS[1];
+    state.live.set(hashFor(preset), [BigInt(1), BigInt(1)]);
+
+    const result = await readModule.readRockStreams({
+      rockId: ROCK_ID,
+      maker: MAKER,
+      app: APP,
+      streams: [preset],
+    });
+    expect(result.state).toBe("REAL");
+    expect(state.calls.filter((name) => name === "safeBalances")).toHaveLength(1);
+  });
 });
 
 describe("planFeeScan", () => {

@@ -81,7 +81,9 @@ test.describe("primary action above the fold — item 7", () => {
     // "Retired rock" is a heading with no action (ArchivedRock), not a button; the other three
     // are button labels. Matching both element kinds is what the spec's own regex implies.
     const candidate = page
-      .getByRole("button", { name: /Trade with this rock|Awaken this rock|Claim this rock/ })
+      .getByRole("button", {
+        name: /Trade with this rock|Add funds|Start earning|Change ownership|Awaken this rock|Claim this rock/,
+      })
       .or(page.getByRole("heading", { name: /Retired rock/ }))
       .first();
 
@@ -239,14 +241,14 @@ test.describe("sheets are reachable without sign-in — item 8", () => {
     });
   });
 
-  test("trade sheet, from /rock/2", async ({ page }) => {
+  test("add funds sheet, from /rock/2", async ({ page }) => {
     await gotoAndSettle(page, "/rock/2");
     await assertSheetReachable(page, {
-      triggerName: "Trade with this rock",
-      sheetTitle: "Trade with this rock",
-      primaryButtonName: /Enter an amount|Swap /,
+      triggerName: "Add funds",
+      sheetTitle: "Add funds",
+      // No footer: the sheet is an address, a QR and live balances. Falls back to Close.
       skipReasonIfDisabled:
-        "'Trade with this rock' is disabled — /rock/2 reads UNAVAILABLE (no registry configured), so only the demo sample's look-alike button rendered",
+        "'Add funds' is disabled — /rock/2 reads UNAVAILABLE (no registry configured), so only the demo sample's look-alike button rendered",
     });
   });
 

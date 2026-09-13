@@ -3,9 +3,12 @@
 /**
  * Owner-only extras, behind one 44 px overflow button (spec 17 §4.5).
  *
- * These are rare, consequential actions; they stay out of the main column so the two things a
+ * These are rare, consequential actions; they stay out of the main column so the things a
  * visitor came to do — trade, or receive the rock — are the only large buttons on the page.
  * Retiring asks for a confirmation that states exactly what it costs.
+ *
+ * Stopping a strategy is not here any more: it belongs next to the strategy it stops, on the
+ * Liquidity tab. Changing ownership is the primary action of the Ownership tab.
  */
 
 import { useState } from "react";
@@ -32,8 +35,6 @@ export interface OwnerMenuProps {
   ownerActions: Capability<string>;
   handoverPending: boolean;
   lost: boolean;
-  /** A live stream the owner can stop. Absent when the rock is not trading. */
-  streamIndex?: number;
   onChanged: () => void;
 }
 
@@ -42,14 +43,11 @@ export function OwnerMenu({
   ownerActions,
   handoverPending,
   lost,
-  streamIndex,
   onChanged,
 }: OwnerMenuProps) {
-  const { cancelHandover, archiveRock, markLost, clearLost, dockStrategy, isPending } =
-    useRockActions();
+  const { cancelHandover, archiveRock, markLost, clearLost, isPending } = useRockActions();
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isRetireOpen, setRetireOpen] = useState(false);
-  const [isCashInOpen, setCashInOpen] = useState(false);
   const [outcome, setOutcome] = useState<ActionOutcome | null>(null);
 
   const blockedReason = ownerActions.state === "UNAVAILABLE" ? ownerActions.reason : null;
@@ -59,16 +57,6 @@ export function OwnerMenu({
     const result = outcomeFrom(await cancelHandover(rockId));
     setOutcome(result);
     if (result.kind !== "error") onChanged();
-  };
-
-  const runCashIn = async () => {
-    if (streamIndex === undefined) return;
-    const result = outcomeFrom(await dockStrategy(rockId, streamIndex));
-    setOutcome(result);
-    if (result.kind !== "error") {
-      setCashInOpen(false);
-      onChanged();
-    }
   };
 
   const runLostFlag = async () => {
@@ -120,21 +108,6 @@ export function OwnerMenu({
             </Button>
           ) : null}
 
-          {streamIndex !== undefined ? (
-            <Button
-              variant="outline"
-              className="w-full"
-              disabled={blocked}
-              onClick={() => {
-                setMenuOpen(false);
-                setOutcome(null);
-                setCashInOpen(true);
-              }}
-            >
-              Cash in
-            </Button>
-          ) : null}
-
           <Button
             variant="outline"
             className="w-full"
@@ -163,43 +136,6 @@ export function OwnerMenu({
           </div>
 
           <ActionOutcomeNotice outcome={outcome} successLabel="Done" />
-        </SheetBody>
-      </Sheet>
-
-      <Sheet
-        open={isCashInOpen}
-        onOpenChange={setCashInOpen}
-        title="Cash in?"
-        footer={
-          <div className="flex flex-col gap-3 sm:flex-row-reverse">
-            <Button
-              size="lg"
-              className="w-full sm:flex-1"
-              onClick={runCashIn}
-              disabled={isPending}
-            >
-              Cash in
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="w-full sm:flex-1"
-              onClick={() => setCashInOpen(false)}
-            >
-              Keep trading
-            </Button>
-          </div>
-        }
-      >
-        <SheetBody className="flex flex-col gap-3">
-          <p className="max-w-prose text-base text-ink-2">
-            Stops trading on this stream. Your tokens never left your account.
-          </p>
-          <p className="max-w-prose text-sm text-ink-3">
-            The fees earned so far are already part of the rock&rsquo;s balance. You can start
-            earning again at any time, with any fee tier.
-          </p>
-          <ActionOutcomeNotice outcome={outcome} successLabel="This stream has stopped" />
         </SheetBody>
       </Sheet>
 

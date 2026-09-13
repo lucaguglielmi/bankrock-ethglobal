@@ -55,8 +55,10 @@ Registration does not create or fund a wallet.
    with the one condition stated beside it: funds sent there belong to the rock only if it is
    awakened with that same wallet.
 10. The owner selects which stream to open and the amounts to expose. The choices are exactly the
-    streams every reader probes — stream 0 at 30 bps ("Wide") and stream 1 at 5 bps ("Tight") —
-    because a fee the readers do not probe hashes to a strategy nothing in the app can find.
+    catalogue every reader probes (`DEFAULT_STREAMS`): stream 0 at 30 bps ("Wide"), stream 1 at
+    5 bps ("Tight") and stream 2 at 100 bps ("Patient") — because a fee the readers do not probe
+    hashes to a strategy nothing in the app can find. Several may be live at once over the one
+    reserve; each is added or stopped on its own (`docs/dashboard-strategies.md`).
 11. **Atomic UserOperation Batching (1-Click Launch):** the user approves once via Privy. The Rock
     Account executes one batched UserOperation bundling `USDC.approve(Aqua, a)`,
     `WETH.approve(Aqua, b)` and

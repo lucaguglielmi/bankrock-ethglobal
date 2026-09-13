@@ -1,16 +1,14 @@
 "use client";
 
 /**
- * The identity row: who this rock is, what state it is in, and who holds it.
+ * The identity row: who this rock is and what state it is in.
  *
- * Every address is rendered through `<Address>` — middle-truncated, copyable, with an explorer
- * link built from `lib/chain` (never a hand-written host). Nothing here is substituted: an
- * address that the registry did not return is simply not shown.
+ * Deliberately nothing else. The owner's address and the rock's account used to sit under the
+ * title, which put two Ethereum addresses on screen the moment the page opened; they now live in
+ * the Ownership and Contracts tabs, where a visitor goes to look for them.
  */
 
 import type { ReactNode } from "react";
-import { Address } from "@/components/ui/address";
-import { explorer } from "@/lib/chain";
 import { cn } from "@/lib/ui/cn";
 
 export type RockLifecycle = "dormant" | "awake" | "handover_pending" | "archived";
@@ -45,52 +43,24 @@ export function RockStateBadge({ state }: { state: RockLifecycle }) {
 export interface RockIdentityProps {
   rockId: string;
   state?: RockLifecycle;
-  owner?: string;
-  smartAccount?: string;
   lost?: boolean;
   /** Owner-only overflow menu, rendered at the end of the title row. */
   trailing?: ReactNode;
 }
 
-export function RockIdentity({
-  rockId,
-  state,
-  owner,
-  smartAccount,
-  lost = false,
-  trailing,
-}: RockIdentityProps) {
+export function RockIdentity({ rockId, state, lost = false, trailing }: RockIdentityProps) {
   return (
-    <header className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-h1 font-extrabold text-ink">Rock #{rockId}</h1>
-          {state ? <RockStateBadge state={state} /> : null}
-          {lost ? (
-            <span className="inline-flex shrink-0 items-center rounded-full bg-danger-bg px-2.5 py-1 text-label text-danger">
-              Marked lost
-            </span>
-          ) : null}
-        </div>
-        {trailing}
+    <header className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-h1 font-extrabold text-ink">Rock #{rockId}</h1>
+        {state ? <RockStateBadge state={state} /> : null}
+        {lost ? (
+          <span className="inline-flex shrink-0 items-center rounded-full bg-danger-bg px-2.5 py-1 text-label text-danger">
+            Marked lost
+          </span>
+        ) : null}
       </div>
-
-      {owner || smartAccount ? (
-        <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
-          {owner ? (
-            <span className="flex min-w-0 flex-wrap items-center gap-1 text-sm text-ink-3">
-              Owner
-              <Address value={owner} explorerHref={explorer.address(owner)} />
-            </span>
-          ) : null}
-          {smartAccount ? (
-            <span className="flex min-w-0 flex-wrap items-center gap-1 text-sm text-ink-3">
-              Rock account
-              <Address value={smartAccount} explorerHref={explorer.address(smartAccount)} />
-            </span>
-          ) : null}
-        </div>
-      ) : null}
+      {trailing}
     </header>
   );
 }

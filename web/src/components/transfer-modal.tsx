@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Give sheet — Flow E (spec 02), spec 17 Part 5 "Give sheet", spec 15 SC-5 / X-3.
+ * "Change ownership" sheet — Flow E (spec 02), spec 17 Part 5 "Give sheet", spec 15 SC-5 / X-3.
+ * Opened from the Ownership tab of the rock page.
  *
  * What this file used to be: a hand-rolled modal that called `transferOwnership` immediately and
  * unconditionally, accepted `name.eth` as a recipient and passed the raw string on as
@@ -174,7 +175,7 @@ export function TransferModal({
     : !isEmpty && !isValidAddress
       ? "That is not an Ethereum address. Paste the full address, starting with 0x."
       : isSelf
-        ? "That is your own address. Give the rock to someone else."
+        ? "That is your own address. Name someone else."
         : null;
 
   const canReview = isValidAddress && recipientError === null;
@@ -214,7 +215,7 @@ export function TransferModal({
       setSubmitError(
         error instanceof Error
           ? error.message
-          : "The gift was not created. Nothing has changed.",
+          : "The handover was not opened. Nothing has changed.",
       );
     }
   }, [
@@ -252,7 +253,7 @@ export function TransferModal({
         disabled={!canReview}
         onClick={() => setStep("review")}
       >
-        Review this gift
+        Review
         <ArrowRight aria-hidden />
       </Button>
     );
@@ -272,7 +273,7 @@ export function TransferModal({
           onClick={handleConfirm}
         >
           <span className="motion-safe:transition-opacity">
-            {isPending ? "Creating the gift…" : "Give this rock"}
+            {isPending ? "Opening the handover…" : "Change ownership"}
           </span>
         </Button>
         <Button
@@ -324,8 +325,8 @@ export function TransferModal({
       onOpenChange={(open) => {
         if (!open) handleClose();
       }}
-      title="Give this rock"
-      description={`Rock #${rockId} stays yours until the person you give it to taps it and claims it.`}
+      title="Change ownership"
+      description={`Rock #${rockId} stays yours until the new owner taps it and claims it.`}
       footer={footer}
     >
       <SheetBody className="flex flex-col gap-6">
@@ -392,8 +393,8 @@ export function TransferModal({
                 ))}
               </div>
               <p className="text-sm text-ink-2">
-                After that the gift lapses and the rock is simply still yours. That window is how
-                long they have to <em>open</em> the gift. The gasless part — the sponsored
+                After that the handover lapses and the rock is simply still yours. That window is
+                how long they have to <em>claim</em> it. The gasless part — the sponsored
                 transaction that hands over the account — only stays valid for a short time after
                 you sign. If they tap in after it expires, you&apos;ll get asked to sign once more
                 before the handover can finish.
@@ -466,7 +467,7 @@ export function TransferModal({
                 className="size-6 shrink-0 rounded border-border accent-primary"
               />
               <span>
-                I want to give rock #{rockId} to this address.
+                I want to hand rock #{rockId} to this address.
               </span>
             </label>
           </>
@@ -481,15 +482,14 @@ export function TransferModal({
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-h3 font-semibold text-ink">
                     {handoverKey === null || handoverKey.state === "UNAVAILABLE"
-                      ? "The gift is not finished"
-                      : "The gift is waiting"}
+                      ? "The handover is not finished"
+                      : "The handover is open"}
                   </h3>
                   {result.state === "DEMO" ? <SimulatedBadge /> : null}
                 </div>
                 {handoverKey !== null && handoverKey.state !== "UNAVAILABLE" ? (
                   <p className="max-w-prose text-base text-ink-2">
-                    They can claim it the next time they tap this rock. The rock stays in your
-                    account until they do.
+                    Ownership changes when they tap it. Until then the rock stays yours.
                   </p>
                 ) : (
                   /*
@@ -501,7 +501,7 @@ export function TransferModal({
                     <p className="max-w-prose text-base text-ink-2">
                       The handover is on chain, but the key that hands over the rock&apos;s account
                       is not stored. If they tap the rock now, the claim will be refused. Sign the
-                      key again to finish the gift — this does not create a second gift.
+                      key again to finish the handover — this does not open a second one.
                     </p>
                     <UnavailableState
                       reason={

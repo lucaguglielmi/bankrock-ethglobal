@@ -42,7 +42,7 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 | N-5 | ERC-20 token paymaster ("self-sustaining rock") | 15 Part 6, 09 D-011 | Post-hackathon. The verifying paymaster alone covers the zero-gas beat. |
 | N-6 | Idle yield into Aave v3 / Morpho | 15 Part 6, 04 | Post-hackathon. |
 | N-7 | Replacement tags; creator registration UI | 15 Part 6, 02 Flows A and F | Cut. `markLost` / `clearLost` exist and are informational only — they freeze nothing. |
-| N-8 | A second strategy sharing one reserve | 04, 15 P3.8 | Unblocked: it is one more `streamIndex`. Not shipped; item 4 in spec 08's fallback order. |
+| N-8 | A second strategy sharing one reserve | 04, 15 P3.8 | Unblocked: it is one more `streamIndex`. The catalogue now offers three (Wide 30 bps / Tight 5 bps / Patient 100 bps, `web/src/lib/aqua/strategy.ts`) and the Liquidity tab shows one card per live stream, never a total (`docs/dashboard-strategies.md`). Whether a second one is shipped on the demo rock is item 4 in spec 08's fallback order. |
 | N-9 | An APY or APR figure, anywhere | 09 D-004 | Never. A CI grep enforces its absence in `web/src/components`. |
 
 ## 3. Unavailable until something is deployed

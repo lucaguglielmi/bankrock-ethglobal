@@ -3,14 +3,17 @@
  *
  *   ?maker=0x…     the Rock Account. Optional: without it the registry is asked which account
  *                  this rock has, so the public rock page needs nothing but the id.
- *   ?stream=&feeBps=  probe one specific stream instead of the two defaults.
+ *   ?stream=&feeBps=  probe one specific stream instead of the catalogue (`DEFAULT_STREAMS`). When
+ *                  only `stream` is given, the fee is the catalogue's fee for that index.
  *   ?fees=0        skip the fee scan (it costs an eth_getLogs round trip).
  *
  * The response is capability-shaped (D-013), and every branch that cannot produce a real number
  * says so instead of producing one:
  *
  *   REAL         at least one strategy is shipped; virtual, actual and executable balances
- *                come from `Aqua.safeBalances` and `ERC20.balanceOf` on Sepolia.
+ *                come from `Aqua.safeBalances` and `ERC20.balanceOf` on Sepolia. `value.stopped`
+ *                lists the catalogue streams that were docked (`Aqua.rawBalances`), which can
+ *                never be shipped again.
  *   UNAVAILABLE  the app address is unset, the RPC is unreachable, the rock has no Rock Account,
  *                or nothing is shipped. `reason` names which.
  *
@@ -24,6 +27,7 @@ import { NextResponse } from "next/server";
 import { isAddress, getAddress, zeroAddress, type Address } from "viem";
 import {
   DEFAULT_STREAMS,
+  streamPresetFor,
   readAccruedFees,
   readRockStreams,
   serializeFees,
@@ -79,17 +83,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   // Which streams to probe. A rock's strategies are recomputable from its id, so this needs no
-  // stored list — see lib/aqua/strategy.ts.
+  // stored list — see lib/aqua/strategy.ts. By default every catalogue preset is probed: one
+  // `safeBalances` call each, and only the live ones come back.
   const streamParam = url.searchParams.get("stream");
   const feeParam = url.searchParams.get("feeBps");
-  let streams = DEFAULT_STREAMS as ReadonlyArray<{
-    streamIndex: number;
-    feeBps: number;
-    label?: string;
-  }>;
+  let streams: ReadonlyArray<{ streamIndex: number; feeBps: number; label?: string }> =
+    DEFAULT_STREAMS;
   if (streamParam !== null || feeParam !== null) {
     const streamIndex = Number(streamParam ?? 0);
-    const feeBps = Number(feeParam ?? DEFAULT_STREAMS[0].feeBps);
+    // A stream's fee is part of its hash, so `?stream=2` alone must mean "stream 2 at the fee the
+    // catalogue gives stream 2" — defaulting to stream 0's fee would probe a hash nothing shipped.
+    const feeBps = Number(
+      feeParam ?? streamPresetFor(streamIndex)?.feeBps ?? DEFAULT_STREAMS[0].feeBps,
+    );
     if (!Number.isInteger(streamIndex) || streamIndex < 0 || !Number.isInteger(feeBps) || feeBps < 0) {
       return unavailable(id, "`stream` and `feeBps` must be non-negative integers");
     }

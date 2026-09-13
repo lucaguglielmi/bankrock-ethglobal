@@ -171,6 +171,11 @@ Candidate pair:
 1. A simple AMM-like strategy.
 2. A fixed-price offer or second pricing curve using the same reserve.
 
+What is built: `XYCSwap` has one curve shape, so the streams differ only in fee. The catalogue
+(`DEFAULT_STREAMS`, `web/src/lib/aqua/strategy.ts`) offers three presets over one reserve — Wide
+(stream 0, 30 bps), Tight (stream 1, 5 bps) and Patient (stream 2, 100 bps) — and the dashboard
+shows one card per live stream (`docs/dashboard-strategies.md`).
+
 The UI must show:
 
 - actual wallet balance;

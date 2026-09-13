@@ -27,8 +27,8 @@ const HEADLINES: Record<DemoScenario, { title: string; body: string; action: str
   },
   awake: {
     title: "Awake rock",
-    body: "An awake rock holds two tokens and anyone can trade against them.",
-    action: "Trade with this rock",
+    body: "An awake rock holds two tokens. Anyone can add funds to it or trade with it.",
+    action: "Add funds",
   },
   handover: {
     title: "Handover pending",
