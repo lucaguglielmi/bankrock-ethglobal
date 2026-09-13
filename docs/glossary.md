@@ -106,5 +106,5 @@ nothing is deposited (D-030); say what a thing *cannot* do when that is the poin
 
 | Term | Meaning |
 | --- | --- |
-| **MCP** | Model Context Protocol, a standard way for an AI assistant to plug into a tool; Bank Rock's endpoint only reads, it can never move anything. |
-| **agent** | An AI assistant such as Claude Desktop that a person connects to the Bank Rock endpoint to ask about a rock. |
+| **MCP** | Model Context Protocol, a standard way for an AI assistant to plug into a tool; Bank Rock's MCP server, the AI Oracle, only reads, it can never move anything. |
+| **agent** | An AI assistant such as Claude Desktop that a person connects to the AI Oracle, Bank Rock's MCP server, to ask about a rock. |

@@ -368,12 +368,12 @@ export const GLOSSARY = {
   mcp: {
     term: "MCP",
     definition:
-      "Model Context Protocol, a standard way for an AI assistant to plug into a tool; Bank Rock's endpoint only reads, it can never move anything.",
+      "Model Context Protocol, a standard way for an AI assistant to plug into a tool; Bank Rock's MCP server, the AI Oracle, only reads, it can never move anything.",
   },
   agent: {
     term: "agent",
     definition:
-      "An AI assistant such as Claude Desktop that a person connects to the Bank Rock endpoint to ask about a rock.",
+      "An AI assistant such as Claude Desktop that a person connects to the AI Oracle, Bank Rock's MCP server, to ask about a rock.",
   },
 } as const satisfies Record<string, GlossaryEntry>;
 

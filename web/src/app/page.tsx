@@ -19,7 +19,7 @@ export default function Home() {
 
         <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-end text-center pb-8 sm:pb-12 gap-8 sm:gap-12 mt-12 sm:mt-24">
           <div className="flex flex-col items-center mt-auto">
-            <AnimatedText text="Tangible DeFi." className="mb-6 text-display font-extrabold text-ink" />
+            <AnimatedText text="Liquidity you can hold." className="mb-6 text-display font-extrabold text-ink" />
 
             {/* After the hackathon: idle yield into a lending protocol (DEMO-STATE N-6) and automatic rebalancing (D-010) are planned; not built, so not claimed. */}
             <p className="max-w-prose text-lead text-ink-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-1000 motion-safe:delay-500 motion-safe:fill-mode-forwards">
@@ -68,7 +68,7 @@ export default function Home() {
         <div className="w-full flex flex-col items-center py-20 border-y border-black/5">
           <div className="flex items-center gap-2 text-ink-3 mb-4 font-mono text-label font-medium uppercase tracking-widest">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-            <span>MCP Endpoint</span>
+            <span>AI Oracle</span>
           </div>
           {/* After the hackathon: a published npm package (npx -y @bankrock/mcp-server) is planned; today the server runs from a checkout of the repo, as /mcp documents. */}
           <div className="bg-black text-white px-6 py-4 rounded-xl shadow-2xl flex items-center justify-between gap-6 w-full max-w-2xl font-mono">

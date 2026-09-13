@@ -24,7 +24,7 @@ const HOW_IT_WORKS_LINKS = [
   { href: "/learn/security", label: "Security" },
 ] as const;
 
-const MCP_LINK = { href: "/mcp", label: "MCP endpoint" } as const;
+const MCP_LINK = { href: "/mcp", label: "AI Oracle" } as const;
 
 /** The funded live rock on Sepolia. Rock 1 is retired; this is the only in-app path to a real rock page. */
 const LIVE_ROCK_LINK = { href: "/rock/3", label: "Live rock" } as const;

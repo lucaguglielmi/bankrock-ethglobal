@@ -171,7 +171,7 @@ export default function PrivacyPage() {
         links={[
           { href: "/privacy", label: "Privacy Policy", current: true },
           { href: "/terms", label: "Terms and Conditions" },
-          { href: "/mcp", label: "MCP Oracle" },
+          { href: "/mcp", label: "AI Oracle" },
         ]}
       />
     </main>

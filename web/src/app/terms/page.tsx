@@ -157,7 +157,7 @@ export default function TermsPage() {
         links={[
           { href: "/privacy", label: "Privacy Policy" },
           { href: "/terms", label: "Terms and Conditions", current: true },
-          { href: "/mcp", label: "MCP Oracle" },
+          { href: "/mcp", label: "AI Oracle" },
         ]}
       />
     </main>

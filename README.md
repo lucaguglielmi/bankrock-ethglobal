@@ -32,7 +32,7 @@ Built for ETHGlobal ETHOnline 2026 (the 1inch Aqua and Privy tracks). Live at
    - [Trading through the taker](#4-trading-through-the-taker)
    - [Gifting as an on-chain handover](#5-gifting-as-an-on-chain-handover)
    - [Retiring a rock](#6-retiring-a-rock)
-   - [The MCP endpoint](#7-the-mcp-endpoint)
+   - [The MCP server](#7-the-mcp-server)
 3. [Contracts on Sepolia](#contracts-on-sepolia)
 4. [Tech stack](#tech-stack)
 5. [Repository layout](#repository-layout)
@@ -252,7 +252,7 @@ registry and Aqua on 2026-09-13). The only swap against a rock on Sepolia so far
 rehearsal trade on rock 1, tx
 `0x2ab70a3c27a0aa1ea719f2e843ac4cd4c1eb53b43b449fab2cbe3a1fca751761`.
 
-### 7. The MCP endpoint
+### 7. The MCP server
 
 `mcp/index.ts` is a stdio [Model Context Protocol](https://modelcontextprotocol.io) server that an
 AI client (Claude Desktop, Cursor, a CLI) runs from a checkout. It is **read-only by decision**
@@ -270,8 +270,9 @@ AI client (Claude Desktop, Cursor, a CLI) runs from a checkout. It is **read-onl
 | `query_logs(...)`, `get_waitlist_stats()` | operator routes; need `ADMIN_API_KEY`, otherwise `unavailable` |
 | `simulate_cross_chain_intent`, `optimize_idle_yield` | always `unavailable` — no bridge, no idle yield (cut, spec 15 Part 6) |
 
-Configuration snippets and a starter prompt are on [bank-rock.com/mcp](https://bank-rock.com/mcp).
-The server needs `SEPOLIA_RPC_URL` and `REGISTRY_ADDRESS` in its `env`.
+The site calls it the **AI Oracle**; configuration snippets and a starter prompt are on
+[bank-rock.com/mcp](https://bank-rock.com/mcp). The server needs `SEPOLIA_RPC_URL` and
+`REGISTRY_ADDRESS` in its `env`.
 
 ---
 

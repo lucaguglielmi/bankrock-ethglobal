@@ -29,7 +29,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Bank Rock | Tangible DeFi",
+  title: "Bank Rock | Liquidity you can hold",
   description: "A physical interface to a self-custodial liquidity account.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
