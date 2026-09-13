@@ -207,7 +207,7 @@ export default function RockPage() {
                 sizes="(max-width: 768px) 100vw, 50vw"
               />
               {/* Comic bubble */}
-              <div className="absolute right-4 top-8 -rotate-6 rounded-2xl border-2 border-ink bg-white px-4 py-2 shadow-lg sm:right-8 sm:top-10">
+              <div className="absolute right-4 top-8 -rotate-6 motion-safe:animate-bubble-wobble rounded-2xl border-2 border-ink bg-white px-4 py-2 shadow-lg sm:right-8 sm:top-10">
                 <p className="text-base font-bold text-ink sm:text-lg">
                   &ldquo;Banks are so 1330&rdquo;
                 </p>
