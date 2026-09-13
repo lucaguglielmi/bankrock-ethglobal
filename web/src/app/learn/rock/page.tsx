@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Term } from "@/components/ui/term";
+import { ActivationFlowDiagram } from "@/components/activation-flow-diagram";
 
 /**
  * "The physical" — what a Bank Rock is, what the chip inside it does, and what one tap sets in
@@ -96,14 +97,8 @@ export default function RockPage() {
         {/* What one tap does */}
         <section className="grid grid-cols-1 items-center gap-12 md:grid-cols-2 lg:gap-24">
           <div className="order-1 flex justify-center">
-            <div className="relative aspect-square w-full max-w-md overflow-hidden rounded-3xl border border-border bg-white shadow-xl">
-              <Image
-                src="/infographics/activation_flow.jpg"
-                alt="From a tap on the rock to an account on the chain, in four steps"
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 50vw"
-              />
+            <div className="w-full max-w-md">
+              <ActivationFlowDiagram />
             </div>
           </div>
 
