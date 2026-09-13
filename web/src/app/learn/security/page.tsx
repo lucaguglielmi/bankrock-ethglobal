@@ -82,7 +82,7 @@ export default function SecurityPage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <h3 className="text-xl font-bold">Future Plans</h3>
-              <span className="rounded-full bg-blue-100 px-3 py-0.5 text-xs font-semibold text-blue-700 uppercase tracking-widest">Coming soon</span>
+              <span className="rounded-full bg-blue-100 px-3 py-0.5 text-label font-semibold text-blue-700 uppercase tracking-widest">Coming soon</span>
             </div>
             <ul className="flex flex-col gap-4 text-base text-ink-2 mt-2">
               <li className="flex gap-3">
