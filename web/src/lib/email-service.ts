@@ -152,11 +152,14 @@ export function generateAlertEmailHtml(payload: AlertEmailPayload): string {
   `.trim();
 }
 
-/** The configured sender. Falls back to the Resend sandbox domain, which is reported as such. */
+/**
+ * The configured sender. Falls back to Resend's documented test sender, `onboarding@resend.dev`,
+ * which is reported as sandbox: it delivers only to the Resend account owner's own inbox.
+ */
 export function alertSender(): { from: string; sandbox: boolean } {
   const configured = optionalEnv("ALERT_FROM_ADDRESS");
   if (configured) return { from: configured, sandbox: false };
-  return { from: "Bank Rock <alerts@resend.dev>", sandbox: true };
+  return { from: "Bank Rock <onboarding@resend.dev>", sandbox: true };
 }
 
 /**
