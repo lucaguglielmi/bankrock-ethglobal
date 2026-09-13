@@ -202,7 +202,7 @@ function RockMesh({ isHovered, isCompact }: RockMeshProps) {
 
   return (
     <Float speed={isHovered ? 0.5 : 1.5} rotationIntensity={isHovered ? 0.1 : 0.3} floatIntensity={isHovered ? 0.2 : 1.0}>
-      <group ref={groupRef} scale={isCompact ? 0.65 : 1} position={isCompact ? [0, 1.2, 0] : [0, 0, 0]}>
+      <group ref={groupRef} scale={isCompact ? 0.65 : 1} position={isCompact ? [0, 0.4, 0] : [0, 0, 0]}>
         {/* Main Stone */}
         <mesh ref={rockRef} castShadow receiveShadow>
           <icosahedronGeometry args={[1, 16]} />
@@ -411,7 +411,7 @@ export function RockCanvas() {
           tracks the visible stone at every viewport width, and carries the touch-action the
           Canvas itself does not need since it never receives pointer events. */}
       <div
-        className="pointer-events-auto absolute z-10 aspect-square w-[80vw] max-w-[600px] -translate-y-[20vh] touch-pan-y rounded-full md:translate-y-0"
+        className="pointer-events-auto absolute z-10 aspect-square w-[80vw] max-w-[600px] -translate-y-[5vh] touch-pan-y rounded-full md:translate-y-0"
         onMouseEnter={handleHoverEnter}
         onMouseLeave={handleHoverLeave}
         onClick={handleToggle}
