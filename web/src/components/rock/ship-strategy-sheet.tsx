@@ -17,9 +17,11 @@
  *    strategy nothing could see. Streams already live on the rock are excluded by the caller
  *    (`excludeStreamIndexes`): a strategy is immutable, so re-shipping one reverts.
  *
- * Three steps: choose (skipped when the caller preselected an option, or only one is left),
- * amounts, review. The chosen strategy stays visible as a summary with a "Change" affordance, so
- * the choice is never out of sight while the amounts are typed.
+ * Two steps: **offer**, then **review**. The offer is a share of the rock — one slider, 0–100 %,
+ * applied to *both* holdings so the rock keeps its own price (spec 21's one-sided balancing is
+ * not implemented, so nothing here invents a rebalance) — followed by the strategy cards, each
+ * saying what it would be allowed to trade at that share. Anyone who wants exact figures can
+ * switch to two plain amount fields; whichever mode is showing is the source of the amounts.
  *
  * Nothing is annualised anywhere in this flow (D-004).
  */
@@ -29,8 +31,12 @@ import { formatUnits, parseUnits } from "viem";
 import { Amount } from "@/components/ui/amount";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetBody } from "@/components/ui/sheet";
+import { Slider } from "@/components/ui/slider";
+import { TokenIcon } from "@/components/ui/token-icon";
+import { UnavailableState } from "@/components/ui/unavailable-state";
 import { tokens } from "@/lib/chain";
 import type { Capability } from "@/lib/demo";
+import { formatAmount } from "@/lib/ui/format";
 import { useAudio } from "@/context/audio-context";
 import { useRockActions } from "@/hooks/useBankRock";
 import {
@@ -44,6 +50,12 @@ import { StrategyPicker } from "@/components/rock/strategy-picker";
 
 const DECIMAL_PATTERN = /^\d*(\.\d*)?$/;
 const ZERO = BigInt(0);
+const HUNDRED = BigInt(100);
+
+/** The shares offered as one-tap chips. The slider itself moves in steps of 5. */
+const QUICK_SHARES = [25, 50, 75, 100] as const;
+const SHARE_STEP = 5;
+const DEFAULT_SHARE = 50;
 
 /** Parses a typed amount into base units. Returns null for anything that is not a clean number. */
 function parseAmount(value: string, decimals: number): bigint | null {
@@ -56,14 +68,19 @@ function parseAmount(value: string, decimals: number): bigint | null {
   }
 }
 
+/** `held × share / 100`, in base units — the same share of each holding, so the price is kept. */
+function shareOf(held: bigint, share: number): bigint {
+  return (held * BigInt(share)) / HUNDRED;
+}
+
 export interface ShipStrategySheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rockId: string;
   reserves: Capability<{ usdc: bigint; weth: bigint }>;
   /**
-   * The option the sheet opens on — what the picker on the Liquidity tab hands over. When given,
-   * the choose step is skipped and the option shows as a summary with a "Change" affordance.
+   * The option the sheet opens on — what the picker on the Liquidity tab hands over. It shows as
+   * selected, and the other offered options stay a tap away.
    */
   option?: ShipOption;
   /** Which stream to preselect when no `option` is given. Must be one the readers probe. */
@@ -77,11 +94,16 @@ export interface ShipStrategySheetProps {
   onShipped: () => void;
 }
 
-type Step = "choose" | "amounts" | "review";
+type Step = "offer" | "review";
+/** Where the amounts come from: the share slider, or two typed fields. */
+type AmountMode = "share" | "manual";
 
 interface FlowState {
   step: Step;
   option: ShipOption | null;
+  mode: AmountMode;
+  /** The share of the rock offered, 0–100, when `mode` is "share". */
+  share: number;
   usdcInput: string;
   wethInput: string;
   outcome: ActionOutcome | null;
@@ -109,8 +131,10 @@ function initialFlow(
     null;
 
   return {
-    step: preselected ? "amounts" : "choose",
+    step: "offer",
     option: preselected,
+    mode: "share",
+    share: DEFAULT_SHARE,
     usdcInput: "",
     wethInput: "",
     outcome: null,
@@ -149,8 +173,17 @@ export function ShipStrategySheet({
   const patch = (changes: Partial<FlowState>) => setFlow((current) => ({ ...current, ...changes }));
 
   const held = reserves.state === "UNAVAILABLE" ? null : reserves.value;
-  const usdcAmount = parseAmount(flow.usdcInput, tokens.USDC.decimals);
-  const wethAmount = parseAmount(flow.wethInput, tokens.WETH.decimals);
+  const holdsBoth = held !== null && held.usdc > ZERO && held.weth > ZERO;
+  // A holding the read says is zero: no strategy can start until it is funded.
+  const knownShort = held !== null && !holdsBoth;
+
+  // The amounts, from whichever mode is showing.
+  const shareUsdc = held ? shareOf(held.usdc, flow.share) : null;
+  const shareWeth = held ? shareOf(held.weth, flow.share) : null;
+  const usdcAmount =
+    flow.mode === "share" ? shareUsdc : parseAmount(flow.usdcInput, tokens.USDC.decimals);
+  const wethAmount =
+    flow.mode === "share" ? shareWeth : parseAmount(flow.wethInput, tokens.WETH.decimals);
 
   const tooMuchUsdc = held !== null && usdcAmount !== null && usdcAmount > held.usdc;
   const tooMuchWeth = held !== null && wethAmount !== null && wethAmount > held.weth;
@@ -158,6 +191,14 @@ export function ShipStrategySheet({
     usdcAmount !== null && wethAmount !== null && usdcAmount > ZERO && wethAmount > ZERO;
   const canReview = flow.option !== null && hasAmounts && !tooMuchUsdc && !tooMuchWeth;
   const shipped = flow.outcome !== null && flow.outcome.kind !== "error";
+
+  /** Switch to the typed fields, starting from what the slider was offering. */
+  const switchToManual = () =>
+    patch({
+      mode: "manual",
+      usdcInput: shareUsdc !== null && shareUsdc > ZERO ? formatUnits(shareUsdc, tokens.USDC.decimals) : "",
+      wethInput: shareWeth !== null && shareWeth > ZERO ? formatUnits(shareWeth, tokens.WETH.decimals) : "",
+    });
 
   const confirm = async () => {
     if (!canReview || flow.option === null || usdcAmount === null || wethAmount === null) return;
@@ -180,9 +221,9 @@ export function ShipStrategySheet({
   };
 
   let footer: ReactNode;
-  if (flow.step === "choose") {
+  if (offered.length === 0) {
     footer = undefined;
-  } else if (flow.step === "amounts") {
+  } else if (flow.step === "offer") {
     footer = (
       <Button
         size="lg"
@@ -214,7 +255,7 @@ export function ShipStrategySheet({
           size="lg"
           variant="outline"
           className="w-full sm:flex-1"
-          onClick={() => patch({ step: "amounts" })}
+          onClick={() => patch({ step: "offer" })}
           disabled={isPending}
         >
           Back
@@ -223,61 +264,97 @@ export function ShipStrategySheet({
     );
   }
 
+  /** "2.5 USDC · 0.0025 WETH" — what a card would ship at the current offer. */
+  const breakdownText =
+    usdcAmount !== null && wethAmount !== null
+      ? `${formatAmount(usdcAmount, { decimals: tokens.USDC.decimals, maxFractionDigits: 2 })} USDC · ${formatAmount(wethAmount, { decimals: tokens.WETH.decimals, maxFractionDigits: 4 })} WETH`
+      : null;
+
   return (
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
       title="Start earning"
-      description={
-        flow.step === "choose"
-          ? "Choose how this rock earns."
-          : "Let people trade against this rock."
-      }
+      description="Let people trade against this rock."
       footer={footer}
     >
-      <SheetBody className="flex flex-col gap-6">
+      <SheetBody className="flex flex-col gap-8">
         {offered.length === 0 ? (
           <p className="max-w-prose text-base text-ink-2">
             Every strategy this rock can run is already live.
           </p>
-        ) : flow.step === "choose" ? (
+        ) : flow.step === "offer" ? (
           <>
-            <StrategyPicker
-              options={offered}
-              selectedStreamIndex={flow.option?.streamIndex}
-              onPick={(picked) => patch({ option: picked, step: "amounts" })}
-            />
-            <p className="max-w-prose text-sm text-ink-3">
-              The fee is fixed once you start. Changing it later means starting another stream.
-            </p>
-          </>
-        ) : flow.step === "amounts" ? (
-          <>
-            <AmountField
-              id="ship-usdc"
-              label="USDC to make available"
-              symbol="USDC"
-              value={flow.usdcInput}
-              onChange={(value) => patch({ usdcInput: value })}
-              max={held ? formatUnits(held.usdc, tokens.USDC.decimals) : null}
-              tooMuch={tooMuchUsdc}
-            />
-            <AmountField
-              id="ship-weth"
-              label="WETH to make available"
-              symbol="WETH"
-              value={flow.wethInput}
-              onChange={(value) => patch({ wethInput: value })}
-              max={held ? formatUnits(held.weth, tokens.WETH.decimals) : null}
-              tooMuch={tooMuchWeth}
-            />
+            <section className="flex flex-col gap-4">
+              <h3 className="text-h3 font-semibold text-ink">
+                How much of the rock to put to work
+              </h3>
 
-            {flow.option ? (
-              <StrategySummary
-                option={flow.option}
-                onChange={offered.length > 1 ? () => patch({ step: "choose" }) : undefined}
+              {flow.mode === "share" ? (
+                <ShareControl
+                  share={flow.share}
+                  onShareChange={(share) => patch({ share })}
+                  disabled={!holdsBoth}
+                  usdc={shareUsdc}
+                  weth={shareWeth}
+                />
+              ) : (
+                <>
+                  <AmountField
+                    id="ship-usdc"
+                    label="USDC to make available"
+                    symbol="USDC"
+                    value={flow.usdcInput}
+                    onChange={(value) => patch({ usdcInput: value })}
+                    max={held ? formatUnits(held.usdc, tokens.USDC.decimals) : null}
+                    tooMuch={tooMuchUsdc}
+                  />
+                  <AmountField
+                    id="ship-weth"
+                    label="WETH to make available"
+                    symbol="WETH"
+                    value={flow.wethInput}
+                    onChange={(value) => patch({ wethInput: value })}
+                    max={held ? formatUnits(held.weth, tokens.WETH.decimals) : null}
+                    tooMuch={tooMuchWeth}
+                  />
+                </>
+              )}
+
+              {reserves.state === "UNAVAILABLE" ? (
+                <UnavailableState reason={reserves.reason} className="py-4" />
+              ) : knownShort ? (
+                <p className="max-w-prose text-sm text-ink-2">
+                  A strategy needs both USDC and WETH, and this rock holds no{" "}
+                  {reserves.value.usdc === ZERO ? "USDC" : "WETH"} yet.
+                </p>
+              ) : null}
+            </section>
+
+            <section className="flex flex-col gap-4">
+              <h3 className="text-h3 font-semibold text-ink">How it earns</h3>
+              <StrategyPicker
+                options={offered}
+                selectedStreamIndex={flow.option?.streamIndex ?? null}
+                disabled={knownShort}
+                onPick={(picked) => patch({ option: picked })}
+                renderDetail={breakdownText ? () => breakdownText : undefined}
               />
-            ) : null}
+              <div className="flex flex-col gap-3">
+                <p className="max-w-prose text-sm text-ink-3">
+                  The fee is fixed once you start. Changing it later means starting another
+                  stream.
+                </p>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="self-start px-0 text-link"
+                  onClick={flow.mode === "share" ? switchToManual : () => patch({ mode: "share" })}
+                >
+                  {flow.mode === "share" ? "Set amounts by hand instead" : "Use the slider instead"}
+                </Button>
+              </div>
+            </section>
           </>
         ) : (
           <>
@@ -312,24 +389,67 @@ export function ShipStrategySheet({
   );
 }
 
-/** The chosen strategy, as a summary — its name, fee and one line — with a way to change it. */
-function StrategySummary({ option, onChange }: { option: ShipOption; onChange?: () => void }) {
+/**
+ * The share of the rock on offer: the big percentage, the slider, four quick chips, and the
+ * live "= X USDC + Y WETH" line. Both tokens are scaled by the same share, so the rock's own
+ * price is what a visitor trades against.
+ */
+function ShareControl({
+  share,
+  onShareChange,
+  disabled,
+  usdc,
+  weth,
+}: {
+  share: number;
+  onShareChange: (share: number) => void;
+  disabled: boolean;
+  usdc: bigint | null;
+  weth: bigint | null;
+}) {
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-label text-ink-3">Strategy</span>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border p-4">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="text-base font-semibold text-ink">
-            {option.label} — {formatFeeRate(option.feeBps)}
-          </span>
-          <span className="max-w-prose text-sm text-ink-3">{option.hint}</span>
-        </div>
-        {onChange ? (
-          <Button variant="outline" size="sm" onClick={onChange}>
-            Change
-          </Button>
-        ) : null}
+    <div className="flex flex-col gap-3">
+      <p className="text-num-lg font-bold tabular-nums text-ink">
+        {share}%
+      </p>
+      <Slider
+        aria-label="Share of the rock to put to work"
+        formatValueText={(value) => `${value}%`}
+        value={share}
+        onValueChange={onShareChange}
+        min={0}
+        max={100}
+        step={SHARE_STEP}
+        disabled={disabled}
+      />
+      <div className="flex flex-wrap gap-2">
+        {QUICK_SHARES.map((quick) => (
+          <button
+            key={quick}
+            type="button"
+            aria-pressed={share === quick}
+            disabled={disabled}
+            onClick={() => onShareChange(quick)}
+            className="inline-flex h-11 min-w-16 items-center justify-center rounded-full border border-border bg-background px-4 text-sm font-medium tabular-nums text-ink motion-safe:transition-colors hover:bg-muted aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-background disabled:pointer-events-none disabled:opacity-50"
+          >
+            {quick}%
+          </button>
+        ))}
       </div>
+      {usdc !== null && weth !== null ? (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-ink-2">
+          <span aria-hidden>=</span>
+          <span className="inline-flex items-center gap-1.5">
+            <TokenIcon symbol="USDC" className="size-5 text-ink-2" />
+            <Amount value={usdc} decimals={tokens.USDC.decimals} symbol="USDC" size="sm" />
+          </span>
+          <span aria-hidden>+</span>
+          <span className="inline-flex items-center gap-1.5">
+            <TokenIcon symbol="WETH" className="size-5 text-ink-2" />
+            <Amount value={weth} decimals={tokens.WETH.decimals} symbol="WETH" size="sm" />
+          </span>
+        </p>
+      ) : null}
     </div>
   );
 }

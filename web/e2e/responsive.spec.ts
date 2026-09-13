@@ -82,7 +82,7 @@ test.describe("primary action above the fold — item 7", () => {
     // are button labels. Matching both element kinds is what the spec's own regex implies.
     const candidate = page
       .getByRole("button", {
-        name: /Trade with this rock|Add funds|Start earning|Change ownership|Awaken this rock|Claim this rock/,
+        name: /Trade with this rock|Add funds|Start earning|Gift this rock|Awaken this rock|Claim this rock/,
       })
       .or(page.getByRole("heading", { name: /Retired rock/ }))
       .first();

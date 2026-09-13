@@ -17,8 +17,8 @@ export default function Home() {
           <RockCanvasDynamic />
         </div>
 
-        <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-between text-center mt-12 sm:mt-24">
-          <div className="flex flex-col items-center">
+        <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-end text-center pb-8 sm:pb-12 gap-8 sm:gap-12 mt-12 sm:mt-24">
+          <div className="flex flex-col items-center mt-auto">
             <AnimatedText text="Tangible DeFi." className="mb-6 text-display font-extrabold text-ink" />
 
             <p className="max-w-prose text-lead text-ink-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-1000 motion-safe:delay-500 motion-safe:fill-mode-forwards">
@@ -26,7 +26,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="mt-12 flex w-full flex-col gap-4 pointer-events-auto motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-1000 motion-safe:delay-700 motion-safe:fill-mode-forwards sm:w-auto sm:flex-row">
+          <div className="flex w-full flex-col gap-4 pointer-events-auto motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-1000 motion-safe:delay-700 motion-safe:fill-mode-forwards sm:w-auto sm:flex-row">
             <Button size="lg" className="w-full sm:w-auto" render={<Link href="/shop" />}>
               Get your Rock
               <ArrowRight className="size-5" aria-hidden />

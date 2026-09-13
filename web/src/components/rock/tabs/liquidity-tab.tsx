@@ -12,7 +12,8 @@
  *   funded       the headline reserve, then either the strategy picker (owner) or one sentence
  *                (visitor), because nothing is trading yet;
  *   live         the headline reserve, one card per live stream, a way to the Trade tab, and for
- *                the owner "Add another strategy" and a quiet Stop per stream.
+ *                the owner a quiet Stop per stream and, while presets remain, an "Add another
+ *                strategy" row of compact cards, each opening the ship sheet on that preset.
  *
  * Nothing on the tab is an address. Addresses appear only inside the sheets a person opens.
  *
@@ -218,14 +219,18 @@ export function LiquidityTab({
         </Button>
 
         {isOwner && remaining.length > 0 ? (
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={ownerBlockedReason !== null}
-            onClick={() => setShipRequest({})}
-          >
-            Add another strategy
-          </Button>
+          <section className="flex flex-col gap-3 pt-2">
+            <div className="flex flex-col gap-0.5">
+              <h3 className="text-h3 font-semibold text-ink">Add another strategy</h3>
+              <p className="text-sm text-ink-2">Same reserve, another price.</p>
+            </div>
+            <StrategyPicker
+              compact
+              options={remaining}
+              disabled={ownerBlockedReason !== null}
+              onPick={(option) => setShipRequest({ option })}
+            />
+          </section>
         ) : null}
       </div>
     );

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "Change ownership" sheet — Flow E (spec 02), spec 17 Part 5 "Give sheet", spec 15 SC-5 / X-3.
+ * "Gift this rock" sheet — Flow E (spec 02), spec 17 Part 5 "Give sheet", spec 15 SC-5 / X-3.
  * Opened from the Ownership tab of the rock page.
  *
  * What this file used to be: a hand-rolled modal that called `transferOwnership` immediately and
@@ -273,7 +273,7 @@ export function TransferModal({
           onClick={handleConfirm}
         >
           <span className="motion-safe:transition-opacity">
-            {isPending ? "Opening the handover…" : "Change ownership"}
+            {isPending ? "Opening the gift…" : "Gift this rock"}
           </span>
         </Button>
         <Button
@@ -325,8 +325,8 @@ export function TransferModal({
       onOpenChange={(open) => {
         if (!open) handleClose();
       }}
-      title="Change ownership"
-      description={`Rock #${rockId} stays yours until the new owner taps it and claims it.`}
+      title="Gift this rock"
+      description={`Rock #${rockId} and its liquidity stay yours until the person you name taps it.`}
       footer={footer}
     >
       <SheetBody className="flex flex-col gap-6">

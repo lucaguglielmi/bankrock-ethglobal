@@ -3,16 +3,20 @@
 /**
  * Alert preferences for one rock (spec 15 N-9, SA-1, SA-5; spec 17 Part 5 "Alerts").
  *
- *  - both reads and writes now carry the Privy access token, because the route requires it:
- *    anyone could previously read back the owner's stored email address for any rock (SA-5);
- *  - the "Send test email" button is gone. That endpoint was an open relay and is now
- *    admin-only (SA-1); a visitor pressing it could only ever have been refused;
+ *  - every topic has two ticks, one per channel: a browser notification on a device that allowed
+ *    them, and an email to the address above. On `sm` and up the topics are a three-column table;
+ *    below that each topic is a card with the two ticks in a row beneath the text;
+ *  - both reads and writes carry the Privy access token, because the route requires it: anyone
+ *    could previously read back the owner's stored email address for any rock (SA-5);
+ *  - the "Send test email" button is gone. That endpoint was an open relay and is now admin-only
+ *    (SA-1); a visitor pressing it could only ever have been refused;
  *  - the card states plainly that nothing is dispatched yet. Preferences persist; delivery does
  *    not exist (spec 15 Part 3, "Alerts delivery: UNAVAILABLE");
  *  - notification permission is requested only when the person presses the button (spec 14).
  *
- * Descriptions are `text-sm`, badges `text-label`, the input `text-base`, every control at least
- * 44 px — the 9 px category badges and 11 px topic descriptions are gone (T-5).
+ * Typography per spec 17: titles `text-sm` 600, descriptions `text-sm text-ink-2`, badges and
+ * column headers `text-label`, the input `text-base`; every checkbox is 24 px inside a 44 px
+ * label, every button at least 40 px.
  */
 
 import { useState, useSyncExternalStore } from "react";
@@ -29,13 +33,19 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UnavailableState } from "@/components/ui/unavailable-state";
-import { DEFAULT_ALERT_TOPICS, type AlertTopicsConfig } from "@/lib/alerts";
+import {
+  ALERT_TOPIC_IDS,
+  coerceTopics,
+  type AlertChannel,
+  type AlertTopicId,
+  type AlertTopicsConfig,
+} from "@/lib/alerts";
 import { useAuth } from "@/context/auth-context";
 import { useAudio } from "@/context/audio-context";
 import { cn } from "@/lib/ui/cn";
 
 interface TopicMeta {
-  id: keyof AlertTopicsConfig;
+  id: AlertTopicId;
   title: string;
   description: string;
   badge: string;
@@ -87,6 +97,11 @@ const TOPICS: TopicMeta[] = [
   },
 ];
 
+const CHANNELS: { id: AlertChannel; label: string; describe: (title: string) => string }[] = [
+  { id: "push", label: "Browser", describe: (title) => `Browser notification for ${title}` },
+  { id: "email", label: "Email", describe: (title) => `Email for ${title}` },
+];
+
 const DELIVERY_NOTE =
   "Nothing is sent yet. Preferences are stored, but there is no delivery pipeline behind them.";
 
@@ -96,7 +111,7 @@ interface AlertPreferencesResponse {
   state?: string;
   reason?: string;
   delivery?: { reason?: string };
-  preferences?: { email?: string; pushEnabled?: boolean; topics?: Partial<AlertTopicsConfig> };
+  preferences?: { email?: string; pushEnabled?: boolean; topics?: unknown };
 }
 
 /** `Notification` support, read the way a browser API should be read from React. */
@@ -109,6 +124,9 @@ function notificationSupported() {
 function notificationSupportedOnServer() {
   return false;
 }
+
+/** The two-column grid every row and the header share: the topic, then one column per channel. */
+const ROW_GRID = "grid grid-cols-2 gap-x-2 gap-y-2 sm:grid-cols-[minmax(0,1fr)_6rem_6rem] sm:gap-x-4";
 
 export function RockAlerts({ rockId }: { rockId: string | number }) {
   const { authenticated, getAccessToken, login, unavailable, unavailableReason } = useAuth();
@@ -156,17 +174,36 @@ export function RockAlerts({ rockId }: { rockId: string | number }) {
   const [error, setError] = useState<string | null>(null);
 
   const email = emailEdit ?? stored?.preferences?.email ?? "";
+  // The server already coerces, but a cached response from before the two-channel shape is still
+  // read safely here rather than trusted.
   const topics: AlertTopicsConfig = {
-    ...DEFAULT_ALERT_TOPICS,
-    ...(stored?.preferences?.topics ?? {}),
+    ...coerceTopics(stored?.preferences?.topics),
     ...topicEdits,
   };
   const pushEnabled = pushEdit ?? Boolean(stored?.preferences?.pushEnabled);
 
-  const toggleTopic = (id: keyof AlertTopicsConfig) => {
+  const emailWanted = ALERT_TOPIC_IDS.some((id) => topics[id].email);
+  const emailMissing = emailWanted && email.trim() === "";
+
+  const toggleTopic = (id: AlertTopicId, channel: AlertChannel) => {
     playTap();
     setSaveState("idle");
-    setTopicEdits((previous) => ({ ...previous, [id]: !topics[id] }));
+    setTopicEdits((previous) => ({
+      ...previous,
+      [id]: { ...topics[id], [channel]: !topics[id][channel] },
+    }));
+  };
+
+  const setColumn = (channel: AlertChannel, on: boolean) => {
+    playTap();
+    setSaveState("idle");
+    setTopicEdits((previous) => {
+      const next: Partial<AlertTopicsConfig> = { ...previous };
+      for (const id of ALERT_TOPIC_IDS) {
+        next[id] = { ...topics[id], [channel]: on };
+      }
+      return next;
+    });
   };
 
   const handleSave = async (event: React.FormEvent) => {
@@ -226,7 +263,7 @@ export function RockAlerts({ rockId }: { rockId: string | number }) {
           Alerts
         </h3>
         <p className="max-w-prose text-sm text-ink-2">
-          Choose what is worth telling you about Rock #{rockId}.
+          Choose what is worth telling you about Rock #{rockId}, and how.
         </p>
         <p className="max-w-prose text-sm text-warning">{deliveryNote}</p>
       </div>
@@ -256,31 +293,56 @@ export function RockAlerts({ rockId }: { rockId: string | number }) {
               }}
               placeholder="you@example.com"
               autoComplete="email"
+              aria-describedby={emailMissing ? "alert-email-note" : undefined}
               className="h-12 w-full rounded-xl border border-border bg-background px-4 text-base text-ink placeholder:text-ink-4"
             />
+            {emailMissing ? (
+              <p id="alert-email-note" className="max-w-prose text-sm text-ink-3">
+                Some alerts below are ticked for email. Add an address for them to reach you.
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-3">
             <h4 className="text-label text-ink-3">What to tell you about</h4>
-            <ul className="flex flex-col gap-2">
-              {TOPICS.map((topic) => {
-                const Icon = topic.icon;
-                const isOn = Boolean(topics[topic.id]);
-                return (
-                  <li key={topic.id}>
-                    <label
+
+            <div className="flex flex-col">
+              {/* Column headers, with one 40 px quick action per channel. Phones get the channel
+                  names beside each tick instead, so this row is only for `sm` and up. */}
+              <div className={cn(ROW_GRID, "hidden items-end border-b border-border pb-2 sm:grid")}>
+                <span className="text-label text-ink-3">Alert</span>
+                {CHANNELS.map((channel) => {
+                  const allOn = ALERT_TOPIC_IDS.every((id) => topics[id][channel.id]);
+                  return (
+                    <div key={channel.id} className="flex flex-col items-center gap-1">
+                      <span className="text-label text-ink-3">{channel.label}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-ink-3"
+                        onClick={() => setColumn(channel.id, !allOn)}
+                        aria-label={`${allOn ? "All off" : "All on"} for ${channel.label.toLowerCase()}`}
+                      >
+                        {allOn ? "All off" : "All on"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <ul className="flex flex-col">
+                {TOPICS.map((topic) => {
+                  const Icon = topic.icon;
+                  return (
+                    <li
+                      key={topic.id}
                       className={cn(
-                        "flex min-h-11 cursor-pointer items-start gap-3 rounded-2xl border p-3 motion-safe:transition-colors",
-                        isOn ? "border-ink" : "border-border hover:bg-muted",
+                        ROW_GRID,
+                        "border-b border-border py-3 last:border-b-0 sm:items-center",
                       )}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isOn}
-                        onChange={() => toggleTopic(topic.id)}
-                        className="mt-0.5 size-6 shrink-0 accent-ink"
-                      />
-                      <span className="flex min-w-0 flex-1 flex-col gap-1">
+                      <div className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1">
                         <span className="flex flex-wrap items-center gap-2">
                           <Icon aria-hidden className="size-4 shrink-0 text-ink-3" />
                           <span className="text-sm font-semibold text-ink">{topic.title}</span>
@@ -289,12 +351,42 @@ export function RockAlerts({ rockId }: { rockId: string | number }) {
                           </span>
                         </span>
                         <span className="max-w-prose text-sm text-ink-2">{topic.description}</span>
-                      </span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
+                      </div>
+
+                      {CHANNELS.map((channel) => {
+                        const isOn = topics[topic.id][channel.id];
+                        return (
+                          <label
+                            key={channel.id}
+                            className={cn(
+                              "flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-2 motion-safe:transition-colors hover:bg-muted",
+                              "sm:justify-center sm:self-stretch",
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isOn}
+                              onChange={() => toggleTopic(topic.id, channel.id)}
+                              className="size-6 shrink-0 accent-ink"
+                            />
+                            <span className="sr-only">{channel.describe(topic.title)}</span>
+                            <span aria-hidden className="text-sm text-ink-2 sm:hidden">
+                              {channel.label}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            {!pushEnabled ? (
+              <p className="max-w-prose text-sm text-ink-3">
+                Browser alerts reach this device only after you allow notifications below.
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-2">

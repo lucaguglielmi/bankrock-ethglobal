@@ -5,7 +5,7 @@
  *
  * In reading order on a phone:
  *
- *   one sentence of status → the handover, when one is open → "Change ownership" for the owner
+ *   one sentence of status → the handover, when one is open → "Gift this rock" for the owner
  *   → provenance → alerts and naming, collapsed
  *
  * The owner's rarer actions (retire, mark lost, cancel a handover) stay in the header's owner
@@ -13,6 +13,7 @@
  * shows no address at all.
  */
 
+import { Gift } from "lucide-react";
 import { Address } from "@/components/ui/address";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,7 +50,7 @@ export interface OwnershipTabProps {
    */
   ownerActions?: Capability<string>;
   onSignIn: () => void;
-  /** Opens the "Change ownership" sheet. */
+  /** Opens the "Gift this rock" sheet. */
   onChangeOwnership: () => void;
   onChanged: () => void;
 }
@@ -108,20 +109,30 @@ export function OwnershipTab({
       ) : null}
 
       {state === "awake" && isOwner ? (
-        <div className="flex flex-col gap-3">
+        <section className="flex flex-col gap-4 rounded-3xl border border-border p-5 sm:p-6">
+          <div className="flex flex-col gap-2">
+            <h2 className="flex items-center gap-2 text-h3 font-semibold text-ink">
+              <Gift aria-hidden className="size-5 shrink-0" />
+              Gift this rock to someone
+            </h2>
+            <p className="max-w-prose text-base text-ink-2">
+              Bank Rocks are meant to be shared. When you gift the physical rock, its liquidity
+              goes with it.
+            </p>
+          </div>
           <Button
             size="lg"
             className="w-full"
             onClick={onChangeOwnership}
             disabled={blockedReason !== null}
           >
-            Change ownership
+            Gift this rock
           </Button>
           <p className="max-w-prose text-sm text-ink-3">
             {blockedReason ??
-              "Hand this rock to someone else. It changes hands when they tap it."}
+              "Name who it is for. It changes hands the moment they tap it with their phone."}
           </p>
-        </div>
+        </section>
       ) : null}
 
       <RockActivity rockId={rockId} />

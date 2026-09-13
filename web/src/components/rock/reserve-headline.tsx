@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The headline reserve — the first figure on an awake rock (spec 17 Part 5).
+ * The headline reserve — the first figure on an awake rock (spec 17 Part 5), as one calm card.
  *
  * Both balances come from the chain read. When that read is unavailable there is no number at
  * all, only the reason: a zero would read as "we measured zero", which is a different claim.
@@ -11,11 +11,16 @@
  * (`contracts/aqua/NOTES.md` §7). With more than one stream there is no single figure to give,
  * because two streams' allowances may sum to more than the rock holds and that sum is not
  * capital; the caption points at the per-stream breakdown instead.
+ *
+ * The rock-and-ripples drawing behind the figures is decoration: absolutely placed, hidden from
+ * assistive tech, and never in the text column's way on a phone.
  */
 
 import { Amount } from "@/components/ui/amount";
 import { SimulatedBadge } from "@/components/ui/simulated-badge";
+import { TokenIcon } from "@/components/ui/token-icon";
 import { UnavailableState } from "@/components/ui/unavailable-state";
+import { ReserveArt } from "@/components/rock/strategy-art";
 import { formatAmount } from "@/lib/ui/format";
 import { tokens } from "@/lib/chain";
 import type { Capability } from "@/lib/demo";
@@ -25,6 +30,9 @@ export interface Reserves {
   usdc: bigint;
   weth: bigint;
 }
+
+const CARD_CLASSES =
+  "relative flex flex-col gap-3 overflow-hidden rounded-3xl bg-linear-to-br from-muted to-background p-5 sm:p-6";
 
 export function ReserveHeadline({
   reserves,
@@ -39,12 +47,13 @@ export function ReserveHeadline({
 }) {
   if (reserves.state === "UNAVAILABLE") {
     return (
-      <section className="flex flex-col gap-2">
-        <h2 className="text-label text-ink-3">Reserve</h2>
+      <section className={CARD_CLASSES}>
+        <Backdrop />
+        <h2 className="relative text-label text-ink-3">Reserve</h2>
         {isLoading ? (
-          <p className="text-base text-ink-3">Reading the reserve…</p>
+          <p className="relative text-base text-ink-3">Reading the reserve…</p>
         ) : (
-          <UnavailableState reason={reserves.reason} />
+          <UnavailableState reason={reserves.reason} className="relative" />
         )}
       </section>
     );
@@ -54,28 +63,35 @@ export function ReserveHeadline({
   const onlyStream = streams.length === 1 ? streams[0] : null;
 
   return (
-    <section className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <section className={CARD_CLASSES}>
+      <Backdrop />
+      <div className="relative flex flex-wrap items-center gap-2">
         <h2 className="text-label text-ink-3">Reserve</h2>
         {reserves.state === "DEMO" ? <SimulatedBadge /> : null}
       </div>
-      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-        <Amount
-          size="lg"
-          value={reserves.value.usdc}
-          decimals={tokens.USDC.decimals}
-          symbol="USDC"
-        />
-        <Amount
-          size="lg"
-          value={reserves.value.weth}
-          decimals={tokens.WETH.decimals}
-          symbol="WETH"
-        />
+      <div className="relative flex flex-col gap-3">
+        <span className="flex items-center gap-3">
+          <TokenIcon symbol="USDC" className="size-6 text-ink" />
+          <Amount
+            size="lg"
+            value={reserves.value.usdc}
+            decimals={tokens.USDC.decimals}
+            symbol="USDC"
+          />
+        </span>
+        <span className="flex items-center gap-3">
+          <TokenIcon symbol="WETH" className="size-6 text-ink" />
+          <Amount
+            size="lg"
+            value={reserves.value.weth}
+            decimals={tokens.WETH.decimals}
+            symbol="WETH"
+          />
+        </span>
       </div>
 
       {onlyStream ? (
-        <p className="max-w-prose text-caption text-ink-3">
+        <p className="relative max-w-prose text-caption text-ink-3">
           of which available to trade:{" "}
           {formatAmount(onlyStream.executable.usdc, {
             decimals: tokens.USDC.decimals,
@@ -89,15 +105,22 @@ export function ReserveHeadline({
           WETH
         </p>
       ) : streams.length > 1 ? (
-        <p className="max-w-prose text-caption text-ink-3">
+        <p className="relative max-w-prose text-caption text-ink-3">
           of which available to trade: shown per stream below — the streams share this one reserve
           and their allowances are not added together.
         </p>
       ) : (
-        <p className="max-w-prose text-caption text-ink-3">
+        <p className="relative max-w-prose text-caption text-ink-3">
           What this rock holds right now. Trading with it moves these two balances.
         </p>
       )}
     </section>
+  );
+}
+
+/** The drawing in the card's top-right corner. Out of the flow, so it never narrows the text. */
+function Backdrop() {
+  return (
+    <ReserveArt className="pointer-events-none absolute -top-6 -right-8 size-40 opacity-15 sm:-top-8 sm:-right-6 sm:size-52" />
   );
 }
