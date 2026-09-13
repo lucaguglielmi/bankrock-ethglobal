@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * "Trading against" — which of a rock's live streams a swap is aimed at.
+ * "You are trading against this rock's liquidity pool" — which of a rock's live streams a swap
+ * is aimed at, said as a sentence so a visitor knows whose money is on the other side.
  *
  * A rock may run several strategies at once, one per catalogue preset, each with its own fee and
  * its own balances (`docs/dashboard-strategies.md`). The quote route and the swap both take a
@@ -15,6 +16,7 @@
  */
 
 import * as React from "react";
+import { Term } from "@/components/ui/term";
 import { Button } from "@/components/ui/button";
 import { formatFeeRate } from "@/components/rock/util";
 import { cn } from "@/lib/ui/cn";
@@ -53,8 +55,9 @@ export function TradeStreamPicker({ streams, value, onChange, className }: Trade
       aria-labelledby={labelId}
       className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 px-1", className)}
     >
-      <span id={labelId} className="text-label uppercase text-ink-3">
-        Trading against
+      <span id={labelId} className="text-sm text-ink-2">
+        You are trading against this rock&rsquo;s{" "}
+        <Term k="stream">liquidity pool</Term>:
       </span>
       <div className="flex flex-wrap gap-2">
         {streams.map((stream) => {
