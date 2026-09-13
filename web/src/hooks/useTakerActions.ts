@@ -67,6 +67,8 @@ import {
 } from "@/lib/rock-account";
 import { useAuth } from "@/context/auth-context";
 import { publicReasonWith } from "@/lib/errors";
+import { useDemoRock } from "@/demo/rock-420/context";
+import { useDemoTakerActions } from "@/demo/rock-420/hooks";
 
 export interface SwapParams {
   rockId: string;
@@ -191,7 +193,19 @@ export function takerBalancesQueryKey(account: string | undefined) {
 /** The cadence the rock page polls on, so tokens sent to the account appear without a reload. */
 const BALANCE_REFETCH_MS = 15_000;
 
+/**
+ * The demo rock's seam (`web/src/demo/rock-420`): on rock #420 the visitor's account, its
+ * balances and the swap are the browser's pretend, and no account is built and no swap is sent.
+ * Both hooks run on every render, so hook order never depends on which rock is open.
+ */
 export function useTakerActions(): UseTakerActions {
+  const demo = useDemoRock();
+  const mock = useDemoTakerActions();
+  const chain = useChainTakerActions(demo === null);
+  return demo ? mock : chain;
+}
+
+function useChainTakerActions(enabled: boolean): UseTakerActions {
   const { wallets } = useWallets();
   const { authenticated, address } = useAuth();
   const [isPending, setIsPending] = useState(false);
@@ -204,7 +218,7 @@ export function useTakerActions(): UseTakerActions {
 
   const accountQuery = useQuery({
     queryKey: takerAccountQueryKey(wallet?.address),
-    enabled: Boolean(wallet),
+    enabled: enabled && Boolean(wallet),
     staleTime: Infinity,
     retry: false,
     queryFn: async (): Promise<Capability<Address>> => {
@@ -228,7 +242,7 @@ export function useTakerActions(): UseTakerActions {
   // Rock Account. A taker Safe is an ordinary holder of the two tokens.
   const balancesQuery = useQuery({
     queryKey: takerBalancesQueryKey(accountAddress),
-    enabled: Boolean(accountAddress),
+    enabled: enabled && Boolean(accountAddress),
     refetchInterval: BALANCE_REFETCH_MS,
     staleTime: BALANCE_REFETCH_MS,
     retry: false,

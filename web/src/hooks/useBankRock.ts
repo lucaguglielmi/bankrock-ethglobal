@@ -68,6 +68,12 @@ import {
   UNCONFIRMED_HANDOVER_KEY_REASON,
   type HandoverKeyResult,
 } from "@/lib/handover-key";
+import { useDemoRock } from "@/demo/rock-420/context";
+import {
+  useDemoHandoverMessage,
+  useDemoOnchainEvents,
+  useDemoRockActions,
+} from "@/demo/rock-420/hooks";
 
 export type { SignedAttestation } from "@/lib/rock-account";
 
@@ -236,7 +242,20 @@ function serialiseUserOp(userOp: Record<string, unknown>, signature: Hex): Recor
 /* Hook                                                                        */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The demo rock's seam (`web/src/demo/rock-420`, DEMO-STATE.md S-5). Inside `DemoRockProvider`
+ * for rock #420 every action mutates the browser's demo state and answers `DEMO` — no Safe is
+ * built, no UserOperation is sent, no hash is returned. Everywhere else this is exactly
+ * `useChainRockActions`. Both hooks run on every render, so hook order never changes.
+ */
 export function useRockActions(): UseRockActions {
+  const demo = useDemoRock();
+  const mock = useDemoRockActions();
+  const chain = useChainRockActions(demo === null);
+  return demo ? mock : chain;
+}
+
+function useChainRockActions(enabled: boolean): UseRockActions {
   const { wallets } = useWallets();
   const { authenticated, address, getAccessToken } = useAuth();
   const [isPending, setIsPending] = useState(false);
@@ -251,6 +270,7 @@ export function useRockActions(): UseRockActions {
   // endpoint discloses only the capability state and a reason — never the key or its address.
   const relayerQuery = useQuery({
     queryKey: ["relayer-availability"],
+    enabled,
     queryFn: async (): Promise<Capability<true>> => {
       const res = await fetch("/api/relayer");
       const body = (await res.json()) as { state?: string; reason?: string };
@@ -1024,7 +1044,27 @@ async function confirmHandoverKey(
  * with no reason means the gift carried no note; a reason means the note could not be read. The
  * two are never conflated (D-013).
  */
-export function useHandoverMessage(rockId: string | undefined, enabled: boolean) {
+export interface UseHandoverMessageResult {
+  message: string | null;
+  isLoading: boolean;
+  unavailableReason: string | null;
+}
+
+export function useHandoverMessage(
+  rockId: string | undefined,
+  enabled: boolean,
+): UseHandoverMessageResult {
+  // The demo rock's seam: its gift note lives in the browser, and no token-bearing read is made.
+  const demo = useDemoRock();
+  const mock = useDemoHandoverMessage();
+  const server = useServerHandoverMessage(rockId, enabled && demo === null);
+  return demo ? mock : server;
+}
+
+function useServerHandoverMessage(
+  rockId: string | undefined,
+  enabled: boolean,
+): UseHandoverMessageResult {
   const { authenticated, getAccessToken } = useAuth();
   const active = Boolean(rockId) && rockId !== "new" && enabled && authenticated;
 
@@ -1089,8 +1129,28 @@ export interface OnchainIndexedEvent {
  * An empty list with no reason means the chain holds no events for this rock. A reason means the
  * history could not be read at all — the two are never conflated (D-013).
  */
-export function useRockOnchainEvents(rockId: string | number | undefined) {
-  const enabled = rockId !== undefined && rockId !== "new";
+export interface UseRockOnchainEventsResult {
+  events: OnchainIndexedEvent[];
+  isLoading: boolean;
+  unavailableReason: string | null;
+  refetch: () => Promise<unknown>;
+}
+
+export function useRockOnchainEvents(
+  rockId: string | number | undefined,
+): UseRockOnchainEventsResult {
+  // The demo rock's seam: nothing about rock #420 is indexed, and the indexer is never asked.
+  const demo = useDemoRock();
+  const mock = useDemoOnchainEvents();
+  const indexed = useIndexedRockEvents(rockId, demo === null);
+  return demo ? mock : indexed;
+}
+
+function useIndexedRockEvents(
+  rockId: string | number | undefined,
+  allowed: boolean,
+): UseRockOnchainEventsResult {
+  const enabled = allowed && rockId !== undefined && rockId !== "new";
 
   const query = useQuery({
     queryKey: ["rock-events", String(rockId ?? "")],

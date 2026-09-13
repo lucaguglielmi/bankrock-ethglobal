@@ -45,6 +45,7 @@ import { Address as AddressLine } from "@/components/ui/address";
 import { Amount } from "@/components/ui/amount";
 import { TokenIcon } from "@/components/ui/token-icon";
 import { HelpTerm } from "@/components/ui/popover";
+import { SimulatedBadge } from "@/components/ui/simulated-badge";
 import { CapabilityResult } from "@/components/sheets/capability-result";
 import { defaultStream, TradeStreamPicker } from "@/components/rock/trade-stream-picker";
 import { cn } from "@/lib/ui/cn";
@@ -95,10 +96,12 @@ interface QuoteValue {
   feeBps: number;
   priceImpactBps: number;
   source: string;
+  /** True when the quote came from the stage demo, not from a contract read. */
+  simulated?: boolean;
 }
 
 interface QuoteResponseBody {
-  state?: "REAL" | "UNAVAILABLE";
+  state?: "REAL" | "DEMO" | "UNAVAILABLE";
   reason?: string;
   value?: Partial<QuoteValue>;
 }
@@ -263,7 +266,7 @@ export function TradePanel({
           const value = body.value;
           if (
             response.ok &&
-            body.state === "REAL" &&
+            (body.state === "REAL" || body.state === "DEMO") &&
             value &&
             isBaseUnits(value.amountOut) &&
             typeof value.amountOutFormatted === "string" &&
@@ -280,6 +283,7 @@ export function TradePanel({
                   feeBps: value.feeBps,
                   priceImpactBps: value.priceImpactBps,
                   source: value.source ?? "the rock's own strategy",
+                  simulated: body.state === "DEMO",
                 },
               },
             });
@@ -732,7 +736,8 @@ export function TradePanel({
                 </dd>
 
                 <dt className="text-ink-3">Where this price comes from</dt>
-                <dd className="justify-self-end text-right font-medium text-ink">
+                <dd className="flex items-center justify-end gap-2 text-right font-medium text-ink">
+                  {quote.status === "real" && quote.value.simulated ? <SimulatedBadge /> : null}
                   {quote.status === "real" ? quote.value.source : "The rock's own strategy"}
                 </dd>
               </dl>

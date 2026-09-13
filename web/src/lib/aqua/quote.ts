@@ -84,10 +84,11 @@ export function quoteExactIn(state: CurveState, amountIn: bigint): QuoteResult {
  *   amountOutWithFee = amountOut * 10000 / (10000 - feeBps)
  *   amountIn         = ceil(balanceIn * amountOutWithFee / (balanceOut - amountOutWithFee))
  *
- * **This is not the inverse of `quoteExactIn`.** The reference app takes its fee off the *input*
- * when quoting an exact input and off the *output* when quoting an exact output, so a round trip
- * comes back roughly `feeBps` higher than it started (0.3% on a 30 bps strategy, not a rounding
- * unit). That asymmetry is upstream's, and it is mirrored here deliberately — this function
+ * **This is not the exact inverse of `quoteExactIn`.** The reference app takes its fee off the
+ * *input* when quoting an exact input and grosses up the *output* when quoting an exact output,
+ * so a round trip drifts by about `feeBps × (amountIn / balanceIn)` — 0.003% for a trade of 1%
+ * of the reserve at 30 bps, a second-order effect, not the fee itself (measured 2026-09-13).
+ * That asymmetry is upstream's, and it is mirrored here deliberately — this function
  * exists to predict `swapExactOut`, which behaves exactly this way. Bank Rock's swap path is
  * exact-in only, so the asymmetry never reaches a user.
  *

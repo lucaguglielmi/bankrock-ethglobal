@@ -22,7 +22,7 @@
  */
 
 import { useState, type ReactNode } from "react";
-import { Globe, RefreshCw } from "lucide-react";
+import { Globe, RefreshCw, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { SimulatedBadge } from "@/components/ui/simulated-badge";
@@ -37,6 +37,7 @@ import { StrategyPicker } from "@/components/rock/strategy-picker";
 import { StreamCard, streamName } from "@/components/rock/stream-card";
 import type { ParsedStream, StrategyView } from "@/hooks/useAquaStrategy";
 import { isDemoMode, type Capability } from "@/lib/demo";
+import { cn } from "@/lib/ui/cn";
 
 const ZERO = BigInt(0);
 
@@ -57,6 +58,11 @@ export interface LiquidityTabProps {
   onGoToTrade?: () => void;
   /** Opens the simulated bridge sheet. Only reachable under `NEXT_PUBLIC_DEMO_MODE=true`. */
   onCrossChain?: () => void;
+  /**
+   * Opens the page's own "Add funds" sheet (the header CTA and the owner menu share it). When
+   * absent the tab mounts its own copy of the sheet.
+   */
+  onAddFunds?: () => void;
 }
 
 /** What the ship sheet opens on: a picked option, or nothing (the sheet then offers the rest). */
@@ -75,6 +81,7 @@ export function LiquidityTab({
   ownerActions,
   onRefresh,
   onCrossChain,
+  onAddFunds,
 }: LiquidityTabProps) {
   const [isFundOpen, setFundOpen] = useState(false);
   const [shipRequest, setShipRequest] = useState<ShipRequest | null>(null);
@@ -93,8 +100,9 @@ export function LiquidityTab({
       `Stream ${Number(index) + 1}`,
   );
   const crossChain = isDemoMode() ? onCrossChain : undefined;
+  const openFund = onAddFunds ?? (() => setFundOpen(true));
 
-  const fundSheet = (
+  const fundSheet = onAddFunds ? null : (
     <FundRockSheet
       open={isFundOpen}
       onOpenChange={setFundOpen}
@@ -123,7 +131,7 @@ export function LiquidityTab({
   if (reserves.value.usdc === ZERO) {
     return (
       <>
-        <FundingWait onAddFunds={() => setFundOpen(true)} onCrossChain={crossChain} />
+        <FundingWait onAddFunds={openFund} onCrossChain={crossChain} />
         {fundSheet}
       </>
     );
@@ -169,7 +177,7 @@ export function LiquidityTab({
           <p className="max-w-prose text-base text-ink-2">
             A strategy needs both USDC and WETH, and this rock holds no WETH yet.
           </p>
-          <Button size="lg" className="w-full" onClick={() => setFundOpen(true)}>
+          <Button size="lg" className="w-full" onClick={openFund}>
             Add funds
           </Button>
         </div>
@@ -179,7 +187,7 @@ export function LiquidityTab({
         <p className="max-w-prose text-base text-ink-2">
           This rock holds funds but is not trading yet. Only its owner can start it.
         </p>
-        <Button variant="outline" className="w-full" onClick={() => setFundOpen(true)}>
+        <Button variant="outline" className="w-full" onClick={openFund}>
           Add funds
         </Button>
       </div>
@@ -220,12 +228,16 @@ export function LiquidityTab({
             </div>
             <StrategyPicker
               compact
+              layout="grid"
               options={remaining}
               disabled={ownerBlockedReason !== null}
               onPick={(option) => setShipRequest({ option })}
+              trailing={<AddFundsCard onClick={openFund} />}
             />
           </section>
-        ) : null}
+        ) : (
+          <AddFundsCard onClick={openFund} />
+        )}
       </div>
     );
   }
@@ -240,7 +252,7 @@ export function LiquidityTab({
   // The body already carries its own "Add funds" when the owner lacks WETH or a visitor finds
   // nothing trading; every other state gets it once, quietly, at the bottom.
   const bodyHasAddFunds =
-    !stillReading && strategy.state !== "UNAVAILABLE" && !isLive && (!isOwner || !hasWeth);
+    !stillReading && strategy.state !== "UNAVAILABLE" && (isLive || !isOwner || !hasWeth);
   const showSecondary = !bodyHasAddFunds || crossChain !== undefined;
 
   return (
@@ -267,7 +279,7 @@ export function LiquidityTab({
       {showSecondary ? (
         <div className="flex flex-col gap-3 border-t border-border pt-6">
           {bodyHasAddFunds ? null : (
-            <Button variant="outline" className="w-full" onClick={() => setFundOpen(true)}>
+            <Button variant="outline" className="w-full" onClick={openFund}>
               Add funds
             </Button>
           )}
@@ -325,5 +337,31 @@ function StoppedLine({ names }: { names: string[] }) {
     <p className="max-w-prose text-caption text-ink-3">
       Stopped: {names.join(", ")}. A stopped stream cannot be restarted.
     </p>
+  );
+}
+
+/**
+ * "Add funds" as a card, so it can sit in the same row as the strategies on desktop and stack
+ * under them on a phone. Funding needs no owner authority, so it is never disabled.
+ */
+function AddFundsCard({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex h-full min-h-16 w-full items-center gap-3 rounded-2xl border border-dashed border-ink-4 bg-background px-4 py-3 text-left text-ink",
+        "motion-safe:transition-colors hover:bg-muted",
+        "sm:flex-col sm:items-start sm:gap-4 sm:p-5",
+      )}
+    >
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-ink sm:size-14">
+        <Wallet aria-hidden className="size-5 sm:size-6" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:w-full">
+        <span className="text-base font-semibold text-ink">Add funds</span>
+        <span className="text-sm text-ink-2">Top up the reserve every strategy draws on.</span>
+      </span>
+    </button>
   );
 }

@@ -25,6 +25,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Address } from "viem";
 import { unavailable, type Capability } from "@/lib/demo";
 import { parseStrategyView, type ParsedStrategyView, type RockStrategyViewJson } from "@/lib/aqua";
+import { useDemoRock } from "@/demo/rock-420/context";
+import { useDemoAquaStrategy } from "@/demo/rock-420/hooks";
 
 const REFETCH_MS = 15_000;
 
@@ -89,12 +91,25 @@ async function fetchStrategy(
  *               caller does not know it yet.
  */
 export function useAquaStrategy(rockId: string, maker?: Address): UseAquaStrategyResult {
+  // The demo rock's seam (`web/src/demo/rock-420`): its position comes from the browser and the
+  // strategy route is never asked. Both hooks run every render, so hook order never changes.
+  const demo = useDemoRock();
+  const mock = useDemoAquaStrategy();
+  const chain = useServerStrategy(rockId, maker, demo === null);
+  return demo ? mock : chain;
+}
+
+function useServerStrategy(
+  rockId: string,
+  maker: Address | undefined,
+  enabled: boolean,
+): UseAquaStrategyResult {
   const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: aquaStrategyQueryKey(rockId, maker),
     queryFn: () => fetchStrategy(rockId, maker),
-    enabled: rockId.trim() !== "",
+    enabled: enabled && rockId.trim() !== "",
     refetchInterval: REFETCH_MS,
     staleTime: REFETCH_MS,
     // `fetchStrategy` resolves with UNAVAILABLE instead of throwing, so a retry would only repeat

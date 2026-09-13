@@ -35,8 +35,15 @@ export interface StrategyPickerProps {
   disabled?: boolean;
   /** Inline content under the hint — the amounts this strategy would ship, for instance. */
   renderDetail?: (option: ShipOption) => ReactNode;
-  /** Smaller cards — art, name and fee only — for the "Add another strategy" row. */
+  /** Smaller cards — art, name, fee and a one-line hint — for the "Add another strategy" row. */
   compact?: boolean;
+  /**
+   * `list` stacks the cards; `grid` puts them side by side from `sm` up (two per row, three from
+   * `md`) and stacks them only on phones.
+   */
+  layout?: "list" | "grid";
+  /** An extra cell rendered after the cards — the "Add funds" card beside the strategies. */
+  trailing?: ReactNode;
 }
 
 export function StrategyPicker({
@@ -47,13 +54,21 @@ export function StrategyPicker({
   disabled = false,
   renderDetail,
   compact = false,
+  layout = "list",
+  trailing,
 }: StrategyPickerProps) {
   const isDisabled = disabled || disabledReason !== null;
   const selectable = selectedStreamIndex !== undefined;
 
   return (
     <div className="flex flex-col gap-3">
-      <ul className={cn("flex flex-col", compact ? "gap-2" : "gap-3")}>
+      <ul
+        className={cn(
+          layout === "grid"
+            ? "grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3"
+            : cn("flex flex-col", compact ? "gap-2" : "gap-3"),
+        )}
+      >
         {options.map((option) => {
           const selected = option.streamIndex === selectedStreamIndex;
           return (
@@ -64,39 +79,47 @@ export function StrategyPicker({
                 disabled={isDisabled}
                 onClick={() => onPick(option)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-2xl border border-border bg-background text-left text-ink",
+                  "flex h-full w-full items-center gap-3 rounded-2xl border border-border bg-background text-left text-ink",
                   "motion-safe:transition-colors hover:bg-muted",
                   "aria-pressed:border-ink aria-pressed:inset-ring aria-pressed:inset-ring-ink",
                   "disabled:pointer-events-none disabled:opacity-50",
-                  compact ? "min-h-14 px-3 py-2" : "min-h-20 px-4 py-4",
+                  compact ? "min-h-16 px-4 py-3" : "min-h-20 px-4 py-4",
+                  // In a grid the card stands upright from `sm`: art on top, words underneath.
+                  layout === "grid" ? "sm:flex-col sm:items-start sm:gap-4 sm:p-5" : null,
                 )}
               >
                 <StrategyArt
                   label={option.label}
-                  className={cn("text-ink", compact ? "size-10" : "size-14")}
+                  className={cn(
+                    "text-ink",
+                    compact ? "size-11" : "size-14",
+                    layout === "grid" ? "sm:size-14" : null,
+                  )}
                 />
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:w-full">
                   <span className="flex items-baseline justify-between gap-3">
                     <span className="text-base font-semibold text-ink">{option.label}</span>
                     <span className="shrink-0 text-num tabular-nums font-semibold text-ink">
                       {formatFeeRate(option.feeBps)}
                     </span>
                   </span>
-                  {compact ? null : (
-                    <>
-                      <span className="max-w-prose text-sm text-ink-2">{option.hint}</span>
-                      {renderDetail ? (
-                        <span className="text-sm tabular-nums text-ink-3">
-                          {renderDetail(option)}
-                        </span>
-                      ) : null}
-                    </>
-                  )}
+                  <span
+                    className={cn(
+                      "max-w-prose text-sm text-ink-2",
+                      compact ? "line-clamp-2" : null,
+                    )}
+                  >
+                    {option.hint}
+                  </span>
+                  {!compact && renderDetail ? (
+                    <span className="text-sm tabular-nums text-ink-3">{renderDetail(option)}</span>
+                  ) : null}
                 </span>
               </button>
             </li>
           );
         })}
+        {trailing ? <li>{trailing}</li> : null}
       </ul>
       {disabledReason ? (
         <p role="status" className="max-w-prose text-sm text-ink-3">

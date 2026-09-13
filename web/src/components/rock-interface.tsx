@@ -22,15 +22,22 @@
  *                      read-only until the rock changes hands.
  *  - **archived**      no tabs — the retired rock and its history.
  *  - **unavailable**   the reason, and under demo mode a badged sample.
+ *
+ * **Rock #420 is the stage demo** (`web/src/demo/rock-420`, DEMO-STATE.md S-5). For that id alone
+ * the page is wrapped in `DemoRockProvider`, every hook above answers from the browser's demo
+ * state with `DEMO` capabilities, the tap is not verified (there is no tag), and a banner with a
+ * "Reset demo" control sits above the identity row. Nothing else on the page changes for it.
  */
 
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { Wallet } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRock } from "@/hooks/useRock";
 import { useRockAccount } from "@/hooks/useRockAccount";
 import { useAquaStrategy } from "@/hooks/useAquaStrategy";
 import { isDemoMode, real, unavailable, type Capability } from "@/lib/demo";
+import { Button } from "@/components/ui/button";
 import { SimulatedBadge } from "@/components/ui/simulated-badge";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
@@ -44,6 +51,7 @@ import { DormantRock } from "@/components/rock/rock-dormant";
 import { ArchivedRock } from "@/components/rock/rock-archived";
 import { RockSample } from "@/components/rock/rock-sample";
 import { OwnerMenu } from "@/components/rock/owner-menu";
+import { FundRockSheet } from "@/components/rock/fund-rock-sheet";
 import { LiquidityTab } from "@/components/rock/tabs/liquidity-tab";
 import { TradeTab } from "@/components/rock/tabs/trade-tab";
 import { OwnershipTab } from "@/components/rock/tabs/ownership-tab";
@@ -51,6 +59,11 @@ import { ContractsTab } from "@/components/rock/tabs/contracts-tab";
 import { useTapAttestation } from "@/components/rock/use-tap-attestation";
 import { tapGateFor } from "@/components/rock/tap-gate";
 import { sameAddress } from "@/components/rock/util";
+import { DEMO_NO_CHAIN_REASON, isDemoRockId } from "@/demo/rock-420/constants";
+import { DemoRockProvider, useDemoRock } from "@/demo/rock-420/context";
+import { useDemoRockActions } from "@/demo/rock-420/hooks";
+import { DemoRockBanner, DemoRockLine } from "@/demo/rock-420/demo-rock-banner";
+import { DemoFundSheet } from "@/demo/rock-420/demo-fund-sheet";
 
 export interface RockPageParams {
   e?: string;
@@ -111,8 +124,23 @@ const NO_ACCOUNT_YET_REASON = "This rock has no account yet. Awakening it opens 
 /* Page                                                                        */
 /* -------------------------------------------------------------------------- */
 
-export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
+export function RockInterface(props: RockInterfaceProps) {
+  // Rock #420 alone is the browser-side demo. The provider is the whole gate: every hook the page
+  // reads checks it, and for any other id the page below is exactly what it always was.
+  if (isDemoRockId(props.rockId)) {
+    return (
+      <DemoRockProvider rockId={props.rockId}>
+        <RockPage {...props} />
+      </DemoRockProvider>
+    );
+  }
+  return <RockPage {...props} />;
+}
+
+function RockPage({ rockId, searchParams }: RockInterfaceProps) {
   const router = useRouter();
+  const demo = useDemoRock();
+  const demoActions = useDemoRockActions();
   const { ready, authenticated, address } = useAuth();
   const { rock, reserves, isLoading, refresh } = useRock(rockId);
 
@@ -145,11 +173,13 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
     authenticated,
   });
 
+  // The demo rock has no tag. Its tap is never verified — the parameters are dropped and the gate
+  // held at "wait" — so no counter is spent and no attestation is ever claimed for it.
   const tap = useTapAttestation({
     rockId,
-    params: { e: searchParams.e, c: searchParams.c, enc: searchParams.enc },
+    params: demo ? {} : { e: searchParams.e, c: searchParams.c, enc: searchParams.enc },
     subject: address,
-    gate,
+    gate: demo ? "wait" : gate,
   });
 
   /*
@@ -183,8 +213,31 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
   const [pendingAction, setPendingAction] = useState<"give" | null>(null);
   const [isGiveOpen, setGiveOpen] = useState(false);
   const [isCrossChainOpen, setCrossChainOpen] = useState(false);
+  const [isDemoFundOpen, setDemoFundOpen] = useState(false);
+  const [isFundOpen, setFundOpen] = useState(false);
 
   const isOwner = sameAddress(record?.owner, address);
+
+  /*
+   * How money gets into the rock. The real rock's "Add funds" is a wallet transfer to its account;
+   * the demo rock's is a sheet that credits the browser's pretend, badged. The Liquidity tab's
+   * "Add funds from another chain" entry opens the bridge simulation for a real rock and the demo
+   * funding sheet for rock #420; because that entry renders only under `NEXT_PUBLIC_DEMO_MODE`,
+   * the demo gets its own door under the tab whenever the flag is off.
+   */
+  const openCrossChain = useCallback(() => {
+    if (demo) setDemoFundOpen(true);
+    else setCrossChainOpen(true);
+  }, [demo]);
+  const crossChainDoor = isDemoMode() ? openCrossChain : undefined;
+
+  /** The page's one "Add funds" door: the header CTA and the owner menu both open it. */
+  const openAddFunds = useCallback(() => {
+    if (demo) setDemoFundOpen(true);
+    else setFundOpen(true);
+  }, [demo]);
+  const canAddFunds =
+    record !== null && (record.state === "awake" || record.state === "handover_pending");
 
   /*
    * Which tab is open. The visitor's own choice wins; before that, a hash in the URL; before
@@ -231,8 +284,11 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
   const tabOwnerActions: Capability<string> =
     record?.state === "handover_pending" ? unavailable(HANDOVER_READ_ONLY_REASON) : authority;
 
-  const contractsAccount: Capability<string> =
-    !record || record.state === "dormant"
+  // The Contracts tab promises "on Ethereum Sepolia and readable by anyone". The demo rock's
+  // account exists in this browser only, so that tab is told so rather than shown an address.
+  const contractsAccount: Capability<string> = demo
+    ? unavailable(DEMO_NO_CHAIN_REASON)
+    : !record || record.state === "dormant"
       ? unavailable(NO_ACCOUNT_YET_REASON)
       : real(record.smartAccount);
 
@@ -281,19 +337,24 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
                 onAwakened={refreshAll}
               />
             ) : (
-              <LiquidityTab
-                rockId={rockId}
-                smartAccount={record.smartAccount}
-                reserves={reserves}
-                strategy={strategy}
-                isStrategyLoading={isStrategyLoading}
-                isRefreshing={isLoading}
-                isOwner={isOwner}
-                ownerActions={tabOwnerActions}
-                onRefresh={refreshAll}
-                onGoToTrade={() => selectTab("trade")}
-                onCrossChain={isDemoMode() ? () => setCrossChainOpen(true) : undefined}
-              />
+              <>
+                <LiquidityTab
+                  rockId={rockId}
+                  // The demo rock's account is a derivation nobody controls, so the "Add funds"
+                  // sheet is not handed it: it must never be offered as a place to send tokens.
+                  smartAccount={demo ? undefined : record.smartAccount}
+                  reserves={reserves}
+                  strategy={strategy}
+                  isStrategyLoading={isStrategyLoading}
+                  isRefreshing={isLoading}
+                  isOwner={isOwner}
+                  ownerActions={tabOwnerActions}
+                  onRefresh={refreshAll}
+                  onGoToTrade={() => selectTab("trade")}
+                  onCrossChain={crossChainDoor}
+                  onAddFunds={openAddFunds}
+                />
+              </>
             )}
           </TabsPanel>
 
@@ -346,6 +407,8 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-6">
+      {demo ? <DemoRockBanner onReset={demo.reset} /> : null}
+
       {tap.status === "checked" && tap.resolution === "next_free" ? (
         <p className="text-sm text-ink-2">This rock was retired; starting a new one</p>
       ) : null}
@@ -357,12 +420,19 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         trailing={
           <span className="flex items-center gap-2">
             {rock.state === "DEMO" ? <SimulatedBadge /> : null}
+            {canAddFunds ? (
+              <Button onClick={openAddFunds}>
+                <Wallet aria-hidden />
+                Add funds
+              </Button>
+            ) : null}
             {isOwner && record && record.state !== "archived" ? (
               <OwnerMenu
                 rockId={rockId}
                 ownerActions={authority}
                 handoverPending={record.state === "handover_pending"}
                 lost={record.lost}
+                onAddFunds={canAddFunds ? openAddFunds : undefined}
                 onChanged={refreshAll}
               />
             ) : null}
@@ -370,7 +440,7 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         }
       />
 
-      <AttestationLine tap={tap} />
+      {demo ? <DemoRockLine /> : <AttestationLine tap={tap} />}
 
       {body}
 
@@ -384,13 +454,34 @@ export function RockInterface({ rockId, searchParams }: RockInterfaceProps) {
         onTransferSuccess={refreshAll}
       />
 
-      {isDemoMode() ? (
+      {isDemoMode() && !demo ? (
         <CrossChainModal
           isOpen={isCrossChainOpen}
           onClose={() => setCrossChainOpen(false)}
           rockId={rockId}
           smartAccountAddress={record?.smartAccount ?? ""}
           onDepositSuccess={refreshAll}
+        />
+      ) : null}
+
+      {demo ? null : (
+        <FundRockSheet
+          open={isFundOpen}
+          onOpenChange={setFundOpen}
+          rockId={rockId}
+          smartAccount={record?.smartAccount}
+          reserves={reserves}
+        />
+      )}
+
+      {demo ? (
+        <DemoFundSheet
+          open={isDemoFundOpen}
+          onOpenChange={setDemoFundOpen}
+          rockId={rockId}
+          reserves={reserves}
+          onFund={demoActions.fundDemo}
+          isPending={demoActions.isPending}
         />
       ) : null}
 

@@ -38,6 +38,8 @@ import { consumeIpRateLimit } from "@/lib/rate-limit";
 import { parseRockId } from "@/lib/rock-account";
 import { publicReasonWith } from "@/lib/errors";
 import { logger } from "@/lib/telemetry";
+import { isDemoRockId } from "@/demo/rock-420/constants";
+import { demoQuote } from "@/demo/rock-420/quote";
 
 function unavailableBody(reason: string) {
   return { state: "UNAVAILABLE" as const, reason, value: null };
@@ -85,6 +87,32 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const tokenIn = tokens[tokenInParam as TokenSymbol];
   const tokenOutSymbol: TokenSymbol = tokenInParam === "USDC" ? "WETH" : "USDC";
   const tokenOut = tokens[tokenOutSymbol];
+
+  /*
+   * Rock #420 is the stage demo (`web/src/demo/rock-420`, DEMO-STATE.md S-5). It has no strategy
+   * on chain, so nothing below could answer for it; its quote is the same `quoteExactIn` over the
+   * demo's seeded streams, and it says where it came from: `source: "demo"`. No RPC is touched.
+   */
+  if (isDemoRockId(id)) {
+    const quote = demoQuote({
+      streamIndex: Number(streamIndexParam),
+      tokenIn: tokenInParam as TokenSymbol,
+      amountIn: amountInParam,
+    });
+    if (quote.state === "UNAVAILABLE") {
+      return NextResponse.json(unavailableBody(quote.reason));
+    }
+    return NextResponse.json({
+      state: "DEMO",
+      value: quote.value,
+      rockId: id,
+      maker,
+      streamIndex: Number(streamIndexParam),
+      tokenIn: tokenIn.symbol,
+      tokenOut: tokenOut.symbol,
+      amountIn: amountInParam,
+    });
+  }
 
   const aquaAddresses = getAquaAddresses();
   if (aquaAddresses.state === "UNAVAILABLE") {

@@ -12,14 +12,21 @@
  * the invented river coordinates and tap counter, the "BaseScan Verified" badge, and the
  * hand-built explorer links. A hash now reaches the page only through `<TxHash>`, and only when
  * it is a real 32-byte receipt hash.
+ *
+ * Rock #420, the stage demo (`web/src/demo/rock-420`), is the one exception to "every row comes
+ * from a route": its history lives in the browser, renders through the same rows, is badged
+ * SIMULATED, and carries no hash at all — nothing about it was ever mined.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { ArrowRightLeft, CheckCircle2, Gift, Sparkles } from "lucide-react";
+import { SimulatedBadge } from "@/components/ui/simulated-badge";
 import { TxHash } from "@/components/ui/tx-hash";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { explorer } from "@/lib/chain";
 import { asTxHash, formatDateTime } from "@/components/rock/util";
+import { useDemoRock } from "@/demo/rock-420/context";
+import { useDemoActivityRows } from "@/demo/rock-420/hooks";
 
 type ActivityType = "trade" | "transfer" | "awaken" | "hardware";
 
@@ -81,7 +88,9 @@ type LoadState =
   | { status: "unavailable"; reason: string };
 
 export function RockActivity({ rockId }: { rockId: string }) {
-  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [fetched, setFetched] = useState<LoadState>({ status: "loading" });
+  const demo = useDemoRock();
+  const demoRows = useDemoActivityRows();
 
   const load = useCallback(async (): Promise<LoadState> => {
     const id = encodeURIComponent(rockId);
@@ -113,21 +122,34 @@ export function RockActivity({ rockId }: { rockId: string }) {
   }, [rockId]);
 
   useEffect(() => {
+    // The demo rock's history is in the browser; neither route is asked about it.
+    if (demo) return;
     let cancelled = false;
     load().then((next) => {
-      if (!cancelled) setState(next);
+      if (!cancelled) setFetched(next);
     });
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [load, demo]);
+
+  // The demo's rows pass through the same normaliser as a route's, so a `txHash` could only ever
+  // come from a real 32-byte value — and the demo's rows have none.
+  const state: LoadState = demo
+    ? { status: "ready", rows: normalise({ events: demoRows }) }
+    : fetched;
 
   return (
     <section className="flex flex-col gap-4 border-t border-border pt-8">
       <div className="flex flex-col gap-1">
-        <h2 className="text-h2 font-bold text-ink">Provenance</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-h2 font-bold text-ink">Provenance</h2>
+          {demo ? <SimulatedBadge /> : null}
+        </div>
         <p className="max-w-prose text-sm text-ink-2">
-          Everything this rock has done, read back from {explorer.name}.
+          {demo
+            ? "A pretend history for a demo rock. It lives in this browser, and nothing here is on chain."
+            : `Everything this rock has done, read back from ${explorer.name}.`}
         </p>
       </div>
 

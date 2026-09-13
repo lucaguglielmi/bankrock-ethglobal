@@ -22,6 +22,8 @@ import {
   type RockRecord,
   type RockReserves,
 } from "@/lib/rock-account";
+import { useDemoRock } from "@/demo/rock-420/context";
+import { useDemoRockRead } from "@/demo/rock-420/hooks";
 
 const REFETCH_MS = 15_000;
 
@@ -42,12 +44,26 @@ export function reservesQueryKey(smartAccount: string | undefined) {
   return ["rock-reserves", smartAccount ?? "none"] as const;
 }
 
+/**
+ * The seam for the demo rock (`web/src/demo/rock-420`, DEMO-STATE.md S-5). Inside
+ * `DemoRockProvider` for rock #420 the answer comes from the browser's demo state and the chain
+ * is never asked; everywhere else this is exactly `useChainRock`. Both hooks run on every render,
+ * so the hook order is the same whichever rock is open.
+ */
 export function useRock(rockId: string): UseRockResult {
+  const demo = useDemoRock();
+  const mock = useDemoRockRead();
+  const chain = useChainRock(rockId, demo === null);
+  return demo ? mock : chain;
+}
+
+function useChainRock(rockId: string, enabled: boolean): UseRockResult {
   const queryClient = useQueryClient();
 
   const rockQuery = useQuery({
     queryKey: rockQueryKey(rockId),
     queryFn: () => readRock(rockId),
+    enabled,
     refetchInterval: REFETCH_MS,
     staleTime: REFETCH_MS,
     // `readRock` resolves with UNAVAILABLE instead of throwing, so a retry would only repeat a
@@ -64,7 +80,7 @@ export function useRock(rockId: string): UseRockResult {
   const reservesQuery = useQuery({
     queryKey: reservesQueryKey(smartAccount),
     queryFn: () => readReserves(smartAccount),
-    enabled: Boolean(smartAccount) && !isDormant,
+    enabled: enabled && Boolean(smartAccount) && !isDormant,
     refetchInterval: REFETCH_MS,
     staleTime: REFETCH_MS,
     retry: false,

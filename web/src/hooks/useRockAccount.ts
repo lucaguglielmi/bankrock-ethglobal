@@ -37,6 +37,8 @@ import {
   type RockRecord,
 } from "@/lib/rock-account";
 import { useAuth } from "@/context/auth-context";
+import { useDemoRock } from "@/demo/rock-420/context";
+import { useDemoRockAccount } from "@/demo/rock-420/hooks";
 
 export interface UseRockAccountResult {
   /** The account that holds this rock's reserve. */
@@ -88,6 +90,15 @@ export interface UseRockAccountParams {
 }
 
 export function useRockAccount(params: UseRockAccountParams = {}): UseRockAccountResult {
+  // The demo rock's seam (`web/src/demo/rock-420`): its account and authority are the browser's
+  // pretend, and no derivation or `isOwner` read is made. Both hooks run on every render.
+  const demo = useDemoRock();
+  const mock = useDemoRockAccount();
+  const chain = useChainRockAccount(params, demo === null);
+  return demo ? mock : chain;
+}
+
+function useChainRockAccount(params: UseRockAccountParams, enabled: boolean): UseRockAccountResult {
   const { record = null, uidHash } = params;
   const { wallets } = useWallets();
   const { authenticated, address } = useAuth();
@@ -106,7 +117,8 @@ export function useRockAccount(params: UseRockAccountParams = {}): UseRockAccoun
     : undefined;
 
   // Derivation is only reached for a rock with no account on chain yet, and it needs a tag.
-  const derivationEnabled = Boolean(wallet) && Boolean(uidHash) && boundAccount === undefined;
+  const derivationEnabled =
+    enabled && Boolean(wallet) && Boolean(uidHash) && boundAccount === undefined;
 
   const derivation = useQuery({
     queryKey: rockAccountQueryKey(wallet?.address, uidHash),
@@ -127,7 +139,7 @@ export function useRockAccount(params: UseRockAccountParams = {}): UseRockAccoun
   // the answer without anything on this device changing.
   const answerQuery = useQuery({
     queryKey: accountAnswerQueryKey(boundAccount, wallet?.address),
-    enabled: Boolean(boundAccount) && Boolean(wallet),
+    enabled: enabled && Boolean(boundAccount) && Boolean(wallet),
     // The same 15-second cadence `useRock` polls the registry on: a claim changes the Safe's owner
     // set without anything on this device changing, and the page must catch up on its own.
     staleTime: 15_000,
