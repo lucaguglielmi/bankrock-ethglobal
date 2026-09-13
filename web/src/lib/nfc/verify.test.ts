@@ -50,6 +50,22 @@ vi.mock("@/lib/rock-account", () => {
       }
       return (highest + BigInt(1)).toString();
     },
+    // Restated like the two above: walk forward from the suggestion until the (mocked) registry
+    // reports a dormant id; null when it cannot answer. Covered for real in next-free-rock.test.ts.
+    findNextDormantRockId: async (
+      start: string,
+      readState: (id: string) => Promise<{ state: string; value?: { state: string } }>,
+      limit = 256,
+    ) => {
+      const first = parseRockId(start) ?? BigInt(1);
+      for (let i = BigInt(0); i < BigInt(limit); i++) {
+        const id = (first + i).toString();
+        const record = await readState(id);
+        if (record.state === "UNAVAILABLE") return null;
+        if (record.value?.state === "dormant") return id;
+      }
+      return null;
+    },
     resolveRockForTag: async () =>
       registry.boundUnavailable
         ? { state: "UNAVAILABLE", reason: "no registry" }
