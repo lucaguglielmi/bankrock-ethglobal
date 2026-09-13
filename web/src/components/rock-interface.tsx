@@ -21,7 +21,7 @@
  *  - **handover**      Ownership opens by default and holds the handover; the other tabs are
  *                      read-only until the rock changes hands.
  *  - **archived**      no tabs — the retired rock and its history.
- *  - **unavailable**   the reason, and under demo mode a badged sample.
+ *  - **unavailable**   the reason, and nothing else.
  *
  * **Rock #420 is the stage demo** (`web/src/demo/rock-420`, DEMO-STATE.md S-5). For that id alone
  * the page is wrapped in `DemoRockProvider`, every hook above answers from the browser's demo
@@ -36,20 +36,17 @@ import { useAuth } from "@/context/auth-context";
 import { useRock } from "@/hooks/useRock";
 import { useRockAccount } from "@/hooks/useRockAccount";
 import { useAquaStrategy } from "@/hooks/useAquaStrategy";
-import { isDemoMode, real, unavailable, type Capability } from "@/lib/demo";
+import { real, unavailable, type Capability } from "@/lib/demo";
 import { Button } from "@/components/ui/button";
 import { SimulatedBadge } from "@/components/ui/simulated-badge";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
-import { DemoSwitcher, type DemoScenario } from "@/components/demo-switcher";
 import { TransferModal } from "@/components/transfer-modal";
-import { CrossChainModal } from "@/components/cross-chain-modal";
 import { PrivyOnboardingModal } from "@/components/privy-onboarding-modal";
 import { AttestationLine } from "@/components/rock/attestation-line";
 import { RockIdentity } from "@/components/rock/rock-identity";
 import { DormantRock } from "@/components/rock/rock-dormant";
 import { ArchivedRock } from "@/components/rock/rock-archived";
-import { RockSample } from "@/components/rock/rock-sample";
 import { OwnerMenu } from "@/components/rock/owner-menu";
 import { FundRockSheet } from "@/components/rock/fund-rock-sheet";
 import { LiquidityTab } from "@/components/rock/tabs/liquidity-tab";
@@ -208,11 +205,9 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
     uidHash: tapUidHash,
   });
 
-  const [scenario, setScenario] = useState<DemoScenario>("awake");
   const [isOnboardingOpen, setOnboardingOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<"give" | null>(null);
   const [isGiveOpen, setGiveOpen] = useState(false);
-  const [isCrossChainOpen, setCrossChainOpen] = useState(false);
   const [isDemoFundOpen, setDemoFundOpen] = useState(false);
   const [isFundOpen, setFundOpen] = useState(false);
 
@@ -220,18 +215,9 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
 
   /*
    * How money gets into the rock. The real rock's "Add funds" is a wallet transfer to its account;
-   * the demo rock's is a sheet that credits the browser's pretend, badged. The Liquidity tab's
-   * "Add funds from another chain" entry opens the bridge simulation for a real rock and the demo
-   * funding sheet for rock #420; because that entry renders only under `NEXT_PUBLIC_DEMO_MODE`,
-   * the demo gets its own door under the tab whenever the flag is off.
+   * the demo rock's is a sheet that credits the browser's pretend, badged. One door serves both:
+   * the header CTA, the owner menu and the Liquidity tab all open it.
    */
-  const openCrossChain = useCallback(() => {
-    if (demo) setDemoFundOpen(true);
-    else setCrossChainOpen(true);
-  }, [demo]);
-  const crossChainDoor = isDemoMode() ? openCrossChain : undefined;
-
-  /** The page's one "Add funds" door: the header CTA and the owner menu both open it. */
   const openAddFunds = useCallback(() => {
     if (demo) setDemoFundOpen(true);
     else setFundOpen(true);
@@ -292,8 +278,6 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
       ? unavailable(NO_ACCOUNT_YET_REASON)
       : real(record.smartAccount);
 
-  const showSamples = isDemoMode() && rock.state === "UNAVAILABLE" && !isLoading;
-
   let body: ReactNode;
 
   if (isLoading && !record) {
@@ -301,12 +285,7 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
     // is missing before it has had a chance to arrive would be its own small lie.
     body = <p className="text-base text-ink-3">Reading this rock…</p>;
   } else if (rock.state === "UNAVAILABLE") {
-    body = (
-      <>
-        <UnavailableState reason={rock.reason} />
-        {showSamples ? <RockSample scenario={scenario} /> : null}
-      </>
-    );
+    body = <UnavailableState reason={rock.reason} />;
   } else if (record) {
     const state = record.state;
 
@@ -351,7 +330,6 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
                   ownerActions={tabOwnerActions}
                   onRefresh={refreshAll}
                   onGoToTrade={() => selectTab("trade")}
-                  onCrossChain={crossChainDoor}
                   onAddFunds={openAddFunds}
                 />
               </>
@@ -444,8 +422,6 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
 
       {body}
 
-      <DemoSwitcher currentScenario={scenario} onSelectScenario={setScenario} />
-
       <TransferModal
         isOpen={isGiveOpen}
         onClose={() => setGiveOpen(false)}
@@ -453,16 +429,6 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
         currentOwner={record?.owner ?? ""}
         onTransferSuccess={refreshAll}
       />
-
-      {isDemoMode() && !demo ? (
-        <CrossChainModal
-          isOpen={isCrossChainOpen}
-          onClose={() => setCrossChainOpen(false)}
-          rockId={rockId}
-          smartAccountAddress={record?.smartAccount ?? ""}
-          onDepositSuccess={refreshAll}
-        />
-      ) : null}
 
       {demo ? null : (
         <FundRockSheet

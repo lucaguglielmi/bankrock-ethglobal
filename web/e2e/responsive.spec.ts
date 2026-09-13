@@ -13,14 +13,14 @@ import {
 /**
  * Browser checks for specs/17-mobile-ui-and-typography.md Part 7, items 1-9.
  *
- * Runs against a production build with `NEXT_PUBLIC_DEMO_MODE=true` (spec 17 Part 7's own
- * preamble: "so every surface renders") and, in this CI job, no chain configured — no
- * `NEXT_PUBLIC_REGISTRY_ADDRESS`. That means `/rock/1` and `/rock/2` read `UNAVAILABLE` (spec 15
- * Part 3) and show the honest empty state plus a disabled `RockSample`, never the live
- * `Trade`/`Give`/cross-chain controls, which only mount once a rock record actually reads `REAL`.
- * Items 7 and 8 detect that and skip with a clear reason instead of failing on data nobody
- * configured — see the two `skipReasonIfDisabled` sites below. Point this job's env at a real
- * deployed registry and those checks exercise the genuine sheets instead.
+ * Runs against a plain production build — there is no build flag — and, in this CI job, no chain
+ * configured: no `NEXT_PUBLIC_REGISTRY_ADDRESS`. `/rock/1` and `/rock/2` therefore read
+ * `UNAVAILABLE` (spec 15 Part 3) and show the honest empty state alone, never the live
+ * `Trade`/`Give` controls, which only mount once a rock record actually reads `REAL`. The rock
+ * dashboard itself is checked on `/rock/420`, the stage demo (`src/demo/rock-420`): gated by its
+ * id alone, it renders a full, badged rock page from browser state with no chain at all, so items
+ * 7 and 8 run against real controls instead of skipping. Point this job's env at a deployed
+ * registry and `/rock/1` and `/rock/2` render their live pages too.
  *
  * Item 10 (Lighthouse mobile performance/accessibility budgets) is not run here: it needs a
  * throttled-network run against a public deployment, which is out of place in a PR-blocking unit
@@ -68,7 +68,7 @@ test.describe("layout and typography — items 1, 2, 3, 4, 5, 6", () => {
 });
 
 test.describe("primary action above the fold — item 7", () => {
-  test("the primary action on /rock/2 is fully inside the first viewport at 360x640", async ({
+  test("the primary action on /rock/420 is fully inside the first viewport at 360x640", async ({
     page,
   }, testInfo) => {
     test.skip(
@@ -76,7 +76,9 @@ test.describe("primary action above the fold — item 7", () => {
       "checked once, at the viewport spec 17 item 7 names (360x640)",
     );
 
-    await gotoAndSettle(page, "/rock/2");
+    // The stage demo is an awake, funded rock, so its identity row carries "Add funds" — the
+    // same button, in the same place, a live awake rock renders (rock-interface.tsx).
+    await gotoAndSettle(page, "/rock/420");
 
     // "Retired rock" is a heading with no action (ArchivedRock), not a button; the other three
     // are button labels. Matching both element kinds is what the spec's own regex implies.
@@ -87,14 +89,7 @@ test.describe("primary action above the fold — item 7", () => {
       .or(page.getByRole("heading", { name: /Retired rock/ }))
       .first();
 
-    if ((await candidate.count()) === 0) {
-      test.skip(
-        true,
-        "no primary-action element matched on /rock/2 — likely UNAVAILABLE with demo mode off, or the sample view not rendering",
-      );
-    }
-
-    await expect(candidate).toBeVisible();
+    await expect(candidate, "the demo rock page rendered no primary action").toBeVisible();
     const box = await candidate.boundingBox();
     const viewport = page.viewportSize();
     expect(box, "the primary action has no bounding box").not.toBeNull();
@@ -126,12 +121,6 @@ interface SheetCheck {
    * the one action always reachable without scrolling, on any sheet.
    */
   primaryButtonName?: string | RegExp;
-  /**
-   * When the trigger is present but disabled, skip with this message instead of failing — the
-   * two rock-page sheets are only reachable once a rock record reads REAL (spec 15 Part 3); with
-   * no registry configured, the trigger renders as the demo sample's disabled look-alike button.
-   */
-  skipReasonIfDisabled?: string;
 }
 
 /**
@@ -147,11 +136,11 @@ async function assertSheetReachable(page: Page, check: SheetCheck): Promise<void
     `no button matching "${check.triggerName}" ever appeared`,
   ).toBeVisible({ timeout: 10_000 });
 
-  if (check.skipReasonIfDisabled && !(await trigger.isEnabled())) {
-    test.skip(true, check.skipReasonIfDisabled);
-    return;
-  }
-
+  // Playwright scrolls a below-the-fold trigger into view before it can click it. That scroll is
+  // the page's business, not the sheet's, so it is made explicitly here and the position it
+  // leaves the page at is the baseline the "no scrolling to reach the action" check compares to.
+  await trigger.scrollIntoViewIfNeeded();
+  const scrollYBeforeOpen = await page.evaluate(() => window.scrollY);
   await trigger.click();
 
   const dialog = page.getByRole("dialog", { name: check.sheetTitle });
@@ -161,6 +150,15 @@ async function assertSheetReachable(page: Page, check: SheetCheck): Promise<void
     ? dialog.getByRole("button", { name: check.primaryButtonName }).first()
     : dialog.getByRole("button", { name: "Close" }).first();
   await expect(primary, "the sheet's primary action was not found inside it").toBeVisible();
+
+  // On phone widths the sheet slides up from the bottom edge (`Sheet`: a 200 ms transform
+  // transition from `translate-y-full`) and `toBeVisible` is already satisfied mid-slide. Item 8's
+  // claim is that the action ends up wholly inside the viewport, so wait for exactly that — it
+  // retries until the transition has finished — and only then measure the sheet at rest.
+  await expect(
+    primary,
+    "the sheet's primary action never came fully into the viewport",
+  ).toBeInViewport({ ratio: 1 });
 
   const [box, viewport, pageScrollY, hasScrollRegion] = await Promise.all([
     primary.boundingBox(),
@@ -183,10 +181,12 @@ async function assertSheetReachable(page: Page, check: SheetCheck): Promise<void
     ).toBeLessThanOrEqual(viewport.height);
   }
 
+  // `<=` rather than `===`: a modal scroll lock may pin the document and report 0 while the page
+  // stays visually where it was, which is not a scroll made to reach the action.
   expect(
     pageScrollY,
     "the page itself scrolled to reveal the sheet's primary action — it should already be in view",
-  ).toBe(0);
+  ).toBeLessThanOrEqual(scrollYBeforeOpen);
 
   expect(
     hasScrollRegion,
@@ -209,7 +209,7 @@ test.describe("sheets are reachable without sign-in — item 8", () => {
     await gotoAndSettle(page, "/shop");
     await assertSheetReachable(page, {
       triggerName: "Convince Us",
-      sheetTitle: "Claim an OG Rock",
+      sheetTitle: "Claim a Testnet Rock",
       primaryButtonName: "Send message",
     });
   });
@@ -218,7 +218,7 @@ test.describe("sheets are reachable without sign-in — item 8", () => {
     await gotoAndSettle(page, "/");
     await assertSheetReachable(page, {
       triggerName: "More about the rocks",
-      sheetTitle: "The physical bearer",
+      sheetTitle: "The stone itself",
       primaryButtonName: "Close",
     });
   });
@@ -232,34 +232,18 @@ test.describe("sheets are reachable without sign-in — item 8", () => {
     });
   });
 
-  test("Aqua explainer sheet, from /", async ({ page }) => {
-    await gotoAndSettle(page, "/");
-    await assertSheetReachable(page, {
-      triggerName: "What is Aqua?",
-      sheetTitle: "Understanding Aqua",
-      // No footer: it is tabs-only by design (spec 17 Part 5, L-10). Falls back to Close.
-    });
-  });
+  // The Aqua explainer is no longer a sheet: "What is Aqua?" on the landing page is a link to
+  // /learn/defi (components/how-it-works.tsx), and a page is covered by items 1-6 and 9 above.
 
-  test("add funds sheet, from /rock/2", async ({ page }) => {
-    await gotoAndSettle(page, "/rock/2");
+  test("add funds sheet, from /rock/420", async ({ page }) => {
+    // The demo rock's "Add funds" opens its own badged sheet (src/demo/rock-420/demo-fund-sheet)
+    // through the same door — header CTA, owner menu — a live rock's wallet-transfer sheet uses.
+    // Its footer action is disabled until an amount is typed; reachability is what is checked.
+    await gotoAndSettle(page, "/rock/420");
     await assertSheetReachable(page, {
       triggerName: "Add funds",
       sheetTitle: "Add funds",
-      // No footer: the sheet is an address, a QR and live balances. Falls back to Close.
-      skipReasonIfDisabled:
-        "'Add funds' is disabled — /rock/2 reads UNAVAILABLE (no registry configured), so only the demo sample's look-alike button rendered",
-    });
-  });
-
-  test("cross-chain sheet, from /rock/2", async ({ page }) => {
-    await gotoAndSettle(page, "/rock/2");
-    await assertSheetReachable(page, {
-      triggerName: "Add funds from another chain",
-      sheetTitle: "Top up from another chain",
-      primaryButtonName: /Enter an amount|Simulate sending|Deposit from another chain/,
-      skipReasonIfDisabled:
-        "'Add funds from another chain' is disabled — /rock/2 reads UNAVAILABLE (no registry configured), so only the demo sample's look-alike button rendered",
+      primaryButtonName: /Add to the rock|Adding…|Done/,
     });
   });
 });

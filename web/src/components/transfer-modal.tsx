@@ -392,12 +392,12 @@ export function TransferModal({
                   />
                 ))}
               </div>
+              {/* After the hackathon: a prompt to re-sign if the bundler refuses the stored operation at claim time; not built, so not claimed. */}
               <p className="text-sm text-ink-2">
                 After that the handover lapses and the rock is simply still yours. That window is
                 how long they have to <em>claim</em> it. The gasless part — the sponsored
-                transaction that hands over the account — only stays valid for a short time after
-                you sign. If they tap in after it expires, you&apos;ll get asked to sign once more
-                before the handover can finish.
+                transaction that hands over the account — is signed now and kept on our server
+                until they claim, or until you cancel the gift.
               </p>
             </fieldset>
 

@@ -46,8 +46,9 @@ One sponsored UserOperation from the Rock Account, atomic — either every call 
 with
 
 - `amountIn` = half of the token that is in surplus (by value at the quoted price; see 1.4);
-- `minOut` = `quoteExactIn(houseStrategy, amountIn) × (1 − tolerance)`, tolerance **1 %**,
-  `deadline` = now + 5 minutes — the same rules the visitor swap uses (D-030, audit F-8);
+- `minOut` = `quoteExactIn(houseStrategy, amountIn) × (1 − tolerance)`, tolerance **0.5 %**
+  (50 bps, `SLIPPAGE_TOLERANCE_BPS` in `web/src/components/rock/trade-panel.tsx`),
+  `deadline` = now + 5 minutes — the same rules the visitor swap uses (D-030; the deadline is audit F-8);
 - `usdcToShip` = balance − amountIn, `wethToShip` = **minOut**, not the quote: the ship records
   virtual balances, and the rock is guaranteed to hold at least `minOut` when step 4 runs. Any
   extra WETH the swap delivers above `minOut` stays in the Rock Account as reserve headroom.

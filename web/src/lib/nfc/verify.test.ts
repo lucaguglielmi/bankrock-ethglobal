@@ -2,10 +2,39 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { privateKeyToAccount } from "viem/accounts";
 import { keccak256, zeroAddress, type Hex } from "viem";
 
-import { resetSharedMemoryCounterStore } from "./counter-store";
 import { aesCbcEncrypt } from "./crypto";
 import { computeSdmMac, deriveSessionKeys } from "./sdm";
 import { uidSuffix, verifyTap } from "./verify";
+
+/* -------------------------------------------------------------------------- */
+/* Counter store                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The verifier fails closed without D1, and a unit test has none. A `MemoryCounterStore` — the
+ * atomic in-process double `counter-store.test.ts` covers — is injected explicitly in its place,
+ * so the replay rules below run against a store that really advances. Nothing in the production
+ * module can be talked into this: `resolveCounterStore` itself is what is replaced here.
+ * `available = false` makes it answer as production does with no D1.
+ */
+const counterStore = vi.hoisted(() => ({
+  available: true,
+  /** Forgets every counter the injected store has accepted. Bound by the mock factory. */
+  reset: () => {},
+}));
+
+vi.mock("./counter-store", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./counter-store")>();
+  const memory = new actual.MemoryCounterStore();
+  counterStore.reset = () => memory.reset();
+  return {
+    ...actual,
+    resolveCounterStore: async () =>
+      counterStore.available
+        ? { available: true, kind: "memory", store: memory }
+        : { available: false, reason: "counter_store_unavailable" },
+  };
+});
 
 /* -------------------------------------------------------------------------- */
 /* Registry stubs                                                              */
@@ -135,7 +164,6 @@ const ENV_KEYS = [
   "NXP_MASTER_KEY",
   "NXP_KEY_DIVERSIFY",
   "NXP_KEY_DIVERSIFY_APP_ID",
-  "NEXT_PUBLIC_DEMO_MODE",
   "ATTESTATION_SIGNER_PRIVATE_KEY",
   "NEXT_PUBLIC_REGISTRY_ADDRESS",
   "NEXT_PUBLIC_CHAIN_ID",
@@ -149,7 +177,8 @@ beforeEach(() => {
     saved[key] = process.env[key];
     delete process.env[key];
   }
-  resetSharedMemoryCounterStore();
+  counterStore.available = true;
+  counterStore.reset();
   resetRegistry();
 });
 
@@ -158,13 +187,12 @@ afterEach(() => {
     if (saved[key] === undefined) delete process.env[key];
     else process.env[key] = saved[key];
   }
-  resetSharedMemoryCounterStore();
+  counterStore.reset();
 });
 
-/** Key set, plus the demo-mode flag that permits the in-memory counter store. */
+/** Key set; the injected counter store is already available. */
 function configureVerifier(): void {
   process.env.NXP_MASTER_KEY = MASTER_KEY_HEX;
-  process.env.NEXT_PUBLIC_DEMO_MODE = "true";
 }
 
 /** Key set plus a signer and a registry address, so an attestation can be made. */
@@ -181,14 +209,12 @@ describe("uidSuffix", () => {
 
 describe("fail closed", () => {
   it("returns unconfigured with NXP_MASTER_KEY unset, and never verified", async () => {
-    process.env.NEXT_PUBLIC_DEMO_MODE = "true";
     const { e, c } = tap(1);
     const outcome = await verifyTap({ rockId: "1", e, c });
     expect(outcome.body).toEqual({ verified: false, reason: "unconfigured" });
   });
 
   it("returns unconfigured for a master key of the wrong length or shape", async () => {
-    process.env.NEXT_PUBLIC_DEMO_MODE = "true";
     const { e, c } = tap(1);
     for (const value of ["", "00", MASTER_KEY_HEX.slice(0, 30), "zz".repeat(16)]) {
       process.env.NXP_MASTER_KEY = value;
@@ -199,11 +225,29 @@ describe("fail closed", () => {
   });
 
   it("refuses to verify without a counter store, even with a valid CMAC", async () => {
+    // What production answers whenever D1 is unreachable: no store, no verdict, no exception.
     process.env.NXP_MASTER_KEY = MASTER_KEY_HEX;
-    delete process.env.NEXT_PUBLIC_DEMO_MODE;
+    counterStore.available = false;
     const { e, c } = tap(1);
     const outcome = await verifyTap({ rockId: "1", e, c });
+    expect(outcome.status).toBe(200);
     expect(outcome.body).toEqual({ verified: false, reason: "counter_store_unavailable" });
+    expect(outcome.counterStore).toBeUndefined();
+  });
+
+  it("a refusal for want of a store spends nothing — the same tap verifies once one is back", async () => {
+    process.env.NXP_MASTER_KEY = MASTER_KEY_HEX;
+    const { e, c } = tap(1);
+
+    counterStore.available = false;
+    await expect(verifyTap({ rockId: "1", e, c })).resolves.toMatchObject({
+      body: { verified: false, reason: "counter_store_unavailable" },
+    });
+
+    counterStore.available = true;
+    await expect(verifyTap({ rockId: "1", e, c })).resolves.toMatchObject({
+      body: { verified: true, counter: 1 },
+    });
   });
 });
 
@@ -597,7 +641,7 @@ describe("effective rock id resolution", () => {
 
     const { e, c } = tap(7);
     for (const rockId of [undefined, "", "new", "-1"]) {
-      resetSharedMemoryCounterStore();
+      counterStore.reset();
       const fresh = tap(7);
       const outcome = await verifyTap({ rockId, e: fresh.e, c: fresh.c });
       expect(outcome.body.resolution).toBe("next_free");

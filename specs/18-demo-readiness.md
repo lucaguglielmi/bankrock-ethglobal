@@ -7,7 +7,7 @@
 This document says **what is still missing, right now, to run the three-minute demo in
 [`08-mvp-and-demo.md`](./08-mvp-and-demo.md) end to end on a physical rock.**
 
-State of the tree: branch `exit-from-demo-mode`, HEAD `11d6817` ("XYCSwap strategy encoding,
+State of the tree: branch `main`, HEAD `11d6817` ("XYCSwap strategy encoding,
 taker periphery, tests and deploy script"), with an uncommitted working set. Uncommitted files are
 treated as real. `bash scripts/spec-checks.sh` runs 21 checks and is blocking in CI; run it before
 reading anything below as done, because an in-flight edit can turn one red.
@@ -29,12 +29,12 @@ contract deployed — i.e. what the *code* can do, not what the environment curr
 | # | Beat (spec 08) | Capability | Today | What is missing |
 | --- | --- | --- | --- | --- |
 | 1 | 0:00 Tap the rock, page opens | Tag URL resolves | **REAL** | Cloudflare `www` redirect still returns 308 to a literal placeholder (R-1); the tag has never been programmed (Part 4). `/r/[id]` preserves the query and deliberately does not verify — verifying on a redirect would burn the tap's counter. |
-| 2 | 0:00 "Verified Physical" badge | NFC attestation | **REAL (needs config)** | `NXP_MASTER_KEY` and `ATTESTATION_SIGNER_PRIVATE_KEY` unset; **never tested against a physical tag**, which is the one thing code cannot settle. F-7 is closed: the judge switcher has no callback that could set the badge, and it renders only under the flag. |
+| 2 | 0:00 "Verified Physical" badge | NFC attestation | **REAL (needs config)** | `NXP_MASTER_KEY` and `ATTESTATION_SIGNER_PRIVATE_KEY` unset; **never tested against a physical tag**, which is the one thing code cannot settle. F-7 is closed: the judge switcher was removed on 2026-09-13 along with the demo flag; nothing client-side can set the badge. |
 | 3 | 0:00 AR view | WebXR | **not implemented** | Cut by spec 15 Part 6. The opening beat is rewritten without it (spec 08). Do not demo it. |
 | 4 | 0:25 Privy sign-in, fresh browser | User identity | **REAL (needs config)** | `NEXT_PUBLIC_PRIVY_APP_ID` + the dashboard origin/chain config (spec 16 #1). The fabricated wallet is gone (A-1, A-2) and the hook-order crash is fixed (X-1). |
 | 5 | 0:55 Rock state, owner, Rock Account | Registry reads | **REAL (needs deploy)** | The registry is not deployed. The contract, the deploy script, the exported ABI, `web/src/lib/chain/abi/registry.ts` and `mcp/registry-abi.ts` are all current and CI fails on a stale copy of any of them. |
 | 6 | 0:55 Awaken: Safe deployed, sponsored | ERC-4337 Rock Account | **REAL (needs deploy + Pimlico)** | Registry address and a Pimlico sponsorship policy for chain 11155111. There is no separate "create the Safe" step: the address is counterfactual, salted by the tag (D-029), signed into the attestation, and deployed by the first sponsored UserOperation. |
-| 7 | 0:55 Fund: faucet + USDC/WETH | Funding | **REAL (ETH), manual (tokens)** | `FAUCET_PRIVATE_KEY` unset and unfunded. USDC/WETH have no in-app faucet: claim from Circle by hand to the Rock Account address (spec 16 Part 3). The app now shows that address where it is needed — the **Fund this rock** sheet on an awake rock (account, live balances, the USDC and WETH contracts, the Etherscan link) and, on a dormant rock, the account it would open with the signed-in wallet (D-029); the cross-chain bridge sheet renders only under `NEXT_PUBLIC_DEMO_MODE=true` (S-1). |
+| 7 | 0:55 Fund: faucet + USDC/WETH | Funding | **REAL (ETH), manual (tokens)** | `FAUCET_PRIVATE_KEY` unset and unfunded. USDC/WETH have no in-app faucet: claim from Circle by hand to the Rock Account address (spec 16 Part 3). The app now shows that address where it is needed — the **Fund this rock** sheet on an awake rock (account, live balances, the USDC and WETH contracts, the Etherscan link) and, on a dormant rock, the account it would open with the signed-in wallet (D-029); the cross-chain bridge sheet was removed on 2026-09-13 with the demo flag (a bridge is DEMO-STATE N-10). |
 | 8 | 0:55 Ship the Aqua strategy | Aqua strategy | **REAL (needs deploy)** | `NEXT_PUBLIC_AQUA_APP_ADDRESS` from `scripts/deploy-aqua-app.js`. **E-4 is resolved** — the strategy is `abi.encode(XYCSwap.Strategy)` with the rock id in the salt, pinned by matching tests in TypeScript and Solidity (D-030). This was the highest-risk item in the project; it is no longer open. |
 | 9 | 0:55 Show actual vs virtual balances | Reserves | **REAL (needs deploy)** | App address. `lib/aqua/read.ts` reads actual, virtual and *executable* separately and never sums virtual balances; `safeBalances` reverting is handled as "not shipped", not as an error. No APY anywhere (D-004). |
 | 10 | 1:35 Second user swaps against the rock | Visitor swap | **REAL (needs deploy)** | App **and** taker addresses. The visitor trades from a personal Safe (salt 0) through `XYCSwapTaker`, because the app calls back into its caller and a plain wallet cannot answer (D-030). Quote from `XYCSwap.quoteExactIn`; the 1inch API path is deleted. The trade sheet shows that Safe's address and its USDC/WETH balances, so the tokens can be sent before the demo and an empty account blocks the button with "This account holds no USDC — send some to the address above" instead of reverting in estimation. |
@@ -236,7 +236,7 @@ when the question was first asked.
 ### (c) Zero-code fallback for rehearsals
 
 Keep one rock id, never archive, and reset only the off-chain state between runs:
-`NEXT_PUBLIC_DEMO_MODE=true` locally, `MemoryCounterStore` instead of D1 (already the rule in
+a local D1 (`npm run db:migrate:local`); the in-memory counter store is a test double only (formerly the rule in
 `lib/nfc/counter-store.ts`: memory is selected only when the flag is on), and rehearse every beat
 except the one-shot `awakenRock`. Costs nothing, proves nothing on-chain.
 
@@ -291,7 +291,7 @@ Per spec 15 Part 8, plus what Part 1 above adds:
 | 2 | `bash scripts/spec-checks.sh`, and the CI run itself | all 21 checks pass. The job is blocking, as is the Playwright `e2e-responsive` matrix. `D-014*` and `D-015` are the two a judge can see |
 | 3 | ~~Registry deployed and verified; `contracts/deployments/sepolia.json` committed~~ **done 2026-09-12** | `bash scripts/check-live.sh` shows code at the registry address |
 | 4 | ~~XYCSwap + XYCSwapTaker deployed; one strategy shipped on a throwaway rock; one swap executed against it from a second account~~ **all done 2026-09-12** (rehearsal report) | `Shipped` and `Pushed` events on Sepolia Etherscan, and `safeBalances` answering for the recomputed `strategyHash` |
-| 5 | Every Part 2 secret set **on the Worker `web`**; `NEXT_PUBLIC_DEMO_MODE=false` | deploy job green **and** `NEXT_PUBLIC_APP_VERSION` on `https://bank-rock.com` has changed — a green deploy to a surface no domain points at is the failure this catches (spec 12) |
+| 5 | Every Part 2 secret set **on the Worker `web`** | deploy job green **and** `NEXT_PUBLIC_APP_VERSION` on `https://bank-rock.com` has changed — a green deploy to a surface no domain points at is the failure this catches (spec 12) |
 | 6 | D1 migrations applied to production (the deploy job does this) | `nfc_counters` exists |
 | 7 | Tag programmed per Part 4 | a tap on a phone opens `/r/{id}?e=…&c=…` |
 | 8 | Wallets funded: **relayer 0.05 ETH**, faucet 0.05 ETH (optional), attester 0, Rock Account 10–20 USDC + 0.01 WETH, taker 10–20 USDC + 0.005 WETH (Part 2.2 step 8) | balances read on Etherscan |

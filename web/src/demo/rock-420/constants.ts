@@ -2,8 +2,8 @@
  * Rock #420 — the stage demo rock (DEMO-STATE.md S-5).
  *
  * Rock 420 does not exist on chain. Every surface of its page is a badged pretend that lives in
- * the browser: the gate is the id alone, so it is served whether or not `NEXT_PUBLIC_DEMO_MODE`
- * is on. Nothing in this directory reads the registry, Aqua, an RPC or the application database
+ * the browser: there is no build flag; the id is the only gate, so it is served on the production
+ * deployment too. Nothing in this directory reads the registry, Aqua, an RPC or the application database
  * for this id, and nothing in it ever produces a transaction hash (D-014).
  *
  * The mock addresses are derived at runtime from labels — never written as literals (D-015) —

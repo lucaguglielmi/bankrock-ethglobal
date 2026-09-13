@@ -24,7 +24,7 @@ The seamed hooks are `useRock`, `useAquaStrategy`, `useRockAccount`, `useRockAct
 same seam for provenance. The real branches' queries are disabled for the demo, so no read of rock
 420 is ever made.
 
-Because the gate is the id alone, the demo is served **regardless of `NEXT_PUBLIC_DEMO_MODE`**.
+There is no build flag; the id is the only gate, so the demo is served **on the production deployment too**.
 
 ## What is mocked, and how
 

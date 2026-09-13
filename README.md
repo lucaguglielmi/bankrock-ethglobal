@@ -32,7 +32,7 @@ Built for ETHGlobal ETHOnline 2026 (the 1inch Aqua and Privy tracks). Live at
    - [Trading through the taker](#4-trading-through-the-taker)
    - [Gifting as an on-chain handover](#5-gifting-as-an-on-chain-handover)
    - [Retiring a rock](#6-retiring-a-rock)
-   - [The MCP endpoint](#7-the-mcp-endpoint)
+   - [The MCP server](#7-the-mcp-server)
 3. [Contracts on Sepolia](#contracts-on-sepolia)
 4. [Tech stack](#tech-stack)
 5. [Repository layout](#repository-layout)
@@ -41,6 +41,7 @@ Built for ETHGlobal ETHOnline 2026 (the 1inch Aqua and Privy tracks). Live at
 8. [Security model, in plain words](#security-model-in-plain-words)
 9. [Known limits and what is next](#known-limits-and-what-is-next)
 10. [Documentation](#documentation)
+11. [Independence](#independence)
 
 ---
 
@@ -101,7 +102,10 @@ Two honest footnotes. The verifier is real and pinned by tests against NXP's own
 vectors, but a physical tag has not yet been tapped against it (DEMO-STATE P-1). Until the
 prototype tag is programmed, a private "magic tap" route (`GET /api/demo/tap?key=…`, DEMO-STATE
 S-4) forges a genuine `(e, c)` pair for a *synthetic* tag with the real master key and redirects
-into the real flow — the chip is the only thing simulated, and every use is logged.
+into the real flow — the chip is the only thing simulated, and every use is logged. Rock 3, the
+live demo rock, was awakened through that link with the synthetic tag `04DE3057A11E80`; its
+on-chain counter (367523) is minutes since 2026-01-01, not a chip read count. No physical chip
+has been tapped yet.
 
 ### 2. The Rock Account and sponsored transactions
 
@@ -213,8 +217,8 @@ receipt's own `Pulled`/`Pushed` events, never from the preview.
 There is no immediate transfer function. A rock changes hands only when someone holding the stone
 presents a fresh attestation (D-027, D-032):
 
-1. The owner names a recipient — required; the app issues no open gifts — picks an expiry (at most
-   90 days) and optionally writes a message. Naming is a two-phone move: the recipient's account
+1. The owner names a recipient — required; the app issues no open gifts — picks an expiry (the app
+   offers 1, 7 or 30 days; the contract allows up to 90) and optionally writes a message. Naming is a two-phone move: the recipient's account
    sheet shows a QR of `bank-rock.com/rock/<id>?give=<their address>`; the giver's camera opens it
    and the give sheet is pre-filled. Pasting is the fallback.
 2. One signature does two things. `initiateHandover(rockId, recipient, expiresAt, messageHash)`
@@ -242,10 +246,13 @@ stored owner swap.
 readable, the tag binding is released so the next tap starts a new rock id, the read counter is
 **not** reset (so an old attestation cannot be replayed against the new rock), and the rock id is
 never reissued. It is what makes rehearsal possible with one physical tag. Rock 1 was retired at
-the end of the Sepolia rehearsal; **rock 3 is the live demo rock** (awake, funded with test USDC and
-WETH, one Wide stream live — read from the registry and Aqua on 2026-09-13).
+the end of the Sepolia rehearsal; **rock 3 is the live demo rock** (awake, holding 5 USDC and
+0.005 WETH, one Wide stream live allowing 2 USDC / 0.0003 WETH, and no trades yet — read from the
+registry and Aqua on 2026-09-13). The only swap against a rock on Sepolia so far is the 0.25 USDC
+rehearsal trade on rock 1, tx
+`0x2ab70a3c27a0aa1ea719f2e843ac4cd4c1eb53b43b449fab2cbe3a1fca751761`.
 
-### 7. The MCP endpoint
+### 7. The MCP server
 
 `mcp/index.ts` is a stdio [Model Context Protocol](https://modelcontextprotocol.io) server that an
 AI client (Claude Desktop, Cursor, a CLI) runs from a checkout. It is **read-only by decision**
@@ -263,8 +270,9 @@ AI client (Claude Desktop, Cursor, a CLI) runs from a checkout. It is **read-onl
 | `query_logs(...)`, `get_waitlist_stats()` | operator routes; need `ADMIN_API_KEY`, otherwise `unavailable` |
 | `simulate_cross_chain_intent`, `optimize_idle_yield` | always `unavailable` — no bridge, no idle yield (cut, spec 15 Part 6) |
 
-Configuration snippets and a starter prompt are on [bank-rock.com/mcp](https://bank-rock.com/mcp).
-The server needs `SEPOLIA_RPC_URL` and `REGISTRY_ADDRESS` in its `env`.
+The site calls it the **AI Oracle**; configuration snippets and a starter prompt are on
+[bank-rock.com/mcp](https://bank-rock.com/mcp). The server needs `SEPOLIA_RPC_URL` and
+`REGISTRY_ADDRESS` in its `env`.
 
 ---
 
@@ -311,7 +319,7 @@ source — every state, error and event has a plain-English `@notice`.
 | Contracts | **Solidity** 0.8.24 (registry) / 0.8.30 (vendored Aqua, taker), **Hardhat 3** with Solidity tests, OpenZeppelin 5 | `contracts/` |
 | AI | **Model Context Protocol** server (`@modelcontextprotocol/sdk`), stdio | `mcp/` |
 | Tests | **Vitest** (unit), **Playwright** + axe (viewport × route matrix), Hardhat/Forge-style `.t.sol` suites (unit + fuzz) | plus 21 static spec checks in `scripts/spec-checks.sh` |
-| PWA | Serwist service worker built by `web/scripts/build-sw.mjs` as a `prebuild` step | Web Push optional |
+| PWA | Serwist service worker built by `web/scripts/build-sw.mjs` as a `prebuild` step | Web Push optional; its delivery is sandboxed on purpose until mainnet |
 
 ---
 
@@ -333,7 +341,7 @@ source — every state, error and event has a plain-English `@notice`.
 │   ├── deployments/                        sepolia.json, sepolia-aqua-app.json, the rehearsal log
 │   └── audit/                              2026-09-12 findings, changes, sign-off
 ├── web/                      ← the Next.js app and the Cloudflare Worker
-│   ├── src/app/              pages (/, /rock/[id], /r/[id], /learn/*, /mcp, /shop, admin) and API routes
+│   ├── src/app/              pages (/, /rock/[id], /r/[id], /learn/*, /mcp, /shop, /alerts, /privacy, /terms, admin) and API routes
 │   ├── src/components/       rock-interface.tsx (the four-tab dashboard), rock/*, ui/*, landing sections
 │   ├── src/hooks/            useBankRock (awaken, ship, dock, gift, retire), useTakerActions (swap), reads
 │   ├── src/lib/chain/        the ONLY place an address literal may appear (D-015); ABIs
@@ -350,7 +358,7 @@ source — every state, error and event has a plain-English `@notice`.
 │   ├── spec-checks.sh        the 21 static definition-of-done checks (blocking in CI)
 │   ├── check-live.sh         is the deployed site up and pointed at contracts that exist?
 │   └── sync-web-abi.mjs      copies compiled ABIs into web/ and mcp/
-└── .github/workflows/        ci.yml (web, contracts, mcp, spec checks), deploy.yml, rehearse.yml
+└── .github/workflows/        ci.yml (web, contracts, mcp, spec checks, Playwright), deploy.yml, rehearse.yml
 ```
 
 ---
@@ -385,9 +393,9 @@ Each further capability is unlocked by exactly one thing, and until then the UI 
 | the ETH faucet | `FAUCET_PRIVATE_KEY` (funded); there is no default key |
 | a local database | `npm run db:migrate:local` (D1 binding `DB` in `wrangler.jsonc`) |
 
-`NEXT_PUBLIC_DEMO_MODE=true` turns on the badged simulation surfaces (the bridge sheet, the judge
-scenario switcher, an in-memory tap counter) for local rehearsal only. Production pins it to
-`false`, and the deploy workflow asserts that.
+There is no demo build flag. The only simulated surfaces are the magic tap link (S-4) and rock
+#420 (S-5), both listed in `DEMO-STATE.md`; the tap verifier fails closed without D1 and has no
+in-memory fallback.
 
 ### Tests and checks
 
@@ -399,9 +407,10 @@ cd mcp && npm install && npm run build
 bash scripts/spec-checks.sh                                # 21 static checks; must print 21 passed
 ```
 
-CI (`.github/workflows/ci.yml`) runs four jobs on every push and pull request: **Web** (lint,
+CI (`.github/workflows/ci.yml`) runs five jobs on every push and pull request: **Web** (lint,
 typecheck, test, build), **Contracts** (test, and fail if the committed ABI copies are stale),
-**MCP server** (build, ABI drift), and **Spec checks**. The spec checks are the mechanical half of
+**MCP server** (build, ABI drift), **Spec checks**, and **Responsive UI and accessibility** (the
+Playwright viewport × route matrix with axe; currently red on `main`, the other four are green). The spec checks are the mechanical half of
 the specs' definitions of done: no address literal outside `web/src/lib/chain`, no APY/APR wording,
 no synthesized transaction hashes, no fail-open secret checks, the typography scale, and the
 committed configuration matching the deployment records.
@@ -439,8 +448,8 @@ and re-awaken the tag — asserting every step from chain reads. Its last live r
 ## What is real and what is simulated
 
 Every user-visible value is in one of three states, computed and never assumed: **REAL** (a live
-contract, RPC or database answered), **DEMO** (invented, badged, and only under
-`NEXT_PUBLIC_DEMO_MODE=true`) or **UNAVAILABLE** (the backing is unreachable; the UI says what is
+contract, RPC or database answered), **DEMO** (invented and badged; today only rock #420, the
+stage prop, answers it) or **UNAVAILABLE** (the backing is unreachable; the UI says what is
 missing and shows no number). There is no fourth state and no `catch` block that substitutes a
 plausible value. The living list is [`DEMO-STATE.md`](./DEMO-STATE.md); the summary as of this
 README:
@@ -455,18 +464,19 @@ app and taker are deployed, verified and served by the live site.
 (P-1); the honest failure of a deliberately reverting UserOperation (P-7); the relayer's daily cap
 actually refusing a claim (P-10).
 
-**Simulated, and badged as such:** the cross-chain bridge sheet (S-1) and the judge scenario
-switcher's sample views (S-3), both only under the demo flag; the magic tap link that stands in for
-the chip until the tag is programmed (S-4 — everything after the tap is the real path); and
-**rock #420, the stage prop** (S-5): `/rock/420` is a rock that exists only in the browser —
+**Simulated, and badged as such:** the magic tap link that stands in for the chip until the tag
+is programmed (S-4 — everything after the tap is the real path); and **rock #420, the stage
+prop** (S-5): `/rock/420` is a rock that exists only in the browser —
 seeded balances, streams, trades and history in `localStorage`, every action answering a `DEMO`
 capability with no transaction hash, a banner naming it a demo and a *Reset demo* control. It is
-served regardless of the demo flag and never touches the registry, Aqua, an RPC or the database.
+gated by its id alone — there is no demo flag — and never touches the registry, Aqua, an RPC or
+the database.
 **Rock 3 is the real one.**
 
-**Unavailable on purpose, with no path:** AR view; alert delivery (preferences persist, nothing
-is sent); fiat on/off-ramp; session keys for an AI runtime; an ERC-20 gas paymaster; idle yield
-into lending protocols; replacement tags; and **any APY or APR figure, ever**.
+**Unavailable on purpose, with no path:** AR view; alert delivery and Web Push (preferences
+persist, nothing is sent — sandboxed intentionally until the project is on mainnet); fiat
+on/off-ramp; session keys for an AI runtime; an ERC-20 gas paymaster; idle yield into lending
+protocols; replacement tags; and **any APY or APR figure, ever**.
 
 **Designed, not implemented:** balancing a one-token top-up inside the ship operation against a
 Bank Rock house stream ([`specs/21-balance-and-ship.md`](./specs/21-balance-and-ship.md), D-038).
@@ -520,7 +530,6 @@ model is [`specs/06-nfc-security.md`](./specs/06-nfc-security.md). Security cont
   holding the stone.
 - Rate limits, the faucet, the relayer cap and the tap counter all live in D1 and **fail closed**:
   when the database cannot be reached, those routes refuse rather than guess.
-- The `www` host's bare root still redirects wrongly (DEMO-STATE W-1); every other path is fine.
 
 **Next**
 

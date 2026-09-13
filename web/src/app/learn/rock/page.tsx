@@ -60,7 +60,10 @@ export default function RockPage() {
                 its real record on <Term k="sepolia" />. Until the chip is programmed, a private
                 demo link plays the part of the chip and hands the rest of the flow the same signed
                 code a real tap would; everything after that point — the check, the counter, the{" "}
-                <Term k="attestation" />, the on-chain awakening — is the real path. Rock 420 is a
+                <Term k="attestation" />, the on-chain awakening — is the real path. Rock 3 was
+                awakened through that link with the synthetic tag 04DE3057A11E80; its on-chain
+                counter (367523) is minutes since 2026-01-01, not a chip read count. No physical
+                chip has been tapped yet. Rock 420 is a
                 stage prop: it lives only in your browser, is badged as a demo on every value, and
                 touches nothing on chain. The full list of what is still simulated is public in the
                 repository&rsquo;s <span className="font-semibold">DEMO-STATE.md</span>.

@@ -118,7 +118,7 @@ still one of its signing owners — the registry asks it.
 | Field | Example | What to put |
 | --- | --- | --- |
 | `rockId` | `1` | The rock you own. |
-| `recipient` | `0x2222…2222` | The wallet allowed to collect it. Put `0x0000000000000000000000000000000000000000` to mean "whoever taps this rock next" — anyone holding the object can then claim it. |
+| `recipient` | `0x2222…2222` | The wallet allowed to collect it. Put `0x0000000000000000000000000000000000000000` to mean "whoever taps this rock next" — anyone holding the object can then claim it. **Warning:** the Bank Rock app never issues such an open gift, and a claim on one reverts `AccountDoesNotAnswerToOwner` — no owner swap can be pre-signed for an unnamed recipient, so the Rock Account still answers to the giver (D-032). |
 | `expiresAt` | `1789000000` | Unix seconds. Must be in the future and no more than 90 days away. [epochconverter.com](https://www.epochconverter.com) converts a date. |
 | `messageHash` | `0x0000…0000` | `keccak256` of a gift message, or all zeros for none. The message itself is never stored on-chain. |
 

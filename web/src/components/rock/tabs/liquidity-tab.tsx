@@ -24,10 +24,9 @@
  */
 
 import { useState, type ReactNode } from "react";
-import { Globe, RefreshCw, Wallet } from "lucide-react";
+import { RefreshCw, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { SimulatedBadge } from "@/components/ui/simulated-badge";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { EditStrategySheet } from "@/components/rock/edit-strategy-sheet";
 import { FundingWait } from "@/components/rock/funding-wait";
@@ -39,7 +38,7 @@ import { StopStrategySheet } from "@/components/rock/stop-strategy-sheet";
 import { StrategyPicker } from "@/components/rock/strategy-picker";
 import { StreamCard, streamName } from "@/components/rock/stream-card";
 import type { ParsedStream, StrategyView } from "@/hooks/useAquaStrategy";
-import { isDemoMode, type Capability } from "@/lib/demo";
+import type { Capability } from "@/lib/demo";
 import { cn } from "@/lib/ui/cn";
 
 const ZERO = BigInt(0);
@@ -59,8 +58,6 @@ export interface LiquidityTabProps {
   onRefresh: () => void;
   /** Switches the dashboard to the Trade tab. Unused since the Trade tab is one tap away. */
   onGoToTrade?: () => void;
-  /** Opens the simulated bridge sheet. Only reachable under `NEXT_PUBLIC_DEMO_MODE=true`. */
-  onCrossChain?: () => void;
   /**
    * Opens the page's own "Add funds" sheet (the header CTA and the owner menu share it). When
    * absent the tab mounts its own copy of the sheet.
@@ -83,7 +80,6 @@ export function LiquidityTab({
   isOwner,
   ownerActions,
   onRefresh,
-  onCrossChain,
   onAddFunds,
 }: LiquidityTabProps) {
   const [isFundOpen, setFundOpen] = useState(false);
@@ -111,7 +107,6 @@ export function LiquidityTab({
       SHIP_OPTIONS.find((option) => option.streamIndex === Number(index))?.label ??
       `Stream ${Number(index) + 1}`,
   );
-  const crossChain = isDemoMode() ? onCrossChain : undefined;
   const openFund = onAddFunds ?? (() => setFundOpen(true));
 
   const fundSheet = onAddFunds ? null : (
@@ -143,7 +138,7 @@ export function LiquidityTab({
   if (reserves.value.usdc === ZERO) {
     return (
       <>
-        <FundingWait onAddFunds={openFund} onCrossChain={crossChain} />
+        <FundingWait onAddFunds={openFund} />
         {fundSheet}
       </>
     );
@@ -280,7 +275,6 @@ export function LiquidityTab({
   // nothing trading; every other state gets it once, quietly, at the bottom.
   const bodyHasAddFunds =
     !stillReading && strategy.state !== "UNAVAILABLE" && (isLive || !isOwner || !hasWeth);
-  const showSecondary = !bodyHasAddFunds || crossChain !== undefined;
 
   return (
     <div className="flex flex-col gap-10">
@@ -303,28 +297,13 @@ export function LiquidityTab({
         {earning}
       </section>
 
-      {showSecondary ? (
+      {bodyHasAddFunds ? null : (
         <div className="flex flex-col gap-3 border-t border-border pt-6">
-          {bodyHasAddFunds ? null : (
-            <Button variant="outline" className="w-full" onClick={openFund}>
-              Add funds
-            </Button>
-          )}
-          {crossChain ? (
-            <Button
-              variant="outline"
-              className="h-auto min-h-12 w-full flex-wrap justify-between gap-3 py-3 text-left"
-              onClick={crossChain}
-            >
-              <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <Globe aria-hidden />
-                Add funds from another chain
-              </span>
-              <SimulatedBadge />
-            </Button>
-          ) : null}
+          <Button variant="outline" className="w-full" onClick={openFund}>
+            Add funds
+          </Button>
         </div>
-      ) : null}
+      )}
 
       {fundSheet}
 

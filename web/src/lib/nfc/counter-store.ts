@@ -33,11 +33,13 @@ export function normaliseUid(uidHex: string): string {
 }
 
 /**
- * Non-durable in-process store.
+ * Non-durable in-process store — a test double, nothing more.
  *
- * WARNING: for unit tests and local development only. Worker isolates are
- * created and discarded continuously, so this provides no replay protection in
- * production. It is only ever selected when `NEXT_PUBLIC_DEMO_MODE === "true"`.
+ * WARNING: unit tests only. Worker isolates are created and discarded
+ * continuously, so this provides no replay protection in production, and
+ * `resolveCounterStore` never selects it: with no D1 binding the verifier
+ * fails closed. A test that needs a working store injects an instance of this
+ * class explicitly (see `verify.test.ts`).
  */
 export class MemoryCounterStore implements CounterStore {
   /** Non-durable: lives and dies with the isolate. */
@@ -132,31 +134,23 @@ export class D1CounterStore implements CounterStore {
 /* Selection                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Which store answered. `"d1"` is the only kind production ever reports;
+ * `"memory"` is what an injected `MemoryCounterStore` reports in a unit test.
+ */
 export type CounterStoreKind = "d1" | "memory";
 
 export type CounterStoreResolution =
   | { available: true; kind: CounterStoreKind; store: CounterStore }
   | { available: false; reason: "counter_store_unavailable" };
 
-/** Shared memory store, so a single demo-mode process keeps one view. */
-const sharedMemoryStore = new MemoryCounterStore();
-
-/** Test helper: reset the shared demo-mode store. */
-export function resetSharedMemoryCounterStore(): void {
-  sharedMemoryStore.reset();
-}
-
-function demoModeEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_DEMO_MODE === "true";
-}
-
 /**
  * Resolve the counter store for this request.
  *
- * D1 via the OpenNext Cloudflare context is the only durable option. When it is
- * not reachable the verifier fails closed (D-017): it returns `unavailable`,
- * and only a build explicitly running with `NEXT_PUBLIC_DEMO_MODE=true` falls
- * back to the non-durable in-memory store.
+ * D1 via the OpenNext Cloudflare context is the only option. When it is not
+ * reachable the verifier fails closed (D-017): it returns `unavailable` and no
+ * tap is verified. There is no fallback — not in development, not in a build
+ * flag — because a non-durable store is no replay protection at all (R-4).
  */
 export async function resolveCounterStore(): Promise<CounterStoreResolution> {
   let db: D1DatabaseLike | undefined;
@@ -169,16 +163,12 @@ export async function resolveCounterStore(): Promise<CounterStoreResolution> {
     }
   } catch {
     // No Cloudflare context (unit tests, `next dev` without the adapter, or a
-    // build without the binding). Fall through to the demo-mode decision.
+    // build without the binding). There is nothing to fall through to.
     db = undefined;
   }
 
   if (db) {
     return { available: true, kind: "d1", store: new D1CounterStore(db) };
-  }
-
-  if (demoModeEnabled()) {
-    return { available: true, kind: "memory", store: sharedMemoryStore };
   }
 
   return { available: false, reason: "counter_store_unavailable" };

@@ -15,7 +15,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Bank Rock — Tangible DeFi",
+    name: "Bank Rock — Liquidity you can hold",
     short_name: "Bank Rock",
     description: "A physical interface to self-custodial liquidity and agentic Aqua strategies.",
     start_url: "/",

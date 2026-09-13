@@ -143,7 +143,7 @@ export function generateAlertEmailHtml(payload: AlertEmailPayload): string {
 
     <div style="padding: 20px 32px; background-color: #fbfbfb; border-top: 1px solid #f0f0f0; font-size: 11px; color: #a3a3a3; line-height: 1.5;">
       <p style="margin: 0 0 6px 0;">You received this notification because your email is registered to monitor Bank Rock #${safeRockId}.</p>
-      <p style="margin: 0;">Hand-forged in Tuscany.</p>
+      <p style="margin: 0;">Picked by hand near Florence.</p>
     </div>
 
   </div>
@@ -152,11 +152,14 @@ export function generateAlertEmailHtml(payload: AlertEmailPayload): string {
   `.trim();
 }
 
-/** The configured sender. Falls back to the Resend sandbox domain, which is reported as such. */
+/**
+ * The configured sender. Falls back to Resend's documented test sender, `onboarding@resend.dev`,
+ * which is reported as sandbox: it delivers only to the Resend account owner's own inbox.
+ */
 export function alertSender(): { from: string; sandbox: boolean } {
   const configured = optionalEnv("ALERT_FROM_ADDRESS");
   if (configured) return { from: configured, sandbox: false };
-  return { from: "Bank Rock <alerts@resend.dev>", sandbox: true };
+  return { from: "Bank Rock <onboarding@resend.dev>", sandbox: true };
 }
 
 /**

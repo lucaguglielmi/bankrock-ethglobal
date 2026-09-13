@@ -1,11 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   D1CounterStore,
   MemoryCounterStore,
   NFC_COUNTERS_TABLE,
   normaliseUid,
-  resetSharedMemoryCounterStore,
   resolveCounterStore,
   type D1DatabaseLike,
 } from "./counter-store";
@@ -17,6 +16,11 @@ describe("normaliseUid", () => {
   });
 });
 
+/**
+ * The test double `verify.test.ts` and `endpoints.test.ts` inject in place of D1. Its replay
+ * semantics have to match the durable store's exactly, or those suites would be proving the
+ * wrong thing.
+ */
 describe("MemoryCounterStore", () => {
   let store: MemoryCounterStore;
 
@@ -163,33 +167,44 @@ describe("D1CounterStore", () => {
 /* -------------------------------------------------------------------------- */
 
 describe("resolveCounterStore", () => {
-  const original = process.env.NEXT_PUBLIC_DEMO_MODE;
-
   afterEach(() => {
-    if (original === undefined) delete process.env.NEXT_PUBLIC_DEMO_MODE;
-    else process.env.NEXT_PUBLIC_DEMO_MODE = original;
-    resetSharedMemoryCounterStore();
+    vi.doUnmock("@opennextjs/cloudflare");
+    vi.resetModules();
   });
 
-  it("is unavailable with no D1 binding and demo mode off", async () => {
-    delete process.env.NEXT_PUBLIC_DEMO_MODE;
+  it("is unavailable with no D1 binding — there is no fallback (D-017, R-4)", async () => {
+    // A unit test has no Cloudflare context, which is exactly the production failure this
+    // guards: nothing in the environment can turn an absent D1 into a non-durable store.
     await expect(resolveCounterStore()).resolves.toEqual({
       available: false,
       reason: "counter_store_unavailable",
     });
   });
 
-  it("is unavailable when NEXT_PUBLIC_DEMO_MODE is any value other than the literal true", async () => {
-    for (const value of ["false", "1", "TRUE", "yes", ""]) {
-      process.env.NEXT_PUBLIC_DEMO_MODE = value;
-      const resolved = await resolveCounterStore();
-      expect(resolved.available).toBe(false);
-    }
+  it("selects D1, and only D1, when the Cloudflare context exposes the binding", async () => {
+    const { db, queries } = fakeD1();
+    vi.doMock("@opennextjs/cloudflare", () => ({
+      getCloudflareContext: async () => ({ env: { DB: db } }),
+    }));
+    vi.resetModules();
+    const fresh = await import("./counter-store");
+
+    const resolved = await fresh.resolveCounterStore();
+    expect(resolved).toMatchObject({ available: true, kind: "d1" });
+    if (!resolved.available) throw new Error("unreachable");
+    await expect(resolved.store.advance("04DE5F1EACC040", 1)).resolves.toBe(true);
+    expect(queries[0]).toContain(NFC_COUNTERS_TABLE);
   });
 
-  it("falls back to the non-durable memory store only in demo mode", async () => {
-    process.env.NEXT_PUBLIC_DEMO_MODE = "true";
-    const resolved = await resolveCounterStore();
-    expect(resolved).toMatchObject({ available: true, kind: "memory" });
+  it("is unavailable when the context has no usable DB binding", async () => {
+    vi.doMock("@opennextjs/cloudflare", () => ({
+      getCloudflareContext: async () => ({ env: { DB: {} } }),
+    }));
+    vi.resetModules();
+    const fresh = await import("./counter-store");
+    await expect(fresh.resolveCounterStore()).resolves.toEqual({
+      available: false,
+      reason: "counter_store_unavailable",
+    });
   });
 });

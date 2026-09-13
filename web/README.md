@@ -37,8 +37,9 @@ Secrets are set on the Worker and never in a file; `.env.example` lists every va
 lives in production, and what unset means for the UI (always `UNAVAILABLE` with a reason, never a
 placeholder — D-013). Copy it to `.env.local` for local work.
 
-`NEXT_PUBLIC_DEMO_MODE=true` enables the badged simulation surfaces for local rehearsal only;
-production pins it to `false`, and the deploy workflow asserts that.
+There is no build-time demo flag. The one simulated surface is rock 420, the stage demo
+(`src/demo/rock-420/`), gated by its id alone and badged `SIMULATED` wherever it shows a value;
+`scripts/spec-checks.sh` fails if the retired flag reappears.
 
 Every contract address is read from `src/lib/chain` and nowhere else (D-015); a spec check fails
 the build if a 20-byte literal appears anywhere else under `src/`.
