@@ -5,10 +5,11 @@
  * story (Florence map) and a short mechanics explainer main added ("What is this, exactly?").
  * Restyled from the version merged in from `main`: tokens only (no arbitrary pixel text sizes, no
  * low-contrast neutral-400 on real copy — the SVG map's own decorative pins keep their `fill-*`
- * colours, which are illustration, not text), 44 px prev/next controls at every width (not `hidden
- * md:block`), a touch swipe in addition to the buttons, and `prefers-reduced-motion` respected via
- * Framer Motion's own `useReducedMotion` (the Tailwind `motion-safe:` variant only gates CSS
- * transitions/animations, which this slide-in effect is not).
+ * colours, which are illustration, not text), the map's captions as HTML text over the SVG rather
+ * than `<text>` inside its viewBox (`MapLabel`), 44 px prev/next controls at every width (not
+ * `hidden md:block`), a touch swipe in addition to the buttons, and `prefers-reduced-motion`
+ * respected via Framer Motion's own `useReducedMotion` (the Tailwind `motion-safe:` variant only
+ * gates CSS transitions/animations, which this slide-in effect is not).
  */
 
 import * as React from "react";
@@ -21,6 +22,51 @@ import { cn } from "@/lib/ui/cn";
 
 const SLIDE_COUNT = 2;
 const SWIPE_THRESHOLD_PX = 50;
+
+/** The map's `viewBox` is `0 0 160 160`; its pins and captions are placed in those units. */
+const MAP_UNITS = 160;
+
+interface MapLabelProps {
+  /** The pin's position, in viewBox units. */
+  x: number;
+  y: number;
+  /** Which side of the pin the caption sits on. */
+  side?: "left" | "right";
+  /**
+   * `aside` is one of the grey jokes, shown only from `lg` up — below that the map is a phone's
+   * width and they would run into each other; `place` is the bold blue name that always shows.
+   */
+  kind?: "aside" | "place";
+  children: React.ReactNode;
+}
+
+const MAP_LABEL_KIND: Record<NonNullable<MapLabelProps["kind"]>, string> = {
+  aside: "hidden font-medium text-ink-3 lg:block",
+  place: "font-bold tracking-widest text-link uppercase drop-shadow-md",
+};
+
+/**
+ * A pin's caption, laid over the map as HTML text. SVG `<text>` scales with the viewBox — the old
+ * `fontSize="2"` came out at 3 px on a phone — which fails the 12 px floor (spec 17 Part 7 item 2)
+ * and cannot be read anyway; here the caption is `text-label` at real size, positioned at the pin's
+ * viewBox coordinates as percentages so it still follows the map as it resizes. (Classes are joined
+ * by hand: `cn()`'s tailwind-merge takes `text-label` for a colour and drops it next to `text-ink-3`.)
+ */
+function MapLabel({ x, y, side = "right", kind = "aside", children }: MapLabelProps) {
+  const top = `${(100 * y) / MAP_UNITS}%`;
+  const style =
+    side === "left"
+      ? { top, right: `${100 - (100 * x) / MAP_UNITS}%` }
+      : { top, left: `${(100 * x) / MAP_UNITS}%` };
+  return (
+    <span
+      className={`absolute -translate-y-1/2 whitespace-nowrap text-label ${side === "left" ? "pr-2" : "pl-2"} ${MAP_LABEL_KIND[kind]}`}
+      style={style}
+    >
+      {children}
+    </span>
+  );
+}
 
 export function StoryCarousel() {
   const [slide, setSlide] = React.useState(0);
@@ -82,6 +128,7 @@ export function StoryCarousel() {
               </div>
 
               <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-neutral-100 bg-white p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)]">
+                <div className="relative h-full w-full">
 <svg viewBox="0 0 160 160" className="w-full h-full z-10 opacity-90 transition-transform duration-1000 group-hover:scale-105" style={{ filter: 'drop-shadow(0 20px 30px rgba(0,0,0,0.05))' }}>
   <g transform="translate(24.221002152929323, 10.0) scale(0.013681802323365489, -0.013681802323365489) translate(-1043.07, -10238.65)">
     <path d="M4826 10195 c-49 -25 -101 -45 -116 -45 -15 0 -59 12 -96 27 -56 21 -87 27 -159 27 -126 1 -152 -6 -221 -65 -75 -65 -108 -79 -188 -79 -54 0 -75 6 -133 35 -93 49 -109 44 -116 -36 -3 -40 -13 -72 -26 -90 -28 -38 -26 -54 9 -79 43 -30 40 -56 -7 -64 -66 -10 -89 -7 -117 19 -38 35 -66 32 -108 -12 -49 -53 -51 -65 -18 -110 30 -38 37 -67 21 -77 -19 -12 -18 -47 1 -71 23 -30 17 -62 -17 -77 -21 -10 -30 -5 -77 37 -29 26 -59 60 -67 76 -20 43 -48 45 -134 9 -42 -17 -88 -30 -103 -28 -41 5 -63 43 -71 121 -7 76 -30 117 -66 117 -20 0 -24 -8 -35 -76 -16 -104 -48 -169 -112 -229 -117 -109 -107 -92 -115 -191 -4 -49 -12 -95 -17 -101 -30 -37 -86 3 -144 103 -25 42 -26 49 -15 80 7 19 10 38 6 43 -3 5 -29 17 -58 25 -65 19 -97 41 -97 67 0 27 -23 70 -50 92 -23 19 -24 49 -3 141 l6 29 -44 -7 c-32 -5 -55 -18 -84 -45 -22 -21 -61 -51 -88 -66 l-47 -27 21 -34 c30 -49 20 -73 -58 -140 -38 -32 -87 -76 -111 -98 l-42 -40 -73 36 -73 37 -50 -15 c-27 -8 -102 -20 -166 -26 -106 -11 -121 -10 -154 6 -37 17 -37 17 -115 -15 -75 -30 -79 -33 -79 -63 0 -24 9 -41 36 -67 49 -47 64 -79 64 -141 0 -50 2 -54 37 -78 59 -40 103 -81 103 -97 0 -8 -11 -29 -25 -47 -17 -23 -25 -46 -25 -74 0 -40 -1 -41 -27 -36 -18 3 -57 -5 -103 -22 -41 -15 -108 -30 -149 -34 -44 -5 -77 -13 -82 -21 -12 -18 -6 -60 20 -134 23 -64 36 -78 119 -126 57 -34 82 -70 82 -121 0 -27 -9 -43 -45 -78 -25 -25 -57 -61 -70 -81 -22 -31 -24 -39 -14 -68 9 -27 8 -40 -11 -83 -21 -50 -21 -52 -4 -97 23 -60 105 -140 185 -180 58 -29 69 -31 170 -31 168 0 199 -22 154 -109 -14 -28 -25 -62 -25 -76 0 -19 -9 -31 -31 -43 -60 -33 -79 -53 -79 -82 0 -71 30 -76 192 -30 175 49 183 53 239 136 72 107 103 139 153 158 39 15 47 23 69 76 21 47 34 63 64 78 152 78 330 68 422 -24 26 -26 41 -49 38 -58 -3 -8 1 -20 9 -26 11 -10 18 -8 33 11 l20 24 43 -40 c23 -22 45 -43 48 -46 3 -3 20 -14 39 -24 19 -9 77 -51 130 -93 53 -41 102 -80 109 -85 9 -7 17 -4 27 9 13 19 14 18 37 -3 14 -13 33 -23 44 -23 23 0 94 -69 94 -91 0 -8 11 -30 24 -48 29 -39 34 -65 50 -256 12 -146 14 -154 59 -255 26 -58 56 -122 67 -142 25 -46 25 -72 0 -200 -25 -128 -25 -124 5 -104 33 22 51 20 102 -9 32 -19 43 -32 43 -50 0 -13 -4 -27 -10 -30 -5 -3 -10 -24 -10 -45 0 -21 -5 -42 -11 -45 -16 -11 20 -45 48 -45 64 0 172 -84 195 -152 6 -18 22 -46 35 -62 16 -19 22 -35 17 -50 -9 -31 -34 -56 -56 -56 -23 0 -23 -12 2 -41 l20 -24 19 24 c15 20 25 23 52 18 152 -25 278 -138 383 -344 21 -43 31 -53 52 -53 17 0 35 -11 52 -32 15 -18 57 -62 93 -98 83 -83 89 -90 109 -153 14 -45 23 -56 63 -77 57 -32 152 -138 193 -216 27 -53 34 -59 65 -62 19 -2 43 -12 54 -22 11 -10 44 -28 72 -40 39 -17 60 -34 83 -68 16 -25 30 -54 30 -64 0 -27 37 -23 78 9 19 14 55 30 80 34 43 9 47 7 104 -36 33 -25 64 -45 69 -45 4 0 25 9 46 20 31 15 46 17 77 10 22 -5 43 -7 47 -4 32 19 199 -376 199 -469 0 -45 16 -49 25 -7 8 35 12 36 37 13 18 -16 21 -16 49 -1 37 22 50 17 94 -38 20 -24 47 -47 60 -50 46 -12 39 -47 -25 -112 -23 -24 -40 -45 -38 -47 2 -1 48 12 103 30 55 18 134 36 175 40 l76 7 36 -59 c102 -166 113 -213 69 -295 l-31 -57 36 -7 c22 -4 43 -17 56 -35 16 -22 25 -26 35 -18 17 15 101 -55 128 -105 11 -21 25 -34 32 -31 7 2 13 0 13 -5 0 -5 11 -17 25 -26 25 -16 27 -16 73 23 66 55 67 55 107 39 50 -21 85 -51 118 -98 23 -35 27 -51 27 -108 0 -75 19 -139 74 -248 24 -47 46 -77 62 -84 51 -23 84 -138 84 -291 l0 -97 61 -122 c59 -118 61 -123 49 -162 -6 -21 -24 -52 -39 -67 -28 -28 -28 -28 -72 -12 -57 21 -84 13 -136 -38 -39 -37 -57 -73 -34 -67 11 4 61 -68 61 -88 0 -22 -85 -187 -115 -223 -15 -17 -47 -43 -71 -57 -38 -22 -42 -28 -33 -45 7 -15 6 -40 -7 -95 l-16 -75 28 -31 c47 -50 83 -68 112 -57 14 5 51 7 84 3 49 -6 62 -4 79 12 37 33 79 102 79 129 0 16 18 50 47 88 90 118 120 144 194 172 38 15 76 36 84 48 23 33 21 239 -2 278 -17 28 -17 31 2 65 36 67 116 129 210 163 101 37 100 36 166 12 l50 -20 20 47 20 46 -27 54 c-26 50 -27 57 -15 101 9 37 9 54 0 74 -9 20 -9 40 0 83 15 75 15 71 -19 89 -17 9 -36 27 -42 40 -7 15 -41 41 -84 65 -39 21 -81 52 -92 67 -18 25 -27 28 -96 31 -72 4 -78 6 -100 36 -65 86 -68 127 -16 200 38 53 60 123 60 191 0 37 5 57 17 66 9 8 27 39 40 69 14 30 35 69 47 85 13 17 28 46 34 65 28 84 96 147 184 171 66 17 134 -27 126 -83 -2 -17 12 -29 82 -66 47 -25 104 -55 127 -67 38 -21 52 -22 147 -18 l106 6 33 -36 c18 -20 48 -65 67 -101 33 -61 34 -66 22 -100 -12 -34 -12 -40 12 -80 36 -62 230 -204 262 -192 11 4 14 26 14 90 0 98 7 120 51 170 39 45 37 65 -28 196 -42 84 -60 108 -163 210 -63 63 -125 129 -137 145 -12 17 -23 24 -23 18 0 -25 -28 -13 -38 16 -8 21 -19 31 -44 36 -35 8 -90 33 -98 45 -3 5 -40 26 -83 48 -89 47 -218 142 -256 190 -14 18 -55 50 -91 72 -75 45 -259 120 -294 120 -14 0 -46 16 -72 37 -27 20 -77 45 -114 56 -75 22 -151 59 -169 81 -8 9 -22 16 -33 16 -11 0 -45 24 -76 53 -31 29 -81 68 -110 86 -58 37 -76 62 -67 92 4 11 49 51 100 90 137 103 151 133 91 204 l-33 39 -95 -22 c-90 -20 -97 -21 -151 -5 -52 14 -65 14 -158 0 -93 -15 -104 -15 -132 0 -17 8 -60 18 -95 21 -60 5 -66 8 -126 62 -46 42 -80 63 -127 79 -68 23 -109 54 -109 82 0 12 -15 25 -42 37 -29 12 -75 53 -138 122 -52 57 -118 118 -146 136 -70 45 -100 83 -149 189 -58 124 -92 236 -100 325 -9 104 -27 162 -97 314 -52 110 -62 142 -66 199 l-4 67 -127 84 c-98 65 -166 122 -306 256 -98 95 -217 204 -263 244 -46 39 -92 84 -102 101 -25 40 -81 257 -81 310 1 86 1 122 0 174 -2 71 23 106 75 105 24 -1 36 3 36 12 0 34 23 62 49 61 24 -2 26 2 35 56 8 53 6 61 -12 80 -18 18 -25 19 -47 9 -39 -18 -45 -15 -45 22 0 64 -14 162 -19 139 l-6 -23 -33 26 c-40 32 -65 78 -57 105 6 19 14 20 63 2 8 -4 12 6 12 31 0 69 52 157 116 197 28 17 37 19 50 8 11 -9 18 -9 26 -1 7 7 25 12 41 12 25 0 28 -3 25 -27 -2 -19 -11 -30 -28 -35 -18 -6 -15 -7 14 -3 21 2 68 19 105 36 40 20 86 34 116 36 109 7 115 8 130 31 15 21 15 22 -9 22 -31 0 -32 8 -5 54 13 23 25 33 35 29 8 -3 22 2 32 10 15 14 25 13 97 -8 83 -24 100 -40 73 -72 -12 -15 -11 -15 10 -4 13 7 31 26 40 42 22 38 41 37 92 -6 56 -47 80 -78 80 -105 0 -17 5 -21 28 -18 21 2 28 9 30 30 4 36 -8 52 -90 123 -38 33 -68 66 -68 74 0 9 9 30 20 46 29 43 26 73 -7 85 -45 16 -76 34 -80 47 -3 7 21 40 53 73 31 33 55 62 53 63 -2 2 -47 16 -99 32 -52 15 -101 32 -108 38 -9 7 -12 29 -10 66 l3 56 79 42 c88 47 208 124 203 129 -2 2 -84 17 -183 34 -100 17 -205 37 -235 46 -30 9 -112 31 -184 50 -144 38 -244 82 -275 121 -32 41 -44 101 -31 151 10 40 9 46 -12 72 -13 15 -27 47 -31 69 -8 54 -25 53 -140 -4z m112 -2987 c10 -10 17 -10 31 -1 16 10 20 9 25 -3 10 -26 7 -54 -10 -79 -15 -23 -16 -23 -60 -8 -49 16 -57 40 -28 81 17 25 25 27 42 10z" className="fill-neutral-200" />
@@ -92,12 +139,10 @@ export function StoryCarousel() {
 
   <g transform="translate(48.50, 29.74)">
     <circle cx="0" cy="0" r="0.6" className="fill-neutral-400" />
-    <text x="-1.5" y="0.8" textAnchor="end" fontSize="2" className="fill-neutral-500 font-medium tracking-wide">Good designers</text>
   </g>
 
   <g transform="translate(77.80, 30.02)">
     <circle cx="0" cy="0" r="0.6" className="fill-neutral-400" />
-    <text x="1.5" y="0.8" textAnchor="start" fontSize="2" className="fill-neutral-500 font-medium tracking-wide">nice wine</text>
   </g>
 
   {/* Florence flashing dot */}
@@ -107,24 +152,40 @@ export function StoryCarousel() {
     <circle cx="0" cy="0" r="1" className="fill-blue-600 drop-shadow-[0_0_2px_rgba(37,99,235,0.8)]" />
     {/* Animated dashed ring */}
     <circle cx="0" cy="0" r="6" className="stroke-blue-400/60 fill-transparent stroke-[0.3] animate-[spin_4s_linear_infinite]" strokeDasharray="2 4" />
-    <text x="3" y="1" fontSize="2.5" className="fill-blue-600 font-bold tracking-widest uppercase drop-shadow-md">Florence</text>
   </g>
 
   <g transform="translate(79.50, 72.72)">
     <circle cx="0" cy="0" r="0.6" className="fill-neutral-400" />
-    <text x="1.5" y="0.8" textAnchor="start" fontSize="2" className="fill-neutral-500 font-medium tracking-wide">Old Roman stuff</text>
   </g>
 
   <g transform="translate(96.11, 85.41)">
     <circle cx="0" cy="0" r="0.6" className="fill-neutral-400" />
-    <text x="1.5" y="0.8" textAnchor="start" fontSize="2" className="fill-neutral-500 font-medium tracking-wide">Good pizza here</text>
   </g>
 
   <g transform="translate(46.72, 95.69)">
     <circle cx="0" cy="0" r="0.6" className="fill-neutral-400" />
-    <text x="-1.5" y="0.8" textAnchor="end" fontSize="2" className="fill-neutral-500 font-medium tracking-wide">nice beaches</text>
   </g>
 </svg>
+
+                  <MapLabel x={48.5} y={29.74} side="left">
+                    Good designers
+                  </MapLabel>
+                  <MapLabel x={77.8} y={30.02}>
+                    nice wine
+                  </MapLabel>
+                  <MapLabel x={67.87} y={50.19} kind="place">
+                    Florence
+                  </MapLabel>
+                  <MapLabel x={79.5} y={72.72}>
+                    Old Roman stuff
+                  </MapLabel>
+                  <MapLabel x={96.11} y={85.41}>
+                    Good pizza here
+                  </MapLabel>
+                  <MapLabel x={46.72} y={95.69} side="left">
+                    nice beaches
+                  </MapLabel>
+                </div>
 
                 <div className="absolute bottom-6 left-6 z-30 flex flex-col gap-1 text-caption text-ink-3 uppercase">
                   <span>Tuscany, IT</span>

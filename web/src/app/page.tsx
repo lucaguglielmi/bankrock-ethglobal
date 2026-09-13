@@ -50,17 +50,17 @@ export default function Home() {
           <div className="flex flex-col gap-4">
             <h2 className="text-2xl font-bold tracking-tight">The physical object</h2>
             <p className="text-ink-2 leading-relaxed">How it&apos;s made, the NFC activation flow, and true ownership mechanics.</p>
-            <Link href="/learn/rock" className="inline-flex items-center gap-1.5 font-semibold hover:opacity-70 transition-opacity">Learn more <ArrowRight className="size-4" /></Link>
+            <Link href="/learn/rock" className="inline-flex h-11 items-center gap-1.5 font-semibold hover:opacity-70 transition-opacity">Learn more <ArrowRight className="size-4" /></Link>
           </div>
           <div className="flex flex-col gap-4">
             <h2 className="text-2xl font-bold tracking-tight">DeFi & Aqua</h2>
             <p className="text-ink-2 leading-relaxed">The smart account architecture and shared liquidity powering Bank Rock.</p>
-            <Link href="/learn/defi" className="inline-flex items-center gap-1.5 font-semibold hover:opacity-70 transition-opacity">Learn more <ArrowRight className="size-4" /></Link>
+            <Link href="/learn/defi" className="inline-flex h-11 items-center gap-1.5 font-semibold hover:opacity-70 transition-opacity">Learn more <ArrowRight className="size-4" /></Link>
           </div>
           <div className="flex flex-col gap-4">
             <h2 className="text-2xl font-bold tracking-tight">Security & Privacy</h2>
             <p className="text-ink-2 leading-relaxed">Self-custody, telemetry, and keeping the physical-to-digital bridge safe.</p>
-            <Link href="/learn/security" className="inline-flex items-center gap-1.5 font-semibold hover:opacity-70 transition-opacity">Learn more <ArrowRight className="size-4" /></Link>
+            <Link href="/learn/security" className="inline-flex h-11 items-center gap-1.5 font-semibold hover:opacity-70 transition-opacity">Learn more <ArrowRight className="size-4" /></Link>
           </div>
         </div>
 
@@ -74,7 +74,7 @@ export default function Home() {
           <div className="bg-black text-white px-6 py-4 rounded-xl shadow-2xl flex items-center justify-between gap-6 w-full max-w-2xl font-mono">
             <code className="text-sm truncate opacity-90">cd bankrock-ethglobal/mcp &amp;&amp; npm install &amp;&amp; npm start</code>
             <div className="flex items-center gap-4 shrink-0">
-              <Link href="/mcp" className="text-sm border border-white/20 hover:bg-white/10 px-4 py-2 rounded-lg transition-colors font-sans font-medium">
+              <Link href="/mcp" className="inline-flex min-h-11 items-center text-sm border border-white/20 hover:bg-white/10 px-4 py-2 rounded-lg transition-colors font-sans font-medium">
                 Docs
               </Link>
             </div>
@@ -90,23 +90,23 @@ export default function Home() {
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 md:flex-row md:items-center">
           <div className="text-h1 font-extrabold">Bank Rock</div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 font-medium">
-            <Link href="/mcp" className="inline-flex h-11 items-center text-white/70 motion-safe:transition-colors hover:text-white">
+            <Link href="/mcp" className="inline-flex h-11 min-w-11 items-center justify-center text-white/70 motion-safe:transition-colors hover:text-white">
               AI Oracle
             </Link>
-            <Link href="/shop" className="inline-flex h-11 items-center text-white/70 motion-safe:transition-colors hover:text-white">
+            <Link href="/shop" className="inline-flex h-11 min-w-11 items-center justify-center text-white/70 motion-safe:transition-colors hover:text-white">
               Shop
             </Link>
-            <Link href="/terms" className="inline-flex h-11 items-center text-white/70 motion-safe:transition-colors hover:text-white">
+            <Link href="/terms" className="inline-flex h-11 min-w-11 items-center justify-center text-white/70 motion-safe:transition-colors hover:text-white">
               Terms
             </Link>
-            <Link href="/privacy" className="inline-flex h-11 items-center text-white/70 motion-safe:transition-colors hover:text-white">
+            <Link href="/privacy" className="inline-flex h-11 min-w-11 items-center justify-center text-white/70 motion-safe:transition-colors hover:text-white">
               Privacy
             </Link>
             <Link
               href="https://github.com/lucaguglielmi/bankrock-ethglobal"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-11 items-center text-white/70 motion-safe:transition-colors hover:text-white"
+              className="inline-flex h-11 min-w-11 items-center justify-center text-white/70 motion-safe:transition-colors hover:text-white"
             >
               GitHub
             </Link>

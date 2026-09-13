@@ -176,9 +176,24 @@ export function fontFamilyStartsWithInter(fontFamily: string): boolean {
 
 /**
  * Navigates to a route and waits for the page to be visually settled: fonts loaded (item 5
- * depends on the real font, not a fallback, having applied) and no pending navigation.
+ * depends on the real font, not a fallback, having applied), no pending navigation, and every
+ * entrance animation finished. The landing hero's `motion-safe:animate-in fade-in` runs for ~1.7 s
+ * after load (500/700 ms delays plus a 1 s fade), and `networkidle` resolves well inside that, so
+ * item 9 would otherwise sample its copy and buttons at partial opacity and report a contrast
+ * violation that the settled page does not have. Only finite animations are awaited — the map
+ * pin's `animate-ping` and its kin loop forever — and a cap keeps a stalled one from hanging a test.
  */
 export async function gotoAndSettle(page: Page, route: Route): Promise<void> {
   await page.goto(route, { waitUntil: "networkidle" });
   await page.evaluate(() => document.fonts.ready).catch(() => undefined);
+  await page
+    .evaluate(() => {
+      const finite = document
+        .getAnimations()
+        .filter((animation) => Number.isFinite(animation.effect?.getTiming().iterations ?? Infinity))
+        .map((animation) => animation.finished.catch(() => undefined));
+      const cap = new Promise<void>((resolve) => setTimeout(resolve, 5_000));
+      return Promise.race([Promise.all(finite), cap]);
+    })
+    .catch(() => undefined);
 }
