@@ -14,7 +14,7 @@ import { TapRockAnimation } from "@/components/tap-rock-animation";
 import { ArrowRight, QrCode } from "lucide-react";
 
 /** Where the account sheet's "Demo mode" link goes. Placeholder — the real demo entry point is decided later. */
-export const DEMO_MODE_HREF = "/rock/1";
+export const DEMO_MODE_HREF = "/rock/3";
 
 /**
  * The header auth control (spec 17 §4.3). Signed out: a `Connect` button.
