@@ -373,19 +373,19 @@ export default function McpPage() {
         </section>
 
         <footer className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-8 text-sm text-ink-2">
-          <Link href="/" className="hover:text-ink">
+          <Link href="/" className="flex min-h-11 min-w-11 items-center hover:text-ink">
             Home
           </Link>
-          <Link href="/learn/defi" className="hover:text-ink">
+          <Link href="/learn/defi" className="flex min-h-11 min-w-11 items-center hover:text-ink">
             The DeFi position
           </Link>
-          <Link href="/learn/security" className="hover:text-ink">
+          <Link href="/learn/security" className="flex min-h-11 min-w-11 items-center hover:text-ink">
             Security
           </Link>
-          <Link href="/shop" className="hover:text-ink">
+          <Link href="/shop" className="flex min-h-11 min-w-11 items-center hover:text-ink">
             Shop
           </Link>
-          <Link href={LIVE_ROCK_HREF} className="hover:text-ink">
+          <Link href={LIVE_ROCK_HREF} className="flex min-h-11 min-w-11 items-center hover:text-ink">
             Open a rock
           </Link>
         </footer>

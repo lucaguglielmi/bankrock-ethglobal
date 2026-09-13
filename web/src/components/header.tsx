@@ -53,8 +53,8 @@ export function Header() {
       style={{ height: "var(--header-h)", zIndex: "var(--z-header)" }}
     >
       <nav aria-label="Main navigation" className="flex h-[calc(var(--header-h)-var(--safe-top))] items-center justify-between px-[var(--gutter)]">
-        {/* Every header link is a 44 px-tall target (spec 17 item 3); the underline that marks
-            the active inline link sits on an inner span so the box stays that tall. */}
+        {/* Every header link is a 44 x 44 px target at least (spec 17 item 3); the underline that
+            marks the active inline link sits on an inner span so the box keeps that size. */}
         <Link
           href="/"
           aria-label="Bank Rock home"
@@ -78,7 +78,7 @@ export function Header() {
               key={link.href}
               href={link.href}
               className={cn(
-                "flex h-11 items-center text-sm motion-safe:transition-opacity",
+                "flex h-11 min-w-11 items-center justify-center text-sm motion-safe:transition-opacity",
                 isLinkActive(link.href)
                   ? "font-semibold text-ink"
                   : "font-medium text-ink-2 hover:opacity-70"
@@ -92,7 +92,7 @@ export function Header() {
           <Link
             href={LIVE_ROCK_LINK.href}
             className={cn(
-              "flex h-11 items-center text-sm motion-safe:transition-colors",
+              "flex h-11 min-w-11 items-center justify-center text-sm motion-safe:transition-colors",
               isRockActive ? "font-semibold text-ink" : "font-medium text-ink-3 hover:text-ink"
             )}
           >

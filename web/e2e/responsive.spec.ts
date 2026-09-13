@@ -136,6 +136,11 @@ async function assertSheetReachable(page: Page, check: SheetCheck): Promise<void
     `no button matching "${check.triggerName}" ever appeared`,
   ).toBeVisible({ timeout: 10_000 });
 
+  // Playwright scrolls a below-the-fold trigger into view before it can click it. That scroll is
+  // the page's business, not the sheet's, so it is made explicitly here and the position it
+  // leaves the page at is the baseline the "no scrolling to reach the action" check compares to.
+  await trigger.scrollIntoViewIfNeeded();
+  const scrollYBeforeOpen = await page.evaluate(() => window.scrollY);
   await trigger.click();
 
   const dialog = page.getByRole("dialog", { name: check.sheetTitle });
@@ -176,10 +181,12 @@ async function assertSheetReachable(page: Page, check: SheetCheck): Promise<void
     ).toBeLessThanOrEqual(viewport.height);
   }
 
+  // `<=` rather than `===`: a modal scroll lock may pin the document and report 0 while the page
+  // stays visually where it was, which is not a scroll made to reach the action.
   expect(
     pageScrollY,
     "the page itself scrolled to reveal the sheet's primary action — it should already be in view",
-  ).toBe(0);
+  ).toBeLessThanOrEqual(scrollYBeforeOpen);
 
   expect(
     hasScrollRegion,
