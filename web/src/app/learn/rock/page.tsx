@@ -74,8 +74,8 @@ export default function RockPage() {
           <div className="order-1 flex flex-col gap-6 md:order-2">
             <div className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-3xl border border-border bg-muted shadow-xl">
               <Image
-                src="/infographics/photo_rock_silicon_nfc.jpg"
-                alt="A polished rock with the NFC chip and a drop of resin set into it"
+                src="/infographics/photo_rock_red_resin.jpg"
+                alt="A black rock held in a hand with a red glittery resin drop"
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 50vw"

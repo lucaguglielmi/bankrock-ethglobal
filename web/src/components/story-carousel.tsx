@@ -139,7 +139,7 @@ export function StoryCarousel() {
 
               <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-neutral-100 bg-white p-4 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/rocks/rock1.jpg" alt="Bank Rock inside its box" className="size-full rounded-2xl object-cover" />
+                <img src="/rocks/rock2.jpg" alt="Bank Rock inside its box" className="size-full rounded-2xl object-cover" />
               </div>
             </motion.div>
           ) : (

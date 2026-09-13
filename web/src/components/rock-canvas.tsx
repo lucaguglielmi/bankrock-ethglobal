@@ -402,7 +402,7 @@ export function RockCanvas() {
     return (
       <div ref={wrapperRef} className="pointer-events-none absolute inset-0 z-0 touch-pan-y">
         {/* eslint-disable-next-line @next/next/no-img-element -- decorative background, not an LCP-critical <Image> */}
-        <img src="/rocks/rock1.jpg" alt="" className="size-full object-cover" />
+        <img src="/rocks/rock2.jpg" alt="" className="size-full object-cover" />
       </div>
     );
   }
