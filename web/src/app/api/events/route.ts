@@ -1,5 +1,5 @@
 /**
- * GET /api/events?rockId=N — a rock's indexed provenance (X-5).
+ * GET /api/events?rockId=N - a rock's indexed provenance (X-5).
  *
  * Returns the decoded registry events with the block's own timestamp and the transaction hash, or
  * an empty list carrying `state: "UNAVAILABLE"` and a reason when the registry address is unset,

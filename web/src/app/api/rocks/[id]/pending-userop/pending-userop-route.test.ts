@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * `POST /api/rocks/[id]/pending-userop` — who may replace or discard a pre-signed hand-over.
+ * `POST /api/rocks/[id]/pending-userop` - who may replace or discard a pre-signed hand-over.
  *
  * Audit P-5: the route checked that the caller was signed in, not that they were the creator. A
  * Privy token proves an account and Privy sign-up is open, so any stranger could discard another
- * rock's pre-signed Safe owner swap — and the recipient would then get the registry claim and
+ * rock's pre-signed Safe owner swap - and the recipient would then get the registry claim and
  * never the Rock Account. These cases pin the ownership rule.
  *
  * P-5 left the other half open, which the security review found: first-writer-wins plus a public
  * `sender` check meant a stranger could *store* a row of nonsense first, take the creator DID, and
  * lock the real giver out of their own gift. The `simulateSignedUserOp` cases below are that half
- * — the bundler is asked whether the operation validates before any row is written.
+ * - the bundler is asked whether the operation validates before any row is written.
  */
 
 const simulateSignedUserOp = vi.fn();
@@ -194,7 +194,7 @@ describe("an operation the bundler will not validate", () => {
     // A squatter's row: the sender is public, so this is the only field they cannot fake.
     simulateSignedUserOp.mockResolvedValue({
       state: "UNAVAILABLE",
-      reason: "The bundler refused this operation: the operation's signature was not accepted — sign the hand-over again",
+      reason: "The bundler refused this operation: the operation's signature was not accepted - sign the hand-over again",
     });
 
     const { status, body } = await post(validOp);
@@ -246,7 +246,7 @@ describe("discarding", () => {
     expect(deleted).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses a discard from another account — the finding itself (P-5)", async () => {
+  it("refuses a discard from another account - the finding itself (P-5)", async () => {
     storedRow = { rockId: "1", creatorDid: CREATOR, recipient: RECIPIENT };
     identity = STRANGER;
 

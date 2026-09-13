@@ -48,7 +48,7 @@ function token(claims: { iss?: string; aud?: string; sub?: string; expSeconds?: 
 }
 
 describe("verifyPrivyToken", () => {
-  it("is UNAVAILABLE when the app id is unset (D-017 — never 'allow')", async () => {
+  it("is UNAVAILABLE when the app id is unset (D-017 - never 'allow')", async () => {
     delete process.env.NEXT_PUBLIC_PRIVY_APP_ID;
     vi.resetModules();
     const mod = await import("./privy");

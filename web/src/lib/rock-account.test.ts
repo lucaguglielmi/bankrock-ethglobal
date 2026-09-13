@@ -64,7 +64,7 @@ function result(overrides: Partial<{
   ] as GetRockResult;
 }
 
-describe("mapRockRecord — registry state", () => {
+describe("mapRockRecord - registry state", () => {
   it("maps each enum value to its state name", () => {
     expect(mapRockRecord("1", result({ state: 0, owner: zeroAddress })).state).toBe("dormant");
     expect(mapRockRecord("1", result({ state: 1 })).state).toBe("awake");
@@ -92,7 +92,7 @@ describe("mapRockRecord — registry state", () => {
   });
 });
 
-describe("mapRockRecord — handover", () => {
+describe("mapRockRecord - handover", () => {
   it("is null unless the rock is handover_pending", () => {
     expect(mapRockRecord("1", result({ state: 1 })).handover).toBeNull();
     expect(mapRockRecord("1", result({ state: 3 })).handover).toBeNull();
@@ -158,7 +158,7 @@ describe("mapRockRecord — handover", () => {
 });
 
 describe("parseRockId", () => {
-  it("accepts positive integers only — rock id 0 does not exist on chain", () => {
+  it("accepts positive integers only - rock id 0 does not exist on chain", () => {
     expect(parseRockId("1")).toBe(BigInt(1));
     expect(parseRockId(" 42 ")).toBe(BigInt(42));
     expect(parseRockId("0")).toBeNull();

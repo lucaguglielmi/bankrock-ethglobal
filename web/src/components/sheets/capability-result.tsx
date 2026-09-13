@@ -4,7 +4,7 @@
  * The outcome of one write, rendered honestly (spec 15 Part 3, D-014).
  *
  *   REAL         the hash from the receipt, with an explorer link
- *   DEMO         the literal text `no transaction — simulated`, badged — never a hex string
+ *   DEMO         the literal text `no transaction - simulated`, badged - never a hex string
  *   UNAVAILABLE  the reason, and nothing else
  */
 
@@ -21,7 +21,7 @@ export interface CapabilityResultProps {
   /** One sentence saying what changed. */
   description: string;
   /**
-   * Extra `<dt>`/`<dd>` pairs for this particular write — the amount received from a swap, say —
+   * Extra `<dt>`/`<dd>` pairs for this particular write - the amount received from a swap, say -
    * rendered above the transaction row. Only ever values read back from the result.
    */
   rows?: React.ReactNode;
@@ -49,7 +49,7 @@ function CapabilityResult({ result, title, description, rows }: CapabilityResult
               explorerHref={explorer.tx(result.value.txHash)}
             />
           ) : (
-            <span className="text-ink-3">no transaction — simulated</span>
+            <span className="text-ink-3">no transaction - simulated</span>
           )}
         </dd>
       </dl>

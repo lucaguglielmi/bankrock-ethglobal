@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The rock page — the page a physical tap opens (spec 17 Part 5, spec 15 Phase 1).
+ * The rock page - the page a physical tap opens (spec 17 Part 5, spec 15 Phase 1).
  *
  * It is a small dashboard with four tabs: Liquidity, Trade, Ownership and Contracts. The default
  * tab shows no Ethereum address at all; addresses live in the last two tabs, where a visitor goes
@@ -20,7 +20,7 @@
  *  - **awake**         all four tabs.
  *  - **handover**      Ownership opens by default and holds the handover; the other tabs are
  *                      read-only until the rock changes hands.
- *  - **archived**      no tabs — the retired rock and its history.
+ *  - **archived**      no tabs - the retired rock and its history.
  *  - **unavailable**   the reason, and nothing else.
  *
  * **Rock #420 is the stage demo** (`web/src/demo/rock-420`, DEMO-STATE.md S-5). For that id alone
@@ -158,8 +158,8 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
 
   /*
    * Verifying a tap consumes its counter, so it happens once, at the moment its answer is worth
-   * the most: after sign-in wherever the attestation has to name a subject — a dormant rock, and a
-   * rock waiting to be claimed — and as soon as the rock's state is known everywhere else. The
+   * the most: after sign-in wherever the attestation has to name a subject - a dormant rock, and a
+   * rock waiting to be claimed - and as soon as the rock's state is known everywhere else. The
    * rule is `tap-gate.ts`, so the irreversible decision is stated in one tested place.
    */
   const rockResolved = record !== null || !isLoading;
@@ -170,8 +170,8 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
     authenticated,
   });
 
-  // The demo rock has no tag. Its tap is never verified — the parameters are dropped and the gate
-  // held at "wait" — so no counter is spent and no attestation is ever claimed for it.
+  // The demo rock has no tag. Its tap is never verified - the parameters are dropped and the gate
+  // held at "wait" - so no counter is spent and no attestation is ever claimed for it.
   const tap = useTapAttestation({
     rockId,
     params: demo ? {} : { e: searchParams.e, c: searchParams.c, enc: searchParams.enc },
@@ -192,11 +192,11 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
   /*
    * Two answers about this rock's account (`useRockAccount`):
    *
-   *  - `rockAccount` — which account holds the money. For an awakened rock that is the registry's,
+   *  - `rockAccount` - which account holds the money. For an awakened rock that is the registry's,
    *    read and never re-derived (D-037); before the awakening it is the counterfactual address
    *    this wallet and this tag derive, which is what a dormant rock shows so it can be funded
    *    before it is awakened;
-   *  - `authority` — whether that account still answers to the signed-in wallet. `isOwner` below is
+   *  - `authority` - whether that account still answers to the signed-in wallet. `isOwner` below is
    *    the other half, object ownership as the registry records it. Asking both means the owner's
    *    buttons are never offered when the transaction behind them would revert.
    */
@@ -227,7 +227,7 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
 
   /*
    * Which tab is open. The visitor's own choice wins; before that, a hash in the URL; before
-   * that, the tab the rock's state makes most useful — Ownership for a rock waiting to be
+   * that, the tab the rock's state makes most useful - Ownership for a rock waiting to be
    * claimed, Liquidity for everything else.
    */
   const hashTab = useHashTab();
@@ -238,7 +238,7 @@ function RockPage({ rockId, searchParams }: RockInterfaceProps) {
 
   /* ---------------------------------------------------------------------- */
   /* Tag → rock. A verified tap knows which rock it belongs to; the URL only  */
-  /* claims one. When they disagree, the tag wins — and the verification      */
+  /* claims one. When they disagree, the tag wins - and the verification      */
   /* travels with us in memory, because the counter is already spent and the  */
   /* SDM parameters must not be carried into another URL.                     */
   /* ---------------------------------------------------------------------- */

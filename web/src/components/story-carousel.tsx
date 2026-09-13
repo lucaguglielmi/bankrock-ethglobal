@@ -4,7 +4,7 @@
  * The landing page's two-slide story section (spec 17 Part 5, "Landing sections"): the origin
  * story (Florence map) and a short mechanics explainer main added ("What is this, exactly?").
  * Restyled from the version merged in from `main`: tokens only (no arbitrary pixel text sizes, no
- * low-contrast neutral-400 on real copy — the SVG map's own decorative pins keep their `fill-*`
+ * low-contrast neutral-400 on real copy - the SVG map's own decorative pins keep their `fill-*`
  * colours, which are illustration, not text), the map's captions as HTML text over the SVG rather
  * than `<text>` inside its viewBox (`MapLabel`), 44 px prev/next controls at every width (not
  * `hidden md:block`), a touch swipe in addition to the buttons, and `prefers-reduced-motion`
@@ -20,7 +20,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Term } from "@/components/ui/term";
 import { cn } from "@/lib/ui/cn";
 
-const SLIDE_COUNT = 2;
+const SLIDE_COUNT = 3;
 const SWIPE_THRESHOLD_PX = 50;
 
 /** The map's `viewBox` is `0 0 160 160`; its pins and captions are placed in those units. */
@@ -33,7 +33,7 @@ interface MapLabelProps {
   /** Which side of the pin the caption sits on. */
   side?: "left" | "right";
   /**
-   * `aside` is one of the grey jokes, shown only from `lg` up — below that the map is a phone's
+   * `aside` is one of the grey jokes, shown only from `lg` up - below that the map is a phone's
    * width and they would run into each other; `place` is the bold blue name that always shows.
    */
   kind?: "aside" | "place";
@@ -46,8 +46,8 @@ const MAP_LABEL_KIND: Record<NonNullable<MapLabelProps["kind"]>, string> = {
 };
 
 /**
- * A pin's caption, laid over the map as HTML text. SVG `<text>` scales with the viewBox — the old
- * `fontSize="2"` came out at 3 px on a phone — which fails the 12 px floor (spec 17 Part 7 item 2)
+ * A pin's caption, laid over the map as HTML text. SVG `<text>` scales with the viewBox - the old
+ * `fontSize="2"` came out at 3 px on a phone - which fails the 12 px floor (spec 17 Part 7 item 2)
  * and cannot be read anyway; here the caption is `text-label` at real size, positioned at the pin's
  * viewBox coordinates as percentages so it still follows the map as it resizes. (Classes are joined
  * by hand: `cn()`'s tailwind-merge takes `text-label` for a colour and drops it next to `text-ink-3`.)
@@ -113,28 +113,19 @@ export function StoryCarousel() {
             >
               <div className="flex flex-col gap-6">
                 <span className="text-label text-ink-3 uppercase">How it&apos;s built</span>
-              <h2 className="text-h2 font-bold text-ink">What is this, exactly?</h2>
-              <div className="flex flex-col gap-4 text-base text-ink-2">
-                <p>
-                  <strong className="text-ink">Bank Rock is not a bank.</strong> It is a stone with
-                  a small <Term k="nfcTag" /> inside. <Term k="tap">Tap</Term> it with your phone,
-                  sign in, and it becomes yours: it gets its own <Term k="rockAccount" /> on
-                  Ethereum, which you top up with two tokens.
-                </p>
-                <p>
-                  The rock offers those tokens for trading through{" "}
-                  <Term k="aqua" className="font-semibold text-ink" />, a 1inch protocol. Nothing is
-                  handed to a pool: the tokens stay in the rock&rsquo;s account, and Aqua only keeps
-                  count of what each <Term k="strategy" /> may trade.
-                </p>
-                <p>
-                  When someone trades with the rock, the tokens move straight between the two
-                  accounts and a small <Term k="fee" /> stays behind in the rock. The rock can also
-                  lose value when prices move a long way — see{" "}
-                  <Term k="divergenceLoss" />. Today it all runs on <Term k="sepolia" />, with test
-                  tokens that are worth nothing.
-                </p>
-              </div>
+                <h2 className="text-h2 font-bold text-ink">What is this, exactly?</h2>
+                <div className="flex flex-col gap-4 text-base text-ink-2">
+                  <p>
+                    <strong className="text-ink">Bank Rock is not a bank.</strong> It is a stone with
+                    a small <Term k="nfcTag" /> inside. <Term k="tap">Tap</Term> it with your phone,
+                    sign in, and it becomes yours: it gets its own <Term k="rockAccount" /> on
+                    Ethereum, which you top up with two tokens.
+                  </p>
+                  <p>
+                    Once active, the rock acts as an autonomous liquidity provider. You alone control its 
+                    funds, while the rock handles the complexity of decentralized trading completely gaslessly.
+                  </p>
+                </div>
               </div>
 
               <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-neutral-100 bg-white p-4 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)]">
@@ -142,7 +133,7 @@ export function StoryCarousel() {
                 <img src="/rocks/rock2.jpg" alt="Bank Rock inside its box" className="size-full rounded-2xl object-cover" />
               </div>
             </motion.div>
-          ) : (
+          ) : slide === 1 ? (
 <motion.div
               key="origin"
               initial={{ opacity: 0, x: offset }}
@@ -231,6 +222,40 @@ export function StoryCarousel() {
                   <span>Tuscany, IT</span>
                   <span className="text-ink-4">43.7696° N, 11.2558° E</span>
                 </div>
+              </div>
+            </motion.div>
+) : (
+<motion.div
+              key="aqua"
+              initial={{ opacity: 0, x: offset }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: offset }}
+              transition={transition}
+              className="grid grid-cols-1 items-center gap-16 md:grid-cols-2 md:gap-24"
+            >
+              <div className="flex flex-col gap-6">
+                <span className="text-label text-ink-3 uppercase">DeFi liquidity inside</span>
+                <h2 className="text-h2 font-bold text-ink">Yield & Strategies</h2>
+                <div className="flex flex-col gap-4 text-base text-ink-2">
+                  <p>
+                    The rock offers your tokens for trading through{" "}
+                    <Term k="aqua" className="font-semibold text-ink" />, a 1inch protocol. Nothing is
+                    handed to a pool: the tokens stay in the rock&apos;s account, and Aqua only keeps
+                    count of what each <Term k="strategy" /> may trade.
+                  </p>
+                  <p>
+                    When someone trades with the rock, the tokens move straight between the two
+                    accounts and a small <Term k="fee" /> stays behind in the rock. The rock can also
+                    lose value when prices move a long way - see{" "}
+                    <Term k="divergenceLoss" />. Today it all runs on <Term k="sepolia" />, with test
+                    tokens that are worth nothing.
+                  </p>
+                </div>
+              </div>
+
+              <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-neutral-100 bg-white p-4 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/infographics/why_aqua.jpg" alt="Aqua Protocol integration diagram" className="size-full rounded-2xl object-cover" />
               </div>
             </motion.div>
           )}

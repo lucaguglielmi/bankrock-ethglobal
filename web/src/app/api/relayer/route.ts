@@ -1,5 +1,5 @@
 /**
- * GET /api/relayer — is claim relaying configured?
+ * GET /api/relayer - is claim relaying configured?
  *
  * The gift-claim path needs an operator key to pay gas for a recipient who has none. The client
  * has no way to know whether that key exists, and it must not offer a "claim your rock" button

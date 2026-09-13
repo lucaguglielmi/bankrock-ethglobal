@@ -29,7 +29,7 @@ export function parseChainIdEnv(value: string | undefined): number {
   return parsed;
 }
 
-/** Validated at module load — a malformed value fails the process, it never degrades silently. */
+/** Validated at module load - a malformed value fails the process, it never degrades silently. */
 export const chainId = parseChainIdEnv(env.chainId);
 
 /** The one chain this application targets. */
@@ -59,8 +59,8 @@ export function parseAddressEnv(name: string, value: string | undefined): Addres
  * registry                : output of our own deploy (Phase 2)
  * aquaApp / aquaTaker     : outputs of `contracts/scripts/deploy-aqua-app.js` (Phase 3)
  *
- * There is no SwapVM router address. That path was not taken — the reference `XYCSwap` AquaApp is
- * what is deployed — and the router's `quote` signature was never verified, so an ABI for it would
+ * There is no SwapVM router address. That path was not taken - the reference `XYCSwap` AquaApp is
+ * what is deployed - and the router's `quote` signature was never verified, so an ABI for it would
  * have been a guess. See `contracts/scripts/deploy-swapvm-router.md` if it is ever revisited.
  */
 export const addresses = {
@@ -98,7 +98,7 @@ export function requireAddress(key: AddressKey): Capability<Address> {
 /**
  * ERC-4337 EntryPoint v0.7, verified on Sepolia at 16,035 bytes (spec 16 §1.1).
  *
- * Canonical and identical on every chain, so it is a constant rather than a variable — and this
+ * Canonical and identical on every chain, so it is a constant rather than a variable - and this
  * module is the only place an address literal may appear (D-015).
  */
 export const ENTRY_POINT_07_ADDRESS: Address = "0x0000000071727De22E5E9d8BAf0edAc6f37da032";
@@ -107,7 +107,7 @@ export const ENTRY_POINT_07_ADDRESS: Address = "0x0000000071727De22E5E9d8BAf0edA
  * Safe's owner linked-list sentinel.
  *
  * The owner list of a single-owner Safe is `SENTINEL -> owner -> SENTINEL`, and `swapOwner` takes
- * the entry that points at the one being replaced — the sentinel, in that case. It is a protocol
+ * the entry that points at the one being replaced - the sentinel, in that case. It is a protocol
  * constant, identical on every chain; it lives here because this module is the only place an
  * address literal may appear (D-015).
  */
@@ -151,7 +151,7 @@ export function appPath(path: string): string {
 /**
  * A viem public client for Sepolia.
  *
- * Server-side the RPC comes from SEPOLIA_RPC_URL (a real provider — public RPCs reject wide
+ * Server-side the RPC comes from SEPOLIA_RPC_URL (a real provider - public RPCs reject wide
  * eth_getLogs, see X-5). In the browser, or when it is unset, viem's default Sepolia transport
  * is used; reads may then be rate-limited, which surfaces as UNAVAILABLE, never as a guess.
  */

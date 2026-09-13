@@ -3,7 +3,7 @@ import { LegalPageHeader, LegalPageFooter } from "@/components/chrome/legal-page
 import { InlineCode } from "@/components/ui/code-block";
 
 export const metadata = {
-  title: "Privacy Policy — Bank Rock",
+  title: "Privacy Policy - Bank Rock",
   description: "Privacy Policy detailing our zero-PII philosophy, hardware attestation telemetry, and on-chain transparency for Bank Rock.",
 };
 

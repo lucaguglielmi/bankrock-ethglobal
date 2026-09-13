@@ -11,7 +11,7 @@
  *  - an **acknowledgement** to the submitter.
  *
  * Same contract as `sendAlertEmail` (`lib/email-service.ts`): it never throws, and it never reports
- * a send that did not happen — no API key, a provider rejection or a network error is
+ * a send that did not happen - no API key, a provider rejection or a network error is
  * `success: false` with a reason. Every interpolated value is HTML-escaped (SA-7).
  *
  * Two things differ from the alert path on purpose:
@@ -65,7 +65,7 @@ const SANDBOX_NOTE =
   "until bank-rock.com is verified in Resend, the sandbox sender delivers only to the Resend account owner's inbox";
 
 /**
- * The sender for contact mail: `CONTACT_FROM_ADDRESS`, else the alert sender — which is
+ * The sender for contact mail: `CONTACT_FROM_ADDRESS`, else the alert sender - which is
  * `ALERT_FROM_ADDRESS` or the Resend sandbox, reported as such.
  */
 export function contactSender(): { from: string; sandbox: boolean } {
@@ -120,7 +120,7 @@ export function generateOperatorNotificationHtml(input: ContactEmailInput): stri
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>New ${escapeHtml(requestLabel(input.kind))} request — Bank Rock</title>
+  <title>New ${escapeHtml(requestLabel(input.kind))} request - Bank Rock</title>
 </head>
 <body style="${BODY_STYLE}">
   <div style="${CARD_STYLE}">
@@ -159,7 +159,7 @@ export function generateAcknowledgementHtml(input: ContactEmailInput): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>We got your message — Bank Rock</title>
+  <title>We got your message - Bank Rock</title>
 </head>
 <body style="${BODY_STYLE}">
   <div style="${CARD_STYLE}">
@@ -168,9 +168,9 @@ export function generateAcknowledgementHtml(input: ContactEmailInput): string {
     </div>
     <div style="padding: 32px;">
       <p style="${TEXT_STYLE}">Hi ${safeName},</p>
-      <p style="${TEXT_STYLE}">Thanks — we received your message through the "${safeForm}" form and will reply to this address. Here is a copy of what you sent:</p>
+      <p style="${TEXT_STYLE}">Thanks - we received your message through the "${safeForm}" form and will reply to this address. Here is a copy of what you sent:</p>
       <div style="${QUOTE_STYLE}">${messageHtml(input.message)}</div>
-      <p style="${TEXT_STYLE}">One thing worth knowing: Bank Rock runs on Ethereum Sepolia, a test network, with test tokens that have no monetary value — there is no mainnet deployment.</p>
+      <p style="${TEXT_STYLE}">One thing worth knowing: Bank Rock runs on Ethereum Sepolia, a test network, with test tokens that have no monetary value - there is no mainnet deployment.</p>
       <p style="margin: 24px 0 0 0; font-size: 12px; color: #a3a3a3; line-height: 1.5;">Picked by hand near Florence.</p>
     </div>
   </div>
@@ -213,7 +213,7 @@ async function sendOne(
 
     if (!data.data?.id) {
       const reason = sender.sandbox
-        ? `${PROVIDER_REJECTED_REASON} — ${SANDBOX_NOTE}`
+        ? `${PROVIDER_REJECTED_REASON} - ${SANDBOX_NOTE}`
         : PROVIDER_REJECTED_REASON;
       // The provider's own words go to telemetry only (redacted there), never outward.
       logger.warn("Contact email rejected by provider", {
@@ -272,7 +272,7 @@ function notSent(
 /**
  * Sends the operator notification and the submitter acknowledgement for one stored request.
  *
- * The two are sent independently — one failing does not stop the other — and each result says
+ * The two are sent independently - one failing does not stop the other - and each result says
  * on its own whether the provider accepted it. Never throws.
  */
 export async function sendContactEmails(input: ContactEmailInput): Promise<ContactEmailDispatch> {
@@ -302,7 +302,7 @@ export async function sendContactEmails(input: ContactEmailInput): Promise<Conta
 
   const acknowledgement = sendOne(resend, "acknowledgement", input, sender, {
     to: input.email,
-    subject: "We got your message — Bank Rock",
+    subject: "We got your message - Bank Rock",
     html: generateAcknowledgementHtml(input),
   });
 

@@ -3,7 +3,7 @@
 /**
  * Provenance (spec 17 Part 5, spec 15 D-014, X-5).
  *
- * Every row comes from `GET /api/events` — the indexed registry logs — and falls back to
+ * Every row comes from `GET /api/events` - the indexed registry logs - and falls back to
  * `GET /api/rocks/[id]/activity`, the application database. Both routes answer with a capability
  * state, so "nothing happened yet" and "we could not read it" stay different answers and the
  * second one names what is missing.
@@ -15,7 +15,7 @@
  *
  * Rock #420, the stage demo (`web/src/demo/rock-420`), is the one exception to "every row comes
  * from a route": its history lives in the browser, renders through the same rows, is badged
- * SIMULATED, and carries no hash at all — nothing about it was ever mined.
+ * SIMULATED, and carries no hash at all - nothing about it was ever mined.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -134,7 +134,7 @@ export function RockActivity({ rockId }: { rockId: string }) {
   }, [load, demo]);
 
   // The demo's rows pass through the same normaliser as a route's, so a `txHash` could only ever
-  // come from a real 32-byte value — and the demo's rows have none.
+  // come from a real 32-byte value - and the demo's rows have none.
   const state: LoadState = demo
     ? { status: "ready", rows: normalise({ events: demoRows }) }
     : fetched;

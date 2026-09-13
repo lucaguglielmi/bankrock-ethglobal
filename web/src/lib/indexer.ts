@@ -1,5 +1,5 @@
 /**
- * Registry event indexer — a rock's provenance (X-5, spec 15 Phase 2 item 5).
+ * Registry event indexer - a rock's provenance (X-5, spec 15 Phase 2 item 5).
  *
  *  - the scan starts at `REGISTRY_DEPLOY_BLOCK` and walks forward in chunks of at most 2,000
  *    blocks. The old code scanned a rolling `currentBlock - 50000` window, so provenance aged out
@@ -21,7 +21,7 @@
  *  - the mirror and the cursor stop `INDEXER_CONFIRMATIONS` blocks below the head (security
  *    review 2026-09-13, R-17). The mirror only ever adds rows, so a log that a reorganisation
  *    later removes would otherwise stay in the history for good. The unconfirmed tail is still
- *    scanned and answered on every call — a transaction mined seconds ago is shown — it is just
+ *    scanned and answered on every call - a transaction mined seconds ago is shown - it is just
  *    not written down until it has settled.
  */
 
@@ -218,7 +218,7 @@ function describe(
  * A log as this module consumes it.
  *
  * `topics` is typed as the loose array a node returns rather than viem's tuple, so a log read
- * from `getLogs` — or assembled in a test — needs no cast to be decoded.
+ * from `getLogs` - or assembled in a test - needs no cast to be decoded.
  */
 export interface RegistryLog {
   topics: readonly (Hex | Hex[] | null)[];
@@ -340,7 +340,7 @@ export function rowToIndexerEvent(row: {
   };
 }
 
-/** Newest first, by block then log index — the order the activity list renders in. */
+/** Newest first, by block then log index - the order the activity list renders in. */
 export function sortEventsNewestFirst(events: IndexerEvent[]): IndexerEvent[] {
   return [...events].sort((a, b) => {
     const blockDiff = BigInt(b.blockNumber) - BigInt(a.blockNumber);
@@ -372,7 +372,7 @@ export function mergeEvents(
  * The scan resumes from the D1 cursor (B7, `lib/indexer-cursor.ts`) and only ever moves forward:
  * every decoded event in the new range is mirrored, the cursor is advanced **after** that write
  * succeeds, and the rock's older history is read back out of the mirror. With no D1 binding, a
- * failed mirror or an unreadable cursor, the behaviour is exactly what it was before — a full
+ * failed mirror or an unreadable cursor, the behaviour is exactly what it was before - a full
  * scan from `REGISTRY_DEPLOY_BLOCK`, chunked at 2,000 blocks.
  *
  * @returns REAL with the (possibly empty) event list, or UNAVAILABLE naming what is missing.
@@ -386,14 +386,14 @@ export async function getRockOnchainEvents(
   const registry = addresses.registry;
   if (!registry) {
     return unavailable(
-      "NEXT_PUBLIC_REGISTRY_ADDRESS is not configured — the registry is not deployed yet, so no provenance exists on chain",
+      "NEXT_PUBLIC_REGISTRY_ADDRESS is not configured - the registry is not deployed yet, so no provenance exists on chain",
     );
   }
 
   const deployBlock = registryDeployBlock();
   if (deployBlock === null) {
     return unavailable(
-      "REGISTRY_DEPLOY_BLOCK is not configured — without it the indexer has no starting block to scan from",
+      "REGISTRY_DEPLOY_BLOCK is not configured - without it the indexer has no starting block to scan from",
     );
   }
 
@@ -421,7 +421,7 @@ export async function getRockOnchainEvents(
     const currentBlock = await client.getBlockNumber();
     // Only blocks a few confirmations below the head are mirrored and counted by the cursor
     // (review R-17). The tail above that is scanned as well, so the answer is as fresh as the
-    // chain — it is just not written down until it has settled.
+    // chain - it is just not written down until it has settled.
     const safeHead = confirmedHead(currentBlock);
     const ranges = buildBlockRanges(fromBlock, safeHead);
     const tailFrom = safeHead + BigInt(1) > fromBlock ? safeHead + BigInt(1) : fromBlock;
@@ -530,7 +530,7 @@ export async function getRockOnchainEvents(
  * The rock's mirrored history, or null when it could not be read.
  *
  * Null is not "no events": an empty list is a real answer and null is a failure, and the caller
- * treats them differently — see `getRockOnchainEvents`.
+ * treats them differently - see `getRockOnchainEvents`.
  */
 async function readStoredEvents(rockId: string): Promise<IndexerEvent[] | null> {
   const db = getDb();
@@ -567,7 +567,7 @@ async function readStoredEvents(rockId: string): Promise<IndexerEvent[] | null> 
  * The row id is `${txHash}-${logIndex}`, so re-indexing the same range is idempotent.
  *
  * The return value matters now: the cursor may only advance over blocks whose events are in the
- * table. A failed write is still not fatal to the read — the chain remains the source of truth,
+ * table. A failed write is still not fatal to the read - the chain remains the source of truth,
  * and the next poll simply re-scans the same range.
  */
 async function mirrorToDatabase(events: IndexerEvent[]): Promise<boolean> {

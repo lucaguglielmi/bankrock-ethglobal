@@ -1,5 +1,5 @@
 /**
- * POST /api/rocks/[id]/claim — complete a gift handover on behalf of the recipient (Flow E).
+ * POST /api/rocks/[id]/claim - complete a gift handover on behalf of the recipient (Flow E).
  *
  * The recipient has just tapped a rock they have never owned. Their wallet is new and holds no
  * gas; the Rock Account's Safe is still owned by the giver, so it cannot sponsor the claim
@@ -7,13 +7,13 @@
  *
  * Why this is not an open relay: the registry credits `att.subject`, and `att.subject` is inside
  * the signed attestation. The relayer cannot redirect the rock to itself, and this route refuses
- * any attestation that is not signed by this deployment's attester — which is only ever produced
+ * any attestation that is not signed by this deployment's attester - which is only ever produced
  * by a real tap with a counter the tag has never used before.
  *
  * What the perimeter audit added on top of that (P-1), because a valid attestation is a bearer
  * token for its ten-minute TTL and every acceptance spends real gas:
  *
- *   1. the registry is read *before* broadcasting — the rock must have an unexpired handover, and
+ *   1. the registry is read *before* broadcasting - the rock must have an unexpired handover, and
  *      a named recipient must be the attestation's subject. Previously the registry was the only
  *      thing that decided, after the gas had already been committed;
  *   2. three claims per rock per hour, alongside the per-IP limit, both fail-closed: a limiter
@@ -21,15 +21,15 @@
  *   3. a daily spend cap, reserved before the send and enforced in one atomic statement. Unset
  *      means relaying is off, not uncapped.
  *
- * And P-2: no failure reason here is built from an exception. viem puts the RPC URL — which
- * carries the provider's API key — into its error text, and this endpoint is unauthenticated.
+ * And P-2: no failure reason here is built from an exception. viem puts the RPC URL - which
+ * carries the provider's API key - into its error text, and this endpoint is unauthenticated.
  * Reasons come from a fixed set; the detail goes to telemetry, which redacts before it buffers.
  *
  * ## Ordering, after contract review N-1
  *
  * The re-review found that a giver who still controls the Rock Account's Safe can add the
  * recipient as a signer for one batched transaction, use the registry as its controller, and
- * remove them again — archiving or re-gifting the rock the recipient just received. The Safe's
+ * remove them again - archiving or re-gifting the rock the recipient just received. The Safe's
  * owner set is writable by the Safe, so "ask the account who its owners are" is a question the
  * giver answers. The scope is the open-gift path, and the named-gift path *when the pre-signed
  * owner swap does not land*.
@@ -41,20 +41,20 @@
  *      account still belongs to the giver;
  *   2. **the Safe moves first.** The pre-signed owner swap is submitted and its receipt checked
  *      *before* `claimHandover` is broadcast. If it does not land, nothing is claimed and the cap
- *      reservation is released — the recipient is left exactly where they started rather than
+ *      reservation is released - the recipient is left exactly where they started rather than
  *      owning a rock whose account is someone else's.
  *
  * ## What "claimed" means (defect B4)
  *
  * Both halves are judged by a receipt, never by acceptance. `submitClaimHandover` waits for
  * `claimHandover` to be mined and reports `status: "success"` or nothing, because the recipient
- * reads this answer as "This rock is yours" — and a transaction the node accepted can still revert
+ * reads this answer as "This rock is yours" - and a transaction the node accepted can still revert
  * (`AttestationExpired` behind a slow mempool, `AccountDoesNotAnswerToOwner`, `HandoverExpired`),
  * leaving the giver owning the rock. A failure after the broadcast keeps its spend reservation:
  * the gas is gone whether or not the claim landed.
  *
  * `claimHandover` rebinds `rock.smartAccount` to `att.smartAccount`, and for a named gift the
- * verifier signs the rock's existing account — which, after step 2, is the claimant's. This route
+ * verifier signs the rock's existing account - which, after step 2, is the claimant's. This route
  * checks that the attestation names that same account before it does anything at all.
  */
 
@@ -93,7 +93,7 @@ const CLAIM_WINDOW_MS = 60 * 60 * 1000;
  * the claimant's whether or not the registry claim follows. A claimant who posts at
  * deadline-minus-seconds passes every pre-check, the swap lands during up to fifteen seconds of
  * receipt polling, and `claimHandover` is then mined past `att.deadline` and reverts
- * `AttestationExpired` — leaving the giver owning the rock and the recipient owning the Safe that
+ * `AttestationExpired` - leaving the giver owning the rock and the recipient owning the Safe that
  * holds its money. Ninety seconds covers the poll window and a block or two of inclusion delay.
  *
  * Refusing costs the claimant one more tap. The failure it prevents costs someone their rock.
@@ -159,7 +159,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  // The registry decides whether this claim can succeed — ask it before paying for the attempt.
+  // The registry decides whether this claim can succeed - ask it before paying for the attempt.
   const claimable = await isClaimable(id, verified.value.subject, attestation);
   if (claimable.state === "UNAVAILABLE") {
     logger.warn("Refused a relayed claim that the registry would reject", {
@@ -180,7 +180,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   // The Rock Account moves before the rock does (review N-1). A claim whose owner swap did not
-  // land would leave the recipient owning a rock whose account is still the giver's — which is
+  // land would leave the recipient owning a rock whose account is still the giver's - which is
   // exactly the authority the review found a giver can use to archive or re-gift it.
   const ownerSwap = await submitOwnerSwap(id, verified.value.subject);
   if (ownerSwap.state === "UNAVAILABLE") {
@@ -201,7 +201,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   // Only a mined, successful `claimHandover` is a claim. `submitClaimHandover` waits for the
-  // receipt, so a revert and a transaction that never mined both arrive here as failures — and
+  // receipt, so a revert and a transaction that never mined both arrive here as failures - and
   // both of those have already spent the relayer's gas, which is why the reservation is released
   // only when nothing was broadcast at all.
   const claim = await submitClaimHandover(id, attestation);
@@ -296,14 +296,14 @@ async function isClaimable(
 /**
  * Submits the giver's pre-signed Safe owner swap, if there is one for this recipient.
  *
- * TEMPORARY — TO BE FIXED BEFORE MAINNET (security review 2026-09-13, R-4). A landed swap plus
+ * TEMPORARY - TO BE FIXED BEFORE MAINNET (security review 2026-09-13, R-4). A landed swap plus
  * the registry's `isOwner(recipient)` check proves the recipient is *a* signer, not the *only*
  * one: a giver who added a second signer or a module before gifting keeps control of the account
  * after the claim. Before mainnet, read `getOwners`, `getThreshold`, `getModulesPaginated` and
  * `getGuard` here after the receipt and refuse the claim unless the owners are exactly the
  * recipient, the threshold is 1, and there are no modules and no guard.
  *
- * The stored operation names its recipient. If the rock was given openly — "whoever taps it" —
+ * The stored operation names its recipient. If the rock was given openly - "whoever taps it" -
  * there is no stored operation, because there was no address to sign for at the time, and this
  * returns UNAVAILABLE with that reason rather than silently doing nothing.
  */
@@ -324,7 +324,7 @@ async function submitOwnerSwap(
 
   if (!row) {
     return unavailable(
-      "no pre-signed Rock Account hand-over is stored for this rock — ask the giver to open the gift again",
+      "no pre-signed Rock Account hand-over is stored for this rock - ask the giver to open the gift again",
     );
   }
 

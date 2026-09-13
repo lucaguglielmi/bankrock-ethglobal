@@ -2,7 +2,7 @@
  * Calldata tests.
  *
  * `lib/chain` and `lib/aqua/config` read their addresses once, at module load, so each case sets
- * the environment and then imports the module — the same `vi.resetModules()` pattern
+ * the environment and then imports the module - the same `vi.resetModules()` pattern
  * `rock-account.server.test.ts` uses.
  *
  * The point being defended here is the shape of the two batches: who is approved, in what order,
@@ -76,7 +76,7 @@ describe("buildShipCalls", () => {
     const { calls } = plan.value;
     expect(calls).toHaveLength(3);
 
-    // 1 & 2 — the approvals go to the token contracts, and the spender is Aqua, never the app.
+    // 1 & 2 - the approvals go to the token contracts, and the spender is Aqua, never the app.
     for (const [index, token, amount] of [
       [0, USDC, shipParams.usdcAmount],
       [1, WETH, shipParams.wethAmount],
@@ -90,7 +90,7 @@ describe("buildShipCalls", () => {
       expect(decoded.args?.[1]).toBe(amount);
     }
 
-    // 3 — ship(app, strategy, [USDC, WETH], [a, b]) against Aqua itself.
+    // 3 - ship(app, strategy, [USDC, WETH], [a, b]) against Aqua itself.
     expect(calls[2].to).toBe(AQUA_ADDRESS);
     const ship = decodeFunctionData({ abi: AQUA, data: calls[2].data });
     expect(ship.functionName).toBe("ship");
@@ -121,7 +121,7 @@ describe("buildShipCalls", () => {
     if (plan.state !== "REAL") throw new Error("expected REAL");
     const approve = decodeFunctionData({ abi: ERC20_ABI, data: plan.value.calls[0].data });
     expect(approve.args?.[1]).toBe(aqua.maxUint256);
-    // The shipped amount is unchanged — the allowance is wider, the strategy is not.
+    // The shipped amount is unchanged - the allowance is wider, the strategy is not.
     const ship = decodeFunctionData({ abi: AQUA, data: plan.value.calls[2].data });
     expect(ship.args?.[3]).toEqual([shipParams.usdcAmount, shipParams.wethAmount]);
   });
@@ -195,7 +195,7 @@ describe("buildPushCalls", () => {
       [0, USDC, BigInt(500_000_000)],
       [1, WETH, BigInt(10) ** BigInt(17)],
     ] as const) {
-      // Against Aqua itself — the app never receives a call from the maker.
+      // Against Aqua itself - the app never receives a call from the maker.
       expect(calls[index].to).toBe(AQUA_ADDRESS);
       expect(calls[index].value).toBe(BigInt(0));
       const decoded = decodeFunctionData({ abi: AQUA, data: calls[index].data });
@@ -286,7 +286,7 @@ describe("buildSwapCall", () => {
     return { aqua, strategy };
   }
 
-  it("approves the periphery — not Aqua, not the app — and then calls it", async () => {
+  it("approves the periphery - not Aqua, not the app - and then calls it", async () => {
     const { aqua, strategy } = await plan();
     const swap = aqua.buildSwapCall({
       strategy,

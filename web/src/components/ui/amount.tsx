@@ -9,7 +9,7 @@ const SIZE_CLASSES = {
 
 /**
  * Renders a token amount with tabular figures and token-correct precision
- * (spec 17 §3.3). Always set in Inter, never monospace — monospace is for
+ * (spec 17 §3.3). Always set in Inter, never monospace - monospace is for
  * identifiers, not quantities.
  */
 export interface AmountProps {

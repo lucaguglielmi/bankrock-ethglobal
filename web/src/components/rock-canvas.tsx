@@ -8,7 +8,7 @@
  * inside it, and annotation labels that fade in on hover. Everything else is the branch's
  * performance budget, re-applied exactly (spec 17 §4.8, L-10): `dpr={[1, 1.5]}`, a render loop
  * that only runs while the canvas is actually visible (`IntersectionObserver` + `visibilitychange`
- * — not just CSS-hidden), no mount at all under `prefers-reduced-motion` (a static photo takes its
+ * - not just CSS-hidden), no mount at all under `prefers-reduced-motion` (a static photo takes its
  * place), `touch-action: pan-y` on the hit area so the hero never captures vertical scroll, a
  * lighter `ContactShadows` map on phones, and no HDRI `Environment` below `md` (the ambient +
  * directional light rig already present carries it).
@@ -34,7 +34,7 @@ import {
 import * as THREE from "three";
 import { useAudio } from "@/context/audio-context";
 
-// A pair of short, synthesized tones for the hover-in / hover-out transition — decorative only,
+// A pair of short, synthesized tones for the hover-in / hover-out transition - decorative only,
 // and silenced by the site's own mute toggle rather than a second, independent volume control.
 let audioCtx: AudioContext | null = null;
 
@@ -329,7 +329,7 @@ function useMatchMedia(query: string): boolean {
 
 /**
  * True only while the canvas is both scrolled into view and the tab is foregrounded (spec 17
- * §4.8, L-10). Drives `frameloop` so the render loop actually stops — not just visually hidden —
+ * §4.8, L-10). Drives `frameloop` so the render loop actually stops - not just visually hidden -
  * when neither is true.
  */
 function useCanvasVisible(ref: RefObject<HTMLElement | null>): boolean {
@@ -409,7 +409,7 @@ export function RockCanvas() {
 
   return (
     <div ref={wrapperRef} className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
-      {/* Invisible DOM hit area for the rock — sized independently of the 3D camera framing so it
+      {/* Invisible DOM hit area for the rock - sized independently of the 3D camera framing so it
           tracks the visible stone at every viewport width, and carries the touch-action the
           Canvas itself does not need since it never receives pointer events. */}
       <div
@@ -449,7 +449,7 @@ export function RockCanvas() {
         {/* Dust/Sparkles particles around for atmosphere while keeping it minimal */}
         <Sparkles count={40} scale={8} size={2} speed={0.4} opacity={0.15} color="#c0c0c0" />
 
-        {/* Dramatic floor shadow — lighter resolution on phones (spec 17 §4.8, L-10) */}
+        {/* Dramatic floor shadow - lighter resolution on phones (spec 17 §4.8, L-10) */}
         <ContactShadows
           position={[0, -2.5, 0]}
           opacity={isHovered ? 0.7 : 0.8}

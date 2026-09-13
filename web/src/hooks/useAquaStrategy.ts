@@ -16,7 +16,7 @@
  *
  * What the consuming card must not do (spec 04, `contracts/aqua/NOTES.md` §7):
  *   - never add two streams' virtual balances together and label the result capital;
- *   - never show `virtual` as what a visitor can trade — that is `executable`;
+ *   - never show `virtual` as what a visitor can trade - that is `executable`;
  *   - never annualise the fee figure into an APY (D-004).
  */
 
@@ -87,7 +87,7 @@ async function fetchStrategy(
 
 /**
  * @param rockId the public rock id.
- * @param maker  the Rock Account. Optional — the server resolves it from the registry when the
+ * @param maker  the Rock Account. Optional - the server resolves it from the registry when the
  *               caller does not know it yet.
  */
 export function useAquaStrategy(rockId: string, maker?: Address): UseAquaStrategyResult {

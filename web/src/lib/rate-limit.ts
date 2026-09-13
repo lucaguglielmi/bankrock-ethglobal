@@ -123,7 +123,7 @@ export async function consumeIpRateLimit(
  *
  * Unlike `consumeIpRateLimit`, an unreachable ledger is a refusal, not a pass: on these routes the
  * limit is the only thing between a captured credential and an unbounded bill. Returns the reason
- * to put in a 429 or a 503 body — never an error object, so nothing internal escapes (audit P-2).
+ * to put in a 429 or a 503 body - never an error object, so nothing internal escapes (audit P-2).
  */
 export interface RequiredLimitResult {
   ok: boolean;
@@ -144,7 +144,7 @@ export async function requireRateLimit(
       ok: false,
       status: 503,
       reason:
-        "The rate-limit ledger is unavailable, so this request cannot be accepted — it would be unlimited",
+        "The rate-limit ledger is unavailable, so this request cannot be accepted - it would be unlimited",
     };
   }
   if (!decision.allowed) {

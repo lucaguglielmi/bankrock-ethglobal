@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "You are trading against this rock's liquidity pool" — which of a rock's live streams a swap
+ * "You are trading against this rock's liquidity pool" - which of a rock's live streams a swap
  * is aimed at, said as a sentence so a visitor knows whose money is on the other side.
  *
  * A rock may run several strategies at once, one per catalogue preset, each with its own fee and
@@ -10,7 +10,7 @@
  * there is a choice to make: with one live stream it is absent and that stream is used.
  *
  * It is one small row above the trade card: the label, then the chips. Chips are 44 px and wrap
- * rather than shrink (spec 17 §4.5). Each is labelled with the preset's name and its fee — the fee
+ * rather than shrink (spec 17 §4.5). Each is labelled with the preset's name and its fee - the fee
  * is the authenticated half of "what the rock earns" (`formatFeeRate`) and is never annualised
  * (D-004).
  */

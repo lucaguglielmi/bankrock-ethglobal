@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * Pointer-only. `Tooltip` opens on hover/focus and is unreachable by touch —
+ * Pointer-only. `Tooltip` opens on hover/focus and is unreachable by touch -
  * do not use it for content a touch user must be able to read (spec 17
  * §4.4, L-12). For anything tappable, such as a glossary term, use
  * `HelpTerm` (`components/ui/popover.tsx`), which renders this `Tooltip` on

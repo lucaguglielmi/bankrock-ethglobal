@@ -1,4 +1,4 @@
-/** Minimal ERC-20 surface used by the app. No addresses here — see lib/chain. */
+/** Minimal ERC-20 surface used by the app. No addresses here - see lib/chain. */
 export const ERC20_ABI = [
   {
     type: "function",

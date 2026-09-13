@@ -13,8 +13,8 @@
 // its caller: an EOA or a plain Safe cannot trade against it directly (contracts/aqua/NOTES.md
 // §5). A visitor's transaction is `approve(taker, amountIn)` then `taker.swapExactIn(...)`.
 //
-// No address appears here. Both come from the environment — NEXT_PUBLIC_AQUA_APP_ADDRESS and
-// NEXT_PUBLIC_AQUA_TAKER_ADDRESS — through `lib/aqua/config.ts` (D-015).
+// No address appears here. Both come from the environment - NEXT_PUBLIC_AQUA_APP_ADDRESS and
+// NEXT_PUBLIC_AQUA_TAKER_ADDRESS - through `lib/aqua/config.ts` (D-015).
 export const XYC_SWAP_ABI = [
   {
     "inputs": [

@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * "Choose how this rock earns" — one card per strategy the rock can run.
+ * "Choose how this rock earns" - one card per strategy the rock can run.
  *
  * The cards are `SHIP_OPTIONS`, which is derived from `DEFAULT_STREAMS`: the only strategies any
- * reader in the app probes (`ship-options.ts`). Nothing here names a strategy or a fee itself —
+ * reader in the app probes (`ship-options.ts`). Nothing here names a strategy or a fee itself -
  * a new preset in the catalogue arrives here already described, and one that is already live is
  * left out by the caller (`unshippedOptions`), because a strategy is immutable and a docked one
  * can never be revived (`contracts/aqua/NOTES.md` §4).
@@ -31,18 +31,18 @@ export interface StrategyPickerProps {
   selectedStreamIndex?: number | null;
   /** When the owner's wallet may not act from the rock's account (D-037): the cards are disabled and this is shown. */
   disabledReason?: string | null;
-  /** Disables the cards without adding a sentence — for when the surface already explains why. */
+  /** Disables the cards without adding a sentence - for when the surface already explains why. */
   disabled?: boolean;
-  /** Inline content under the hint — the amounts this strategy would ship, for instance. */
+  /** Inline content under the hint - the amounts this strategy would ship, for instance. */
   renderDetail?: (option: ShipOption) => ReactNode;
-  /** Smaller cards — art, name, fee and a one-line hint — for the "Add another strategy" row. */
+  /** Smaller cards - art, name, fee and a one-line hint - for the "Add another strategy" row. */
   compact?: boolean;
   /**
    * `list` stacks the cards; `grid` puts them side by side from `sm` up (two per row, three from
    * `md`) and stacks them only on phones.
    */
   layout?: "list" | "grid";
-  /** An extra cell rendered after the cards — the "Add funds" card beside the strategies. */
+  /** An extra cell rendered after the cards - the "Add funds" card beside the strategies. */
   trailing?: ReactNode;
 }
 

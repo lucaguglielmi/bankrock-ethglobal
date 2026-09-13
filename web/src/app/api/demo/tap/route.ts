@@ -1,25 +1,10 @@
 /**
- * =============================================================================================
- * DEMO / TESTING ONLY — THIS ROUTE WILL BE REMOVED BEFORE MAINNET.
- *
- * It exists so the app can be exercised end to end without tapping a physical rock: it forges a
- * genuine SDM pair under the production master key for a synthetic tag and hands it to the real
- * verify → attest → awaken path. Nothing here belongs in a deployment that holds value.
- *
- * Security review 2026-09-13, finding R-1: while `DEMO_TAP_SECRET` is set, whoever holds it can
- * mint a valid tap for ANY tag uid, including a real rock's, and the forged read counter (minutes
- * since 2026-01-01) leaves a real tag's replay counter far behind for good. Keep the secret unset
- * except during a recording, never paste the link into a recorded browser, and delete this file
- * together with DEMO-STATE S-4 before mainnet.
- * =============================================================================================
- *
- * DEMO ONLY — a "magic link" that plays the part of the NFC chip.
- *
+ * ====================================================================================== *
  * Added 2026-09-13 for the recorded demo, before the prototype tag was programmed. It is not a
  * simulation of anything downstream: the route builds a genuine SDM pair (`e`, `c`) for a
  * SYNTHETIC tag with the same master key a real tag would carry, then redirects into the real
  * tap flow. Verification, the read-counter store, the signed attestation and the on-chain
- * awakening are all the production code path — the only thing faked is the piece of plastic.
+ * awakening are all the production code path - the only thing faked is the piece of plastic.
  *
  * Gate: the route exists only when the Worker secret `DEMO_TAP_SECRET` is set, and every call
  * must carry it as `?key=`. Anything else is a 404, so the surface is invisible when unused.
@@ -32,7 +17,7 @@
  * The read counter is `max(last accepted + 1, minutes since 2026-01-01)`: strictly increasing
  * per tag, like the chip's, and monotonic in wall-clock time even on a fresh counter store, so a
  * link can never replay. The rock id in the redirect is the one the tag is bound to when it is
- * already awake, else the first dormant id the registry reports — the same answer a real tap gets.
+ * already awake, else the first dormant id the registry reports - the same answer a real tap gets.
  */
 import { NextResponse } from "next/server";
 
@@ -63,12 +48,12 @@ function notFound(): NextResponse {
 function forgeTap(masterKey: Buffer, uid: Buffer, counter: number): { e: string; c: string } {
   const counterBytes = Buffer.from([counter & 0xff, (counter >> 8) & 0xff, (counter >> 16) & 0xff]);
   const padding = Buffer.from([0x01, 0x02, 0x03, 0x04, 0x05]);
-  // PICCDataTag 0xC7: UID mirrored, counter mirrored, 7-byte UID — spec 18 §4.2.
+  // PICCDataTag 0xC7: UID mirrored, counter mirrored, 7-byte UID - spec 18 §4.2.
   const plain = Buffer.concat([Buffer.from([0xc7]), uid, counterBytes, padding]);
   const session = deriveSessionKeys(masterKey, uid, counterBytes);
   return {
     e: aesCbcEncrypt(masterKey, plain).toString("hex").toUpperCase(),
-    // No SDMENCFileData is mirrored, so the MAC input is empty — the verifier's default.
+    // No SDMENCFileData is mirrored, so the MAC input is empty - the verifier's default.
     c: computeSdmMac(session.macKey, Buffer.alloc(0)).toString("hex").toUpperCase(),
   };
 }
@@ -106,7 +91,7 @@ export async function GET(req: Request): Promise<NextResponse> {
   const counter = Math.min(MAX_COUNTER, Math.max((last ?? 0) + 1, byClock));
 
   // Where the real tap would land: the bound rock if this tag already has one, else the first
-  // dormant id the registry reports (never the mirror's guess — see lib/nfc/rock-resolution.ts).
+  // dormant id the registry reports (never the mirror's guess - see lib/nfc/rock-resolution.ts).
   const uidHash = hashUid(uid);
   const bound = await resolveRockForTag(uidHash);
   let rockId: string | null = bound.state === "REAL" ? bound.value.rockId : null;
@@ -119,7 +104,7 @@ export async function GET(req: Request): Promise<NextResponse> {
   }
 
   const { e, c } = forgeTap(keys.config.masterKey, uid, counter);
-  logger.warn("DEMO tap link used — a synthetic tag was forged for this request", {
+  logger.warn("DEMO tap link used - a synthetic tag was forged for this request", {
     action: "DEMO_TAP_FORGED",
     rockId,
     counter,

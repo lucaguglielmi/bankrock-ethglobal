@@ -10,7 +10,7 @@
  *
  * `subject` is the wallet the tap authorises. It is client-supplied on purpose:
  * the tap is the authorisation, and `subject` only names who the tapper is
- * giving the rock to. It never substitutes for the tap — no CMAC match, no
+ * giving the rock to. It never substitutes for the tap - no CMAC match, no
  * attestation. Binding it into the signed struct is what lets the transaction
  * be relayed or sent from a sponsored Safe without the relayer redirecting the
  * rock to itself.
@@ -22,14 +22,14 @@
  * close, so a `smartAccount` in the query string is ignored, not honoured.
  *
  * `rockId` is likewise a hint, not the answer. The id written on a tag at
- * provisioning time can be stale — the tag may have been moved to a replacement
- * rock, or its rock archived — so the response carries `effectiveRockId` and
+ * provisioning time can be stale - the tag may have been moved to a replacement
+ * rock, or its rock archived - so the response carries `effectiveRockId` and
  * `resolution`, resolved from the registry, and the page navigates to those.
  * The attestation is signed for the effective id, never for the URL id.
  *
  * Rate limited per IP, and fail closed (P-4, D-017). This is the most expensive
- * unauthenticated endpoint in the app — after a CMAC match it reads the
- * registry, the indexed events and D1, and derives a Safe address — so a
+ * unauthenticated endpoint in the app - after a CMAC match it reads the
+ * registry, the indexed events and D1, and derives a Safe address - so a
  * request that the limiter could not account for is refused rather than served.
  * That is the same stance the verifier already takes on the counter store: a
  * tap that cannot be checked for replay is not a tap that passed.
@@ -60,9 +60,9 @@ function respond(status: number, body: VerifyTapResponse): NextResponse {
 /**
  * Returns a refusal, or `null` to proceed.
  *
- * `consumeIpRateLimit` fails *open* by design — it reports `enforced: false`
+ * `consumeIpRateLimit` fails *open* by design - it reports `enforced: false`
  * when there is no D1 binding and when the request carries no client IP header
- * — and leaves the stance to the caller. This caller refuses, because an
+ * - and leaves the stance to the caller. This caller refuses, because an
  * unlimited path to the crypto and the RPC is exactly what P-4 describes.
  */
 async function refuseIfRateLimited(request: Request): Promise<NextResponse | null> {

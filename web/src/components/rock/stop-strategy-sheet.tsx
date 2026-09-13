@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * "Cash in?" — stopping one stream (Flow H; `contracts/aqua/NOTES.md` §4).
+ * "Cash in?" - stopping one stream (Flow H; `contracts/aqua/NOTES.md` §4).
  *
  * Docking *is* the withdrawal. Nothing was ever taken from the rock's account, so nothing comes
- * back: `dock` zeroes the stream's allowance and marks it closed, and the tokens — fees included —
+ * back: `dock` zeroes the stream's allowance and marks it closed, and the tokens - fees included -
  * are exactly where they were. The copy says that literally and promises no incoming transfer.
  *
  * A docked stream can never be revived; starting again means a new stream, at any fee tier. This
@@ -45,7 +45,7 @@ export function StopStrategySheet({
   const [outcome, setOutcome] = useState<ActionOutcome | null>(null);
 
   // Reset the last outcome whenever the sheet is opened again (state from a previous render,
-  // adjusted during render — no effect needed).
+  // adjusted during render - no effect needed).
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);

@@ -19,7 +19,7 @@ describe("address validation (D-015)", () => {
       /NEXT_PUBLIC_AQUA_ADDRESS/,
     );
     expect(() => parseAddressEnv("NEXT_PUBLIC_AQUA_ADDRESS", "not-an-address")).toThrow();
-    // 39 hex digits — one short.
+    // 39 hex digits - one short.
     expect(() =>
       parseAddressEnv("NEXT_PUBLIC_AQUA_ADDRESS", "0x1111113ccf1426a8e30e2bff5e005d929bf6a90"),
     ).toThrow();

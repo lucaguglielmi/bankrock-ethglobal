@@ -99,7 +99,7 @@
 /*
  * Motion tokens for the account sheet's "tap your rock" illustration
  * (components/tap-rock-animation.tsx). Applied only under `motion-safe:`, so with
- * `prefers-reduced-motion: reduce` the illustration is the static touching frame — the
+ * `prefers-reduced-motion: reduce` the illustration is the static touching frame - the
  * phone's rest position and the rings' rest opacity below are that frame. One 3 s cycle:
  * glide in, hold against the rock while two rings leave the contact point, glide out.
  */
@@ -109,6 +109,7 @@
   --animate-tap-ripple-late: tap-ripple-late 3s ease-in-out infinite;
   --animate-rock-bob: rock-bob 6s ease-in-out infinite;
   --animate-ripple-breathe: ripple-breathe 6s ease-in-out infinite;
+  --animate-bubble-wobble: bubble-wobble 4s ease-in-out infinite;
 
   @keyframes rock-bob {
     0%,
@@ -117,6 +118,14 @@
     }
     50% {
       transform: translateY(-3px) rotate(-1.5deg);
+    }
+  }
+  @keyframes bubble-wobble {
+    0%, 100% {
+      transform: rotate(-6deg) scale(1) translateY(0);
+    }
+    50% {
+      transform: rotate(-3deg) scale(1.03) translateY(-2px);
     }
   }
   @keyframes ripple-breathe {

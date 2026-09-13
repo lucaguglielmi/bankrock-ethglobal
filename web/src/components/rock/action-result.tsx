@@ -4,7 +4,7 @@
  * What the page says after an action (spec 15 D-013, D-014).
  *
  *  - REAL         the receipt's own hash, through `<TxHash>`, with an explorer link;
- *  - DEMO         the literal words "no transaction — simulated". Never a hex string;
+ *  - DEMO         the literal words "no transaction - simulated". Never a hex string;
  *  - UNAVAILABLE  the reason the action could not run, in plain language.
  */
 
@@ -49,7 +49,7 @@ export function ActionOutcomeNotice({
     return (
       <p className="flex flex-wrap items-center gap-2 text-sm text-ink-2">
         <SimulatedBadge />
-        no transaction — simulated
+        no transaction - simulated
       </p>
     );
   }

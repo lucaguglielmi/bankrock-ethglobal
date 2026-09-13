@@ -5,7 +5,7 @@
  * computed, never assumed:
  *
  *   REAL         backed by a live contract, RPC or database read
- *   DEMO         simulated — only rock 420, the stage demo (`web/src/demo/rock-420`), answers
+ *   DEMO         simulated - only rock 420, the stage demo (`web/src/demo/rock-420`), answers
  *                this state, and it is gated by that id alone; there is no build flag
  *   UNAVAILABLE  real backing unreachable
  *
@@ -46,18 +46,18 @@ export function isAvailable<T>(
  * access, so every public variable is read literally exactly once, here.
  */
 export const env = {
-  /** NEXT_PUBLIC_APP_URL — the single canonical origin (D-022). */
+  /** NEXT_PUBLIC_APP_URL - the single canonical origin (D-022). */
   appUrl: (process.env.NEXT_PUBLIC_APP_URL || "https://bank-rock.com").replace(/\/+$/, ""),
-  /** NEXT_PUBLIC_CHAIN_ID — must be 11155111 (Ethereum Sepolia, D-023). */
+  /** NEXT_PUBLIC_CHAIN_ID - must be 11155111 (Ethereum Sepolia, D-023). */
   chainId: process.env.NEXT_PUBLIC_CHAIN_ID || "",
-  /** NEXT_PUBLIC_PRIVY_APP_ID — empty when sign-in is not configured (A-1, A-2). */
+  /** NEXT_PUBLIC_PRIVY_APP_ID - empty when sign-in is not configured (A-1, A-2). */
   privyAppId: process.env.NEXT_PUBLIC_PRIVY_APP_ID || "",
   /** Addresses. Consumed only by lib/chain, which is the single source of truth (D-015). */
   aquaAddress: process.env.NEXT_PUBLIC_AQUA_ADDRESS || "",
   usdcAddress: process.env.NEXT_PUBLIC_USDC_ADDRESS || "",
   wethAddress: process.env.NEXT_PUBLIC_WETH_ADDRESS || "",
   registryAddress: process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || "",
-  /** Our XYCSwap deployment — the AquaApp strategies are shipped to. */
+  /** Our XYCSwap deployment - the AquaApp strategies are shipped to. */
   aquaAppAddress: process.env.NEXT_PUBLIC_AQUA_APP_ADDRESS || "",
   /** The XYCSwapTaker periphery a visitor's wallet calls to swap (NOTES.md §5). */
   aquaTakerAddress: process.env.NEXT_PUBLIC_AQUA_TAKER_ADDRESS || "",
@@ -81,7 +81,7 @@ export class MissingEnvError extends Error {
 }
 
 /**
- * Server-side mandatory configuration read (D-017 — fail closed).
+ * Server-side mandatory configuration read (D-017 - fail closed).
  *
  * Throws at first use when the variable is unset or blank. Callers convert the throw into a
  * 503 UNAVAILABLE response; no code path may treat a missing secret as "no authentication

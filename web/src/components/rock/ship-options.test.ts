@@ -7,7 +7,7 @@
  * reader computes is the hash the owner shipped.
  *
  * This test reproduces that probe against the sheet's own list. It fails if a fee tier is ever
- * added to the sheet that no reader looks for — which is the defect it was written for: stream 0
+ * added to the sheet that no reader looks for - which is the defect it was written for: stream 0
  * at 5 or 100 bps shipped a real allowance that the position card, the Trade button, the quote
  * route and Cash in all reported as "not trading". It pins no count: the catalogue may grow,
  * and the invariants below hold for any length.
@@ -73,7 +73,7 @@ describe("the ship sheet's choices", () => {
     },
   );
 
-  it("names 'Wide, 30 bps' on stream 0 — the stream every default caller opens on", () => {
+  it("names 'Wide, 30 bps' on stream 0 - the stream every default caller opens on", () => {
     const first = shipOptionFor(undefined);
     expect(first.streamIndex).toBe(0);
     expect(first.feeBps).toBe(30);

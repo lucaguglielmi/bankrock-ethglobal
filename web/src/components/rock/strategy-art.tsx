@@ -1,7 +1,7 @@
 import { cn } from "@/lib/ui/cn";
 
 /**
- * The strategy illustrations — one calm mark per preset, keyed by the preset's `label`.
+ * The strategy illustrations - one calm mark per preset, keyed by the preset's `label`.
  *
  * The three presets differ only in fee, so the pictures say what the fee *does* rather than
  * anything about the curve: Tight trades most often (several quick ripples), Wide trades
@@ -11,7 +11,7 @@ import { cn } from "@/lib/ui/cn";
  * Ink strokes in `currentColor`, the brand blue as the single accent. No motion.
  */
 
-/** The blue of `public/brand/logo.svg` — the one accent colour illustrations may use. */
+/** The blue of `public/brand/logo.svg` - the one accent colour illustrations may use. */
 export const BRAND_BLUE = "#2855E8";
 
 export type StrategyArtKind = "tight" | "wide" | "patient" | "neutral";
@@ -31,7 +31,7 @@ export function strategyArtKind(label: string | undefined): StrategyArtKind {
 }
 
 export interface StrategyArtProps {
-  /** The preset's `label` — "Wide", "Tight", "Patient". */
+  /** The preset's `label` - "Wide", "Tight", "Patient". */
   label: string | undefined;
   /** Size and colour classes. @default "size-16 text-ink" */
   className?: string;
@@ -78,7 +78,7 @@ export function StrategyArt({ label, className, decorative = true }: StrategyArt
   );
 }
 
-/** Tight — several small, quick ripples. The middle one carries the accent. */
+/** Tight - several small, quick ripples. The middle one carries the accent. */
 function TightMark() {
   return (
     <g {...STROKE}>
@@ -93,7 +93,7 @@ function TightMark() {
   );
 }
 
-/** Wide — one broad, gentle wave, with a quieter echo beneath it in the accent. */
+/** Wide - one broad, gentle wave, with a quieter echo beneath it in the accent. */
 function WideMark() {
   return (
     <g {...STROKE}>
@@ -103,7 +103,7 @@ function WideMark() {
   );
 }
 
-/** Patient — still water, one drop about to land, one faint ring where it will. */
+/** Patient - still water, one drop about to land, one faint ring where it will. */
 function PatientMark() {
   return (
     <g {...STROKE}>
@@ -118,7 +118,7 @@ function PatientMark() {
   );
 }
 
-/** Anything the catalogue does not name — a single, unremarkable ripple. */
+/** Anything the catalogue does not name - a single, unremarkable ripple. */
 function NeutralMark() {
   return (
     <g {...STROKE}>

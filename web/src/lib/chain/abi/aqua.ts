@@ -1,5 +1,5 @@
 /**
- * 1inch Aqua — the real interface (E-3).
+ * 1inch Aqua - the real interface (E-3).
  *
  * Source: github.com/1inch/aqua, `src/interfaces/IAqua.sol` and `src/Aqua.sol`, as recorded in
  * specs/16-environment-and-secrets.md §1.5 and specs/04-aqua-integration.md.
@@ -7,7 +7,7 @@
  * The previous ABI in lib/aa.ts encoded `ship(bytes32 strategyHash, bytes bytecode)`, which does
  * not exist; every call would have reverted. Facts that follow from the real interface:
  *
- *  - the maker approves tokens to **Aqua itself**, once, for all strategies — not to the app;
+ *  - the maker approves tokens to **Aqua itself**, once, for all strategies - not to the app;
  *  - `app` is an AquaApp implementation (our SwapVM router in Aqua mode, or the reference
  *    XYCSwap constant-product app), never Aqua;
  *  - `strategyHash = keccak256(strategy)` and a strategy is immutable once shipped;
@@ -39,10 +39,10 @@ export const AQUA_ABI = [
     outputs: [],
   },
   {
-    // `push(maker, app, strategyHash, token, amount)` — IAqua.sol. Anyone may call it; it only
+    // `push(maker, app, strategyHash, token, amount)` - IAqua.sol. Anyone may call it; it only
     // ever *raises* the strategy's virtual balance and does `safeTransferFrom(msg.sender, maker,
     // amount)` with Aqua as spender. A taker uses it to pay for a swap (NOTES.md §5); the maker
-    // itself uses it to make more of its own reserve available to a live strategy — a
+    // itself uses it to make more of its own reserve available to a live strategy - a
     // self-transfer that spends the maker's allowance to Aqua and moves nothing.
     type: "function",
     name: "push",
@@ -92,15 +92,15 @@ export const AQUA_ABI = [
   /*                                                                            */
   /* No Aqua event parameter is `indexed` on the deployed contract               */
   /* (`src/interfaces/IAqua.sol`; contracts/aqua/NOTES.md §2 and §8.2). Every log */
-  /* therefore has exactly one topic — the signature — and all four arguments    */
+  /* therefore has exactly one topic - the signature - and all four arguments    */
   /* live in `data`.                                                             */
   /*                                                                            */
   /* This ABI previously marked `maker`, `app` and `strategyHash` as indexed on  */
   /* `Shipped` and `Docked`. Against the real contract that matches no log when   */
   /* used as a filter and mis-decodes any log it is handed. Two consequences the  */
   /* rest of the app has to respect: a maker or a strategy hash cannot be         */
-  /* filtered server-side by topic — fetch by address and signature, decode, then */
-  /* filter in JavaScript — and `Pulled`/`Pushed` are the only record of a swap,  */
+  /* filtered server-side by topic - fetch by address and signature, decode, then */
+  /* filter in JavaScript - and `Pulled`/`Pushed` are the only record of a swap,  */
   /* which is how fees are read (NOTES.md §6).                                    */
   /* ------------------------------------------------------------------------ */
   {

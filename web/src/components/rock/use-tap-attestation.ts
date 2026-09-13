@@ -3,7 +3,7 @@
 /**
  * The NFC tap, verified server-side exactly once per page load (spec 15 D-018, F-1, F-7).
  *
- * Nothing in this file — and nothing that consumes it — can set `verified`. The only producer is
+ * Nothing in this file - and nothing that consumes it - can set `verified`. The only producer is
  * `verifyNtagSignature`, which runs on the server and returns true only after a real CMAC match
  * and a monotonic counter advance. The demo switcher cannot reach this state at all.
  *
@@ -12,7 +12,7 @@
  *
  *  - on a **dormant** rock or a rock **waiting to be claimed**, opened by a signed-out visitor,
  *    the call is **held**. Awakening and claiming both need an attestation bound to the visitor's
- *    wallet, and only the same single verification can produce one — so the page says "tap
+ *    wallet, and only the same single verification can produce one - so the page says "tap
  *    detected, sign in first" and runs the one verification after sign-in, with `subject` known;
  *  - everywhere else (an awake rock, an archived one, a signed-in visitor) it runs as soon as the
  *    rock's state and the signed-in wallet are known.
@@ -39,9 +39,9 @@ export interface TapParams {
 
 /**
  * How the verifier decided which rock this tag belongs to:
- * `bound` — the tag is bound to a rock on-chain; `url` — the id in the URL was used;
- * `next_free` — the bound rock was retired, so a fresh id was allocated;
- * `registry_unavailable` — the registry could not be read.
+ * `bound` - the tag is bound to a rock on-chain; `url` - the id in the URL was used;
+ * `next_free` - the bound rock was retired, so a fresh id was allocated;
+ * `registry_unavailable` - the registry could not be read.
  */
 export type TapResolution = "bound" | "url" | "next_free" | "registry_unavailable";
 
@@ -50,7 +50,7 @@ export type { TapGate, TapGateInput } from "@/components/rock/tap-gate";
 export { tapGateFor, tapNeedsSubject } from "@/components/rock/tap-gate";
 
 export type TapAttestation =
-  /** The page was opened without tap parameters — a link, a bookmark, a share. */
+  /** The page was opened without tap parameters - a link, a bookmark, a share. */
   | { status: "absent" }
   | { status: "waiting" }
   | { status: "held" }
@@ -159,7 +159,7 @@ export function useTapAttestation({
  * The server-signed attestation for this tap, or null.
  *
  * Null unless the tap verified, the server signed an attestation for it, and that attestation
- * names `subject` — the wallet that is about to send the transaction. Anything less is not a
+ * names `subject` - the wallet that is about to send the transaction. Anything less is not a
  * usable authorisation for awakening or claiming.
  */
 export function signedAttestation(

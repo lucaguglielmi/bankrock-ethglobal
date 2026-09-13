@@ -4,12 +4,12 @@
  * A rock that has been given away but not yet collected (Flow E).
  *
  * The owner sees who it is waiting for and how long is left. Everyone else sees whether they can
- * take it — which requires a verified tap signed for their own wallet, so holding the link is
+ * take it - which requires a verified tap signed for their own wallet, so holding the link is
  * never enough (D-018).
  *
  * This is the surface the recipient actually meets, so it is where the gift's message is read
- * (defect B2). The note was stored off chain from the moment the gift was opened — only its hash
- * goes on chain — and the single component that rendered it was a sheet mounted on no page, so
+ * (defect B2). The note was stored off chain from the moment the gift was opened - only its hash
+ * goes on chain - and the single component that rendered it was a sheet mounted on no page, so
  * every message written so far has been invisible to the person it was for.
  *
  * A signed-out visitor's tap is **held** rather than spent (`tap-gate.ts`, defect A1): an
@@ -81,7 +81,7 @@ export function HandoverRock({
   const attestation = signedAttestation(tap, address);
   const isNamedRecipient = recipient === null || sameAddress(recipient, address);
 
-  // Asked only for the person it was written for, and only once they are signed in — reading it
+  // Asked only for the person it was written for, and only once they are signed in - reading it
   // needs a Privy token. The giver wrote it and does not need it read back to them.
   const { message: giftMessage, unavailableReason: giftMessageReason } = useHandoverMessage(
     rockId,

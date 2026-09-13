@@ -4,14 +4,14 @@
  * References
  * ----------
  * - NXP AN12196, "NTAG 424 DNA and NTAG 424 DNA TagTamper features and hints",
- *   section "Secure Dynamic Messaging" — encrypted PICCData layout, the SV1/SV2
+ *   section "Secure Dynamic Messaging" - encrypted PICCData layout, the SV1/SV2
  *   session vectors, the CMAC truncation rule, and the worked SDM example
  *   (`picc_data=EF963FF7828658A599F3041510671E88&cmac=94EED9EE65337086`).
- * - NXP NT4H2421Gx datasheet (NTAG 424 DNA) — PICCDataTag encoding and the
+ * - NXP NT4H2421Gx datasheet (NTAG 424 DNA) - PICCDataTag encoding and the
  *   little-endian SDMReadCtr.
  * - NXP AN10922, "Symmetric key diversifications", section on AES-128
- *   diversification — D = 0x01 || DivInput, K = CMAC(master, D).
- * - RFC 4493 — AES-CMAC (implemented in ./crypto).
+ *   diversification - D = 0x01 || DivInput, K = CMAC(master, D).
+ * - RFC 4493 - AES-CMAC (implemented in ./crypto).
  *
  * Fixes the defects recorded as F-3 in specs/15-exit-demo-mode.md: the UID is
  * read at offset 1 (after the PICCDataTag byte), the SDMReadCtr is 3 bytes
@@ -32,13 +32,13 @@ export const UID_LENGTH = 7;
 /** SDMReadCtr length, in bytes. */
 export const READ_COUNTER_LENGTH = 3;
 
-/** PICCDataTag bit 7 — the UID is mirrored into the PICCData. */
+/** PICCDataTag bit 7 - the UID is mirrored into the PICCData. */
 const PICC_TAG_UID_MIRROR = 0x80;
-/** PICCDataTag bit 6 — the SDMReadCtr is mirrored into the PICCData. */
+/** PICCDataTag bit 6 - the SDMReadCtr is mirrored into the PICCData. */
 const PICC_TAG_COUNTER_MIRROR = 0x40;
 /** PICCDataTag bits 5..4 are RFU and must be zero. */
 const PICC_TAG_RFU = 0x30;
-/** PICCDataTag bits 3..0 — UID length in bytes. */
+/** PICCDataTag bits 3..0 - UID length in bytes. */
 const PICC_TAG_UID_LENGTH = 0x0f;
 
 /** AN10922 AES-128 diversification prefix. */
@@ -46,9 +46,9 @@ const DIVERSIFICATION_PREFIX = 0x01;
 /** Default application identifier mixed into the AN10922 diversification input. */
 export const DEFAULT_DIVERSIFY_APP_ID = "BankRock";
 
-/** SV1 header — session key for SDMENCFileData (AN12196). */
+/** SV1 header - session key for SDMENCFileData (AN12196). */
 const SV1_HEADER = Buffer.from([0xc3, 0x3c, 0x00, 0x01, 0x00, 0x80]);
-/** SV2 header — session key for the SDM file-read CMAC (AN12196). */
+/** SV2 header - session key for the SDM file-read CMAC (AN12196). */
 const SV2_HEADER = Buffer.from([0x3c, 0xc3, 0x00, 0x01, 0x00, 0x80]);
 
 export interface SdmKeyConfig {
@@ -90,9 +90,9 @@ export interface PiccData {
 }
 
 export interface SdmSessionKeys {
-  /** K_SesSDMFileReadENC — decrypts SDMENCFileData. */
+  /** K_SesSDMFileReadENC - decrypts SDMENCFileData. */
   encKey: Buffer;
-  /** K_SesSDMFileReadMAC — keys the SDM CMAC. */
+  /** K_SesSDMFileReadMAC - keys the SDM CMAC. */
   macKey: Buffer;
 }
 
@@ -117,9 +117,9 @@ export interface SdmVerifyFailure {
 export type SdmVerifyResult = SdmVerifySuccess | SdmVerifyFailure;
 
 export interface SdmVerifyInput {
-  /** Encrypted PICCData — the `e` / `picc_data` URL parameter, 16 bytes. */
+  /** Encrypted PICCData - the `e` / `picc_data` URL parameter, 16 bytes. */
   piccData: Buffer;
-  /** Truncated SDM CMAC — the `c` / `cmac` URL parameter, 8 bytes. */
+  /** Truncated SDM CMAC - the `c` / `cmac` URL parameter, 8 bytes. */
   cmac: Buffer;
   /**
    * SDMENCFileData exactly as it appeared in the URL (the `enc` parameter),

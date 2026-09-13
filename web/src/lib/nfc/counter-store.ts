@@ -33,7 +33,7 @@ export function normaliseUid(uidHex: string): string {
 }
 
 /**
- * Non-durable in-process store — a test double, nothing more.
+ * Non-durable in-process store - a test double, nothing more.
  *
  * WARNING: unit tests only. Worker isolates are created and discarded
  * continuously, so this provides no replay protection in production, and
@@ -101,7 +101,7 @@ const SELECT_SQL = `SELECT counter FROM ${NFC_COUNTERS_TABLE} WHERE uid = ?1`;
  * `DO UPDATE ... WHERE` predicate inside the same implicit transaction as the
  * insert, so a replay either inserts a row that did not exist or updates a row
  * whose counter is strictly lower. When the predicate is false, nothing is
- * written and `meta.changes` is 0 — the replay loses the race.
+ * written and `meta.changes` is 0 - the replay loses the race.
  */
 const ADVANCE_SQL = `INSERT INTO ${NFC_COUNTERS_TABLE} (uid, counter, updated_at)
 VALUES (?1, ?2, ?3)
@@ -149,8 +149,8 @@ export type CounterStoreResolution =
  *
  * D1 via the OpenNext Cloudflare context is the only option. When it is not
  * reachable the verifier fails closed (D-017): it returns `unavailable` and no
- * tap is verified. There is no fallback — not in development, not in a build
- * flag — because a non-durable store is no replay protection at all (R-4).
+ * tap is verified. There is no fallback - not in development, not in a build
+ * flag - because a non-durable store is no replay protection at all (R-4).
  */
 export async function resolveCounterStore(): Promise<CounterStoreResolution> {
   let db: D1DatabaseLike | undefined;

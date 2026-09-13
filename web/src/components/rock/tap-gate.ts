@@ -4,7 +4,7 @@
  * Verifying a tap consumes its counter: the verifier advances the tag's read counter in durable
  * storage and the same URL can never be verified again. So the page gets exactly one chance to ask
  * the question, and the answer is only worth having if it is signed for the wallet that is about
- * to act — `subject` is inside the EIP-712 attestation, and the registry credits *that* address.
+ * to act - `subject` is inside the EIP-712 attestation, and the registry credits *that* address.
  *
  * Two of the five rock states need a subject:
  *
@@ -14,10 +14,10 @@
  * With nobody signed in, the verifier has no subject to name. It still advances the counter and
  * then reports the attestation `UNAVAILABLE` with `missing_subject` (`lib/nfc/verify.ts`), which
  * is the tap spent for nothing: the visitor signs in and is told to tap again. Spec 08's gift beat
- * is one tap — "the recipient taps it, signs in on a fresh account with no ETH, and the claim is
- * relayed" — so the tap is **held** until sign-in and spent once, afterwards.
+ * is one tap - "the recipient taps it, signs in on a fresh account with no ETH, and the claim is
+ * relayed" - so the tap is **held** until sign-in and spent once, afterwards.
  *
- * Everywhere else — an awake rock, an archived one, a rock the registry could not be read for —
+ * Everywhere else - an awake rock, an archived one, a rock the registry could not be read for -
  * the tap answers a question that needs no subject ("is this object real?"), so it is spent as
  * soon as the rock's state is known.
  *
@@ -26,9 +26,9 @@
  */
 
 /**
- * `wait`   — not enough is known yet to spend the tap.
- * `hold`   — deliberately not verified: sign-in must come first.
- * `verify` — run the single verification now.
+ * `wait`   - not enough is known yet to spend the tap.
+ * `hold`   - deliberately not verified: sign-in must come first.
+ * `verify` - run the single verification now.
  */
 export type TapGate = "wait" | "hold" | "verify";
 

@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * "My address" — the recipient's half of the give link (B1, Flow E, spec 08 beat 2:10).
+ * "My address" - the recipient's half of the give link (B1, Flow E, spec 08 beat 2:10).
  *
  * The recipient opens this on their own phone; the giver points their camera at it and the stock
  * camera app opens `…/rock/<id>?give=<address>`, which prefills the give sheet. That is the whole
- * mechanism: no scanner, no camera permission, no camera library — only a generator
+ * mechanism: no scanner, no camera permission, no camera library - only a generator
  * (`lib/qr.ts`), which is a few hundred lines of arithmetic and no dependency.
  *
  * Two details that are not decoration:
@@ -82,7 +82,7 @@ export function MyAddressQr({ address, path, className }: MyAddressQrProps) {
 
       <p className="max-w-prose text-center text-sm text-ink-2">
         Point the giver&apos;s camera at this. It opens Bank Rock with your address already filled
-        in — no typing, no pasting.
+        in - no typing, no pasting.
       </p>
     </div>
   );

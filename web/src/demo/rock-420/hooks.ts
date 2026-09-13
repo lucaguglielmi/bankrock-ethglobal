@@ -5,8 +5,8 @@
  *
  * Each returns exactly the shape its real counterpart returns, so every sheet and tab on the rock
  * page works unchanged for rock #420. They are ordinary hooks and are called unconditionally by
- * the real hooks — `const demo = useDemoRock(); const mock = useDemo…(); const chain = useChain…();
- * return demo ? mock : chain;` — so hook order never depends on which rock is open.
+ * the real hooks - `const demo = useDemoRock(); const mock = useDemo…(); const chain = useChain…();
+ * return demo ? mock : chain;` - so hook order never depends on which rock is open.
  *
  * Every value is a `DEMO` capability (D-013). Every action result is `DEMO` or `UNAVAILABLE`, and
  * none carries a transaction hash (D-014): `demoOutcome` builds the value **without** a `txHash`

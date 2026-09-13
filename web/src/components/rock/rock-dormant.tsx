@@ -6,7 +6,7 @@
  * Awakening needs two things and says which one is missing: a signed-in wallet, and a tap this
  * server verified and signed for that wallet. Neither can be faked from the client (D-018).
  *
- * It also shows **the account this rock would open** — the counterfactual Rock Account derived
+ * It also shows **the account this rock would open** - the counterfactual Rock Account derived
  * from the verified tag and the signed-in wallet (D-029), which the page could not show at all
  * until `uidHash` was passed down from the tap. Flow B step 9 funds that address, and funding it
  * before awakening is legitimate: the Safe is deployed by the first sponsored UserOperation, and
@@ -38,12 +38,12 @@ export interface DormantRockProps {
   authenticated: boolean;
   address?: string;
   /**
-   * The account this rock would open, from `useRockAccount` — derived from the verified tag and
+   * The account this rock would open, from `useRockAccount` - derived from the verified tag and
    * the signed-in wallet (D-029). UNAVAILABLE carries the reason there is no address yet: signed
    * out, no tap, or the derivation could not be run.
    */
   rockAccount: Capability<string>;
-  /** Opens the onboarding sheet — a dormant rock cannot be awakened by a visitor without a wallet. */
+  /** Opens the onboarding sheet - a dormant rock cannot be awakened by a visitor without a wallet. */
   onSignIn: () => void;
   onAwakened: () => void;
 }

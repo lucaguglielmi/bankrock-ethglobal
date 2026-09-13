@@ -11,7 +11,7 @@ const COPIED_RESET_MS = 2000;
 /**
  * Renders a transaction hash, middle-truncated (spec 17 §4.6). A hash may
  * only ever originate from a signed, broadcast transaction (spec 15
- * D-014) — this component enforces that at the type level by accepting
+ * D-014) - this component enforces that at the type level by accepting
  * only a `` `0x${string}` `` of receipt length, never a plain `string`
  * literal, and renders nothing when no real hash exists yet.
  */
@@ -37,7 +37,7 @@ function TxHash({ value, explorerHref, onCopy, className }: TxHashProps) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => setCopied(false), COPIED_RESET_MS);
     } catch {
-      // Clipboard access denied or unavailable — nothing to fall back to.
+      // Clipboard access denied or unavailable - nothing to fall back to.
     }
   }, [value, onCopy]);
 

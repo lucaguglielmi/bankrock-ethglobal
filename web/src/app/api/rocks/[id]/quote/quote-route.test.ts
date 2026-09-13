@@ -6,8 +6,8 @@ import { encodeStrategy } from "@/lib/aqua/strategy";
  *
  * The route is exercised with the chain stubbed at two seams: `readRockStreams` (what is shipped
  * and at what balances) and the public client (whether `XYCSwap.quoteExactIn` can be called). That
- * covers the two answers it can give — the app's own view, and the mirrored constant-product
- * arithmetic — and every way it must refuse instead of inventing a price.
+ * covers the two answers it can give - the app's own view, and the mirrored constant-product
+ * arithmetic - and every way it must refuse instead of inventing a price.
  */
 
 const MAKER = `0x${"11".repeat(20)}` as const;

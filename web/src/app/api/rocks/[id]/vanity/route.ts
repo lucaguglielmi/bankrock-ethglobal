@@ -1,5 +1,5 @@
 /**
- * POST /api/rocks/[id]/vanity — claim a rock's vanity name (S-7).
+ * POST /api/rocks/[id]/vanity - claim a rock's vanity name (S-7).
  *
  * "Claim your vanity URL" used to be an 800 ms `setTimeout` that saved nothing and then showed a
  * success state. This writes to D1 and is Privy-authenticated; with no database it answers 503
@@ -9,7 +9,7 @@
  * writes must come from the same Privy DID. Registry-based ownership replaces this in Phase 2,
  * when a rock has an on-chain owner to check against.
  *
- * TEMPORARY — WILL BE FIXED BEFORE MAINNET (security review 2026-09-13, R-3 and R-12): any
+ * TEMPORARY - WILL BE FIXED BEFORE MAINNET (security review 2026-09-13, R-3 and R-12): any
  * signed-in account can claim any rock's row first, and `id` is not passed through `parseRockId`,
  * so non-numeric and zero-padded ids become separate rows. Before mainnet, bind the write to the
  * rock's on-chain owner and canonicalise the id.

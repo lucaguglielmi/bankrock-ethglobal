@@ -4,7 +4,7 @@
  *
  * Why a relayer exists at all (Flow E, spec 15 Phase 2): a gift recipient taps a rock they have
  * never owned, on a wallet that has never held a testnet ETH. They have nothing to pay gas with
- * and no Safe of their own — the Rock Account's Safe is still owned by the giver at that moment,
+ * and no Safe of their own - the Rock Account's Safe is still owned by the giver at that moment,
  * so it cannot sponsor the claim either. `claimHandover` is therefore submitted by an operator
  * key. That is safe because the registry credits `att.subject`, not `msg.sender`: the relayer
  * cannot redirect the rock to itself, and the attestation it relays is only produced by a real,
@@ -103,7 +103,7 @@ export const ATTESTATION_TYPES = {
 /**
  * Validates a client-supplied attestation against the server's own view of the world.
  *
- * The domain is rebuilt here from configuration and the signature is recovered against *that* —
+ * The domain is rebuilt here from configuration and the signature is recovered against *that* -
  * the `domain` field the client sent is never used. A caller who could choose the domain could
  * present a signature made for a different chain or a different contract and have it accepted.
  */
@@ -124,7 +124,7 @@ export async function verifyAttestation(
     return unavailable("The attestation was issued for a different rock");
   }
   if (attestation.message.deadline * 1000 <= Date.now()) {
-    return unavailable("The attestation has expired — tap the rock again");
+    return unavailable("The attestation has expired - tap the rock again");
   }
 
   let recovered: Address;
@@ -170,7 +170,7 @@ export async function verifyAttestation(
  * What one relayed claim is assumed to cost, reserved before the transaction is sent.
  *
  * A cap can only be enforced ahead of the spend, and the real cost is not known until the receipt
- * — so a conservative constant is reserved up front. On Sepolia a `claimHandover` is well under
+ * - so a conservative constant is reserved up front. On Sepolia a `claimHandover` is well under
  * this; over-reserving means the cap binds earlier than strictly necessary, which is the safe
  * direction to be wrong in.
  */
@@ -216,7 +216,7 @@ export function spendDayKey(now: number = Date.now()): string {
  * the update when the new total still fits, and `RETURNING` tells us whether it did. Two
  * concurrent claims therefore cannot both pass a cap that only one of them fits under.
  *
- * Fails closed on every uncertainty — no cap, no database, a failed statement — because the thing
+ * Fails closed on every uncertainty - no cap, no database, a failed statement - because the thing
  * being bounded is real money leaving a key.
  */
 export async function reserveRelayerSpend(
@@ -253,7 +253,7 @@ export async function reserveRelayerSpend(
 
     if (!rows || rows.length === 0) {
       logger.warn("Relayer daily cap reached", { action: "RELAYER_CAP_REACHED", day });
-      return unavailable("The relayer has reached its daily limit — try again tomorrow");
+      return unavailable("The relayer has reached its daily limit - try again tomorrow");
     }
 
     return real({ day, reservedWei: amountWei });
@@ -289,8 +289,8 @@ export async function releaseRelayerSpend(day: string, amountWei: bigint): Promi
 /**
  * How long a relayed claim is watched for its receipt.
  *
- * The same discipline `submitSignedUserOp` uses for the owner swap — ten polls, a block and a half
- * apart — because the two halves of a gift are watched by the same person on the same screen, and
+ * The same discipline `submitSignedUserOp` uses for the owner swap - ten polls, a block and a half
+ * apart - because the two halves of a gift are watched by the same person on the same screen, and
  * one of them giving up in five seconds while the other waits fifteen would be an arbitrary
  * difference in what "done" means.
  */
@@ -301,7 +301,7 @@ const RECEIPT_TIMEOUT_MS = RECEIPT_POLL_INTERVAL_MS * RECEIPT_POLL_ATTEMPTS;
 /**
  * The gas limit a relayed `claimHandover` is sent with.
  *
- * Generous for the call — a storage rebind, an `isOwner` staticcall and three events — and it has
+ * Generous for the call - a storage rebind, an `isOwner` staticcall and three events - and it has
  * to be a fixed number rather than an estimate, because it is half of the product that must stay
  * inside the reservation.
  */
@@ -324,7 +324,7 @@ export const RELAYER_GAS_PRICE_TOO_HIGH_REASON = "gas price too high for the rel
 /**
  * The fee cap a relayed claim may be sent with, so that it cannot cost more than was reserved.
  *
- * The daily cap is enforced by reserving `RELAYED_CLAIM_COST_ESTIMATE_WEI` *before* the send — but
+ * The daily cap is enforced by reserving `RELAYED_CLAIM_COST_ESTIMATE_WEI` *before* the send - but
  * an unpriced `sendTransaction` lets viem choose the fees from the current block, so a fee spike
  * between the reservation and the broadcast spends more of the relayer's key than the ledger ever
  * recorded, and the cap stops being a cap. Bounding the transaction is what makes the reservation
@@ -374,7 +374,7 @@ export type RelayedClaim =
  * Sends `claimHandover` from the relayer key **and waits for it to be mined**.
  *
  * It used to return as soon as the node accepted the transaction, which the recipient's screen
- * read as "This rock is yours" — a sentence about a state that did not exist yet and might never:
+ * read as "This rock is yours" - a sentence about a state that did not exist yet and might never:
  * `claimHandover` reverts for reasons this route cannot rule out in advance
  * (`AttestationExpired` when the mempool is slow, `AccountDoesNotAnswerToOwner`,
  * `HandoverExpired`), and a reverted claim leaves the giver owning the rock and the recipient
@@ -521,7 +521,7 @@ export type SerializedUserOperation = Record<string, string> & {
  * registry, but the Rock Account is a Safe whose single owner is still the giver's wallet. Until
  * that owner is swapped, the new owner of the rock cannot move its assets and the old owner
  * still can. The Safe can only authorise its own owner swap with a signature from its current
- * owner — the giver — and the giver is by definition not present when the recipient taps.
+ * owner - the giver - and the giver is by definition not present when the recipient taps.
  *
  * So the giver pre-signs it. `initiateHandover` signs this UserOperation at the moment the gift
  * is created, when the giver is online and is still the Safe's owner, and it is stored until the
@@ -535,7 +535,7 @@ export type SerializedUserOperation = Record<string, string> & {
  *    Safe's owner to this named recipient. It is stored server-side, and it is only ever
  *    submitted after the registry has accepted a fresh, counter-verified attestation for the same
  *    rock;
- *  - if the giver cancels the handover, the stored operation must be discarded — `cancelHandover`
+ *  - if the giver cancels the handover, the stored operation must be discarded - `cancelHandover`
  *    deletes it (see the claim/cancel routes). A cancelled gift whose owner-swap operation
  *    survived would be a live path to hand the Safe away.
  */
@@ -562,8 +562,8 @@ function pimlicoUrl(): Capability<string> {
  * A refusal *by* the bundler, as opposed to a failure to reach it.
  *
  * The two need different words: "your paymaster policy does not cover this" is something an
- * operator can fix, and "the network is down" is not. The message is the bundler's own — an `AAxx`
- * code, a paymaster policy, a prefund — and `publicReason` classifies it into a fixed sentence
+ * operator can fix, and "the network is down" is not. The message is the bundler's own - an `AAxx`
+ * code, a paymaster policy, a prefund - and `publicReason` classifies it into a fixed sentence
  * without ever quoting it (`lib/errors.ts`).
  */
 class BundlerRpcError extends Error {
@@ -588,7 +588,7 @@ async function bundlerRpc(url: string, method: string, params: unknown[]): Promi
  *
  * Why a stored hand-over key is simulated before it is kept: the only thing
  * `POST /api/rocks/[id]/pending-userop` could check about a submitted operation was that its
- * `sender` is the rock's Rock Account — which is public. Any signed-in Privy account could
+ * `sender` is the rock's Rock Account - which is public. Any signed-in Privy account could
  * therefore store a row of nonsense against any rock, take the row's creator DID (it is
  * first-writer-wins, audit P-5), and both lock the real giver out and hand the recipient a gift
  * the claim route would submit and fail on. A signature is the thing a squatter cannot forge, and
@@ -627,7 +627,7 @@ export async function simulateSignedUserOp(
  *
  * Returns the transaction hash only once the bundler reports a receipt. If the operation is
  * accepted but not yet mined within the short poll window, the result is UNAVAILABLE with a
- * reason naming the userOpHash — an accepted-but-unmined operation is not a transaction, and
+ * reason naming the userOpHash - an accepted-but-unmined operation is not a transaction, and
  * this must not report one.
  */
 export async function submitSignedUserOp(
@@ -657,7 +657,7 @@ export async function submitSignedUserOp(
       const txHash = receipt?.receipt?.transactionHash;
       if (txHash) {
         // Included is not succeeded (review N-6). ERC-4337 reports a UserOperation that reverted
-        // inside its own execution with `success: false` and a perfectly good transaction hash —
+        // inside its own execution with `success: false` and a perfectly good transaction hash -
         // a stale `prevOwner`, a spent nonce or a Safe guard all look like this. Reading only the
         // hash would report a Safe owner swap that never happened as landed, and the claim route
         // would then hand over a rock whose account is still the giver's: N-1, reached through

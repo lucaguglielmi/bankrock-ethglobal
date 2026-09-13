@@ -7,7 +7,7 @@ import { cn } from "@/lib/ui/cn";
 /**
  * The single fixed-bottom container (spec 17 §4.9, L-4). Rendered once in
  * the root layout. Its only occupants are things like the demo switcher,
- * the update toast and the `sonner` `Toaster` — nothing else may be
+ * the update toast and the `sonner` `Toaster` - nothing else may be
  * `position: fixed` at the bottom of the viewport.
  *
  * Measures its own height with `ResizeObserver` and writes it to

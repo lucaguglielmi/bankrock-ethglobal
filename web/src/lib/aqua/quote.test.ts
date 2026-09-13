@@ -80,7 +80,7 @@ describe("quoteExactOut", () => {
     expect(quoteExactOut(curve, BigInt("47482973758155927")).amountIn).toBe(BigInt(100_015_003));
   });
 
-  it("is deliberately *not* the inverse of quoteExactIn — the fee lands on the other side", () => {
+  it("is deliberately *not* the inverse of quoteExactIn - the fee lands on the other side", () => {
     const amountIn = BigInt(100) * USDC;
     const { amountOut } = quoteExactIn(curve, amountIn);
     const back = quoteExactOut(curve, amountOut);

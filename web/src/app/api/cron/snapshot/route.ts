@@ -1,5 +1,5 @@
 /**
- * GET /api/cron/snapshot — records a TVL snapshot per rock (N-8, SA-9, SA-12, D-016, D-023).
+ * GET /api/cron/snapshot - records a TVL snapshot per rock (N-8, SA-9, SA-12, D-016, D-023).
  *
  *  - the cron secret moves from `?token=` to the `x-cron-secret` header, so it stops travelling
  *    into access logs (SA-12), and an unset secret rejects instead of disabling the check (SA-9);

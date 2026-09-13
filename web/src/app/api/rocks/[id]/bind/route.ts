@@ -1,5 +1,5 @@
 /**
- * POST /api/rocks/[id]/bind — record (or release) the tag → rock binding off chain.
+ * POST /api/rocks/[id]/bind - record (or release) the tag → rock binding off chain.
  *
  * The registry is the authority: `rockIdForUid(uidHash)` says which rock a tag currently belongs
  * to, and archiving releases it there. This table is only a cache, so a tap can be routed without
@@ -7,7 +7,7 @@
  *
  * Because it is only a cache, it is written by corroboration rather than by trust: the route
  * reads the registry and stores what the registry already says. A caller who lies is simply
- * refused — there is no input here that can make the database disagree with the chain. That is
+ * refused - there is no input here that can make the database disagree with the chain. That is
  * what makes it safe to call it from the client right after an awaken, instead of inventing an
  * internal credential for a fact that is public on chain anyway.
  *

@@ -84,9 +84,9 @@ export function NewsletterSignup() {
             <div className="mt-4 text-caption text-ink-3">{email}</div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
-            <div className="relative flex-1">
-              <Mail className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-ink-4" aria-hidden />
+          <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-3 sm:max-w-lg sm:flex-row sm:items-center sm:rounded-full sm:border sm:border-neutral-200 sm:bg-neutral-50 sm:p-1.5 sm:shadow-sm sm:transition-all sm:focus-within:ring-2 sm:focus-within:ring-ink sm:focus-within:ring-offset-2">
+            <div className="relative flex-1 rounded-full border border-neutral-200 bg-neutral-50 sm:border-none sm:bg-transparent">
+              <Mail className="pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-ink-4" aria-hidden />
               <input
                 type="email"
                 value={email}
@@ -97,14 +97,14 @@ export function NewsletterSignup() {
                 placeholder="vitalik@ethereum.org"
                 aria-label="Email address"
                 required
-                className="h-14 w-full rounded-full border border-neutral-200 bg-neutral-50 pr-5 pl-11 text-base font-medium text-ink placeholder:text-ink-4 shadow-sm outline-none transition-all focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+                className="h-14 w-full rounded-full bg-transparent pr-5 pl-12 text-base font-medium text-ink placeholder:text-ink-4 outline-none transition-all focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 sm:focus-visible:ring-0 sm:focus-visible:ring-offset-0"
               />
             </div>
-            <Button type="submit" size="lg" disabled={status === "loading"} className="w-full sm:w-auto">
+            <Button type="submit" size="lg" disabled={status === "loading"} className="w-full rounded-full sm:w-auto sm:shrink-0">
               {status === "loading" ? (
                 <>
                   <Loader2 className="size-4 animate-spin" aria-hidden />
-                  <span>Subscribing…</span>
+                  <span className="sm:hidden">Wait...</span>
                 </>
               ) : (
                 <>

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Start earning — shipping a strategy to Aqua (spec 04, Flow B steps 8–10).
+ * Start earning - shipping a strategy to Aqua (spec 04, Flow B steps 8–10).
  *
  * Three things this sheet is careful about:
  *
@@ -17,9 +17,9 @@
  *    strategy nothing could see. Streams already live on the rock are excluded by the caller
  *    (`excludeStreamIndexes`): a strategy is immutable, so re-shipping one reverts.
  *
- * Two steps: **offer**, then **review**. The offer is a share of the rock — one slider, 0–100 %,
+ * Two steps: **offer**, then **review**. The offer is a share of the rock - one slider, 0–100 %,
  * applied to *both* holdings so the rock keeps its own price (spec 21's one-sided balancing is
- * not implemented, so nothing here invents a rebalance) — followed by the strategy cards, each
+ * not implemented, so nothing here invents a rebalance) - followed by the strategy cards, each
  * saying what it would be allowed to trade at that share. Anyone who wants exact figures can
  * switch to two plain amount fields; whichever mode is showing is the source of the amounts.
  *
@@ -68,7 +68,7 @@ function parseAmount(value: string, decimals: number): bigint | null {
   }
 }
 
-/** `held × share / 100`, in base units — the same share of each holding, so the price is kept. */
+/** `held × share / 100`, in base units - the same share of each holding, so the price is kept. */
 function shareOf(held: bigint, share: number): bigint {
   return (held * BigInt(share)) / HUNDRED;
 }
@@ -79,7 +79,7 @@ export interface ShipStrategySheetProps {
   rockId: string;
   reserves: Capability<{ usdc: bigint; weth: bigint }>;
   /**
-   * The option the sheet opens on — what the picker on the Liquidity tab hands over. It shows as
+   * The option the sheet opens on - what the picker on the Liquidity tab hands over. It shows as
    * selected, and the other offered options stay a tap away.
    */
   option?: ShipOption;
@@ -264,7 +264,7 @@ export function ShipStrategySheet({
     );
   }
 
-  /** "2.5 USDC · 0.0025 WETH" — what a card would ship at the current offer. */
+  /** "2.5 USDC · 0.0025 WETH" - what a card would ship at the current offer. */
   const breakdownText =
     usdcAmount !== null && wethAmount !== null
       ? `${formatAmount(usdcAmount, { decimals: tokens.USDC.decimals, maxFractionDigits: 2 })} USDC · ${formatAmount(wethAmount, { decimals: tokens.WETH.decimals, maxFractionDigits: 4 })} WETH`
@@ -368,7 +368,7 @@ export function ShipStrategySheet({
               </div>
               {flow.option ? (
                 <p className="text-sm text-ink-2">
-                  {flow.option.label} — earns {formatFeeRate(flow.option.feeBps)} of every trade.
+                  {flow.option.label} - earns {formatFeeRate(flow.option.feeBps)} of every trade.
                 </p>
               ) : null}
             </div>
@@ -377,7 +377,7 @@ export function ShipStrategySheet({
               Your rock keeps its tokens; Aqua tracks what is available to trade.
             </p>
             <p className="max-w-prose text-sm text-ink-3">
-              You can stop at any time, and the fees stay in the rock&rsquo;s own balance — there is
+              You can stop at any time, and the fees stay in the rock&rsquo;s own balance - there is
               nothing to collect.
             </p>
 

@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * The headline reserve — the first figure on an awake rock (spec 17 Part 5), as one calm card.
+ * The headline reserve - the first figure on an awake rock (spec 17 Part 5), as one calm card.
  *
  * Both balances come from the chain read. When that read is unavailable there is no number at
  * all, only the reason: a zero would read as "we measured zero", which is a different claim.
  *
  * Under it, when a strategy is live, one caption says how much of that reserve a visitor can
- * actually trade against right now — `executable`, which is `min(virtual, held, allowance)`
+ * actually trade against right now - `executable`, which is `min(virtual, held, allowance)`
  * (`contracts/aqua/NOTES.md` §7). With more than one stream there is no single figure to give,
  * because two streams' allowances may sum to more than the rock holds and that sum is not
  * capital; the caption points at the per-stream breakdown instead.
@@ -106,7 +106,7 @@ export function ReserveHeadline({
         </p>
       ) : streams.length > 1 ? (
         <p className="relative max-w-prose text-caption text-ink-3">
-          of which available to trade: shown per stream below — the streams share this one reserve
+          of which available to trade: shown per stream below - the streams share this one reserve
           and their allowances are not added together.
         </p>
       ) : (

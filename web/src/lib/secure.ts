@@ -83,12 +83,12 @@ export function requireHeaderSecret(
   return { ok: true };
 }
 
-/** `x-admin-key: <ADMIN_API_KEY>` — operator-only read endpoints (SA-2, N-10). */
+/** `x-admin-key: <ADMIN_API_KEY>` - operator-only read endpoints (SA-2, N-10). */
 export function requireAdminApiKey(req: Request): GuardResult {
   return requireHeaderSecret(req, "x-admin-key", "ADMIN_API_KEY");
 }
 
-/** `x-cron-secret: <CRON_SECRET>` — scheduled callers (SA-6, SA-7, SA-12). */
+/** `x-cron-secret: <CRON_SECRET>` - scheduled callers (SA-6, SA-7, SA-12). */
 export function requireCronSecret(req: Request): GuardResult {
   return requireHeaderSecret(req, "x-cron-secret", "CRON_SECRET");
 }

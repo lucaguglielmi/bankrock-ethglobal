@@ -13,15 +13,15 @@ import { MyAddressQr } from "@/components/my-address-qr";
 import { TapRockAnimation } from "@/components/tap-rock-animation";
 import { ArrowRight, QrCode } from "lucide-react";
 
-/** Where the account sheet's "Demo mode" link goes. Placeholder — the real demo entry point is decided later. */
+/** Where the account sheet's "Demo mode" link goes. Placeholder - the real demo entry point is decided later. */
 export const DEMO_MODE_HREF = "/rock/420";
 
 /**
  * The header auth control (spec 17 §4.3). Signed out: a `Connect` button.
- * Unavailable (spec 15 A-1/A-2 removed the fabricated wallet — sign-in can
+ * Unavailable (spec 15 A-1/A-2 removed the fabricated wallet - sign-in can
  * genuinely be unconfigured): a muted, non-interactive-looking chip with a
  * `HelpTerm` naming the reason. Signed in: one 44 px chip that opens the
- * account `Sheet` — nothing else lives in the header.
+ * account `Sheet` - nothing else lives in the header.
  */
 export function LoginButton() {
   const {

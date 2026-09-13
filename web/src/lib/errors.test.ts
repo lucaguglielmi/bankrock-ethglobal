@@ -10,7 +10,7 @@ import { MissingEnvError } from "./demo";
 /**
  * Audit P-2: a `reason` that reaches a response body must never carry a secret.
  *
- * The finding was concrete — `SEPOLIA_RPC_URL` carries the provider's API key in its path, viem
+ * The finding was concrete - `SEPOLIA_RPC_URL` carries the provider's API key in its path, viem
  * puts the URL into its error text, and the claim route returned that text to an unauthenticated
  * caller. These cases pin the property that makes the class of bug impossible rather than the one
  * instance of it: `publicReason` never reads a message at all.
@@ -52,7 +52,7 @@ describe("publicReason", () => {
     expect(publicReason({ message: SECRET_URL })).toBe(INTERNAL_ERROR_REASON);
   });
 
-  it("names a missing environment variable — the name, never the value", () => {
+  it("names a missing environment variable - the name, never the value", () => {
     expect(publicReason(new MissingEnvError("SEPOLIA_RPC_URL"))).toBe(
       "SEPOLIA_RPC_URL is not configured",
     );
@@ -77,11 +77,11 @@ describe("publicReason", () => {
  * B5: a bundler or paymaster failure used to read "internal error".
  *
  * Every sponsored action in the app is a UserOperation, so this was the most common failure in the
- * product wearing the least useful words. A bundler has no error *type* — the refusal arrives as a
- * JSON-RPC message — so these are classified by message, and the first case below is the one that
+ * product wearing the least useful words. A bundler has no error *type* - the refusal arrives as a
+ * JSON-RPC message - so these are classified by message, and the first case below is the one that
  * matters: classifying by message must not become quoting the message.
  */
-describe("publicReason — bundler and paymaster failures", () => {
+describe("publicReason - bundler and paymaster failures", () => {
   /** A bundler error as `lib/rock-account.server.ts` raises it: the bundler's own words. */
   function bundlerError(message: string) {
     return Object.assign(new Error(message), { name: "BundlerRpcError" });

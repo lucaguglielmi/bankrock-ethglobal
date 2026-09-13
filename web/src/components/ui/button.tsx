@@ -23,7 +23,7 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       // Sizes (spec 17 §4.5): no size below 40 px. `sm` is for inline
-      // secondary actions only — `default` is the baseline button height.
+      // secondary actions only - `default` is the baseline button height.
       size: {
         sm: "h-10 gap-1.5 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5",
         default:

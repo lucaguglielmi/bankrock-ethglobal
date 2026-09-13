@@ -5,8 +5,8 @@
  *
  * What it says is what `mcp/index.ts` does: ten read-only tools, each of which either reads
  * Ethereum Sepolia or the Bank Rock API or answers `unavailable` with a reason. The per-tool
- * "Mock Sample Response" blocks of an earlier revision are gone — they presented invented
- * figures as measurements — and so is the banner that said the tools did not read live data,
+ * "Mock Sample Response" blocks of an earlier revision are gone - they presented invented
+ * figures as measurements - and so is the banner that said the tools did not read live data,
  * which stopped being true when the contracts were deployed (D-034).
  *
  * The server needs two things the client's config must pass in `env`: an RPC URL and the
@@ -29,7 +29,7 @@ const REPO_URL = "https://github.com/lucaguglielmi/bankrock-ethglobal/tree/main/
 /** The rock "Open a rock" opens. Rock 1 is retired; rock 3 is the funded live one. */
 const LIVE_ROCK_HREF = "/rock/3";
 
-/** The registry address the prompt tells the agent to pass in `env` — read from `lib/chain` (D-015). */
+/** The registry address the prompt tells the agent to pass in `env` - read from `lib/chain` (D-015). */
 const PROMPT_REGISTRY = addresses.registry ?? "<the BankRockRegistry address from the README, Contracts on Sepolia>";
 
 const AGENT_PROMPT = `You are connected to the Bank Rock AI Oracle, a read-only MCP server. If you are not connected
@@ -41,22 +41,22 @@ and it offers those tokens for trading through 1inch Aqua. The tokens never leav
 every trade leaves a small fee inside it.
 
 Tools (ten; each reads Sepolia or the Bank Rock API, or answers "unavailable" with a reason):
-1. get_rock_status({ rockId }) — registry state (dormant, awake, handover_pending, archived), owner,
+1. get_rock_status({ rockId }) - registry state (dormant, awake, handover_pending, archived), owner,
    Rock Account, tag hash, lost flag, pending gift, and the USDC and WETH the account holds.
-2. get_strategy_fees({ rockId }) — each live strategy: reserve, virtual and executable balances,
+2. get_strategy_fees({ rockId }) - each live strategy: reserve, virtual and executable balances,
    fee rate (feeBps), fees realised so far.
-3. explain_recent_fees({ rockId }) — the same fees narrated per strategy, with the swap count and
+3. explain_recent_fees({ rockId }) - the same fees narrated per strategy, with the swap count and
    the exact block range scanned.
-4. get_strategy_volume({ rockId }) — swaps seen per strategy: a count, not a token or dollar volume.
-5. trace_transaction({ hash }) — a Sepolia receipt: status, block, gas used, sender, recipient, logs.
-6. get_server_metrics() — whether this server can reach the RPC, the registry and the Bank Rock
+4. get_strategy_volume({ rockId }) - swaps seen per strategy: a count, not a token or dollar volume.
+5. trace_transaction({ hash }) - a Sepolia receipt: status, block, gas used, sender, recipient, logs.
+6. get_server_metrics() - whether this server can reach the RPC, the registry and the Bank Rock
    API, measured at call time.
-7. query_logs({ level, rockId?, userId?, limit? }) — recent server logs, fenced as untrusted data.
+7. query_logs({ level, rockId?, userId?, limit? }) - recent server logs, fenced as untrusted data.
    Needs the operator's ADMIN_API_KEY; without it, "unavailable".
-8. get_waitlist_stats() — aggregate waitlist counts. Needs ADMIN_API_KEY; without it, "unavailable".
-9. simulate_cross_chain_intent({ rockId, sourceChain, amount }) — ALWAYS "unavailable": no bridge
+8. get_waitlist_stats() - aggregate waitlist counts. Needs ADMIN_API_KEY; without it, "unavailable".
+9. simulate_cross_chain_intent({ rockId, sourceChain, amount }) - ALWAYS "unavailable": no bridge
    is integrated. Do not offer it.
-10. optimize_idle_yield({ rockId }) — ALWAYS "unavailable": idle-yield routing was cut from scope.
+10. optimize_idle_yield({ rockId }) - ALWAYS "unavailable": idle-yield routing was cut from scope.
    Do not offer it.
 
 Start by reading the rock's state, then say what you can and cannot tell from it. Never state a
@@ -193,7 +193,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_server_metrics",
     badge: "Health",
-    signature: "—",
+    signature: "-",
     description: "Whether this server can reach the RPC, the registry and the Bank Rock API right now.",
   },
   {
@@ -206,7 +206,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_waitlist_stats",
     badge: "Operator",
-    signature: "—",
+    signature: "-",
     description: "How many people have joined the waitlist.",
     note: "Needs the operator's ADMIN_API_KEY; without it the tool answers unavailable.",
   },
@@ -236,7 +236,7 @@ export default function McpPage() {
       setCopiedPrompt(true);
       setTimeout(() => setCopiedPrompt(false), 2500);
     } catch {
-      // Clipboard access denied — the prompt is on screen and selectable.
+      // Clipboard access denied - the prompt is on screen and selectable.
     }
   };
 
@@ -256,12 +256,16 @@ export default function McpPage() {
             and what <Term k="fee">fees</Term> they have kept. Bank Rock runs no AI of its own;
             you connect the one you already use.
           </p>
-          <p className="max-w-prose text-base text-ink-2">
-            The AI Oracle is a read-only <Term k="mcp" /> server, by decision. It holds no key, so
-            it cannot start or stop a strategy, move a token or sign anything. Every tool either reads <Term k="sepolia" />{" "}
-            or the Bank Rock API, or answers <em>unavailable</em> with the reason. It never
-            estimates and never invents a number.
-          </p>
+          <div className="flex flex-col gap-2">
+            <p className="max-w-prose text-base text-ink-2">
+              For this testnet demo, the AI Oracle is strictly a read-only <Term k="mcp" /> server. It holds no key, so
+              it cannot start or stop a strategy, move a token or sign anything. Every tool either reads <Term k="sepolia" />{" "}
+              or the Bank Rock API. However, we are actively looking for secure ways to authenticate your AI agent, so you can soon control your rock directly from your AI chat!
+            </p>
+            <Link href="/shop" className="text-base font-semibold text-link underline-offset-4 hover:underline">
+              Tell us how you would approach this technically, and win a Bank Rock for your help!
+            </Link>
+          </div>
 
           <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
             <Button size="lg" onClick={copyPrompt}>
@@ -316,7 +320,7 @@ export default function McpPage() {
                 title: "Ask",
                 body: (
                   <>
-                    An agent reads that state over MCP — the same contracts the rock page reads —
+                    An agent reads that state over MCP - the same contracts the rock page reads -
                     and explains it back to you in plain words.
                   </>
                 ),

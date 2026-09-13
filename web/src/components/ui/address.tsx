@@ -11,7 +11,7 @@ const COPIED_RESET_MS = 2000;
 /**
  * Middle-truncates a long identifier with a 44 px copy button and an
  * optional explorer link (spec 17 §4.6). The caller supplies `explorerHref`
- * — this component never computes an explorer URL itself.
+ * - this component never computes an explorer URL itself.
  */
 export interface AddressProps {
   value: string;
@@ -35,7 +35,7 @@ function Address({ value, explorerHref, onCopy, className }: AddressProps) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => setCopied(false), COPIED_RESET_MS);
     } catch {
-      // Clipboard access denied or unavailable — nothing to fall back to.
+      // Clipboard access denied or unavailable - nothing to fall back to.
     }
   }, [value, onCopy]);
 

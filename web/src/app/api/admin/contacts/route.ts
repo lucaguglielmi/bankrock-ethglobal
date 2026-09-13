@@ -1,9 +1,9 @@
 /**
- * GET /api/admin/contacts — the contact requests and newsletter sign-ups the database holds.
+ * GET /api/admin/contacts - the contact requests and newsletter sign-ups the database holds.
  *
  * `GET /api/admin/stats` counts these rows; the dashboard showed "Contact requests: 3" and an
- * operator had to open D1 to read what was actually asked. This returns the rows themselves — the
- * most recent hundred of each, newest first — and an empty array when there are none. There is
+ * operator had to open D1 to read what was actually asked. This returns the rows themselves - the
+ * most recent hundred of each, newest first - and an empty array when there are none. There is
  * no POST and no filter: this endpoint answers one question, it does not accept or alter figures.
  *
  * Requires the admin session cookie (the same credential the /admin pages use), checked exactly
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
         createdAt: new Date(row.createdAt).toISOString(),
       })),
       subscribers: subscriberRows.map((row) => {
-        // `subscribers.topics` is where `POST /api/newsletter` keeps the form's `source` — the
+        // `subscribers.topics` is where `POST /api/newsletter` keeps the form's `source` - the
         // landing page sends "landing_page", the alerts page the topics it ticked. It is exposed
         // as stored, and joined into `source` for a table that has one column for it.
         const topics = Array.isArray(row.topics) ? row.topics : [];

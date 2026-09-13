@@ -24,7 +24,7 @@ export function sameAddress(a?: string | null, b?: string | null): boolean {
 
 /**
  * Normalises a timestamp that may arrive as unix seconds, unix milliseconds or a numeric string.
- * Returns milliseconds, or null when there is nothing usable — never a substituted "now".
+ * Returns milliseconds, or null when there is nothing usable - never a substituted "now".
  */
 export function toMillis(value: number | bigint | string | null | undefined): number | null {
   if (value === null || value === undefined || value === "") return null;

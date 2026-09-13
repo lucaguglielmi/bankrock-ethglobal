@@ -20,7 +20,7 @@ import { real, type Capability } from "@/lib/demo";
 export interface ContractsTabProps {
   /**
    * This rock's account, from the registry. UNAVAILABLE while the rock has none, carrying the
-   * reason — a dormant rock opens its account when it is awakened.
+   * reason - a dormant rock opens its account when it is awakened.
    */
   smartAccount: Capability<string>;
 }
@@ -76,7 +76,7 @@ function entriesFor(smartAccount: Capability<string>): ContractEntry[] {
     },
     {
       key: "aquaApp",
-      title: "Strategy app — XYCSwap",
+      title: "Strategy app - XYCSwap",
       author: "1inch",
       summary: (
         <>
@@ -88,7 +88,7 @@ function entriesFor(smartAccount: Capability<string>): ContractEntry[] {
     },
     {
       key: "aquaTaker",
-      title: "Trade router — XYCSwapTaker",
+      title: "Trade router - XYCSwapTaker",
       author: "Bank Rock",
       summary: (
         <>
@@ -104,7 +104,7 @@ function entriesFor(smartAccount: Capability<string>): ContractEntry[] {
       author: "Circle",
       summary: (
         <>
-          <Term k="usdc" /> is one of the two tokens this rock trades — the test version on{" "}
+          <Term k="usdc" /> is one of the two tokens this rock trades - the test version on{" "}
           <Term k="sepolia" />, worth nothing.
         </>
       ),

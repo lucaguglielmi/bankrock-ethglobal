@@ -2,7 +2,7 @@
  * POST /api/admin/login (SA-8, D-017)
  *
  * `if (correctPassword && password === correctPassword)` meant an unset ADMIN_PASSWORD failed
- * closed by accident — every login was rejected — while ADMIN_JWT_SECRET failed *open* through
+ * closed by accident - every login was rejected - while ADMIN_JWT_SECRET failed *open* through
  * its fallback string. Both now fail closed explicitly: an unset secret is a 503 UNAVAILABLE, and
  * the password comparison is constant-time.
  *

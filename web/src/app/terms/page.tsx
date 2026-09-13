@@ -2,7 +2,7 @@ import { Shield } from "lucide-react";
 import { LegalPageHeader, LegalPageFooter } from "@/components/chrome/legal-page";
 
 export const metadata = {
-  title: "Terms and Conditions — Bank Rock",
+  title: "Terms and Conditions - Bank Rock",
   description: "Terms of Service and Conditions governing the use of Bank Rock physical hardware, ERC-4337 accounts, and decentralized interfaces.",
 };
 

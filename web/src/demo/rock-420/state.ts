@@ -1,7 +1,7 @@
 /**
  * The demo model for rock #420: what the browser pretends the chain holds.
  *
- * Pure data and pure builders — no React, no `localStorage`, no network — so the same module
+ * Pure data and pure builders - no React, no `localStorage`, no network - so the same module
  * serves the hooks in the browser, the quote route on the server, and the tests. Persistence is
  * `store.ts`; mutations are `actions.ts`.
  *
@@ -59,7 +59,7 @@ export interface DemoRockState {
   lost: boolean;
   /** Set after a claim. `null` means "whoever is signed in", which is the demo's premise. */
   owner: Address | null;
-  /** The rock's real-looking token balances — one reserve, shared by every stream. */
+  /** The rock's real-looking token balances - one reserve, shared by every stream. */
   holdings: DemoAmounts;
   /** What the rock has "approved Aqua" for. `approve` sets, so this is the largest shipped amount. */
   allowance: DemoAmounts;
@@ -104,10 +104,10 @@ const TIGHT = DEFAULT_STREAMS[1];
 /**
  * The starting position: a rock that has been busy for seven weeks.
  *
- *   held      25,000 USDC and 12.5 WETH — the same 2,000 USDC per WETH both streams price at
+ *   held      25,000 USDC and 12.5 WETH - the same 2,000 USDC per WETH both streams price at
  *   Wide      allows 18,000 USDC / 9 WETH, 24 trades so far
  *   Tight     allows 12,000 USDC / 6 WETH, 43 trades so far
- *   allowance 18,000 USDC / 9 WETH — `approve` sets, so it is the larger shipment
+ *   allowance 18,000 USDC / 9 WETH - `approve` sets, so it is the larger shipment
  *   history   awakened, funded, two strategies started, ten recent trades, one gift received
  */
 export function seedDemoRock(now: number = Date.now()): DemoRockState {
@@ -174,14 +174,14 @@ export function seedDemoRock(now: number = Date.now()): DemoRockState {
       {
         id: "seed-ship-tight",
         type: "hardware",
-        title: "Started earning — Tight",
+        title: "Started earning - Tight",
         description: "A second stream over the same reserve, at 0.05% per trade. 12,000 USDC and 6 WETH allowed.",
         timestamp: daysAgo(now, 40, 1),
       },
       {
         id: "seed-ship-wide",
         type: "hardware",
-        title: "Started earning — Wide",
+        title: "Started earning - Wide",
         description: "18,000 USDC and 9 WETH allowed to trade at 0.30% per trade. Nothing left the account.",
         timestamp: daysAgo(now, 45, 2),
       },
@@ -205,7 +205,7 @@ export function seedDemoRock(now: number = Date.now()): DemoRockState {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Serialisation — `bigint` does not survive JSON                              */
+/* Serialisation - `bigint` does not survive JSON                              */
 /* -------------------------------------------------------------------------- */
 
 const BIGINT_TAG = "$bigint";
@@ -278,7 +278,7 @@ export function deserializeDemoRock(raw: string): DemoRockState | null {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Views — what the hooks hand to the components                               */
+/* Views - what the hooks hand to the components                               */
 /* -------------------------------------------------------------------------- */
 
 /** Case-insensitive address comparison, tolerant of either side missing. */
@@ -291,7 +291,7 @@ export function sameDemoAddress(a?: string | null, b?: string | null): boolean {
  *
  * The premise is "the signed-in user owns it", so with no explicit owner recorded the viewer is
  * the owner. Two exceptions keep the gift story straight: an explicit owner (set by a claim) wins,
- * and a viewer who is the *named recipient* of the open handover is not the owner yet — the
+ * and a viewer who is the *named recipient* of the open handover is not the owner yet - the
  * previous owner is. Signed out, the rock belongs to the seeded previous owner.
  */
 export function demoOwnerFor(state: DemoRockState, viewer?: string): Address {
@@ -338,7 +338,7 @@ export function demoStrategyFor(streamIndex: number, feeBps: number): { strategy
   return { strategy: encoded.strategy, strategyHash: encoded.strategyHash };
 }
 
-/** `executable = min(virtual, held, allowance)` — the same rule `lib/aqua/read.ts` applies. */
+/** `executable = min(virtual, held, allowance)` - the same rule `lib/aqua/read.ts` applies. */
 export function demoExecutable(state: DemoRockState, stream: DemoStream): DemoAmounts {
   return {
     usdc: min(stream.virtual.usdc, state.holdings.usdc, state.allowance.usdc),

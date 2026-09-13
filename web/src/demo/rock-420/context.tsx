@@ -4,7 +4,7 @@
  * Whether the page being rendered is the demo rock.
  *
  * `useDemoRock()` returns `null` on every other rock, and every seam in the real hooks reads
- * exactly that: `const demo = useDemoRock();` — null means the hook does what it always did.
+ * exactly that: `const demo = useDemoRock();` - null means the hook does what it always did.
  */
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";

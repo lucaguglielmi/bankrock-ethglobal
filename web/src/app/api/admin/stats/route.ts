@@ -1,5 +1,5 @@
 /**
- * GET /api/admin/stats — operator dashboard figures from D1 (N-7).
+ * GET /api/admin/stats - operator dashboard figures from D1 (N-7).
  *
  * The admin dashboard was a `setTimeout` returning $1,254,300 TVL, 42 rocks and 8 Gelato tasks.
  * This reads what the database actually holds and says so when it holds nothing. There is no
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
       ],
     );
 
-    // The latest snapshot per rock, summed. Null when nothing has ever been snapshotted — a zero
+    // The latest snapshot per rock, summed. Null when nothing has ever been snapshotted - a zero
     // would read as "we measured zero TVL", which is a different claim.
     const tvlRow = await db.get<{ tvl: number | null; measured_at: number | null }>(sql`
       SELECT SUM(s.tvl_usdc) AS tvl, MAX(s.timestamp) AS measured_at

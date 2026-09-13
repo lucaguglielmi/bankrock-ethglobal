@@ -8,18 +8,18 @@ import {
 import { Term } from "@/components/ui/term";
 
 /**
- * "Security" — what protects a rock and its owner, in the words the threat model uses
+ * "Security" - what protects a rock and its owner, in the words the threat model uses
  * (spec 06, spec 03 trust boundaries, DEMO-STATE §7), with no claim the code does not back.
  *
  * What this page no longer has: a three-button poll that recorded nothing and a feedback form
- * whose submit handler only prevented the default — both were surfaces that looked like they
+ * whose submit handler only prevented the default - both were surfaces that looked like they
  * worked and did not. Feedback goes to the security address the contracts publish.
  *
  * The global header and the page frame come from the root layout and `globals.css`.
  */
 
 export const metadata = {
-  title: "Security — Bank Rock",
+  title: "Security - Bank Rock",
   description:
     "What protects a Bank Rock and its owner: the chip, the signed tap, the account, the registry and what none of them can do.",
 };
@@ -76,7 +76,7 @@ export default function SecurityPage() {
                 After a good tap the server signs an <Term k="attestation" />: a{" "}
                 <Term k="eip712" /> naming the rock, the chip, the counter, a short deadline, the
                 wallet it is for and the account it opens. The <Term k="registry" /> accepts it
-                for exactly two things — awakening a rock and claiming a gift. It can never spend,
+                for exactly two things - awakening a rock and claiming a gift. It can never spend,
                 and the key that signs it holds no funds.
               </AccordionContent>
             </AccordionItem>

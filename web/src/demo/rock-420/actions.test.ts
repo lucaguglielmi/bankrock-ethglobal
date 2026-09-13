@@ -189,7 +189,7 @@ describe("strategies", () => {
     expect(state.allowance).toEqual(seed.allowance);
   });
 
-  it("refuses a stream that is not live, nothing at all, and more than the rock holds — leaving the state alone", () => {
+  it("refuses a stream that is not live, nothing at all, and more than the rock holds - leaving the state alone", () => {
     const seed = seedDemoRock(NOW);
     const notLive = topUpDemoStrategy(seed, { streamIndex: 2, usdcAmount: usdc("1"), wethAmount: weth(0) }, NOW);
     expect(notLive.result.state).toBe("UNAVAILABLE");

@@ -5,7 +5,7 @@
  *
  * It was a `setTimeout` returning $1,254,300 TVL, 42 rocks, 8 Gelato tasks and three invented
  * feed rows. It now reads `GET /api/admin/stats`, which counts what the database holds, and
- * renders the reason when there is nothing to count — a zero TVL would be a measurement claim,
+ * renders the reason when there is nothing to count - a zero TVL would be a measurement claim,
  * so the route returns null for it and this page says so instead.
  *
  * "Contact requests" was a number. It is now the submissions themselves, read from

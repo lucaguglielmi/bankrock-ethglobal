@@ -7,7 +7,7 @@ import { approvalCalls } from "./rock-account";
  * The USDC approval rule.
  *
  * Circle's USDC reverts on a non-zero to non-zero `approve`. A sequence that ignores this works on
- * WETH and fails on USDC — which is the worst shape a bug can have here, because USDC is the token
+ * WETH and fails on USDC - which is the worst shape a bug can have here, because USDC is the token
  * the product is about and the failure only appears on the second ship or the second swap.
  */
 
@@ -47,7 +47,7 @@ describe("approvalCalls", () => {
     expect(amounts(calls)).toEqual([BigInt(0), BigInt(1)]);
   });
 
-  it("is a single call from a zero allowance — the common first ship", () => {
+  it("is a single call from a zero allowance - the common first ship", () => {
     const calls = approvalCalls({
       token: TOKEN,
       spender: SPENDER,

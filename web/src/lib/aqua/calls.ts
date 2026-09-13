@@ -1,6 +1,6 @@
 /**
  * Calldata builders. Every Aqua interaction a rock or a visitor performs is assembled here and
- * nowhere else, and this module **only builds bytes** — it never signs, submits, or estimates.
+ * nowhere else, and this module **only builds bytes** - it never signs, submits, or estimates.
  *
  * Submission belongs to the Rock Account layer (`lib/rock-account.ts`, `lib/aa.ts`): the owner's
  * ship and dock go out as one sponsored UserOperation from the rock's Safe (D-012), and the
@@ -62,7 +62,7 @@ export interface ShipParams extends StreamIdentity {
   usdcAmount: bigint;
   /** Virtual WETH this stream may trade, in base units (18 decimals). */
   wethAmount: bigint;
-  /** The fee in basis points. Part of the strategy's identity — it cannot be changed later. */
+  /** The fee in basis points. Part of the strategy's identity - it cannot be changed later. */
   feeBps: bigint | number;
   /**
    * What to approve Aqua for, per token. Defaults to the shipped amounts.
@@ -161,7 +161,7 @@ export interface DockParams {
 /**
  * Closing a stream (Flow H).
  *
- * One call, and it moves no tokens — there is nothing to withdraw, because the reserve never left
+ * One call, and it moves no tokens - there is nothing to withdraw, because the reserve never left
  * the Rock Account. Both tokens must be listed or Aqua reverts `DockingShouldCloseAllTokens`.
  * Docking is final: the strategy hash is burned and cannot be re-shipped.
  */
@@ -191,7 +191,7 @@ export function buildDockCalls(params: DockParams): Capability<{ calls: Call[]; 
 /* -------------------------------------------------------------------------- */
 
 export interface PushParams {
-  /** The Rock Account — the strategy's maker, and here also the caller. */
+  /** The Rock Account - the strategy's maker, and here also the caller. */
   maker: Address;
   strategyHash: Hex;
   /** How much more USDC this stream may trade, in base units. Zero skips the token. */
@@ -211,7 +211,7 @@ export interface PushPlan {
 }
 
 /**
- * Making more of the rock available to a live strategy — the only "edit" Aqua allows.
+ * Making more of the rock available to a live strategy - the only "edit" Aqua allows.
  *
  * A strategy's bytes are immutable and a docked one can never be revived (NOTES.md §4), so the
  * fee cannot change and nothing can be taken back short of `dock`. What *can* change is the
@@ -221,7 +221,7 @@ export interface PushPlan {
  * strategy).
  *
  * Called by the Rock Account itself, its `safeTransferFrom(msg.sender, maker, amount)` is a
- * transfer from the rock to the rock — no token leaves the account — but it is still a
+ * transfer from the rock to the rock - no token leaves the account - but it is still a
  * `transferFrom` with Aqua as spender, so it **spends `amount` of the rock's allowance to Aqua**.
  * The submitting layer must approve for that on top of what the pulls will need
  * (`useBankRock.topUpStrategy`). Approvals are not built here: they depend on the allowance that
@@ -280,8 +280,8 @@ export interface SwapParams {
    *
    * The periphery used to read `to == 0` as "pay the caller"; the 2026-09-12 re-review removed
    * that sentinel (finding N-2), because a value every reader takes for a burn address must not
-   * quietly mean a payout, and because the periphery's own address — the one a visitor has just
-   * approved and therefore just had in their clipboard — would silently destroy the output. Both
+   * quietly mean a payout, and because the periphery's own address - the one a visitor has just
+   * approved and therefore just had in their clipboard - would silently destroy the output. Both
    * are rejected on-chain, so the recipient is named explicitly here.
    */
   to: Address;
@@ -299,7 +299,7 @@ export interface SwapParams {
 }
 
 export interface SwapPlan {
-  /** The single call against the periphery — `{ to, data }`, no value. */
+  /** The single call against the periphery - `{ to, data }`, no value. */
   call: Call;
   /** `approve(periphery, amountIn)` then the swap. This is what a wallet should submit. */
   calls: Call[];

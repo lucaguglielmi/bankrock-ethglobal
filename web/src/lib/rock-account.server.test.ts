@@ -6,7 +6,7 @@ import type { SignedAttestation } from "./rock-account";
  * The attestation check the claim relayer depends on.
  *
  * `POST /api/rocks/[id]/claim` sends a transaction from a funded operator key on the strength of
- * this check alone, so every way it can be fooled is a way to spend the relayer's gas — and, if
+ * this check alone, so every way it can be fooled is a way to spend the relayer's gas - and, if
  * the registry were to accept the forged attestation, to move someone's rock. These cases are
  * that check's contract.
  */

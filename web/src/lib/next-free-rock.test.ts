@@ -5,7 +5,7 @@ import type { Capability } from "@/lib/demo";
 const chain = (states: Record<string, string>) => async (id: string): Promise<Capability<{ state: string }>> =>
   ({ state: "REAL", value: { state: states[id] ?? "dormant" } }) as Capability<{ state: string }>;
 
-describe("findNextDormantRockId — the registry decides, the mirror only suggests", () => {
+describe("findNextDormantRockId - the registry decides, the mirror only suggests", () => {
   it("returns the suggestion when it is dormant on chain", async () => {
     expect(await findNextDormantRockId("3", chain({ "1": "archived", "2": "awake" }))).toBe("3");
   });

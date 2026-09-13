@@ -3,7 +3,7 @@
  *
  * Both answers used to be the client's job: the page passed whatever `rockId`
  * was in the URL and whatever `smartAccount` it had derived. Neither is safe to
- * take on trust — the URL id is written on the tag at provisioning time and can
+ * take on trust - the URL id is written on the tag at provisioning time and can
  * be stale, and a client-chosen smart account is exactly the front-running hole
  * the sixth attestation field exists to close. So the verifier resolves both,
  * after the CMAC matches, and signs what it resolved.
@@ -30,11 +30,11 @@ import type { RockRecord } from "@/lib/rock-account";
 /**
  * How the effective rock id was arrived at.
  *
- * - `bound`                — the registry already maps this tag's `uidHash` to a rock.
- * - `url`                  — the tag is unbound and the id on the tag is dormant, so it is free to take.
- * - `next_free`            — the tag is unbound and the id on the tag is not available (archived, or
+ * - `bound`                - the registry already maps this tag's `uidHash` to a rock.
+ * - `url`                  - the tag is unbound and the id on the tag is dormant, so it is free to take.
+ * - `next_free`            - the tag is unbound and the id on the tag is not available (archived, or
  *                            already awake), so the next unused id is suggested instead.
- * - `registry_unavailable` — the registry could not be read; the id on the tag is echoed back
+ * - `registry_unavailable` - the registry could not be read; the id on the tag is echoed back
  *                            unchanged and nothing is claimed about it.
  */
 export type RockResolution = "bound" | "url" | "next_free" | "registry_unavailable";
@@ -57,7 +57,7 @@ const AWAKENED_EVENT_SCAN_LIMIT = 1000;
  *
  * Same source as `GET /api/rocks/next-id`, and the same caveat: the result is a
  * suggestion, not a reservation. Two taps at the same moment get the same
- * number and the registry settles it — the second `awakenRock` reverts with
+ * number and the registry settles it - the second `awakenRock` reverts with
  * `RockAlreadyAwakened`. With no database the list is empty, which suggests id
  * 1; the registry still settles it, so this can be optimistic but never
  * silently wrong.
@@ -107,7 +107,7 @@ export async function resolveEffectiveRock(
 
   // The tag is unbound. Is the id written on it still free to take?
   if (parseRockId(urlId) === null) {
-    // Nothing usable on the tag — suggest the next id rather than guess.
+    // Nothing usable on the tag - suggest the next id rather than guess.
     return { effectiveRockId: await nextFreeId(), resolution: "next_free", record: null };
   }
 
@@ -153,7 +153,7 @@ function isZero(address: string | undefined): boolean {
  * The Rock Account this tap authorises.
  *
  * A rock that is already `awake` or `handover_pending` has one, and a claim
- * must name the account the registry already holds — deriving a fresh one there
+ * must name the account the registry already holds - deriving a fresh one there
  * would sign an attestation the registry rejects. Otherwise this is an
  * awakening, and the account is derived from the subject and the tag:
  *

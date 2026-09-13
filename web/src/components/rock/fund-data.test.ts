@@ -2,7 +2,7 @@
  * The funding sheet's data: three addresses, or the reason each one is missing.
  *
  * Nothing here may invent a destination. A rock with no account, or a deployment with no token
- * address configured, has to produce UNAVAILABLE with the missing variable named — a placeholder
+ * address configured, has to produce UNAVAILABLE with the missing variable named - a placeholder
  * address on a "send money here" screen is the worst possible fabrication (D-013, D-015).
  */
 

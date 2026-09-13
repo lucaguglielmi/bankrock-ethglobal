@@ -3,8 +3,8 @@
 /**
  * The one place the page states whether the tap was real (spec 15 D-018).
  *
- * "Verified physical" appears only when the server verified a CMAC. Everything else — a shared
- * link, a replayed URL, an unconfigured verifier, a page opened from a bookmark — reads
+ * "Verified physical" appears only when the server verified a CMAC. Everything else - a shared
+ * link, a replayed URL, an unconfigured verifier, a page opened from a bookmark - reads
  * "Unverified", with an explanation a visitor can act on.
  *
  * A held tap is a fourth case: the parameters are there and untouched, and the single

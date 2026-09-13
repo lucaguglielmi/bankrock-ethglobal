@@ -4,7 +4,7 @@
  * Owner-only extras, behind one 44 px overflow button (spec 17 §4.5).
  *
  * These are rare, consequential actions; they stay out of the main column so the things a
- * visitor came to do — trade, or receive the rock — are the only large buttons on the page.
+ * visitor came to do - trade, or receive the rock - are the only large buttons on the page.
  * Retiring asks for a confirmation that states exactly what it costs.
  *
  * Stopping a strategy is not here any more: it belongs next to the strategy it stops, on the
@@ -29,7 +29,7 @@ export interface OwnerMenuProps {
   /**
    * Whether this wallet may send owner actions from the rock's account, from `useRockAccount`
    * (D-037). Every button here is a UserOperation from that account, so when it is UNAVAILABLE
-   * they are disabled and its reason is shown instead — the alternative is a sheet full of
+   * they are disabled and its reason is shown instead - the alternative is a sheet full of
    * buttons whose transactions revert.
    */
   ownerActions: Capability<string>;

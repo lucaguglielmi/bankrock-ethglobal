@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getTableName, type Column, type SQL, type Table } from "drizzle-orm";
 
 /**
- * `GET /api/admin/contacts` — the rows behind the dashboard's "Contact requests" count.
+ * `GET /api/admin/contacts` - the rows behind the dashboard's "Contact requests" count.
  *
  * The session check is the real one from `lib/auth` (only `next/headers` is replaced, so a cookie
  * jar exists outside a request), and the "unauthenticated" cases compare this route's answer

@@ -1,5 +1,5 @@
 /**
- * GET /api/rocks/[id]/strategy — a rock's live Aqua streams.
+ * GET /api/rocks/[id]/strategy - a rock's live Aqua streams.
  *
  *   ?maker=0x…     the Rock Account. Optional: without it the registry is asked which account
  *                  this rock has, so the public rock page needs nothing but the id.
@@ -19,7 +19,7 @@
  *
  * There is no DEMO branch here at all: this endpoint has no simulated mode to fall back to.
  *
- * Amounts are decimal strings in base units — a `number` cannot hold 18-decimal WETH without
+ * Amounts are decimal strings in base units - a `number` cannot hold 18-decimal WETH without
  * losing precision, and a rounded balance is a wrong balance.
  */
 
@@ -83,7 +83,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   // Which streams to probe. A rock's strategies are recomputable from its id, so this needs no
-  // stored list — see lib/aqua/strategy.ts. By default every catalogue preset is probed: one
+  // stored list - see lib/aqua/strategy.ts. By default every catalogue preset is probed: one
   // `safeBalances` call each, and only the live ones come back.
   const streamParam = url.searchParams.get("stream");
   const feeParam = url.searchParams.get("feeBps");
@@ -92,7 +92,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (streamParam !== null || feeParam !== null) {
     const streamIndex = Number(streamParam ?? 0);
     // A stream's fee is part of its hash, so `?stream=2` alone must mean "stream 2 at the fee the
-    // catalogue gives stream 2" — defaulting to stream 0's fee would probe a hash nothing shipped.
+    // catalogue gives stream 2" - defaulting to stream 0's fee would probe a hash nothing shipped.
     const feeBps = Number(
       feeParam ?? streamPresetFor(streamIndex)?.feeBps ?? DEFAULT_STREAMS[0].feeBps,
     );

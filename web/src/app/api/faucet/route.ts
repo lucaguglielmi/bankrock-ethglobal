@@ -1,9 +1,9 @@
 /**
- * POST /api/faucet — sends Sepolia ETH to a new Rock Account or wallet (SA-4, X-8, D-023).
+ * POST /api/faucet - sends Sepolia ETH to a new Rock Account or wallet (SA-4, X-8, D-023).
  *
  *  - `FAUCET_PRIVATE_KEY` has no default. It used to fall back to the Anvil/Hardhat account #0
  *    key, which every Ethereum developer holds; the address was funded and sweepable by anyone.
- *    Unset now means 503 UNAVAILABLE — the faucet does not exist rather than running as a
+ *    Unset now means 503 UNAVAILABLE - the faucet does not exist rather than running as a
  *    publicly-known key (D-017);
  *  - limits are per-address **and** per-IP, both persisted in D1. Per-address alone is defeated
  *    with a fresh address (X-8), and per-isolate memory does not persist at all;

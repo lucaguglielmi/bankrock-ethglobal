@@ -22,8 +22,8 @@ export function escapeHtml(value: unknown): string {
 }
 
 /**
- * Escapes a value destined for an `href`. Only http(s) and mailto survive; anything else — most
- * importantly `javascript:` — collapses to "#".
+ * Escapes a value destined for an `href`. Only http(s) and mailto survive; anything else - most
+ * importantly `javascript:` - collapses to "#".
  */
 export function escapeHtmlAttributeUrl(value: unknown): string {
   const raw = String(value ?? "").trim();

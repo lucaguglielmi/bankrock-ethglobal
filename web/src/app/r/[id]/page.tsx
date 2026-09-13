@@ -11,7 +11,7 @@
  * redirect there. It cannot, and the reason matters:
  *
  *  - the only identifier in the URL is `e`, the encrypted PICC data. Reading the UID out of it
- *    means running the verifier — and the verifier advances the tag's read counter. A counter that
+ *    means running the verifier - and the verifier advances the tag's read counter. A counter that
  *    advances on a redirect would burn the tap: the rock page would then present a stale counter
  *    and the registry would reject the attestation as a replay. Verification happens exactly once
  *    per tap, on the page that uses its result;
@@ -20,8 +20,8 @@
  *    and the tag itself is never reprogrammed.
  *
  * So resolution happens after verification, on the rock page, from data the verifier already
- * returns. The SIGNED attestation carries `message.uidHash` — `keccak256(uid)`, not the UID, so
- * nothing about the physical tag leaks — and `resolveRockForTag(uidHash)` in `lib/rock-account.ts`
+ * returns. The SIGNED attestation carries `message.uidHash` - `keccak256(uid)`, not the UID, so
+ * nothing about the physical tag leaks - and `resolveRockForTag(uidHash)` in `lib/rock-account.ts`
  * reads `rockIdForUid(uidHash)` from the registry with it. The rock page then:
  *
  *   1. resolves a different rock id than the path      -> navigate there, the tag has moved on;

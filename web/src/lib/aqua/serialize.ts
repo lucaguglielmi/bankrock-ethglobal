@@ -2,7 +2,7 @@
  * JSON shapes for the strategy view.
  *
  * `bigint` does not survive `JSON.stringify`, and a token amount must never be rounded through a
- * `number` on its way to the UI — a 18-decimal WETH balance loses precision above 2^53. Amounts
+ * `number` on its way to the UI - a 18-decimal WETH balance loses precision above 2^53. Amounts
  * therefore cross the wire as decimal strings in base units and are parsed straight back into
  * `bigint`; formatting for humans happens at the last moment, in the component, with the token's
  * decimals.
@@ -143,8 +143,8 @@ export interface ParsedStream extends StrategyBalances {
 export interface ParsedStrategyView extends Omit<RockStrategyView, "streams" | "stopped"> {
   streams: ParsedStream[];
   /**
-   * Stream indexes that were shipped and later docked. Always present after parsing — empty when
-   * the payload carried none — so a picker can pass `[...streams.map(s => s.streamIndex), ...stopped]`
+   * Stream indexes that were shipped and later docked. Always present after parsing - empty when
+   * the payload carried none - so a picker can pass `[...streams.map(s => s.streamIndex), ...stopped]`
    * to `unshippedOptions` without a null check.
    */
   stopped: bigint[];

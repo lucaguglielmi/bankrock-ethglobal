@@ -104,7 +104,7 @@ const CHANNELS: { id: AlertChannel; label: string; describe: (title: string) => 
 ];
 
 const DELIVERY_NOTE =
-  "Nothing is sent yet. Preferences are stored, but there is no delivery pipeline behind them — by design until Bank Rock is on mainnet.";
+  "Nothing is sent yet. Preferences are stored, but there is no delivery pipeline behind them - by design until Bank Rock is on mainnet.";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -409,7 +409,7 @@ export function RockAlerts({ rockId }: { rockId: string | number }) {
             </Button>
             <p className="max-w-prose text-sm text-ink-3">
               Allowing notifications only sets a permission on this device. Nothing is sent until
-              delivery exists — by design until Bank Rock is on mainnet.
+              delivery exists - by design until Bank Rock is on mainnet.
             </p>
           </div>
 

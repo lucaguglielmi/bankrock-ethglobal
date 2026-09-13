@@ -4,12 +4,12 @@ import { sql } from 'drizzle-orm';
 const nowMs = sql`(cast((julianday('now') - 2440587.5)*86400000 as integer))`;
 
 /**
- * Indexed registry events — the rock's provenance.
+ * Indexed registry events - the rock's provenance.
  *
  * `id` is `${txHash}-${logIndex}`, which is the natural key of a log and makes re-indexing
  * idempotent. The previous unique constraint on `tx_hash` alone was wrong: one transaction can
- * emit several events for the same rock — archiving a rock with a pending gift emits
- * `HandoverCancelled` and `RockArchived` together — and the second would have been silently
+ * emit several events for the same rock - archiving a rock with a pending gift emits
+ * `HandoverCancelled` and `RockArchived` together - and the second would have been silently
  * dropped.
  *
  * `event_type` is one of: awakened | handover_initiated | handover_claimed | handover_cancelled |
@@ -41,7 +41,7 @@ export const rockEvents = sqliteTable(
  * `lib/indexer.ts` mirrors every decoded registry event into `rock_events`, but before this
  * table it never read that mirror back: each poll re-scanned from `REGISTRY_DEPLOY_BLOCK` to the
  * head, in 2,000-block chunks, every fifteen seconds, for every rock anyone was looking at. The
- * cursor makes the scan resumable — after the first pass a poll asks only for the blocks that
+ * cursor makes the scan resumable - after the first pass a poll asks only for the blocks that
  * are new.
  *
  * `id` is the scope, `chain:<chainId>:registry:<address>`, so a redeployed registry or a
@@ -108,7 +108,7 @@ export const faucetClaims = sqliteTable('faucet_claims', {
 });
 
 /**
- * Per-IP faucet claims (X-8 — per-address limiting alone is defeated by fresh addresses).
+ * Per-IP faucet claims (X-8 - per-address limiting alone is defeated by fresh addresses).
  * The client IP is stored as a SHA-256 hash: it is a rate-limit key, not a user record.
  */
 export const faucetIpClaims = sqliteTable('faucet_ip_claims', {
@@ -144,7 +144,7 @@ export const alertPreferences = sqliteTable('alert_preferences', {
 });
 
 /**
- * Shop contact requests — "Claim an OG Rock" and "Become a Sponsor" (S-6).
+ * Shop contact requests - "Claim an OG Rock" and "Become a Sponsor" (S-6).
  * A success state may not be shown for a request that was not persisted here.
  */
 export const contactRequests = sqliteTable(
@@ -184,7 +184,7 @@ export const tagBindings = sqliteTable('tag_bindings', {
 export const handoverMessages = sqliteTable(
   'handover_messages',
   {
-    /** `${rockId}:${messageHash}` — one message per handover attempt. */
+    /** `${rockId}:${messageHash}` - one message per handover attempt. */
     id: text('id').primaryKey(),
     rockId: text('rock_id').notNull(),
     messageHash: text('message_hash').notNull(),
@@ -209,7 +209,7 @@ export const pendingUserOps = sqliteTable('pending_userops', {
    * The Privy DID that stored this operation (audit P-5).
    *
    * Only that DID may overwrite or discard it. Without this column any signed-in account could
-   * delete another rock's pre-signed Safe owner swap — the recipient would then get the registry
+   * delete another rock's pre-signed Safe owner swap - the recipient would then get the registry
    * claim and never the Rock Account.
    */
   creatorDid: text('creator_did'),
@@ -223,7 +223,7 @@ export const pendingUserOps = sqliteTable('pending_userops', {
  * Web Push subscriptions (spec 14 §4.9 / Phase 2).
  *
  * `endpoint` is the browser push service URL and is unique per device/browser, so it is the
- * natural primary key — the same shape `ON CONFLICT(endpoint) DO UPDATE` used before. `userDid`
+ * natural primary key - the same shape `ON CONFLICT(endpoint) DO UPDATE` used before. `userDid`
  * is the Privy DID that registered the subscription (never a client-supplied `userId`, SA-5): the
  * subscribe and unsubscribe routes require a verified Privy access token and store the identity
  * the token names, not one the caller asserts.
@@ -242,7 +242,7 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
  *
  * `POST /api/rocks/[id]/claim` broadcasts from a funded key on the strength of an attestation, so
  * the only bound on that spend is a cap someone sets. It is accumulated here, per UTC day, and
- * checked *before* the transaction is sent — a cap consulted afterwards is a report, not a cap.
+ * checked *before* the transaction is sent - a cap consulted afterwards is a report, not a cap.
  *
  * `wei` is TEXT holding a decimal integer: wei does not fit a JS `number`, and SQLite's INTEGER is
  * 64-bit, which a cap above ~9.2 ETH would overflow. The arithmetic is done in SQL with a CAST, so

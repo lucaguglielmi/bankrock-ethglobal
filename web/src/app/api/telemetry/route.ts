@@ -1,5 +1,5 @@
 /**
- * GET /api/telemetry — operator log view (SA-2, SA-3).
+ * GET /api/telemetry - operator log view (SA-2, SA-3).
  *
  *  - it was public. It served wallet addresses, NFC UIDs, full recipient email addresses and
  *    error stacks to anyone. It now requires `x-admin-key: <ADMIN_API_KEY>`, compared in constant
@@ -7,7 +7,7 @@
  *  - entries are redacted before they reach the buffer (see lib/telemetry), so even an
  *    authenticated operator does not get raw PII;
  *  - POST is **removed**. It accepted arbitrary log injection from anyone, and the MCP server
- *    reads this buffer and relays it to an AI agent — that was a prompt-injection path into the
+ *    reads this buffer and relays it to an AI agent - that was a prompt-injection path into the
  *    user's agent (SA-3). Server code calls `logger` directly; nothing needs an ingest endpoint.
  */
 

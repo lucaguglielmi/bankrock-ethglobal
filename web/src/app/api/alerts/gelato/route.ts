@@ -1,5 +1,5 @@
 /**
- * POST /api/alerts/gelato — operational alert from the keeper automation (SA-7).
+ * POST /api/alerts/gelato - operational alert from the keeper automation (SA-7).
  *
  *  - authentication was `body.source === 'gelato_keeper'`, a value the caller supplies. It now
  *    requires `x-cron-secret: <CRON_SECRET>`, compared in constant time, and an unset secret is a

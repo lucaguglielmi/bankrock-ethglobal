@@ -1,5 +1,5 @@
 /**
- * The give link — naming a recipient in the time it takes to point a camera (B1, Flow E).
+ * The give link - naming a recipient in the time it takes to point a camera (B1, Flow E).
  *
  * The give sheet used to accept exactly one thing: an address pasted out of the giver's own
  * clipboard. On stage that means the recipient has to get 42 characters from their phone into the
@@ -11,13 +11,13 @@
  *   https://bank-rock.com/rock/<id>?give=<address>     shown from a rock page
  *   https://bank-rock.com/?give=<address>              shown from anywhere else
  *
- * No camera library, no scanner UI, no new permission — the phone's stock camera already reads
+ * No camera library, no scanner UI, no new permission - the phone's stock camera already reads
  * QR codes and opens links. The app's side of it is this module: build the link, read the
  * parameter back, and strip it so a reload does not prefill a stale recipient.
  *
  * Nothing here fabricates or shortens an address: `readGiveAddress` accepts a lowercase or
  * correctly checksummed 20-byte address and returns the checksummed form, and returns null for
- * everything else — an ENS name, a truncated address, a wrong-checksum address, or a second
+ * everything else - an ENS name, a truncated address, a wrong-checksum address, or a second
  * `give` parameter smuggled in behind the first.
  */
 
@@ -72,7 +72,7 @@ export function giveLinkPath(pathname: string | null | undefined): string {
 /**
  * The link the recipient's QR encodes.
  *
- * The origin comes from `lib/chain`'s `appUrl` (D-022) — there is one canonical origin and it is
+ * The origin comes from `lib/chain`'s `appUrl` (D-022) - there is one canonical origin and it is
  * never written out here.
  */
 export function buildGiveLink(address: string, pathname?: string | null): string {

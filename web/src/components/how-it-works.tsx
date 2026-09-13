@@ -20,7 +20,7 @@ import { Term } from "@/components/ui/term";
  *
  * Lazily loaded only when it is actually going to render: `how-it-works.tsx`
  * itself never imports `@react-three/fiber` (spec 17 §4.8, L-10), so this
- * `import()` — and Three.js — is only ever requested from `md` up, never on
+ * `import()` - and Three.js - is only ever requested from `md` up, never on
  * a phone.
  */
 const HowItWorksBackgroundDynamic = dynamic(
@@ -53,7 +53,7 @@ export function HowItWorks() {
           className={`absolute inset-0 bg-gradient-to-br from-neutral-900 to-black motion-safe:transition-opacity motion-safe:duration-700 ${hoveredTopic ? "opacity-0" : "opacity-100"}`}
         />
 
-        {/* Topic-specific 3D background — desktop only, never mounted on phones */}
+        {/* Topic-specific 3D background - desktop only, never mounted on phones */}
         {isDesktop ? (
           <div className="hidden md:block">
             <HowItWorksBackgroundDynamic topic={hoveredTopic} />

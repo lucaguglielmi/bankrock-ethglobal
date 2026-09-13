@@ -17,7 +17,7 @@ import { cn } from "@/lib/ui/cn";
 export interface SliderProps {
   value: number;
   onValueChange: (value: number) => void;
-  /** Required — the thumb has no visible label of its own. */
+  /** Required - the thumb has no visible label of its own. */
   "aria-label": string;
   /** Spoken value for assistive tech, e.g. `(v) => \`${v}%\``. Defaults to the plain number. */
   formatValueText?: (value: number) => string;

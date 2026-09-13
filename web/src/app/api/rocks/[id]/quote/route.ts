@@ -5,7 +5,7 @@
  *
  * Two sources, in order of authority:
  *
- *  1. `XYCSwap.quoteExactIn(strategy, zeroForOne, amountIn)` — a view on the app itself, running
+ *  1. `XYCSwap.quoteExactIn(strategy, zeroForOne, amountIn)` - a view on the app itself, running
  *     the identical code path `swapExactIn` executes against the same block's balances. This is
  *     the guarantee spec 04's "Quoting" section asks for, with XYCSwap in the place of the
  *     SwapVM router (`contracts/aqua/NOTES.md` §8.3);
@@ -19,7 +19,7 @@
  * UNAVAILABLE with the reason (D-013).
  *
  * `priceImpactBps` is a property of the curve and the trade size, computed from the same reserves
- * the swap will use — not the invented formula the old trade modal carried (N-6). Nothing here is
+ * the swap will use - not the invented formula the old trade modal carried (N-6). Nothing here is
  * annualised, and no APY is derived from it (D-004).
  */
 
@@ -123,7 +123,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const amountIn = parseUnits(amountInParam, tokenIn.decimals);
   const zeroForOne = tokenInParam === "USDC";
 
-  // The strategy is recomputable from the rock id and the maker — no indexer, no stored hash
+  // The strategy is recomputable from the rock id and the maker - no indexer, no stored hash
   // (NOTES.md §3). Its fee is part of its identity, so it is read back from the chain rather than
   // taken from the query: a different fee is a different strategy with no balances.
   const stream = await findLiveStream(id, maker, app, BigInt(streamIndexParam));
@@ -154,7 +154,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     );
   }
 
-  // Prefer the app's own view — the identical code path the swap takes.
+  // Prefer the app's own view - the identical code path the swap takes.
   let amountOut = preview.amountOut;
   let source: "XYCSwap.quoteExactIn" | "lib/aqua/quote" = "lib/aqua/quote";
 
@@ -163,7 +163,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       throw new Error("the strategy bytes were not returned by the probe");
     }
     // The app re-derives the hash from these five fields on every call, so they must be exactly
-    // the shipped ones — decoded from the bytes, never reassembled from the query.
+    // the shipped ones - decoded from the bytes, never reassembled from the query.
     const fields = decodeStrategy(strategy.strategy);
 
     const onChain = (await getPublicClient().readContract({
@@ -187,7 +187,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     source = "XYCSwap.quoteExactIn";
   } catch (err) {
     // The mirrored arithmetic stands in. It is the same formula on the same balances, so this is
-    // a fallback in provenance, not in accuracy — and the response says which one answered.
+    // a fallback in provenance, not in accuracy - and the response says which one answered.
     logger.warn("XYCSwap.quoteExactIn unavailable; using the mirrored curve", {
       action: "QUOTE_VIEW_UNAVAILABLE",
       rockId: id,
@@ -226,7 +226,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
  *
  * The fee is not supplied by the caller and cannot be: a strategy's fee is part of the bytes that
  * hash to its identity, so a wrong fee is simply a different strategy with no balances. The probe
- * recomputes each candidate's hash and asks Aqua — `safeBalances` reverting is the ordinary "not
+ * recomputes each candidate's hash and asks Aqua - `safeBalances` reverting is the ordinary "not
  * shipped" answer, not an error (NOTES.md §3, §4).
  */
 async function findLiveStream(
