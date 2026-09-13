@@ -77,6 +77,91 @@ export default function DefiPage() {
           </div>
         </section>
 
+
+        {/* Section 4: Deep Dive (Migrated from Aqua Modal) */}
+        <section className="flex flex-col gap-12 mt-12 bg-neutral-50 p-8 md:p-12 rounded-3xl border border-black/5">
+          <div className="flex flex-col gap-4 text-center max-w-2xl mx-auto">
+            <h2 className="text-3xl font-bold">Deep Dive: How Aqua Works</h2>
+            <p className="text-ink-2 text-lg">
+              Understanding the mechanics of virtual allocations and market-making without pools.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            <div className="flex flex-col gap-4">
+              <h3 className="text-xl font-bold">Your money never leaves your pocket</h3>
+              <p className="text-ink-2 leading-relaxed">
+                Normally, to earn fees by letting other people trade against your money, you have
+                to hand that money over to a pool and hope the pool behaves.
+              </p>
+              <p className="text-ink-2 leading-relaxed">
+                Aqua changes that. Your tokens stay in your own account. Instead of moving them,
+                you make a <TooltipLink term="virtual allocation" description="A promise that a strategy may use your tokens, written down on-chain. The tokens themselves stay in your account until somebody actually trades against them." href="#" /> — a promise that says: this strategy may use my tokens, but they stay where they are until somebody actually trades.
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-4">
+              <h3 className="text-xl font-bold">What that means for a rock</h3>
+              <p className="text-ink-2 leading-relaxed">
+                The rock holds tokens in its own account. Through Aqua it offers them to the
+                market and earns a fee when someone trades, but the tokens sit inside the rock
+                until that trade happens. Your <TooltipLink term="liquidity" description="The money that is ready to be traded or moved. In most of DeFi, providing liquidity means locking it away first." href="#" /> stays under your control the whole time.
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-4">
+              <h3 className="text-xl font-bold">Mechanics & Risks</h3>
+              <p className="text-ink-2 leading-relaxed">
+                Aqua decouples the execution curve from the custody of the assets: the curve is
+                on-chain and immutable, the assets never leave the maker's account. Because the tokens are not locked inside a pool, the same balance can back several
+                strategies. When a swap arrives, the liquidity it needs is pulled just in time.
+              </p>
+              <div className="flex flex-col gap-3 mt-2">
+                <div className="rounded-xl border border-black/10 p-4 bg-white shadow-sm">
+                  <h4 className="text-sm font-bold text-ink">Divergence loss</h4>
+                  <p className="mt-1 text-sm text-ink-2">
+                    Like any market-making curve, holding both sides through a large price move
+                    leaves you worse off than simply having held the winning side.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-black/10 p-4 bg-white shadow-sm">
+                  <h4 className="text-sm font-bold text-ink">Smart contract risk</h4>
+                  <p className="mt-1 text-sm text-ink-2">
+                    The rock depends on the Aqua and SwapVM contracts. If they are compromised,
+                    what the rock holds is at risk.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <h3 className="text-xl font-bold">How Aqua routes a trade</h3>
+              <dl className="flex flex-col gap-4 text-base">
+                <div>
+                  <dt className="font-semibold text-ink">1. The Maker</dt>
+                  <dd className="text-ink-2 mt-1">
+                    The Rock Account itself. It holds the actual ERC-20 tokens.
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-ink">2. The Strategy</dt>
+                  <dd className="text-ink-2 mt-1">
+                    An immutable curve deployed on-chain. It decides the price at which the maker
+                    is willing to buy or sell.
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-ink">3. The Swap</dt>
+                  <dd className="text-ink-2 mt-1">
+                    When someone routes a trade through the aggregator and this strategy is the
+                    best price, the swap executes straight against the rock's account.
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </section>
+
       </article>
     </main>
   );

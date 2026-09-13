@@ -1,4 +1,5 @@
 "use client";
+import { TooltipLink } from "@/components/ui/tooltip-link";
 import { Header } from "@/components/header";
 import {
   Accordion,
@@ -33,13 +34,13 @@ export default function SecurityPage() {
             <AccordionItem value="item-1">
               <AccordionTrigger className="text-lg font-semibold">1. Hardware Independence (No private keys on NFC)</AccordionTrigger>
               <AccordionContent className="text-ink-2 text-base leading-relaxed">
-                The NFC tag inside the Bank Rock is entirely passive. It contains a signed URL payload to identify the object, but it <strong>never</strong> stores a private key. This means if someone steals your physical rock, they cannot access your funds. Ownership is dictated by the smart contract, controlled by your authenticated wallet.
+                The NFC tag inside the Bank Rock is entirely passive. It contains a signed URL payload to identify the object, but it <strong>never</strong> stores a <TooltipLink term="private key" description="A secret cryptographic key used to authorize transactions and prove ownership of assets." href="#" />. This means if someone steals your physical rock, they cannot access your funds. Ownership is dictated by the smart contract, controlled by your authenticated wallet.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-2">
               <AccordionTrigger className="text-lg font-semibold">2. Self-Custody First</AccordionTrigger>
               <AccordionContent className="text-ink-2 text-base leading-relaxed">
-                Bank Rock does not hold your funds. Using the 1inch Aqua protocol, tokens remain in the Rock&apos;s ERC-4337 smart account. Our servers cannot initiate a withdrawal or transfer. You, as the authenticated Privy signer, are the only entity capable of moving funds out of the rock.
+                Bank Rock does not hold your funds. Using the 1inch Aqua protocol, tokens remain in the Rock&apos;s ERC-4337 <TooltipLink term="smart account" description="A customizable smart contract acting as a wallet, offering advanced features like gas sponsorship." href="#" />. Our servers cannot initiate a withdrawal or transfer. You, as the authenticated Privy signer, are the only entity capable of moving funds out of the rock.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-3">

@@ -3,7 +3,9 @@
 import { useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { InfoModal } from "@/components/info-modal";
-import { AquaInfoModal } from "@/components/aqua-info-modal";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 /**
  * Lazily loaded only when it is actually going to render: `how-it-works.tsx`
@@ -64,7 +66,7 @@ export function HowItWorks() {
               onMouseLeave={() => setHoveredTopic(null)}
               className="max-w-full"
             >
-              <AquaInfoModal triggerText="What is Aqua?" />
+              <Button variant="outline" size="default" className="rounded-full border-white/20 bg-white/5 text-base font-semibold hover:bg-white/10 hover:text-current" render={<Link href="/learn/defi" />}>What is Aqua? <ArrowRight aria-hidden /></Button>
             </div>
             <div
               onMouseEnter={() => setHoveredTopic("control")}

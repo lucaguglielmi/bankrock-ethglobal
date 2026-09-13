@@ -23,7 +23,7 @@ export default function RockPage() {
             <h2 className="text-3xl font-bold">Anatomy of the Rock</h2>
             <div className="prose prose-lg text-ink-2">
               <p>
-                Each Bank Rock is cast by hand, embedding a tiny passive NFC tag deep within the core. The tag carries a unique encrypted payload that links the physical object to its corresponding smart contract.
+                Each Bank Rock is cast by hand, embedding a tiny passive <TooltipLink term="NFC tag" description="Near Field Communication: A short-range wireless technology that lets your phone read data from the rock." href="#" /> deep within the core. The tag carries a unique encrypted payload that links the physical object to its corresponding <TooltipLink term="smart contract" description="A self-executing program running on the Ethereum blockchain that enforces the rules of the Rock." href="#" />.
               </p>
               <p>
                 Because the tag contains no private keys, the rock cannot be &quot;hacked&quot; if stolen. It acts purely as a physical intent to awaken the digital account. We use <TooltipLink term="Privy" description="A toolkit for progressive authentication and embedded wallets." href="https://docs.privy.io/" /> to authenticate you seamlessly when you tap the rock with your phone.
@@ -67,7 +67,7 @@ export default function RockPage() {
                 Once authenticated, a <TooltipLink term="Pimlico" description="An infrastructure provider for ERC-4337 smart accounts and paymasters." href="https://docs.pimlico.io/" /> paymaster sponsors the transaction fees, transferring ownership of the Rock&apos;s smart account to your new wallet address.
               </p>
               <p>
-                The entire process takes seconds and requires absolutely no ETH for gas.
+                The entire process takes seconds and requires absolutely no ETH for <TooltipLink term="gas" description="The transaction fee required to perform operations on the Ethereum network." href="#" />.
               </p>
             </div>
           </div>
