@@ -103,11 +103,51 @@ export function StoryCarousel() {
       <div className="relative mx-auto max-w-5xl">
         <AnimatePresence mode="wait" initial={false}>
           {slide === 0 ? (
-            <motion.div
-              key="origin"
+<motion.div
+              key="mechanics"
               initial={{ opacity: 0, x: -offset }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -offset }}
+              transition={transition}
+              className="grid grid-cols-1 items-center gap-16 md:grid-cols-2 md:gap-24"
+            >
+              <div className="flex flex-col gap-6">
+                <span className="text-label text-ink-3 uppercase">How it&apos;s built</span>
+              <h2 className="text-h2 font-bold text-ink">What is this, exactly?</h2>
+              <div className="flex flex-col gap-4 text-base text-ink-2">
+                <p>
+                  <strong className="text-ink">Bank Rock is not a bank.</strong> It is a stone with
+                  a small <Term k="nfcTag" /> inside. <Term k="tap">Tap</Term> it with your phone,
+                  sign in, and it becomes yours: it gets its own <Term k="rockAccount" /> on
+                  Ethereum, which you top up with two tokens.
+                </p>
+                <p>
+                  The rock offers those tokens for trading through{" "}
+                  <Term k="aqua" className="font-semibold text-ink" />, a 1inch protocol. Nothing is
+                  handed to a pool: the tokens stay in the rock&rsquo;s account, and Aqua only keeps
+                  count of what each <Term k="strategy" /> may trade.
+                </p>
+                <p>
+                  When someone trades with the rock, the tokens move straight between the two
+                  accounts and a small <Term k="fee" /> stays behind in the rock. The rock can also
+                  lose value when prices move a long way — see{" "}
+                  <Term k="divergenceLoss" />. Today it all runs on <Term k="sepolia" />, with test
+                  tokens that are worth nothing.
+                </p>
+              </div>
+              </div>
+
+              <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-neutral-100 bg-white p-4 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/rocks/rock1.jpg" alt="Bank Rock inside its box" className="size-full rounded-2xl object-cover" />
+              </div>
+            </motion.div>
+          ) : (
+<motion.div
+              key="origin"
+              initial={{ opacity: 0, x: offset }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: offset }}
               transition={transition}
               className="grid grid-cols-1 items-center gap-16 md:grid-cols-2 md:gap-24"
             >
@@ -191,39 +231,6 @@ export function StoryCarousel() {
                   <span>Tuscany, IT</span>
                   <span className="text-ink-4">43.7696° N, 11.2558° E</span>
                 </div>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="mechanics"
-              initial={{ opacity: 0, x: offset }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: offset }}
-              transition={transition}
-              className="mx-auto flex max-w-2xl flex-col gap-6"
-            >
-              <span className="text-label text-ink-3 uppercase">How it&apos;s built</span>
-              <h2 className="text-h2 font-bold text-ink">What is this, exactly?</h2>
-              <div className="flex flex-col gap-4 text-base text-ink-2">
-                <p>
-                  <strong className="text-ink">Bank Rock is not a bank.</strong> It is a stone with
-                  a small <Term k="nfcTag" /> inside. <Term k="tap">Tap</Term> it with your phone,
-                  sign in, and it becomes yours: it gets its own <Term k="rockAccount" /> on
-                  Ethereum, which you top up with two tokens.
-                </p>
-                <p>
-                  The rock offers those tokens for trading through{" "}
-                  <Term k="aqua" className="font-semibold text-ink" />, a 1inch protocol. Nothing is
-                  handed to a pool: the tokens stay in the rock&rsquo;s account, and Aqua only keeps
-                  count of what each <Term k="strategy" /> may trade.
-                </p>
-                <p>
-                  When someone trades with the rock, the tokens move straight between the two
-                  accounts and a small <Term k="fee" /> stays behind in the rock. The rock can also
-                  lose value when prices move a long way — see{" "}
-                  <Term k="divergenceLoss" />. Today it all runs on <Term k="sepolia" />, with test
-                  tokens that are worth nothing.
-                </p>
               </div>
             </motion.div>
           )}
