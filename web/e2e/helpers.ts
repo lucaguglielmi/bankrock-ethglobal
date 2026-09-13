@@ -186,6 +186,9 @@ export function fontFamilyStartsWithInter(fontFamily: string): boolean {
 export async function gotoAndSettle(page: Page, route: Route): Promise<void> {
   await page.goto(route, { waitUntil: "networkidle" });
   await page.evaluate(() => document.fonts.ready).catch(() => undefined);
+  // Every route renders one <h1>; a client-rendered page (e.g. /alerts) can reach `networkidle`
+  // a beat before hydration paints it, which once read as "no h1" at 1280x800. Give it a moment.
+  await page.locator("h1").first().waitFor({ state: "attached", timeout: 10_000 }).catch(() => undefined);
   await page
     .evaluate(() => {
       const finite = document

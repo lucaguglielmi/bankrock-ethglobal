@@ -262,7 +262,7 @@ export default function McpPage() {
               it cannot start or stop a strategy, move a token or sign anything. Every tool either reads <Term k="sepolia" />{" "}
               or the Bank Rock API. However, we are actively looking for secure ways to authenticate your AI agent, so you can soon control your rock directly from your AI chat!
             </p>
-            <Link href="/shop" className="text-base font-semibold text-link underline-offset-4 hover:underline">
+            <Link href="/shop" className="inline-flex min-h-11 items-center text-base font-semibold text-link underline-offset-4 hover:underline">
               Tell us how you would approach this technically, and win a Bank Rock for your help!
             </Link>
           </div>
