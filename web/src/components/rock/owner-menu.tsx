@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import { MoreHorizontal, Wallet } from "lucide-react";
+import { MoreHorizontal, Wallet, Skull } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Sheet, SheetBody } from "@/components/ui/sheet";
@@ -134,6 +134,7 @@ export function OwnerMenu({
               setRetireOpen(true);
             }}
           >
+            <Skull aria-hidden />
             Retire this rock
           </Button>
 
@@ -167,6 +168,7 @@ export function OwnerMenu({
               onClick={runRetire}
               disabled={isPending}
             >
+              <Skull aria-hidden />
               Retire this rock
             </Button>
             <Button
