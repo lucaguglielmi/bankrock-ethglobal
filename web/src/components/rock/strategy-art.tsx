@@ -145,10 +145,33 @@ export function ReserveArt({ className }: { className?: string }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M38 96c3-22 16-46 36-60 14-10 30-12 44-6 20 9 32 30 34 50 2 16-8 26-24 30-22 5-52 4-74-4-12-4-18-8-16-10Z" />
-      <path d="M104 46 98 70l9 18-11 18" strokeWidth="2.4" />
-      <ellipse cx="80" cy="112" rx="60" ry="14" opacity="0.55" />
-      <ellipse cx="80" cy="118" rx="76" ry="20" opacity="0.28" />
+      {/* Water: two hand-drawn rings, slightly off-round, breathing slowly when motion is allowed. */}
+      <g className="origin-center [transform-box:fill-box] motion-safe:animate-ripple-breathe">
+        <path
+          d="M28 110c10-10 42-15 66-13 22 2 42 8 46 16 3 7-14 14-42 16-32 2-62-3-72-11-3-3-2-6 2-8Z"
+          opacity="0.5"
+        />
+        <path
+          d="M10 116c14-15 58-22 92-19 30 3 54 12 56 22 1 9-24 18-62 20-44 2-82-6-90-16-2-3 0-5 4-7Z"
+          opacity="0.25"
+          strokeWidth="2.4"
+        />
+      </g>
+
+      {/* The rock: a lumpy pebble with a soft fill, two facets and a few grains, bobbing gently. */}
+      <g className="origin-center [transform-box:fill-box] motion-safe:animate-rock-bob">
+        <path
+          d="M34 88c-8-18 2-42 22-52 12-6 22-2 34-6 16-5 32 4 40 18 6 11 10 24 4 36-5 10-16 14-30 18-14 4-28 6-42 2-12-3-24-6-28-16Z"
+          fill={BRAND_BLUE}
+          fillOpacity="0.14"
+        />
+        <path d="M60 46c10-4 20-6 30-4" strokeWidth="2.4" opacity="0.7" />
+        <path d="M102 54l-7 16 8 12-9 14" strokeWidth="2.4" opacity="0.8" />
+        <path d="M46 78c6 6 14 10 24 12" strokeWidth="2.4" opacity="0.55" />
+        <circle cx="76" cy="66" r="1.8" fill={BRAND_BLUE} stroke="none" opacity="0.7" />
+        <circle cx="118" cy="80" r="1.8" fill={BRAND_BLUE} stroke="none" opacity="0.6" />
+        <circle cx="64" cy="94" r="1.6" fill={BRAND_BLUE} stroke="none" opacity="0.5" />
+      </g>
     </svg>
   );
 }

@@ -121,6 +121,6 @@ export function ReserveHeadline({
 /** The drawing in the card's top-right corner. Out of the flow, so it never narrows the text. */
 function Backdrop() {
   return (
-    <ReserveArt className="pointer-events-none absolute -top-6 -right-8 size-40 opacity-15 sm:-top-8 sm:-right-6 sm:size-52" />
+    <ReserveArt className="pointer-events-none absolute -top-6 -right-8 size-44 opacity-25 sm:-top-8 sm:-right-6 sm:size-56" />
   );
 }

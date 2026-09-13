@@ -107,7 +107,29 @@
   --animate-tap-phone: tap-phone 3s ease-in-out infinite;
   --animate-tap-ripple: tap-ripple 3s ease-in-out infinite;
   --animate-tap-ripple-late: tap-ripple-late 3s ease-in-out infinite;
+  --animate-rock-bob: rock-bob 6s ease-in-out infinite;
+  --animate-ripple-breathe: ripple-breathe 6s ease-in-out infinite;
 
+  @keyframes rock-bob {
+    0%,
+    100% {
+      transform: translateY(0) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-3px) rotate(-1.5deg);
+    }
+  }
+  @keyframes ripple-breathe {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.04);
+      opacity: 0.75;
+    }
+  }
   @keyframes tap-phone {
     0%,
     100% {

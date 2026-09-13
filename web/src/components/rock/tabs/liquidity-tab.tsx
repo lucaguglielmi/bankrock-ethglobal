@@ -22,7 +22,7 @@
  */
 
 import { useState, type ReactNode } from "react";
-import { ArrowRight, Globe, RefreshCw } from "lucide-react";
+import { Globe, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { SimulatedBadge } from "@/components/ui/simulated-badge";
@@ -53,8 +53,8 @@ export interface LiquidityTabProps {
   /** Whether this wallet may act from the rock's account (D-037). UNAVAILABLE carries the reason. */
   ownerActions?: Capability<string>;
   onRefresh: () => void;
-  /** Switches the dashboard to the Trade tab. */
-  onGoToTrade: () => void;
+  /** Switches the dashboard to the Trade tab. Unused since the Trade tab is one tap away. */
+  onGoToTrade?: () => void;
   /** Opens the simulated bridge sheet. Only reachable under `NEXT_PUBLIC_DEMO_MODE=true`. */
   onCrossChain?: () => void;
 }
@@ -74,7 +74,6 @@ export function LiquidityTab({
   isOwner,
   ownerActions,
   onRefresh,
-  onGoToTrade,
   onCrossChain,
 }: LiquidityTabProps) {
   const [isFundOpen, setFundOpen] = useState(false);
@@ -212,11 +211,6 @@ export function LiquidityTab({
           </p>
         ) : null}
         <StoppedLine names={stoppedNames} />
-
-        <Button variant="outline" className="w-full justify-between" onClick={onGoToTrade}>
-          Trade with this rock
-          <ArrowRight aria-hidden />
-        </Button>
 
         {isOwner && remaining.length > 0 ? (
           <section className="flex flex-col gap-3 pt-2">
