@@ -11,7 +11,9 @@ is the reference; this note only decides presentation. Code: `web/src/lib/aqua/s
 `XYCSwap` is one fixed constant-product curve. The only thing a strategy can vary is its fee, so a
 strategy in Bank Rock is a **preset**: `(streamIndex, feeBps)` plus words for the owner. Every
 reader probes exactly the catalogue below; a fee tier not in it would ship a strategy nothing in
-the app could see. Stream 0 and stream 1 are live on Sepolia and must never change.
+the app could see. The indexes and fees are part of every shipped strategy's identity, so once any
+rock has shipped a preset it must never change: stream 0 (Wide) is live on Sepolia today (rock 1,
+now retired, and rock 3, the demo rock — read from Aqua on 2026-09-13).
 
 ## The catalogue
 

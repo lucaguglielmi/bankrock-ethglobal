@@ -249,11 +249,16 @@ Two qualifications:
 
 - `web/src/lib/aqua/quote.ts` mirrors the same integer arithmetic for a preview as the user
   types. It is a preview, never an authority; the app is read before submitting.
-- **`quoteExactOut` is not the inverse of `quoteExactIn`.** The reference app takes its fee off
-  the *input* when quoting an exact input and off the *output* when quoting an exact output, so a
-  round trip comes back roughly `feeBps` high — 0.3% on a 30 bps strategy, not a rounding unit.
-  That asymmetry is upstream's. Bank Rock's swap path is exact-in only, so it never reaches a
-  user, and the preview mirrors it deliberately rather than "fixing" it.
+- **`quoteExactOut` is not the exact inverse of `quoteExactIn`.** The reference app takes its
+  fee off the *input* when quoting an exact input and off the *output* when quoting an exact
+  output. Feeding `quoteExactIn`'s output back into `quoteExactOut` therefore does not return the
+  original input: with `f = feeBps / 10000` and `X` the input-side reserve, the round trip comes
+  back at `amountIn / (1 − f · amountIn / X)`, i.e. high by about `f × (amountIn / X)` — the fee
+  **times the trade's share of the reserve**, not the fee itself. For a trade of 1% of the reserve
+  on a 30 bps strategy that is ~0.003%, and it shrinks with smaller trades (an earlier version of
+  this paragraph said "roughly `feeBps` high"; that was wrong). The asymmetry is upstream's. Bank
+  Rock's swap path is exact-in only, so it never reaches a user, and the preview mirrors it
+  deliberately rather than "fixing" it.
 
 ## Financial correctness and Idle Yield
 

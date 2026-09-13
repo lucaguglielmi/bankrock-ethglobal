@@ -16,6 +16,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AboutRocks } from "@/components/about-rocks";
 import { IconButton } from "@/components/ui/icon-button";
+import { Term } from "@/components/ui/term";
 import { cn } from "@/lib/ui/cn";
 
 const SLIDE_COUNT = 2;
@@ -73,9 +74,9 @@ export function StoryCarousel() {
                   the foundation for modern banking.
                 </p>
                 <p className="max-w-prose text-lead text-ink-2">
-                  Every Bank Rock is handpicked from the riverbeds near Florence, bridging the
-                  birthplace of classical finance with the frontier of agentic, self-custodial
-                  DeFi.
+                  Every Bank Rock is picked by hand from the riverbeds near Florence. A stone from
+                  the birthplace of banking, holding an account that no bank runs and that you
+                  alone control.
                 </p>
                 <AboutRocks />
               </div>
@@ -106,7 +107,7 @@ export function StoryCarousel() {
     <circle cx="0" cy="0" r="1" className="fill-blue-600 drop-shadow-[0_0_2px_rgba(37,99,235,0.8)]" />
     {/* Animated dashed ring */}
     <circle cx="0" cy="0" r="6" className="stroke-blue-400/60 fill-transparent stroke-[0.3] animate-[spin_4s_linear_infinite]" strokeDasharray="2 4" />
-    <text x="3" y="1" fontSize="2.5" className="fill-blue-600 font-black tracking-widest uppercase font-mono drop-shadow-md">Florence</text>
+    <text x="3" y="1" fontSize="2.5" className="fill-blue-600 font-bold tracking-widest uppercase drop-shadow-md">Florence</text>
   </g>
 
   <g transform="translate(79.50, 72.72)">
@@ -144,20 +145,23 @@ export function StoryCarousel() {
               <h2 className="text-h2 font-bold text-ink">What is this, exactly?</h2>
               <div className="flex flex-col gap-4 text-base text-ink-2">
                 <p>
-                  <strong className="text-ink">Bank Rock is not a bank.</strong> It is an
-                  NFC-enabled stone you activate to hold a liquidity position — a constant-product
-                  reserve that earns a share of the fees it generates on every trade, needing no
-                  rebalancing by design — and can lose value when things don&apos;t go well.
+                  <strong className="text-ink">Bank Rock is not a bank.</strong> It is a stone with
+                  a small <Term k="nfcTag" /> inside. <Term k="tap">Tap</Term> it with your phone,
+                  sign in, and it becomes yours: it gets its own <Term k="rockAccount" /> on
+                  Ethereum, which you top up with two tokens.
                 </p>
                 <p>
-                  It can hold DeFi positions powered by <strong className="text-ink">Aqua</strong>.
-                  Instead of locking tokens in a traditional AMM pool, your capital stays in your
-                  Bank Rock&apos;s Rock Account — an ERC-4337 smart wallet you control.
+                  The rock offers those tokens for trading through{" "}
+                  <Term k="aqua" className="font-semibold text-ink" />, a 1inch protocol. Nothing is
+                  handed to a pool: the tokens stay in the rock&rsquo;s account, and Aqua only keeps
+                  count of what each <Term k="strategy" /> may trade.
                 </p>
                 <p>
-                  When a trade happens against it,{" "}
-                  <strong className="text-ink">just-in-time liquidity</strong> fulfills it directly
-                  from that reserve.
+                  When someone trades with the rock, the tokens move straight between the two
+                  accounts and a small <Term k="fee" /> stays behind in the rock. The rock can also
+                  lose value when prices move a long way — see{" "}
+                  <Term k="divergenceLoss" />. Today it all runs on <Term k="sepolia" />, with test
+                  tokens that are worth nothing.
                 </p>
               </div>
             </motion.div>

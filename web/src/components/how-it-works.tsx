@@ -6,8 +6,18 @@ import { InfoModal } from "@/components/info-modal";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Term } from "@/components/ui/term";
 
 /**
+ * The landing page's "How does it work?" block: three sentences a first-time visitor can follow,
+ * two doors into the detail. Unfamiliar words are glossary `Term`s, so the block explains itself
+ * without leaving the page.
+ *
+ * The "How do I control the rock?" sheet used to say an AI agent could "perform on-chain
+ * operations, manage your liquidity, and rebalance your portfolio entirely on your behalf". It
+ * cannot: the MCP server is read-only by decision (D-008, D-019) and holds no key. The sheet now
+ * says what is true.
+ *
  * Lazily loaded only when it is actually going to render: `how-it-works.tsx`
  * itself never imports `@react-three/fiber` (spec 17 §4.8, L-10), so this
  * `import()` — and Three.js — is only ever requested from `md` up, never on
@@ -55,9 +65,13 @@ export function HowItWorks() {
           <h2 className="text-h2 font-bold">How does it work?</h2>
 
           <p className="text-lead font-medium text-white/80">
-            Your bank is up to no good. A Bank Rock is a physical pebble that you can gift someone.
-            They can forget it in a drawer, or activate it by tapping their phone.
-            It holds a self-custodial position that can trade against Aqua&apos;s liquidity.
+            A <Term k="bankRock" className="decoration-white/50" /> is a real stone you can give
+            to someone. They can leave it in a drawer, or <Term k="tap" className="decoration-white/50" />{" "}
+            it with their phone to wake it up. The rock then has its own{" "}
+            <Term k="rockAccount" className="decoration-white/50" /> that holds two tokens and
+            offers them for trading through <Term k="aqua" className="decoration-white/50" />.
+            The tokens stay in the rock; every trade leaves a small{" "}
+            <Term k="fee" className="decoration-white/50" /> behind.
           </p>
 
           <div className="flex flex-wrap gap-4">
@@ -76,7 +90,25 @@ export function HowItWorks() {
               <InfoModal
                 triggerText="How do I control the rock?"
                 title="How do I control the rock?"
-                content="Control is entirely physical and cryptographic. Tap your NFC-enabled smartphone against the resin-sealed portion of the Bank Rock to securely open the interface. Alternatively, you can copy the setup prompt to your favorite AI agent and control the rock via the Model Context Protocol (MCP). Your agent can perform on-chain operations, manage your liquidity, and rebalance your portfolio entirely on your behalf."
+                content={
+                  <>
+                    <p>
+                      Tap the rock with your phone. Its page opens, and you sign in with an email,
+                      a <Term k="passkey" /> or a social login through <Term k="privy" />. That
+                      sign-in is your wallet; there is no seed phrase and nothing to install.
+                    </p>
+                    <p>
+                      Once you own a rock, you decide everything from its page: start or stop a{" "}
+                      <Term k="strategy" />, top it up, give it away or retire it. Each of those is
+                      one <Term k="sponsoredTransaction" />, so you never need ETH.
+                    </p>
+                    <p>
+                      You can also connect the AI assistant you already use to our{" "}
+                      <Term k="mcp" /> endpoint. It can read the rock and explain it to you. It
+                      cannot move, start or stop anything: it holds no key.
+                    </p>
+                  </>
+                }
               />
             </div>
           </div>

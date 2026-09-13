@@ -1,78 +1,186 @@
 import Image from "next/image";
-import { TooltipLink } from "@/components/ui/tooltip-link";
-import { Header } from "@/components/header";
+import Link from "next/link";
+import { Term } from "@/components/ui/term";
+
+/**
+ * "The physical" — what a Bank Rock is, what the chip inside it does, and what one tap sets in
+ * motion. Written for someone who has never held a crypto wallet: every unfamiliar word is a
+ * glossary `Term`, and the page claims nothing DEMO-STATE lists as simulated or unavailable.
+ *
+ * The global header and the page frame (top clearance, side gutters) come from the root layout
+ * and `globals.css`; this page does not add its own.
+ */
+
+export const metadata = {
+  title: "The physical rock — Bank Rock",
+  description:
+    "What a Bank Rock is made of, what the chip inside it does, and what happens when you tap it.",
+};
 
 export default function RockPage() {
   return (
-    <main className="flex min-h-dvh flex-col bg-white text-ink pt-[var(--header-h)] pb-24">
-      <Header />
-      
-      <article className="mx-auto w-full max-w-6xl px-[var(--gutter)] pt-12 flex flex-col gap-24">
-        
-        {/* Header */}
-        <header className="flex flex-col gap-6 text-center items-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">The Physical Object</h1>
-          <p className="text-xl text-ink-2 max-w-2xl">
-            A tangible, handcrafted interface for your self-custodial liquidity.
+    <main className="flex min-h-dvh flex-col bg-white text-ink">
+      <article className="mx-auto flex w-full max-w-6xl flex-col gap-24 pt-12">
+        <header className="flex flex-col items-center gap-6 text-center">
+          <h1 className="text-h1 font-extrabold">The physical rock</h1>
+          <p className="max-w-prose text-lead text-ink-2">
+            A real stone you can hold and hand to someone. Tap it with a phone and its page opens.
+            The stone identifies itself; it never holds a key and it never holds money.
           </p>
         </header>
 
-        {/* Anatomy of the Rock */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 items-center">
-          <div className="flex flex-col gap-6 order-2 md:order-1">
-            <h2 className="text-3xl font-bold">Anatomy of the Rock</h2>
-            <div className="prose prose-lg text-ink-2">
+        {/* What is inside */}
+        <section className="grid grid-cols-1 items-center gap-12 md:grid-cols-2 lg:gap-24">
+          <div className="order-2 flex flex-col gap-6 md:order-1">
+            <h2 className="text-h2 font-bold">What is inside</h2>
+            <div className="flex flex-col gap-4 text-base text-ink-2">
               <p>
-                Each Bank Rock is cast by hand, embedding a tiny passive <TooltipLink term="NFC tag" description="Near Field Communication: A short-range wireless technology that lets your phone read data from the rock." href="#" /> deep within the core. The tag carries a unique encrypted payload that links the physical object to its corresponding <TooltipLink term="smart contract" description="A self-executing program running on the Ethereum blockchain that enforces the rules of the Rock." href="#" />.
+                Every <Term k="bankRock" /> is an ordinary river stone with a tiny{" "}
+                <Term k="nfcTag" /> set into it under a drop of coloured resin. The chip is an{" "}
+                <Term k="ntag424" />. It needs no battery: the phone powers it for the instant of
+                the <Term k="tap" />.
               </p>
               <p>
-                Because the tag contains no private keys, the rock cannot be &quot;hacked&quot; if stolen. It acts purely as a physical intent to awaken the digital account. We use <TooltipLink term="Privy" description="A toolkit for progressive authentication and embedded wallets." href="https://docs.privy.io/" /> to authenticate you seamlessly when you tap the rock with your phone.
+                The chip holds one web link, and nothing else. On every tap it rewrites two parts
+                of that link: a <Term k="readCounter" /> that goes up by one, and a{" "}
+                <Term k="cmac" /> made with a key that never leaves the chip. Our server checks
+                both. If they are right, the page shows the <Term k="verifiedPhysical" /> badge.
+              </p>
+              <p>
+                Because the chip carries no key and no password, a stolen rock does not give
+                anyone the money. The rock&rsquo;s tokens live in its own{" "}
+                <Term k="rockAccount" />, and only the owner&rsquo;s wallet can move them. The
+                stone is <Term k="selfCustody">self-custodial</Term> by construction.
               </p>
             </div>
-            
-            <div className="bg-ink-4/20 p-6 rounded-2xl border border-black/5 mt-4">
-              <p className="text-ink text-sm font-medium leading-relaxed">
-                <strong>Note on the Hackathon Demo:</strong> For the practicality of testing, there is currently only a single physical rock (affectionately named <em>Rock 420</em>) able to generate infinite virtual rock instances from its link. 
-                <br/><br/>
-                On mainnet, each rock link will be entirely unique, utilizing the more secure AWS KMS architecture.
+
+            <div className="mt-2 rounded-2xl border border-border bg-muted/50 p-6">
+              <p className="max-w-prose text-sm font-medium text-ink">
+                About the hackathon demo. There is one prototype rock, and rock 3 on this site is
+                its real record on <Term k="sepolia" />. Until the chip is programmed, a private
+                demo link plays the part of the chip and hands the rest of the flow the same signed
+                code a real tap would; everything after that point — the check, the counter, the{" "}
+                <Term k="attestation" />, the on-chain awakening — is the real path. Rock 420 is a
+                stage prop: it lives only in your browser, is badged as a demo on every value, and
+                touches nothing on chain. The full list of what is still simulated is public in the
+                repository&rsquo;s <span className="font-semibold">DEMO-STATE.md</span>.
               </p>
             </div>
           </div>
 
-          <div className="order-1 md:order-2 flex flex-col gap-6">
-            <div className="w-full max-w-md aspect-[4/3] mx-auto bg-ink-4/10 rounded-3xl flex items-center justify-center relative overflow-hidden border border-black/5 shadow-xl">
-              <Image src="/infographics/photo_rock_silicon_nfc.jpg" alt="Rock with Silicon and NFC tag" fill className="object-cover" />
+          <div className="order-1 flex flex-col gap-6 md:order-2">
+            <div className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-3xl border border-border bg-muted shadow-xl">
+              <Image
+                src="/infographics/photo_rock_silicon_nfc.jpg"
+                alt="A polished rock with the NFC chip and a drop of resin set into it"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+              />
             </div>
-            <div className="w-full max-w-md aspect-[4/3] mx-auto bg-ink-4/10 rounded-3xl flex items-center justify-center relative overflow-hidden border border-black/5 shadow-xl">
-              <Image src="/infographics/photo_finger_nfc.jpg" alt="Finger holding tiny NFC chip for size reference" fill className="object-cover" />
+            <div className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-3xl border border-border bg-muted shadow-xl">
+              <Image
+                src="/infographics/photo_finger_nfc.jpg"
+                alt="A fingertip holding the NFC chip, for size"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+              />
             </div>
           </div>
         </section>
 
-        {/* The Activation Flow */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 items-center">
+        {/* What one tap does */}
+        <section className="grid grid-cols-1 items-center gap-12 md:grid-cols-2 lg:gap-24">
           <div className="order-1 flex justify-center">
-            <div className="w-full max-w-md aspect-square rounded-3xl relative overflow-hidden shadow-xl bg-white border border-black/5">
-              <Image src="/infographics/activation_flow.jpg" alt="Activation Flow" fill className="object-cover" />
+            <div className="relative aspect-square w-full max-w-md overflow-hidden rounded-3xl border border-border bg-white shadow-xl">
+              <Image
+                src="/infographics/activation_flow.jpg"
+                alt="From a tap on the rock to an account on the chain, in four steps"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+              />
             </div>
           </div>
 
-          <div className="flex flex-col gap-6 order-2">
-            <h2 className="text-3xl font-bold">The Activation Flow</h2>
-            <div className="prose prose-lg text-ink-2">
-              <p>
-                Tapping the rock initiates a secure handshake between the physical world and the blockchain. The NFC payload is resolved via our backend, and you are prompted to log in with <TooltipLink term="Privy" description="Embedded wallet infrastructure." href="https://docs.privy.io/" />.
-              </p>
-              <p>
-                Once authenticated, a <TooltipLink term="Pimlico" description="An infrastructure provider for ERC-4337 smart accounts and paymasters." href="https://docs.pimlico.io/" /> paymaster sponsors the transaction fees, transferring ownership of the Rock&apos;s smart account to your new wallet address.
-              </p>
-              <p>
-                The entire process takes seconds and requires absolutely no ETH for <TooltipLink term="gas" description="The transaction fee required to perform operations on the Ethereum network." href="#" />.
-              </p>
-            </div>
+          <div className="order-2 flex flex-col gap-6">
+            <h2 className="text-h2 font-bold">What one tap does</h2>
+            <ol className="flex flex-col gap-4 text-base text-ink-2">
+              <li className="flex gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-background">
+                  1
+                </span>
+                <p>
+                  <strong className="font-medium text-ink">The link opens.</strong> Our server
+                  checks the chip&rsquo;s signed code and counter. A <Term k="copiedLink" /> fails
+                  here, so the badge is something only a real tap can earn.
+                </p>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-background">
+                  2
+                </span>
+                <p>
+                  <strong className="font-medium text-ink">You sign in.</strong> <Term k="privy" />{" "}
+                  turns an email, a <Term k="passkey" /> or a social login into an{" "}
+                  <Term k="embeddedWallet" />. There is no seed phrase and nothing to install.
+                </p>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-background">
+                  3
+                </span>
+                <p>
+                  <strong className="font-medium text-ink">The server signs a note.</strong> The{" "}
+                  <Term k="attestation" /> says a real tap happened for your wallet, names the rock,
+                  and names the account it will open. Its address is{" "}
+                  <Term k="counterfactual" /> and follows the chip, so the same rock always opens
+                  the same account for you.
+                </p>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-background">
+                  4
+                </span>
+                <p>
+                  <strong className="font-medium text-ink">The rock wakes up.</strong> One{" "}
+                  <Term k="sponsoredTransaction" /> creates the <Term k="rockAccount" /> and records
+                  you as the owner in the <Term k="registry" />. You need no ETH for{" "}
+                  <Term k="gas" />: a <Term k="paymaster" /> pays it.
+                </p>
+              </li>
+            </ol>
+            <p className="max-w-prose text-base text-ink-2">
+              From then on, anyone who taps the rock can see it and trade with it, and only you can
+              start or stop its <Term k="strategy">strategies</Term> or give it away. How that
+              part works is on{" "}
+              <Link href="/learn/defi" className="text-link underline-offset-4 hover:underline">
+                the DeFi position
+              </Link>{" "}
+              page.
+            </p>
           </div>
         </section>
 
+        {/* Giving it away */}
+        <section className="flex flex-col gap-6 rounded-3xl border border-border bg-muted/50 p-8 md:p-12">
+          <h2 className="text-h2 font-bold">Giving it away</h2>
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+            <p className="max-w-prose text-base text-ink-2">
+              A rock is meant to change hands. The owner names who it is for and signs once; that
+              opens a <Term k="handover" /> in the registry and pre-signs the change of owner on
+              the <Term k="rockAccount" />, because the giver will not be there when the gift is
+              collected. Then they hand over the stone.
+            </p>
+            <p className="max-w-prose text-base text-ink-2">
+              The recipient taps it, signs in, and the <Term k="claim" /> goes through with no ETH
+              on their side: a <Term k="relayer" /> pays the fee, and the account keeps its address
+              and everything in it. Whoever taps a gifted rock without being named for it sees only
+              its public page.
+            </p>
+          </div>
+        </section>
       </article>
     </main>
   );

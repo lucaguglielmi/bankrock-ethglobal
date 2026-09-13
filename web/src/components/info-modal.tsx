@@ -6,6 +6,9 @@
  * Was a hand-rolled portal that locked page scroll by writing to the body's inline style (L-14)
  * and set its heading at 36 px with display-grade negative tracking (T-7). It is now a `Sheet`:
  * Escape, the backdrop, focus handling and the scroll lock all come from the primitive.
+ *
+ * `content` accepts nodes, not only a string, so a caller can wrap the unfamiliar words in a
+ * glossary `Term` and keep the sheet to one plain paragraph.
  */
 
 import * as React from "react";
@@ -16,7 +19,7 @@ import { Button } from "@/components/ui/button";
 interface InfoModalProps {
   triggerText: string;
   title: string;
-  content: string;
+  content: React.ReactNode;
 }
 
 export function InfoModal({ triggerText, title, content }: InfoModalProps) {
@@ -51,7 +54,11 @@ export function InfoModal({ triggerText, title, content }: InfoModalProps) {
         }
       >
         <SheetBody>
-          <p className="max-w-prose text-base text-ink-2">{content}</p>
+          {typeof content === "string" ? (
+            <p className="max-w-prose text-base text-ink-2">{content}</p>
+          ) : (
+            <div className="flex max-w-prose flex-col gap-4 text-base text-ink-2">{content}</div>
+          )}
         </SheetBody>
       </Sheet>
     </>

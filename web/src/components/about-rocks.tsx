@@ -13,6 +13,7 @@ import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { Sheet, SheetBody } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Term } from "@/components/ui/term";
 
 const ROCK_PHOTOS = [1, 2, 3, 4, 5];
 
@@ -35,7 +36,7 @@ export function AboutRocks() {
       <Sheet
         open={isOpen}
         onOpenChange={setIsOpen}
-        title="The physical bearer"
+        title="The stone itself"
         size="lg"
         footer={
           <Button
@@ -51,8 +52,9 @@ export function AboutRocks() {
         <SheetBody className="flex flex-col gap-6">
           <p className="max-w-prose text-base text-ink-2">
             These are ordinary rocks, picked out of the riverbeds near Florence, then polished and
-            sorted. The best ones get an NFC chip and a splash of coloured resin over it, which
-            turns them into something you can hand to another person.
+            sorted. The best ones get a tiny <Term k="nfcTag" /> and a splash of coloured resin
+            over it. The chip holds a web link and nothing else — no key, no money — which is what
+            makes a rock safe to hand to another person.
           </p>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

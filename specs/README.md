@@ -36,6 +36,19 @@ Working line: **Liquidity you can hold.**
 | [20-live-sepolia-plan.md](./20-live-sepolia-plan.md) | Going live on Sepolia: status of the deployment, the live rehearsal script and live check, the physical tag test, the demo rehearsal, and the parallel work packages | Active |
 | [21-balance-and-ship.md](./21-balance-and-ship.md) | One tap from a one-token deposit to a trading rock: the conversion inside the ship operation against a house stream, and silent embedded-wallet signing | Active |
 
+## Other documents
+
+Not specifications, but read alongside them:
+
+| Document | Purpose |
+| --- | --- |
+| [`../README.md`](../README.md) | The whole project for a newcomer or a judge: the demo, how each part works, the contracts, how to run it, what is real |
+| [`../DEMO-STATE.md`](../DEMO-STATE.md) | What is still simulated, unavailable or unproven, one line each |
+| [`../docs/glossary.md`](../docs/glossary.md) | Every term the app explains, one plain sentence each — the text behind the tooltips (`web/src/lib/ui/glossary.ts`) |
+| [`../docs/dashboard-strategies.md`](../docs/dashboard-strategies.md) | How the three fee tiers look and behave on the rock page |
+| [`../contracts/contracts/aqua/NOTES.md`](../contracts/contracts/aqua/NOTES.md) | How Aqua and XYCSwap actually work, read from the vendored source |
+| [`../contracts/README.md`](../contracts/README.md) | The registry from Etherscan, field by field |
+
 ## Spec rules
 
 - Product behaviour must be described here before implementation.

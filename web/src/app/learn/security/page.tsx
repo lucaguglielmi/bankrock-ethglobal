@@ -1,139 +1,206 @@
-"use client";
-import { TooltipLink } from "@/components/ui/tooltip-link";
-import { Header } from "@/components/header";
+import Link from "next/link";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Term } from "@/components/ui/term";
+
+/**
+ * "Security" — what protects a rock and its owner, in the words the threat model uses
+ * (spec 06, spec 03 trust boundaries, DEMO-STATE §7), with no claim the code does not back.
+ *
+ * What this page no longer has: a three-button poll that recorded nothing and a feedback form
+ * whose submit handler only prevented the default — both were surfaces that looked like they
+ * worked and did not. Feedback goes to the security address the contracts publish.
+ *
+ * The global header and the page frame come from the root layout and `globals.css`.
+ */
+
+export const metadata = {
+  title: "Security — Bank Rock",
+  description:
+    "What protects a Bank Rock and its owner: the chip, the signed tap, the account, the registry and what none of them can do.",
+};
+
+const SECURITY_CONTACT = "security@bank-rock.com";
 
 export default function SecurityPage() {
   return (
-    <main className="flex min-h-dvh flex-col bg-white text-ink pt-[var(--header-h)] pb-24">
-      <Header />
-      
-      <article className="mx-auto w-full max-w-3xl px-[var(--gutter)] pt-12 flex flex-col gap-16">
-        
-        {/* Header */}
-        <header className="flex flex-col gap-6 text-center items-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Security & Privacy</h1>
-          <p className="text-xl text-ink-2 max-w-2xl">
-            True self-custody and transparent telemetry. Safe by design.
+    <main className="flex min-h-dvh flex-col bg-white text-ink">
+      <article className="mx-auto flex w-full max-w-3xl flex-col gap-16 pt-12">
+        <header className="flex flex-col items-center gap-6 text-center">
+          <h1 className="text-h1 font-extrabold">Security</h1>
+          <p className="max-w-prose text-lead text-ink-2">
+            The stone proves it was tapped. Your wallet proves it is you. Neither the chip nor our
+            servers can move the rock&rsquo;s money.
           </p>
         </header>
 
-        {/* Features Accordion */}
-        <section className="flex flex-col gap-8">
-          <h2 className="text-2xl font-bold">How we protect you</h2>
-          
+        <section className="flex flex-col gap-6">
+          <h2 className="text-h2 font-bold">What protects you</h2>
+
           <Accordion className="w-full">
-            <AccordionItem value="item-1">
-              <AccordionTrigger className="text-lg font-semibold">1. Hardware Independence (No private keys on NFC)</AccordionTrigger>
-              <AccordionContent className="text-ink-2 text-base leading-relaxed">
-                The NFC tag inside the Bank Rock is entirely passive. It contains a signed URL payload to identify the object, but it <strong>never</strong> stores a <TooltipLink term="private key" description="A secret cryptographic key used to authorize transactions and prove ownership of assets." href="#" />. This means if someone steals your physical rock, they cannot access your funds. Ownership is dictated by the smart contract, controlled by your authenticated wallet.
+            <AccordionItem value="chip">
+              <AccordionTrigger className="min-h-12 text-base font-semibold">
+                The chip holds no key
+              </AccordionTrigger>
+              <AccordionContent className="max-w-prose text-base text-ink-2">
+                The <Term k="nfcTag" /> inside a rock is passive and holds one web link. It never
+                stores a private key, a password or anything that could spend. Someone who steals
+                the stone can open its public page and nothing more: the money is in the{" "}
+                <Term k="rockAccount" />, and only the owner&rsquo;s wallet can move it.
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-2">
-              <AccordionTrigger className="text-lg font-semibold">2. Self-Custody First</AccordionTrigger>
-              <AccordionContent className="text-ink-2 text-base leading-relaxed">
-                Bank Rock does not hold your funds. Using the 1inch Aqua protocol, tokens remain in the Rock&apos;s ERC-4337 <TooltipLink term="smart account" description="A customizable smart contract acting as a wallet, offering advanced features like gas sponsorship." href="#" />. Our servers cannot initiate a withdrawal or transfer. You, as the authenticated Privy signer, are the only entity capable of moving funds out of the rock.
+
+            <AccordionItem value="copy">
+              <AccordionTrigger className="min-h-12 text-base font-semibold">
+                A copied link proves nothing
+              </AccordionTrigger>
+              <AccordionContent className="max-w-prose text-base text-ink-2">
+                On every tap the <Term k="ntag424" /> chip writes a fresh <Term k="cmac" /> and a{" "}
+                <Term k="readCounter" /> into its link. Our server checks the code with the
+                tag&rsquo;s key and accepts a counter only if it is higher than the last one it
+                stored. A <Term k="copiedLink" /> therefore fails, and the{" "}
+                <Term k="verifiedPhysical" /> badge cannot be painted by anything running in a
+                browser. The check runs on the server only, in one place.
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-3">
-              <AccordionTrigger className="text-lg font-semibold">3. The AI Oracle is read-only</AccordionTrigger>
-              <AccordionContent className="text-ink-2 text-base leading-relaxed">
-                The AI Oracle (MCP) never moves your funds. It can read your rock&apos;s live owner, reserve balances and fees straight from chain and answer questions about them, and that is all it can do — it holds no key, session or otherwise, and cannot sign a transaction on your behalf. Scoped ERC-7579 session keys for a bounded, agent-driven rebalancer are on the post-hackathon roadmap (spec 13), not something this build does today.
+
+            <AccordionItem value="attestation">
+              <AccordionTrigger className="min-h-12 text-base font-semibold">
+                The tap is turned into a signed note, not a permission
+              </AccordionTrigger>
+              <AccordionContent className="max-w-prose text-base text-ink-2">
+                After a good tap the server signs an <Term k="attestation" />: a{" "}
+                <Term k="eip712" /> naming the rock, the chip, the counter, a short deadline, the
+                wallet it is for and the account it opens. The <Term k="registry" /> accepts it
+                for exactly two things — awakening a rock and claiming a gift. It can never spend,
+                and the key that signs it holds no funds.
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-4">
-              <AccordionTrigger className="text-lg font-semibold">4. Transparent Telemetry</AccordionTrigger>
-              <AccordionContent className="text-ink-2 text-base leading-relaxed">
-                We believe in full observability. Our MCP server exposes raw, structured server logs to you and your AI agents. You can trace exactly what the backend did during any transaction, removing the opaque &quot;black box&quot; nature of traditional web apps.
+
+            <AccordionItem value="custody">
+              <AccordionTrigger className="min-h-12 text-base font-semibold">
+                Self-custody, in the plain sense
+              </AccordionTrigger>
+              <AccordionContent className="max-w-prose text-base text-ink-2">
+                The Rock Account is a <Term k="safe" /> with one owner: your <Term k="embeddedWallet" />{" "}
+                from <Term k="privy" />. Every action it takes is a <Term k="userOperation" /> that
+                your wallet signed. Bank Rock&rsquo;s servers prepare screens and pay{" "}
+                <Term k="gas" />; they hold no key that can sign for the account. The registry
+                itself holds no tokens and has no function that takes an approval.
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-5">
-              <AccordionTrigger className="text-lg font-semibold">5. Anonymous Shipping (Future Privacy)</AccordionTrigger>
-              <AccordionContent className="text-ink-2 text-base leading-relaxed">
-                Hardware shouldn&apos;t be a physical liability. In the future, we plan to implement completely anonymous shipping. Your physical delivery address will never be retained in our databases, meaning your physical rock will never be intrinsically associated with your real-world identity.
+
+            <AccordionItem value="gift">
+              <AccordionTrigger className="min-h-12 text-base font-semibold">
+                A gift cannot be redirected
+              </AccordionTrigger>
+              <AccordionContent className="max-w-prose text-base text-ink-2">
+                A <Term k="handover" /> names its recipient on the chain. The <Term k="claim" /> is
+                paid for by a <Term k="relayer" /> because the recipient has no ETH, but the
+                registry credits the wallet named inside the signed attestation, so the relayer
+                cannot send the rock elsewhere. The change of owner on the Rock Account is signed
+                by the giver when the gift is opened, checked by the bundler before it is stored,
+                and lands before the registry claim; if it does not land, nothing changes.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="mcp">
+              <AccordionTrigger className="min-h-12 text-base font-semibold">
+                The AI endpoint only reads
+              </AccordionTrigger>
+              <AccordionContent className="max-w-prose text-base text-ink-2">
+                The <Term k="mcp" /> server can read a rock&rsquo;s owner, balances and fees from
+                the chain and explain them to an <Term k="agent" />. It holds no key of any kind
+                and cannot sign, so it cannot move, start or stop anything. Server logs it relays
+                are labelled as untrusted text before an agent sees them.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="honest">
+              <AccordionTrigger className="min-h-12 text-base font-semibold">
+                Nothing is shown that was not read
+              </AccordionTrigger>
+              <AccordionContent className="max-w-prose text-base text-ink-2">
+                Every number on a rock page is either read live from the chain or shown as
+                unavailable with the reason. There is no fallback value, no invented transaction
+                hash, and no rate of return anywhere. A transaction counts as done only when its
+                receipt says it succeeded.
               </AccordionContent>
             </AccordionItem>
           </Accordion>
         </section>
 
-        {/* Future Ideas Voting & Plans */}
-        <section className="flex flex-col gap-8 bg-ink-4/10 p-6 sm:p-8 rounded-3xl border border-black/5">
-          <div className="flex flex-col gap-4">
-            <h3 className="text-xl font-bold">How do you feel?</h3>
-            <p className="text-ink-2">
-              Do you think Bank Rock is secure enough as it is? Would you trust it to hold 20% of your portfolio in its current status?
-            </p>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2">
-              <Button variant="outline" size="sm" className="rounded-full">👍 Absolutely</Button>
-              <Button variant="outline" size="sm" className="rounded-full">😐 Maybe</Button>
-              <Button variant="outline" size="sm" className="rounded-full">👎 No way</Button>
-            </div>
-          </div>
-
-          <hr className="border-black/5" />
-
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <h3 className="text-xl font-bold">Future Plans</h3>
-              <span className="rounded-full bg-blue-100 px-3 py-0.5 text-label font-semibold text-blue-700 uppercase tracking-widest">Coming soon</span>
-            </div>
-            <ul className="flex flex-col gap-4 text-base text-ink-2 mt-2">
-              <li className="flex gap-3">
-                <span className="text-ink font-bold mt-0.5">•</span>
-                <span><strong>Hardware Wallet Integration:</strong> Ledger-level login to secure large holdings with physical device approval.</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="text-ink font-bold mt-0.5">•</span>
-                <span><strong>Transaction PINs:</strong> Require a secret code or biometric approval on your device for high-value operations.</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="text-ink font-bold mt-0.5">•</span>
-                <span><strong>Dynamic NFC Payloads:</strong> Implementing AWS Nitro Enclaves to generate uniquely encrypted, rotating NFC URLs on-the-fly, making URL cloning impossible.</span>
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        {/* Suggestions Form */}
-        <section className="flex flex-col gap-6">
-          <div className="space-y-2">
-            <h3 className="text-xl font-bold">Find a flaw? Tell us.</h3>
-            <p className="text-ink-2">
-              If you see something we aren&apos;t doing well, drop a message below.
-            </p>
-          </div>
-          
-          <form className="flex flex-col gap-4 max-w-lg" onSubmit={(e) => e.preventDefault()}>
-            <Input 
-              type="text" 
-              placeholder="Email or Telegram handle" 
-              className="bg-ink-4/10 border-black/10 focus-visible:ring-ink"
-              required
-            />
-            <Textarea 
-              placeholder="Your feedback (plain text only)" 
-              className="bg-ink-4/10 border-black/10 focus-visible:ring-ink min-h-[120px]"
-              required
-            />
-            <Button type="submit" className="w-fit">Submit Feedback</Button>
-          </form>
-        </section>
-
-        {/* Conclusion */}
-        <section className="mt-8 border-t border-black/10 pt-12">
-          <p className="text-lg font-medium text-ink-2 italic">
-            This page only exists because we are looking for our own Mr. Robot. If security is your thing and you want to help, please get in touch. We have great ambitions, especially in terms of smart contracts. Just chat to us!
+        <section className="flex flex-col gap-6 rounded-3xl border border-border bg-muted/50 p-6 sm:p-8">
+          <h2 className="text-h2 font-bold">What it does not protect against yet</h2>
+          <p className="max-w-prose text-base text-ink-2">
+            This is a testnet build on <Term k="sepolia" />, and some things are deliberately left
+            for a network where a rock is worth something. They are written down so that
+            &ldquo;we decided to wait&rdquo; and &ldquo;we forgot&rdquo; never look the same.
+          </p>
+          <ul className="flex flex-col gap-3 text-base text-ink-2">
+            <li>
+              <strong className="font-medium text-ink">Your sign-in is the key.</strong> Someone
+              who takes over your Privy login can act as your wallet without holding the rock.
+              Making the rock a required second factor for large moves is the first roadmap item.
+            </li>
+            <li>
+              <strong className="font-medium text-ink">One attestation signer.</strong> A single
+              server key states that taps happened. Splitting it across independent signers is
+              required before real value.
+            </li>
+            <li>
+              <strong className="font-medium text-ink">The <Term k="lostFlag" /> freezes nothing.</strong>{" "}
+              It is a warning to visitors. Holding the rock was never what controlled the money, so
+              losing it does not put the money at risk either.
+            </li>
+            <li>
+              <strong className="font-medium text-ink">Retiring is final.</strong> A retired rock
+              cannot be revived. Its account and history stay readable, and the chip can start a
+              new rock.
+            </li>
+            <li>
+              <strong className="font-medium text-ink">Tokens sent to the trade router are lost.</strong>{" "}
+              <Term k="xycSwapTaker" /> has no owner and no rescue function on purpose; you approve
+              it, you never send to it.
+            </li>
+          </ul>
+          <p className="max-w-prose text-sm text-ink-3">
+            The full list, with what makes each item real, is <span className="font-medium">DEMO-STATE.md</span>{" "}
+            in the repository, and the contract review is specification 19.
           </p>
         </section>
 
+        <section className="flex flex-col gap-4">
+          <h2 className="text-h2 font-bold">Found a flaw?</h2>
+          <p className="max-w-prose text-base text-ink-2">
+            Tell us. The contracts publish the same address:{" "}
+            <a
+              href={`mailto:${SECURITY_CONTACT}`}
+              className="text-link underline-offset-4 hover:underline"
+            >
+              {SECURITY_CONTACT}
+            </a>
+            . Everything the site does is open source, and the addresses of every contract a rock
+            touches are on its Contracts tab and on{" "}
+            <Term k="etherscan" />. If security is your thing and you want to help, we would like
+            to hear from you.
+          </p>
+          <p className="max-w-prose text-sm text-ink-3">
+            For how the pieces fit together, see{" "}
+            <Link href="/learn/rock" className="text-link underline-offset-4 hover:underline">
+              the physical rock
+            </Link>{" "}
+            and{" "}
+            <Link href="/learn/defi" className="text-link underline-offset-4 hover:underline">
+              the DeFi position
+            </Link>
+            .
+          </p>
+        </section>
       </article>
     </main>
   );

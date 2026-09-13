@@ -22,6 +22,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Term } from "@/components/ui/term";
 import { explorer } from "@/lib/chain";
 import type { Capability } from "@/lib/demo";
 import { RockActivity } from "@/components/rock-activity";
@@ -71,9 +72,17 @@ export function OwnershipTab({
 }: OwnershipTabProps) {
   if (state === "dormant") {
     return (
-      <p className="max-w-prose text-lead text-ink-2">
-        Nobody owns this rock yet. Whoever awakens it becomes its first owner.
-      </p>
+      <>
+        <p className="max-w-prose text-lead text-ink-2">
+          Nobody owns this rock yet. Whoever <Term k="awaken">awakens</Term> it becomes its first
+          owner.
+        </p>
+        <p className="max-w-prose text-base text-ink-2">
+          That first <Term k="tap" /> is checked by our server, recorded in the{" "}
+          <Term k="registry" />, and opens the rock&rsquo;s own <Term k="rockAccount" />. Holding
+          the rock is never enough on its own: the owner is the wallet that awakened it.
+        </p>
+      </>
     );
   }
 
@@ -93,6 +102,12 @@ export function OwnershipTab({
         ) : (
           "This rock has an owner."
         )}
+      </p>
+
+      <p className="max-w-prose text-base text-ink-2">
+        Ownership is written in the <Term k="registry" />, and the rock&rsquo;s tokens sit in its{" "}
+        <Term k="rockAccount" />. When a rock is given away, both move to the new owner in one{" "}
+        <Term k="claim" />, and every step is kept as public <Term k="provenance" /> below.
       </p>
 
       {state === "handover_pending" ? (
