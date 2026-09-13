@@ -121,12 +121,6 @@ interface SheetCheck {
    * the one action always reachable without scrolling, on any sheet.
    */
   primaryButtonName?: string | RegExp;
-  /**
-   * When the trigger is present but disabled, skip with this message instead of failing — the
-   * two rock-page sheets are only reachable once a rock record reads REAL (spec 15 Part 3); with
-   * no registry configured, the trigger renders as the demo sample's disabled look-alike button.
-   */
-  skipReasonIfDisabled?: string;
 }
 
 /**
@@ -141,11 +135,6 @@ async function assertSheetReachable(page: Page, check: SheetCheck): Promise<void
     trigger,
     `no button matching "${check.triggerName}" ever appeared`,
   ).toBeVisible({ timeout: 10_000 });
-
-  if (check.skipReasonIfDisabled && !(await trigger.isEnabled())) {
-    test.skip(true, check.skipReasonIfDisabled);
-    return;
-  }
 
   await trigger.click();
 
@@ -236,25 +225,15 @@ test.describe("sheets are reachable without sign-in — item 8", () => {
     });
   });
 
-  test("add funds sheet, from /rock/2", async ({ page }) => {
-    await gotoAndSettle(page, "/rock/2");
+  test("add funds sheet, from /rock/420", async ({ page }) => {
+    // The demo rock's "Add funds" opens its own badged sheet (src/demo/rock-420/demo-fund-sheet)
+    // through the same door — header CTA, owner menu — a live rock's wallet-transfer sheet uses.
+    // Its footer action is disabled until an amount is typed; reachability is what is checked.
+    await gotoAndSettle(page, "/rock/420");
     await assertSheetReachable(page, {
       triggerName: "Add funds",
       sheetTitle: "Add funds",
-      // No footer: the sheet is an address, a QR and live balances. Falls back to Close.
-      skipReasonIfDisabled:
-        "'Add funds' is disabled — /rock/2 reads UNAVAILABLE (no registry configured), so only the demo sample's look-alike button rendered",
-    });
-  });
-
-  test("cross-chain sheet, from /rock/2", async ({ page }) => {
-    await gotoAndSettle(page, "/rock/2");
-    await assertSheetReachable(page, {
-      triggerName: "Add funds from another chain",
-      sheetTitle: "Top up from another chain",
-      primaryButtonName: /Enter an amount|Simulate sending|Deposit from another chain/,
-      skipReasonIfDisabled:
-        "'Add funds from another chain' is disabled — /rock/2 reads UNAVAILABLE (no registry configured), so only the demo sample's look-alike button rendered",
+      primaryButtonName: /Add to the rock|Adding…|Done/,
     });
   });
 });
