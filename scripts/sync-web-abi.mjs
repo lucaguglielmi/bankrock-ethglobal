@@ -5,12 +5,12 @@
  *   web/src/lib/chain/abi/registry.ts   ← BankRockRegistry.json
  *   web/src/lib/chain/abi/aqua-app.ts   ← XYCSwap.json + XYCSwapTaker.json
  *
- * These are the last copies of each interface — the contracts package exports the ABIs,
+ * These are the last copies of each interface - the contracts package exports the ABIs,
  * `mcp/scripts/sync-abi.mjs` pulls the registry into the MCP server, and this pulls all three
  * into the web app. Every copy is generated from the same artifact for the same reason: a
  * hand-maintained ABI that drifts from the deployed contract does not fail loudly, it decodes
  * chain state into wrong values, and a wrong balance rendered confidently is exactly the class of
- * defect spec 15 exists to remove. The 2026-09-12 audit produced a worked example — `aqua-app.ts`
+ * defect spec 15 exists to remove. The 2026-09-12 audit produced a worked example - `aqua-app.ts`
  * was hand-maintained, `XYCSwapTaker.swapExactIn` changed shape under findings F-6 and F-8, and
  * the stale array silently encoded the wrong calldata.
  *
@@ -37,7 +37,7 @@ const rel = (p) => path.relative(repoRoot, p);
 
 /**
  * Each target is one generated module. `exports` are emitted in order, and the `preamble` is the
- * comment block above them — the part a reader needs that the ABI itself cannot say.
+ * comment block above them - the part a reader needs that the ABI itself cannot say.
  */
 const TARGETS = [
   {
@@ -62,8 +62,8 @@ const TARGETS = [
       "its caller: an EOA or a plain Safe cannot trade against it directly (contracts/aqua/NOTES.md",
       "§5). A visitor's transaction is `approve(taker, amountIn)` then `taker.swapExactIn(...)`.",
       "",
-      "No address appears here. Both come from the environment — NEXT_PUBLIC_AQUA_APP_ADDRESS and",
-      "NEXT_PUBLIC_AQUA_TAKER_ADDRESS — through `lib/aqua/config.ts` (D-015).",
+      "No address appears here. Both come from the environment - NEXT_PUBLIC_AQUA_APP_ADDRESS and",
+      "NEXT_PUBLIC_AQUA_TAKER_ADDRESS - through `lib/aqua/config.ts` (D-015).",
     ],
     exports: [
       { name: "XYC_SWAP_ABI", artifact: "XYCSwap.json" },
