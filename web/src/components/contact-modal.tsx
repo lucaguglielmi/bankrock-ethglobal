@@ -11,6 +11,9 @@
  * What it is now: a real `POST /api/contact`. Success is shown only for a 2xx. A 503 renders the
  * route's own reason — the request was not stored, so it was not received. The submit button
  * lives in the sheet's sticky footer and is reachable without scrolling.
+ *
+ * The route also emails the submitter a copy. The success copy says so only when the response
+ * reports that email as sent; otherwise it says what is true — the message is stored.
  */
 
 import * as React from "react";
@@ -26,7 +29,7 @@ type ContactKind = "og_rock" | "sponsor";
 type Status =
   | { state: "idle" }
   | { state: "sending" }
-  | { state: "sent" }
+  | { state: "sent"; acknowledged: boolean }
   | { state: "error"; message: string }
   | { state: "unavailable"; reason: string };
 
@@ -47,6 +50,7 @@ interface ContactResponseBody {
   state?: string;
   reason?: string;
   error?: string;
+  email?: { acknowledgement?: { sent?: boolean } };
 }
 
 export function ContactModal({ triggerText, title, variant = "dark" }: ContactModalProps) {
@@ -93,7 +97,7 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
         const body = (await response.json().catch(() => ({}))) as ContactResponseBody;
 
         if (response.ok) {
-          setStatus({ state: "sent" });
+          setStatus({ state: "sent", acknowledged: body.email?.acknowledgement?.sent === true });
           return;
         }
 
@@ -192,6 +196,7 @@ export function ContactModal({ triggerText, title, variant = "dark" }: ContactMo
               <h3 className="text-h3 font-semibold text-ink">Message received</h3>
               <p className="max-w-prose text-base text-ink-2">
                 It is stored and we will read it. We will reply to the address you gave us.
+                {status.acknowledged ? " We have emailed you a copy." : null}
               </p>
             </div>
           ) : status.state === "unavailable" ? (

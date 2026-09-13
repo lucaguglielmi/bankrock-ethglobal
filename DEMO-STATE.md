@@ -76,7 +76,7 @@ applied. What remains needs something other than a secret.
 | K-1 | Sign-in and any wallet address on screen | 16 #1 | `NEXT_PUBLIC_PRIVY_APP_ID` is set and the origin and chain are configured in the Privy dashboard. |
 | K-2 | The "Verified Physical" badge | 16 #18, 06 | `NXP_MASTER_KEY` matches the key written to the tags. |
 | K-6 | The ETH faucet | 16 #16 | `FAUCET_PRIVATE_KEY` is set and funded. There is no default key. |
-| K-9 | Any email at all | 16 #19, #33 | `RESEND_API_KEY` plus SPF/DKIM verification of `bank-rock.com`. Until then the alert sender stays on the Resend sandbox and reaches only the account owner's inbox — intentionally, and until the project is on mainnet. |
+| K-9 | Any email at all | 16 #19, #20, #33, #38, #39 | Partly real now: the shop's two contact forms (`POST /api/contact`) send an operator notification and a submitter acknowledgement through Resend once `RESEND_API_KEY` and `CONTACT_NOTIFY_EMAIL` (or `ALERT_EMAIL_ADDRESS`) are set, and the response says per email whether the provider accepted it. Alert delivery stays intentionally sandboxed until the project is on mainnet. Both paths share the sender caveat: until SPF/DKIM verification of `bank-rock.com` and a `*_FROM_ADDRESS` on it, the Resend sandbox sender reaches only the account owner's inbox — so the acknowledgement to anyone else is refused, and reported as such. |
 
 ## 5. Real in code, unproven in the world
 

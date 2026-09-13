@@ -197,7 +197,7 @@ tooling variables are the operator's shell, and `BANKROCK_API_URL` is the agent'
 | 16 | `FAUCET_PRIVATE_KEY` | Wallet — fresh, funded | **[3]** Worker secret | `/api/faucet` | Phase 2 | **Must be set.** The current default is the public Anvil key (SA-4). Sends 0.01 ETH per claim. |
 | 17 | `ATTESTATION_SIGNER_PRIVATE_KEY` | Wallet — fresh, **unfunded** | **[3]** Worker secret | `lib/nfc/attestation.ts`; `lib/rock-account.server.ts` derives the expected attester from it | Phase 4 | **Renamed from `SIGNER_PRIVATE_KEY`, which is removed.** Its address is the registry's trusted attester and is passed to the deploy script as `ATTESTATION_SIGNER_ADDRESS`. Signs the six-field struct (D-026) and nothing else. Never holds funds. |
 | 18 | `NXP_MASTER_KEY` | Generate, 16 bytes hex, at tag provisioning | **[3]** Worker secret | `/api/nfc/verify` | Phase 4 | Must equal the key written to the physical NTAG 424 DNA tags. Store in Cloudflare secrets only. |
-| 19 | `RESEND_API_KEY` | You — resend.com | **[3]** Worker secret | `lib/email-service.ts`, Gelato alert route | Phase 5 | **Plus** domain verification for `bank-rock.com` (add the SPF/DKIM records Resend shows) and change `from` to `alerts@bank-rock.com`. Without verification, mail reaches only your own inbox. |
+| 19 | `RESEND_API_KEY` | You — resend.com | **[3]** Worker secret | `lib/email-service.ts`, Gelato alert route, `lib/contact-email.ts` (`POST /api/contact`) | Phase 5 | **Plus** domain verification for `bank-rock.com` (add the SPF/DKIM records Resend shows) and change `from` to `alerts@bank-rock.com`. Without verification, mail reaches only your own inbox. |
 | 20 | `ALERT_EMAIL_ADDRESS` | Fixed: an inbox you read | **[3]** Worker secret | Gelato alert route | Phase 5 | **No default.** The `security@bankrock.xyz` fallback is gone (D-017, D-022): unset means `/api/alerts/gelato` answers UNAVAILABLE rather than mailing anyone. |
 | 21 | `ADMIN_API_KEY` | Generate | **[3]** Worker secret | `/api/newsletter` operator view | Phase 5 | |
 | 22 | `ALCHEMY_WEBHOOK_SECRET` | You — Alchemy Notify, only if used | **[3]** Worker secret | `/api/webhooks/alchemy` | Optional | If unset the route must reject, not accept (D-017). |
@@ -216,6 +216,8 @@ tooling variables are the operator's shell, and `BANKROCK_API_URL` is the agent'
 | 35 | `NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY` | Generate — `npx web-push generate-vapid-keys` | **[1]** `wrangler.jsonc` `vars`, once a pair is generated | `hooks/useNotifications.ts` (browser), `app/api/webpush/route.ts` | Phase 5, optional | The browser subscribes with this key and the server signs with #36; **the two must be halves of one pair, or every delivery fails silently.** Perimeter `P-7` was exactly that mismatch, under two different variable names — the browser read `NEXT_PUBLIC_VAPID_PUBLIC_KEY` while the route read `WEB_PUSH_VAPID_PUBLIC_KEY`. One name now, and it is `NEXT_PUBLIC_`-prefixed because the public key is public by construction |
 | 36 | `WEB_PUSH_VAPID_PRIVATE_KEY` | Generate — the other half of #35 | **[3]** Worker secret | `app/api/webpush/route.ts` | Phase 5, optional | Server-side only. Never `NEXT_PUBLIC_`. Cloudflare secret, not a file |
 | 37 | `WEB_PUSH_SUBJECT` | Fixed — a `mailto:` or `https:` URL you own | **[3]** Worker secret | `app/api/webpush/route.ts` | Phase 5, optional | The VAPID `sub` claim: who a push service should contact about this sender. e.g. `mailto:security@bank-rock.com`. All three of #35–#37 unset ⇒ push is `UNAVAILABLE`, which is the correct state; a partial set is the failure mode worth avoiding (spec 14) |
+| 38 | `CONTACT_NOTIFY_EMAIL` | Fixed: an inbox you read | **[3]** Worker secret | `lib/contact-email.ts`, `POST /api/contact` | Phase 5 | The inbox the shop's two contact forms notify, with `replyTo` set to the submitter. Falls back to `ALERT_EMAIL_ADDRESS` (#20). **No default:** with neither set the notification is reported `not_sent` in the response and the row is still stored. Needs #19; the acknowledgement to the submitter needs #19 plus a verified sender (#33 or #39) to reach anyone but your own inbox (E-6). |
+| 39 | `CONTACT_FROM_ADDRESS` | You — a verified Resend sender | **[3]** Worker secret | `lib/contact-email.ts` | Phase 5, optional | e.g. `Bank Rock <hello@bank-rock.com>`, once the domain is verified. Falls back to `ALERT_FROM_ADDRESS` (#33), then the Resend sandbox sender, which reaches only your own inbox — so a contact acknowledgement to a stranger is refused until one of the two is set on a verified domain. |
 
 ### 2.2a Cross-check against `web/.env.example`
 
@@ -235,7 +237,8 @@ live in production?" at a glance:
   `ADMIN_API_KEY` (#21), `CRON_SECRET` (#7), `PIMLICO_API_KEY` (#15), `FAUCET_PRIVATE_KEY` (#16),
   `ATTESTATION_SIGNER_PRIVATE_KEY` (#17), `RELAYER_PRIVATE_KEY` (#30), `NXP_MASTER_KEY` (#18),
   `NXP_KEY_DIVERSIFY` (#31), `NXP_KEY_DIVERSIFY_APP_ID` (#32), `RESEND_API_KEY` (#19),
-  `ALERT_FROM_ADDRESS` (#33), `ALERT_EMAIL_ADDRESS` (#20), `ALCHEMY_WEBHOOK_SECRET` (#22),
+  `ALERT_FROM_ADDRESS` (#33), `ALERT_EMAIL_ADDRESS` (#20), `CONTACT_NOTIFY_EMAIL` (#38),
+  `CONTACT_FROM_ADDRESS` (#39), `ALCHEMY_WEBHOOK_SECRET` (#22),
   `WEB_PUSH_VAPID_PRIVATE_KEY` (#36), `WEB_PUSH_SUBJECT` (#37) — plus
   `NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY` (#35), which moves to **[1]** if push is ever enabled,
   because a `NEXT_PUBLIC_` value set on the Worker never reaches the browser bundle.
@@ -327,14 +330,15 @@ is the **Secret** list below.
 > That asymmetry is the whole mechanism: committed configuration is authoritative and cannot drift,
 > secrets are untouched and never pass through git or a workflow log. It is also why a value that
 > is merely *account-specific* rather than confidential — `ALERT_FROM_ADDRESS`,
-> `ALERT_EMAIL_ADDRESS`, `WEB_PUSH_SUBJECT`, `NXP_KEY_DIVERSIFY*` — is set as a **Secret**: a
+> `ALERT_EMAIL_ADDRESS`, `CONTACT_NOTIFY_EMAIL`, `CONTACT_FROM_ADDRESS`, `WEB_PUSH_SUBJECT`,
+> `NXP_KEY_DIVERSIFY*` — is set as a **Secret**: a
 > Text variable there would be deleted by the next deploy and the capability would silently go
 > `UNAVAILABLE`.
 
 | What | Value |
 | --- | --- |
 | **D1 binding** | Binding name **`DB`**, database `bankrock-db`, id `f0a28d6f-0a36-46aa-b711-8b5297913d2e`, `migrations_dir: drizzle`. Declared in `web/wrangler.jsonc` and bound on the project. The Worker uses the binding; it never reads `CLOUDFLARE_DATABASE_ID` or `CLOUDFLARE_D1_TOKEN`, which are migration tooling only (#9). Unbound ⇒ counters, rate limits and the relayer spend ledger are all `UNAVAILABLE`, and the relayer therefore refuses to spend |
-| **Secrets — the operator's list** | `SEPOLIA_RPC_URL`, `PIMLICO_API_KEY`, `ADMIN_PASSWORD`, `ADMIN_JWT_SECRET`, `ADMIN_API_KEY`, `CRON_SECRET`, `FAUCET_PRIVATE_KEY`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RESEND_API_KEY`, `ALERT_FROM_ADDRESS`, `ALERT_EMAIL_ADDRESS`, `ALCHEMY_WEBHOOK_SECRET`, and the two web-push server values `WEB_PUSH_VAPID_PRIVATE_KEY` and `WEB_PUSH_SUBJECT` — all as **Secret**, never Text, never in a file. `wrangler secret put NAME` from `web/` does the same thing as the dashboard. Each unset one makes exactly one capability `UNAVAILABLE` (§2.2, and DEMO-STATE §4) |
+| **Secrets — the operator's list** | `SEPOLIA_RPC_URL`, `PIMLICO_API_KEY`, `ADMIN_PASSWORD`, `ADMIN_JWT_SECRET`, `ADMIN_API_KEY`, `CRON_SECRET`, `FAUCET_PRIVATE_KEY`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `RELAYER_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RESEND_API_KEY`, `ALERT_FROM_ADDRESS`, `ALERT_EMAIL_ADDRESS`, `CONTACT_NOTIFY_EMAIL`, `CONTACT_FROM_ADDRESS`, `ALCHEMY_WEBHOOK_SECRET`, and the two web-push server values `WEB_PUSH_VAPID_PRIVATE_KEY` and `WEB_PUSH_SUBJECT` — all as **Secret**, never Text, never in a file. `wrangler secret put NAME` from `web/` does the same thing as the dashboard. Each unset one makes exactly one capability `UNAVAILABLE` (§2.2, and DEMO-STATE §4) |
 | **Non-secret configuration** | Not set here. It is `web/wrangler.jsonc` `vars` (#2, #3, #11–#14, #27–#29, #34), replaced on every deploy from the file |
 | **Custom domains** | `bank-rock.com` and `www.bank-rock.com`, declared in `wrangler.jsonc` `routes` with `custom_domain: true`. Attaching them is what the token's two Zone scopes are for |
 | **`NEXT_PUBLIC_DEMO_MODE`** | `false`, in `wrangler.jsonc`. The deploy job pins the same value in the job environment *and* refuses to build if the file says anything else, so a simulated production build needs two deliberate changes and a passing CI lie (D-013) |
