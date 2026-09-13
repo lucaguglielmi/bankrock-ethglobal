@@ -12,6 +12,9 @@ import { getTableName, type Column, type SQL, type Table } from "drizzle-orm";
 /** A cookie jar for `next/headers`, filled by `createAdminSession` the way the login route does. */
 const jar = new Map<string, string>();
 
+/** Whatever the environment had, put back after every case rather than deleted. */
+const previousSecret = process.env.ADMIN_JWT_SECRET;
+
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined),
@@ -115,7 +118,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  delete process.env.ADMIN_JWT_SECRET;
+  if (previousSecret === undefined) {
+    delete process.env.ADMIN_JWT_SECRET;
+  } else {
+    process.env.ADMIN_JWT_SECRET = previousSecret;
+  }
   vi.clearAllMocks();
 });
 

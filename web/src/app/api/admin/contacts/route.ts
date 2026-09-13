@@ -17,8 +17,11 @@ import { getDb, NO_DATABASE_REASON } from "@/lib/db";
 import { contactRequests, subscribers } from "@/lib/db/schema";
 import { logger } from "@/lib/telemetry";
 
-/** How many rows of each kind one read returns. The response says so, so the page can too. */
-export const ADMIN_CONTACTS_LIMIT = 100;
+/**
+ * How many rows of each kind one read returns. The response carries it as `limit`, so the page
+ * can say "the most recent 100 of 132" instead of implying the list is everything.
+ */
+const ADMIN_CONTACTS_LIMIT = 100;
 
 export async function GET(req: Request) {
   const admin = await requireAdminSession(req);
