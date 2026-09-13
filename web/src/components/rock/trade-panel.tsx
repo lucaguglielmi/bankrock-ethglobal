@@ -159,27 +159,23 @@ function rateFractionDigits(rate: number): number {
 function TokenChip({
   symbol,
   side,
-  onFlip,
 }: {
   symbol: TokenSymbol;
   side: "in" | "out";
-  onFlip: () => void;
 }) {
-  const other = otherToken(symbol);
+  const handleClick = () => {
+    alert("In Sepolia testnet we only support ETH and USDC");
+  };
   return (
     <Button
       type="button"
       variant={side === "in" ? "default" : "outline"}
-      aria-label={
-        side === "in"
-          ? `Paying with ${symbol}. Pay with ${other} instead`
-          : `Receiving ${symbol}. Receive ${other} instead`
-      }
-      onClick={onFlip}
-      className="h-11 gap-2 rounded-full pl-3 pr-4 text-sm font-semibold"
+      onClick={handleClick}
+      className="h-10 gap-1.5 rounded-full pl-2.5 pr-2.5 text-base font-semibold shadow-sm"
     >
       <TokenIcon symbol={symbol} className="size-5" />
-      <span aria-hidden>{symbol}</span>
+      <span>{symbol}</span>
+      <ChevronDown className="size-4 opacity-50" />
     </Button>
   );
 }
@@ -545,12 +541,12 @@ export function TradePanel({
         <TradeStreamPicker streams={streams} value={streamIndex} onChange={handleSelectStream} />
       ) : null}
 
-      <section className="rounded-3xl border border-border bg-background">
-        {/* Top half — what goes into the rock */}
-        <div className="flex flex-col gap-3 p-5 pb-7">
-          <label htmlFor={amountInputId} className="text-label uppercase text-ink-3">
-            Send to the rock
-          </label>
+      <section className="rounded-[24px] border border-border bg-background p-1.5">
+        <div className="relative flex flex-col gap-1">
+          {/* Top half — what goes into the rock */}
+          <div className="flex flex-col gap-3 rounded-[20px] bg-neutral-100/70 p-4 pb-4 dark:bg-neutral-900/50">
+            <span className="text-sm font-medium text-ink-3">Sell</span>
+          <label htmlFor={amountInputId} className="sr-only">Send to the rock</label>
           <div className="flex items-center gap-3">
             <input
               id={amountInputId}
@@ -567,9 +563,9 @@ export function TradePanel({
               aria-describedby={amountHintId}
               className="-mx-1 min-w-0 flex-1 rounded-lg bg-transparent px-1 text-num-lg font-bold tabular-nums text-ink outline-none placeholder:text-ink-4"
             />
-            <TokenChip symbol={tokenIn} side="in" onFlip={handleFlip} />
+            <TokenChip symbol={tokenIn} side="in" />
           </div>
-          <div className="flex min-h-10 items-center justify-between gap-3">
+          <div className="flex min-h-6 items-center justify-between gap-3">
             {heldIn !== null ? (
               <>
                 <p id={amountHintId} className="text-sm text-ink-3">
@@ -599,23 +595,24 @@ export function TradePanel({
               </p>
             )}
           </div>
-        </div>
+          </div>
 
-        {/* The divider, with the flip button riding it */}
-        <div className="relative border-t border-border">
-          <IconButton
-            aria-label={`Swap direction: pay ${tokenOut} instead`}
-            variant="outline"
-            onClick={handleFlip}
-            className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background shadow-xs"
-          >
-            <ArrowUpDown />
-          </IconButton>
-        </div>
+          {/* The flip button over the gap */}
+          <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+            <IconButton
+              aria-label={`Swap direction: pay ${tokenOut} instead`}
+              variant="outline"
+              onClick={handleFlip}
+              className="rounded-xl border-[4px] border-background bg-background shadow-sm hover:bg-neutral-100"
+            >
+              <ArrowUpDown className="size-4" />
+            </IconButton>
+          </div>
 
-        {/* Bottom half — what the rock sends back */}
-        <div className="flex flex-col gap-3 p-5 pt-7">
-          <span className="text-label uppercase text-ink-3">Send from the rock</span>
+          {/* Bottom half — what the rock sends back */}
+          <div className="flex flex-col gap-3 rounded-[20px] bg-neutral-100/70 p-4 pb-4 dark:bg-neutral-900/50">
+            <span className="text-sm font-medium text-ink-3">Buy</span>
+          <span className="sr-only">Send from the rock</span>
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
               {quote.status === "real" ? (
@@ -643,7 +640,7 @@ export function TradePanel({
                 </span>
               )}
             </div>
-            <TokenChip symbol={tokenOut} side="out" onFlip={handleFlip} />
+            <TokenChip symbol={tokenOut} side="out" />
           </div>
           {rateShown && rate !== null ? (
             <p className="text-sm text-ink-3">
@@ -663,9 +660,10 @@ export function TradePanel({
             <p className="max-w-prose text-sm text-ink-2">{quote.reason}</p>
           ) : null}
         </div>
+        </div>
 
         {/* The deal, always in view; the rest of the quote behind "Details" */}
-        <div className="flex flex-col border-t border-border px-5 py-3">
+        <div className="flex flex-col px-4 py-3">
           <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
             <span className="text-ink-3">
               <HelpTerm term="How good a deal is this?">
@@ -746,7 +744,7 @@ export function TradePanel({
         </div>
 
         {/* Footer band: what stands in the way, then the one button */}
-        <div className="flex flex-col gap-3 border-t border-border p-4">
+        <div className="flex flex-col gap-3 p-2">
           {swapError ? (
             <p role="alert" className="text-sm text-danger">
               {swapError}
