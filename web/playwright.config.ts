@@ -3,9 +3,10 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Browser checks for specs/17-mobile-ui-and-typography.md Part 7.
  *
- * Runs against a production build (`next build` with `NEXT_PUBLIC_DEMO_MODE=true`, spec 17 Part
- * 7's preamble: "so every surface renders") started with `next start` on a fixed port, so the
- * same server can be reused across every project instead of rebuilding per viewport.
+ * Runs against a plain production build (`next build`, no build flags, no chain configured)
+ * started with `next start` on a fixed port, so the same server can be reused across every
+ * project instead of rebuilding per viewport. See e2e/helpers.ts for what each route renders in
+ * that state.
  *
  * Five viewports, matching the task list exactly (spec 17 §4.1 names 320/390/430/768/1280; this
  * substitutes 360×640 — the "design at" width the spec leads with — for 430×932, which is not in

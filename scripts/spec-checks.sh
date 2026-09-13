@@ -147,10 +147,12 @@ expect_absent "D-015" "no 20-byte address literal outside web/src/lib/chain" \
   1 "web/src" \
   -rE --exclude='*.test.ts' --exclude='*.test.tsx' '0x[a-fA-F0-9]{40}' --exclude-dir=chain
 
-# D-013 — demo mode never defaults on in production.
-expect_present "D-013a" "deploy workflow sets NEXT_PUBLIC_DEMO_MODE: \"false\" explicitly" \
-  1 ".github/workflows/deploy.yml" \
-  -F 'NEXT_PUBLIC_DEMO_MODE: "false"'
+# D-013 — production is never a simulation. The build-time flag that used to gate simulated
+# surfaces is retired: rock 420, the stage demo, is gated by its id alone (`isDemoRockId`), so a
+# reappearance of the flag anywhere in the code, the configuration or the workflows is a bug.
+expect_absent "D-013a" "the retired NEXT_PUBLIC_DEMO_MODE flag appears nowhere in code, config or workflows" \
+  6 "web/wrangler.jsonc" "web/.env.example" ".github/workflows" "web/src" "web/e2e" "web/scripts" \
+  -r -F 'NEXT_PUBLIC_DEMO_MODE'
 
 expect_absent "D-013b" "no fabricated sign-in left in web/src (A-1, A-2)" \
   1 "web/src" \

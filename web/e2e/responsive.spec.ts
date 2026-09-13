@@ -13,14 +13,14 @@ import {
 /**
  * Browser checks for specs/17-mobile-ui-and-typography.md Part 7, items 1-9.
  *
- * Runs against a production build with `NEXT_PUBLIC_DEMO_MODE=true` (spec 17 Part 7's own
- * preamble: "so every surface renders") and, in this CI job, no chain configured — no
- * `NEXT_PUBLIC_REGISTRY_ADDRESS`. That means `/rock/1` and `/rock/2` read `UNAVAILABLE` (spec 15
- * Part 3) and show the honest empty state plus a disabled `RockSample`, never the live
- * `Trade`/`Give`/cross-chain controls, which only mount once a rock record actually reads `REAL`.
- * Items 7 and 8 detect that and skip with a clear reason instead of failing on data nobody
- * configured — see the two `skipReasonIfDisabled` sites below. Point this job's env at a real
- * deployed registry and those checks exercise the genuine sheets instead.
+ * Runs against a plain production build — there is no build flag — and, in this CI job, no chain
+ * configured: no `NEXT_PUBLIC_REGISTRY_ADDRESS`. `/rock/1` and `/rock/2` therefore read
+ * `UNAVAILABLE` (spec 15 Part 3) and show the honest empty state alone, never the live
+ * `Trade`/`Give` controls, which only mount once a rock record actually reads `REAL`. The rock
+ * dashboard itself is checked on `/rock/420`, the stage demo (`src/demo/rock-420`): gated by its
+ * id alone, it renders a full, badged rock page from browser state with no chain at all, so items
+ * 7 and 8 run against real controls instead of skipping. Point this job's env at a deployed
+ * registry and `/rock/1` and `/rock/2` render their live pages too.
  *
  * Item 10 (Lighthouse mobile performance/accessibility budgets) is not run here: it needs a
  * throttled-network run against a public deployment, which is out of place in a PR-blocking unit
@@ -68,7 +68,7 @@ test.describe("layout and typography — items 1, 2, 3, 4, 5, 6", () => {
 });
 
 test.describe("primary action above the fold — item 7", () => {
-  test("the primary action on /rock/2 is fully inside the first viewport at 360x640", async ({
+  test("the primary action on /rock/420 is fully inside the first viewport at 360x640", async ({
     page,
   }, testInfo) => {
     test.skip(
@@ -76,7 +76,9 @@ test.describe("primary action above the fold — item 7", () => {
       "checked once, at the viewport spec 17 item 7 names (360x640)",
     );
 
-    await gotoAndSettle(page, "/rock/2");
+    // The stage demo is an awake, funded rock, so its identity row carries "Add funds" — the
+    // same button, in the same place, a live awake rock renders (rock-interface.tsx).
+    await gotoAndSettle(page, "/rock/420");
 
     // "Retired rock" is a heading with no action (ArchivedRock), not a button; the other three
     // are button labels. Matching both element kinds is what the spec's own regex implies.
@@ -87,14 +89,7 @@ test.describe("primary action above the fold — item 7", () => {
       .or(page.getByRole("heading", { name: /Retired rock/ }))
       .first();
 
-    if ((await candidate.count()) === 0) {
-      test.skip(
-        true,
-        "no primary-action element matched on /rock/2 — likely UNAVAILABLE with demo mode off, or the sample view not rendering",
-      );
-    }
-
-    await expect(candidate).toBeVisible();
+    await expect(candidate, "the demo rock page rendered no primary action").toBeVisible();
     const box = await candidate.boundingBox();
     const viewport = page.viewportSize();
     expect(box, "the primary action has no bounding box").not.toBeNull();

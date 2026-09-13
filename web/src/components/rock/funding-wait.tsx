@@ -8,22 +8,17 @@
  * timer of its own: the page's reserve read already refetches every 15 seconds, and the tab flips
  * on its own the moment `usdc > 0`.
  *
- * The one thing a person can do here is add funds, so that is the one large button. The bridge
- * beat is offered only under `NEXT_PUBLIC_DEMO_MODE=true`, badged, as spec 15 requires of a
- * simulated surface.
+ * The one thing a person can do here is add funds, so that is the one large button.
  */
 
-import { Globe, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SimulatedBadge } from "@/components/ui/simulated-badge";
 
 export interface FundingWaitProps {
   onAddFunds: () => void;
-  /** Opens the simulated bridge sheet. Rendered only when provided — the shell passes it under demo mode alone. */
-  onCrossChain?: () => void;
 }
 
-export function FundingWait({ onAddFunds, onCrossChain }: FundingWaitProps) {
+export function FundingWait({ onAddFunds }: FundingWaitProps) {
   return (
     <section className="flex flex-col items-center gap-8 py-8 text-center">
       <div className="flex flex-col items-center gap-4" aria-live="polite">
@@ -41,20 +36,6 @@ export function FundingWait({ onAddFunds, onCrossChain }: FundingWaitProps) {
         <Button size="lg" className="w-full" onClick={onAddFunds}>
           Add funds
         </Button>
-        {onCrossChain ? (
-          <Button
-            size="lg"
-            variant="outline"
-            className="h-auto min-h-14 w-full flex-wrap justify-between gap-3 py-3 text-left"
-            onClick={onCrossChain}
-          >
-            <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <Globe aria-hidden />
-              Add funds from another chain
-            </span>
-            <SimulatedBadge />
-          </Button>
-        ) : null}
       </div>
     </section>
   );

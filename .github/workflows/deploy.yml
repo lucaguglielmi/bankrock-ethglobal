@@ -34,15 +34,12 @@ jobs:
     #  3. True secrets are set on the Cloudflare Worker `web` as encrypted secrets and never appear
     #     here or anywhere in git. A deploy never touches them.
     #
-    # Decision D-013: demo mode is opt-in and must never be on in production. wrangler.jsonc sets
-    # it to "false" and the export step refuses to continue if it ever says anything else; it is
-    # pinned here as well so the production build cannot become a simulation through a change to
-    # that default alone. `npm run deploy` runs the OpenNext build, so the flag has to be in scope
-    # for the whole job, not just a build step.
+    # There is no build-time demo flag (D-013): production is never a simulation because nothing
+    # in the code can be switched into one. Rock 420, the stage demo, is gated by its id alone,
+    # and `scripts/spec-checks.sh` fails if the retired flag reappears anywhere.
     #
     # Only the two Cloudflare credentials are needed to publish.
     env:
-      NEXT_PUBLIC_DEMO_MODE: "false"
       # Either name works; the browser-visible key and the server key are the same Pimlico key.
       NEXT_PUBLIC_PIMLICO_API_KEY: ${{ secrets.NEXT_PUBLIC_PIMLICO_API_KEY || secrets.PIMLICO_API_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -81,12 +78,6 @@ jobs:
           node scripts/export-public-vars.mjs > "${RUNNER_TEMP}/public-vars.env"
           echo "Exported from web/wrangler.jsonc:"
           cat "${RUNNER_TEMP}/public-vars.env"
-          # D-013, stated twice on purpose: the job env above pins demo mode off, and a
-          # wrangler.jsonc that disagreed would be a production simulation. Fail instead.
-          if ! grep -qx 'NEXT_PUBLIC_DEMO_MODE=false' "${RUNNER_TEMP}/public-vars.env"; then
-            echo "web/wrangler.jsonc must set NEXT_PUBLIC_DEMO_MODE to \"false\" (D-013)."
-            exit 1
-          fi
           cat "${RUNNER_TEMP}/public-vars.env" >> "$GITHUB_ENV"
           # Not fatal — the site is honest without sponsorship (every UserOperation surface reports
           # UNAVAILABLE) — but loud, because a green deploy with an empty key looks configured.
