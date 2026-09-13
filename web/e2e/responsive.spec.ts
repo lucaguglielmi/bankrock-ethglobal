@@ -255,6 +255,11 @@ test.describe("accessibility: zero color-contrast / target-size violations — i
     test(`${routeSlug(route)}: axe reports no color-contrast or target-size violations`, async ({
       page,
     }) => {
+      // The landing page mounts the WebGL rock canvas from `md` up, and in CI (where the HDRI
+      // loads) axe's evaluation shares the main thread with its render loop: the audit took ~50 s
+      // at 1280x800 against a 45 s budget. `slow()` triples the budget; it changes nothing about
+      // what is asserted.
+      if (route === "/") test.slow();
       await gotoAndSettle(page, route);
 
       // @axe-core/playwright types against its own copy of playwright; the runtime object is the same.
