@@ -258,13 +258,12 @@ export default function McpPage() {
           </p>
           <div className="flex flex-col gap-2">
             <p className="max-w-prose text-base text-ink-2">
-              For this testnet demo, the AI Oracle is strictly a read-only <Term k="mcp" /> server. It holds no key, so
-              it cannot start or stop a strategy, move a token or sign anything. Every tool either reads <Term k="sepolia" />{" "}
-              or the Bank Rock API. However, we are actively looking for secure ways to authenticate your AI agent, so you can soon control your rock directly from your AI chat!
+              For this demo, the AI Oracle is read-only. It reads data directly from <Term k="sepolia" />, so it won&apos;t hallucinate your rock&apos;s state. We&apos;re currently working on secure ways for your AI to manage your rock directly.{" "}
+              <Link href="/shop" className="underline underline-offset-4 hover:text-ink">
+                How would you authenticate the AI? Share your ideas and win a Bank Rock.
+              </Link>
             </p>
-            <Link href="/shop" className="inline-flex min-h-11 items-center text-base font-semibold text-link underline-offset-4 hover:underline">
-              Tell us how you would approach this technically, and win a Bank Rock for your help!
-            </Link>
+
           </div>
 
           <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
