@@ -14,7 +14,7 @@
   --font-heading: var(--font-sans);
 
   /* Type scale (spec 17 §3.2) */
-  --text-display: clamp(3rem, 14vw, 9rem);
+  --text-display: clamp(2.5rem, 11vw, 9rem);
   --text-display--line-height: 0.95;
   --text-display--letter-spacing: -0.04em;
   --text-h1: clamp(2rem, 1.5rem + 2.2vw, 3rem);
