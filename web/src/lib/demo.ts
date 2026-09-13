@@ -64,6 +64,8 @@ export const env = {
   aquaTakerAddress: process.env.NEXT_PUBLIC_AQUA_TAKER_ADDRESS || "",
   /** Browser-visible Pimlico key. Restrict by origin in the Pimlico dashboard. */
   pimlicoApiKeyPublic: process.env.NEXT_PUBLIC_PIMLICO_API_KEY || "",
+  /** The RPC the BROWSER reads Sepolia through; empty means viem's default public endpoint. */
+  sepoliaRpcUrlPublic: process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "",
 } as const;
 
 export type PublicEnv = typeof env;

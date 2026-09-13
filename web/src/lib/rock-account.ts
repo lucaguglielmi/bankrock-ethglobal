@@ -279,7 +279,7 @@ export function registryAddress(): Capability<Address> {
  */
 function readClient() {
   if (typeof window === "undefined") return getPublicClient();
-  return createPublicClient({ chain: sepolia, transport: http() });
+  return createPublicClient({ chain: sepolia, transport: http(env.sepoliaRpcUrlPublic || undefined) });
 }
 
 /** Reads a rock's registry record. */

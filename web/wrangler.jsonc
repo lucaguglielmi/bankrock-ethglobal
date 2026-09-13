@@ -56,6 +56,9 @@
     // login methods and chain list that go with it (spec 18 Part 2.2 step 3).
     "NEXT_PUBLIC_PRIVY_APP_ID": "cmtytvqip029c0djknzi8qz4t",
     "NEXT_PUBLIC_CHAIN_ID": "11155111",
+    // The browser's own Sepolia reads (Safe derivation, receipts, balances). Public, keyless; a
+    // measured, working endpoint (D-036). Server-side reads use the SEPOLIA_RPC_URL secret.
+    "NEXT_PUBLIC_SEPOLIA_RPC_URL": "https://ethereum-sepolia-rpc.publicnode.com",
     // D-013: only the literal "true" enables simulation. Production is never a simulation, and
     // .github/workflows/deploy.yml pins the same value in the build job.
     "NEXT_PUBLIC_DEMO_MODE": "false",

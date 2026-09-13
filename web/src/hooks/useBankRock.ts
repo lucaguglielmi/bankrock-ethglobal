@@ -33,7 +33,7 @@ import { createSmartAccountClient } from "permissionless/clients";
 import { createPimlicoClient } from "permissionless/clients/pimlico";
 import { http } from "viem";
 import { chain, ENTRY_POINT_07_ADDRESS } from "@/lib/chain";
-import { real, unavailable, type Capability } from "@/lib/demo";
+import { real, unavailable, type Capability, env } from "@/lib/demo";
 import { buildDockCalls, buildShipCalls, getAquaAddresses, readRockStreams } from "@/lib/aqua";
 import {
   approvalCalls,
@@ -183,7 +183,8 @@ async function buildSmartAccountClient(params: {
 
     const publicClient = (await import("viem")).createPublicClient({
       chain,
-      transport: http(),
+      // A configured public endpoint beats viem's default, which is shared and rate-limited.
+      transport: http(env.sepoliaRpcUrlPublic || undefined),
     });
 
     const account = await toSafeSmartAccount({
@@ -459,7 +460,12 @@ export function useRockActions(): UseRockActions {
           });
 
           // Record the tag -> rock binding so a later tap can be routed without a chain read.
-          void bindTag(rockId, attestation.message.uidHash, await getAccessToken());
+          // Best effort, and never awaited: the tag→rock binding is a routing hint the next tap
+          // can live without, while `getAccessToken` can prompt Privy on the phone — awaiting it
+          // here left the button on "Awakening…" after the rock was already awake (2026-09-13).
+          void getAccessToken()
+            .then((token) => bindTag(rockId, attestation.message.uidHash, token))
+            .catch(() => undefined);
 
           return real({ txHash, smartAccount });
         } catch (err) {
@@ -604,7 +610,9 @@ export function useRockActions(): UseRockActions {
         const result = await sendFromRockAccount(rockId, encodeCancelHandover(id));
         if (result.state === "UNAVAILABLE") return unavailable(result.reason);
         // A cancelled gift must not leave a live owner-swap operation behind.
-        void discardOwnerSwapUserOp(rockId, await getAccessToken());
+        void getAccessToken()
+          .then((token) => discardOwnerSwapUserOp(rockId, token))
+          .catch(() => undefined);
         return real({ txHash: result.value.txHash });
       }),
     [withPending, sendFromRockAccount, getAccessToken],
@@ -618,7 +626,9 @@ export function useRockActions(): UseRockActions {
         const result = await sendFromRockAccount(rockId, encodeArchiveRock(id));
         if (result.state === "UNAVAILABLE") return unavailable(result.reason);
         // Archiving releases the tag on chain; release it off chain too.
-        void unbindTag(rockId, await getAccessToken());
+        void getAccessToken()
+          .then((token) => unbindTag(rockId, token))
+          .catch(() => undefined);
         return real({ txHash: result.value.txHash });
       }),
     [withPending, sendFromRockAccount, getAccessToken],

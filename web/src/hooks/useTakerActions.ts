@@ -53,7 +53,7 @@ import {
 } from "@/lib/aqua";
 import { AQUA_ABI } from "@/lib/chain/abi/aqua";
 import { chain, ENTRY_POINT_07_ADDRESS } from "@/lib/chain";
-import { real, unavailable, type Capability } from "@/lib/demo";
+import { env, real, unavailable, type Capability } from "@/lib/demo";
 import {
   approvalCalls,
   parseRockId,
@@ -116,7 +116,7 @@ async function buildTakerClient(params: {
     });
 
     const account = await toSafeSmartAccount({
-      client: createPublicClient({ chain, transport: http() }),
+      client: createPublicClient({ chain, transport: http(env.sepoliaRpcUrlPublic || undefined) }),
       owners: [owner],
       version: "1.4.1",
       entryPoint: { address: ENTRY_POINT_07_ADDRESS, version: "0.7" },
