@@ -3,11 +3,11 @@ import { ContactModal } from "@/components/contact-modal";
 export default function Shop() {
   return (
     <main className="relative flex min-h-dvh flex-col overflow-hidden bg-white text-ink">
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center py-16 sm:py-24">
-        <h1 className="mb-6 max-w-prose text-center text-h1 font-extrabold">
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-start sm:items-center py-16 sm:py-24">
+        <h1 className="mb-6 max-w-prose text-left sm:text-center text-h1 font-extrabold">
           Financial Freedom Cannot Be Bought.
         </h1>
-        <p className="mb-12 max-w-prose text-center text-lead text-ink-2">
+        <p className="mb-12 max-w-prose text-left sm:text-center text-lead text-ink-2">
           Bank Rocks are not for sale. They are a physical interface to an experimental agentic DeFi layer.
           The first OG rocks will be granted exclusively to those who barter for one, or can convince us they deserve it.
           Initially, your Bank Rock will operate on testnet. After a feedback round, we will launch and you will be able to activate your rock on mainnet.
