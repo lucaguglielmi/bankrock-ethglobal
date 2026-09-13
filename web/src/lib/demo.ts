@@ -1,12 +1,13 @@
 /**
- * Demo mode and capability states (specs/15-exit-demo-mode.md, D-013 / Part 3).
+ * Capability states and public configuration (specs/15-exit-demo-mode.md, D-013 / Part 3).
  *
  * Every user-visible capability is in exactly one of three states at runtime, and the state is
  * computed, never assumed:
  *
  *   REAL         backed by a live contract, RPC or database read
- *   DEMO         simulated, and NEXT_PUBLIC_DEMO_MODE === "true"
- *   UNAVAILABLE  real backing unreachable and demo mode off
+ *   DEMO         simulated — only rock 420, the stage demo (`web/src/demo/rock-420`), answers
+ *                this state, and it is gated by that id alone; there is no build flag
+ *   UNAVAILABLE  real backing unreachable
  *
  * Simulation is never the silent fallback. A capability that cannot reach its real backing
  * service returns UNAVAILABLE with a reason; it never substitutes a plausible value.
@@ -45,8 +46,6 @@ export function isAvailable<T>(
  * access, so every public variable is read literally exactly once, here.
  */
 export const env = {
-  /** NEXT_PUBLIC_DEMO_MODE — "true" enables badged simulation. Defaults to off. */
-  demoMode: process.env.NEXT_PUBLIC_DEMO_MODE === "true",
   /** NEXT_PUBLIC_APP_URL — the single canonical origin (D-022). */
   appUrl: (process.env.NEXT_PUBLIC_APP_URL || "https://bank-rock.com").replace(/\/+$/, ""),
   /** NEXT_PUBLIC_CHAIN_ID — must be 11155111 (Ethereum Sepolia, D-023). */
@@ -69,14 +68,6 @@ export const env = {
 } as const;
 
 export type PublicEnv = typeof env;
-
-/**
- * True only when NEXT_PUBLIC_DEMO_MODE is exactly the string "true" (D-013).
- * Any other value — unset, "1", "TRUE", "yes" — is false.
- */
-export function isDemoMode(): boolean {
-  return env.demoMode;
-}
 
 /** Thrown by requireEnv when a mandatory secret is unset. Never contains the value. */
 export class MissingEnvError extends Error {

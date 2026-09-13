@@ -21,8 +21,9 @@ export default function Home() {
           <div className="flex flex-col items-center mt-auto">
             <AnimatedText text="Tangible DeFi." className="mb-6 text-display font-extrabold text-ink" />
 
+            {/* After the hackathon: idle yield into a lending protocol (DEMO-STATE N-6) and automatic rebalancing (D-010) are planned; not built, so not claimed. */}
             <p className="max-w-prose text-lead text-ink-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-1000 motion-safe:delay-500 motion-safe:fill-mode-forwards">
-              A rock with an NFC chip that holds a yield-bearing liquidity position with automatic rebalancing.
+              A rock with an NFC chip that holds a liquidity position and keeps a small fee from every trade, inside the stone.
             </p>
           </div>
 
@@ -69,12 +70,10 @@ export default function Home() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
             <span>MCP Endpoint</span>
           </div>
+          {/* After the hackathon: a published npm package (npx -y @bankrock/mcp-server) is planned; today the server runs from a checkout of the repo, as /mcp documents. */}
           <div className="bg-black text-white px-6 py-4 rounded-xl shadow-2xl flex items-center justify-between gap-6 w-full max-w-2xl font-mono">
-            <code className="text-sm truncate opacity-90">npx -y @bankrock/mcp-server</code>
+            <code className="text-sm truncate opacity-90">cd bankrock-ethglobal/mcp &amp;&amp; npm install &amp;&amp; npm start</code>
             <div className="flex items-center gap-4 shrink-0">
-              <button className="hover:text-white/70 transition-colors" title="Copy prompt">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              </button>
               <Link href="/mcp" className="text-sm border border-white/20 hover:bg-white/10 px-4 py-2 rounded-lg transition-colors font-sans font-medium">
                 Docs
               </Link>

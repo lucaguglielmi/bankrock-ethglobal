@@ -11,7 +11,7 @@
  * a `Sheet`, then three stacked cards.
  *
  * What it is now: `TradePanel`, inline content for the rock dashboard's Trade tab — one card with
- * two halves ("Top up the rock" / "Send from the rock"), a flip button riding the divider between
+ * two halves ("Send to the rock" / "Send from the rock"), a flip button riding the divider between
  * them, the deal-quality row always in view, the rest of the quote behind a "Details" disclosure,
  * and the one 56 px button in a footer band whose label morphs with the state (STEERING.md). Every
  * number on screen comes from `GET /api/rocks/[id]/quote` — the amount out, the fee in basis points
@@ -549,7 +549,7 @@ export function TradePanel({
         {/* Top half — what goes into the rock */}
         <div className="flex flex-col gap-3 p-5 pb-7">
           <label htmlFor={amountInputId} className="text-label uppercase text-ink-3">
-            Top up the rock
+            Send to the rock
           </label>
           <div className="flex items-center gap-3">
             <input

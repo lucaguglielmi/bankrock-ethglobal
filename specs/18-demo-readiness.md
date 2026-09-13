@@ -7,7 +7,7 @@
 This document says **what is still missing, right now, to run the three-minute demo in
 [`08-mvp-and-demo.md`](./08-mvp-and-demo.md) end to end on a physical rock.**
 
-State of the tree: branch `exit-from-demo-mode`, HEAD `11d6817` ("XYCSwap strategy encoding,
+State of the tree: branch `main`, HEAD `11d6817` ("XYCSwap strategy encoding,
 taker periphery, tests and deploy script"), with an uncommitted working set. Uncommitted files are
 treated as real. `bash scripts/spec-checks.sh` runs 21 checks and is blocking in CI; run it before
 reading anything below as done, because an in-flight edit can turn one red.

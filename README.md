@@ -41,6 +41,7 @@ Built for ETHGlobal ETHOnline 2026 (the 1inch Aqua and Privy tracks). Live at
 8. [Security model, in plain words](#security-model-in-plain-words)
 9. [Known limits and what is next](#known-limits-and-what-is-next)
 10. [Documentation](#documentation)
+11. [Independence](#independence)
 
 ---
 
@@ -101,7 +102,10 @@ Two honest footnotes. The verifier is real and pinned by tests against NXP's own
 vectors, but a physical tag has not yet been tapped against it (DEMO-STATE P-1). Until the
 prototype tag is programmed, a private "magic tap" route (`GET /api/demo/tap?key=…`, DEMO-STATE
 S-4) forges a genuine `(e, c)` pair for a *synthetic* tag with the real master key and redirects
-into the real flow — the chip is the only thing simulated, and every use is logged.
+into the real flow — the chip is the only thing simulated, and every use is logged. Rock 3, the
+live demo rock, was awakened through that link with the synthetic tag `04DE3057A11E80`; its
+on-chain counter (367523) is minutes since 2026-01-01, not a chip read count. No physical chip
+has been tapped yet.
 
 ### 2. The Rock Account and sponsored transactions
 
@@ -213,8 +217,8 @@ receipt's own `Pulled`/`Pushed` events, never from the preview.
 There is no immediate transfer function. A rock changes hands only when someone holding the stone
 presents a fresh attestation (D-027, D-032):
 
-1. The owner names a recipient — required; the app issues no open gifts — picks an expiry (at most
-   90 days) and optionally writes a message. Naming is a two-phone move: the recipient's account
+1. The owner names a recipient — required; the app issues no open gifts — picks an expiry (the app
+   offers 1, 7 or 30 days; the contract allows up to 90) and optionally writes a message. Naming is a two-phone move: the recipient's account
    sheet shows a QR of `bank-rock.com/rock/<id>?give=<their address>`; the giver's camera opens it
    and the give sheet is pre-filled. Pasting is the fallback.
 2. One signature does two things. `initiateHandover(rockId, recipient, expiresAt, messageHash)`
@@ -242,8 +246,11 @@ stored owner swap.
 readable, the tag binding is released so the next tap starts a new rock id, the read counter is
 **not** reset (so an old attestation cannot be replayed against the new rock), and the rock id is
 never reissued. It is what makes rehearsal possible with one physical tag. Rock 1 was retired at
-the end of the Sepolia rehearsal; **rock 3 is the live demo rock** (awake, funded with test USDC and
-WETH, one Wide stream live — read from the registry and Aqua on 2026-09-13).
+the end of the Sepolia rehearsal; **rock 3 is the live demo rock** (awake, holding 5 USDC and
+0.005 WETH, one Wide stream live allowing 2 USDC / 0.0003 WETH, and no trades yet — read from the
+registry and Aqua on 2026-09-13). The only swap against a rock on Sepolia so far is the 0.25 USDC
+rehearsal trade on rock 1, tx
+`0x2ab70a3c27a0aa1ea719f2e843ac4cd4c1eb53b43b449fab2cbe3a1fca751761`.
 
 ### 7. The MCP endpoint
 
@@ -333,7 +340,7 @@ source — every state, error and event has a plain-English `@notice`.
 │   ├── deployments/                        sepolia.json, sepolia-aqua-app.json, the rehearsal log
 │   └── audit/                              2026-09-12 findings, changes, sign-off
 ├── web/                      ← the Next.js app and the Cloudflare Worker
-│   ├── src/app/              pages (/, /rock/[id], /r/[id], /learn/*, /mcp, /shop, admin) and API routes
+│   ├── src/app/              pages (/, /rock/[id], /r/[id], /learn/*, /mcp, /shop, /alerts, /privacy, /terms, admin) and API routes
 │   ├── src/components/       rock-interface.tsx (the four-tab dashboard), rock/*, ui/*, landing sections
 │   ├── src/hooks/            useBankRock (awaken, ship, dock, gift, retire), useTakerActions (swap), reads
 │   ├── src/lib/chain/        the ONLY place an address literal may appear (D-015); ABIs
@@ -350,7 +357,7 @@ source — every state, error and event has a plain-English `@notice`.
 │   ├── spec-checks.sh        the 21 static definition-of-done checks (blocking in CI)
 │   ├── check-live.sh         is the deployed site up and pointed at contracts that exist?
 │   └── sync-web-abi.mjs      copies compiled ABIs into web/ and mcp/
-└── .github/workflows/        ci.yml (web, contracts, mcp, spec checks), deploy.yml, rehearse.yml
+└── .github/workflows/        ci.yml (web, contracts, mcp, spec checks, Playwright), deploy.yml, rehearse.yml
 ```
 
 ---
@@ -399,9 +406,10 @@ cd mcp && npm install && npm run build
 bash scripts/spec-checks.sh                                # 21 static checks; must print 21 passed
 ```
 
-CI (`.github/workflows/ci.yml`) runs four jobs on every push and pull request: **Web** (lint,
+CI (`.github/workflows/ci.yml`) runs five jobs on every push and pull request: **Web** (lint,
 typecheck, test, build), **Contracts** (test, and fail if the committed ABI copies are stale),
-**MCP server** (build, ABI drift), and **Spec checks**. The spec checks are the mechanical half of
+**MCP server** (build, ABI drift), **Spec checks**, and **Responsive UI and accessibility** (the
+Playwright viewport × route matrix with axe; currently red on `main`, the other four are green). The spec checks are the mechanical half of
 the specs' definitions of done: no address literal outside `web/src/lib/chain`, no APY/APR wording,
 no synthesized transaction hashes, no fail-open secret checks, the typography scale, and the
 committed configuration matching the deployment records.
@@ -521,7 +529,6 @@ model is [`specs/06-nfc-security.md`](./specs/06-nfc-security.md). Security cont
   holding the stone.
 - Rate limits, the faucet, the relayer cap and the tap counter all live in D1 and **fail closed**:
   when the database cannot be reached, those routes refuse rather than guess.
-- The `www` host's bare root still redirects wrongly (DEMO-STATE W-1); every other path is fine.
 
 **Next**
 

@@ -18,7 +18,7 @@ const SECTIONS = [
 ];
 
 export default function PrivacyPage() {
-  const lastUpdated = "September 12, 2026";
+  const lastUpdated = "September 13, 2026";
 
   return (
     <main className="min-h-dvh bg-[#fafafa] text-ink">
@@ -42,8 +42,9 @@ export default function PrivacyPage() {
             </p>
             <ul className="list-disc space-y-2 pl-6">
               <li>
-                <strong>No Personal Identifying Information (PII):</strong> We do not require, collect, or store your legal name,
-                physical home address, phone number, government identification, or banking credentials.
+                <strong>No Personal Identifying Information (PII):</strong> Using a rock does not require your legal name,
+                physical home address, phone number, government identification, or banking credentials, and we do not collect them.
+                A name and an email address are stored only when you submit the contact form, together with your message.
               </li>
               <li>
                 <strong>No Tracking Cookies or Ad Networks:</strong> We do not deploy cross-site tracking pixels, fingerprinting scripts,
@@ -75,7 +76,7 @@ export default function PrivacyPage() {
               <div className="rounded-2xl border border-neutral-200 bg-white p-4">
                 <h3 className="mb-1 text-h3 font-semibold text-ink">B. Public Blockchain Data</h3>
                 <p className="text-base text-ink-2">
-                  When you connect a wallet or awaken a rock, public addresses (your EOA, ERC-4337 Safe address, or Privy embedded signer)
+                  When you sign in or awaken a rock, public addresses (your Privy embedded wallet address and the rock&apos;s Safe address)
                   and transaction hashes are processed to display balances and execute swaps. Because blockchains are public ledgers,
                   all on-chain transactions are publicly broadcast and permanently verifiable by nature.
                 </p>
@@ -94,10 +95,13 @@ export default function PrivacyPage() {
           {/* Section 3 */}
           <section id={SECTIONS[2].id} className="space-y-4">
             <h2 className="text-h2 font-bold text-ink">3. Local Storage and Client-Side State</h2>
+            {/* After the hackathon: a theme setting may be added; there is none today, so it is not listed here. */}
             <p>
-              We utilize browser <InlineCode>localStorage</InlineCode> solely to preserve
-              your local UI state, such as theme preferences and active testnet session credentials. This information never leaves your device
-              and can be cleared at any time via your browser settings.
+              We use browser <InlineCode>localStorage</InlineCode> only for local state: the rock 420 stage demo
+              (<InlineCode>bankrock.demo.rock420.v1</InlineCode>), your sound preference, the last sign-in method you used, whether you
+              dismissed the add-to-home-screen banner, and a copy of any email address you entered in the newsletter form (the address itself
+              is also sent to our server when you submit it). Privy&apos;s SDK keeps its own sign-in session in your browser. Everything else
+              never leaves your device, and all of it can be cleared at any time via your browser settings.
             </p>
           </section>
 

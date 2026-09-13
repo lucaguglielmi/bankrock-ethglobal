@@ -112,7 +112,7 @@ export function StoryCarousel() {
 
   <g transform="translate(79.50, 72.72)">
     <circle cx="0" cy="0" r="0.6" className="fill-neutral-400" />
-    <text x="1.5" y="0.8" textAnchor="start" fontSize="2" className="fill-neutral-500 font-medium tracking-wide">Old romans stuff</text>
+    <text x="1.5" y="0.8" textAnchor="start" fontSize="2" className="fill-neutral-500 font-medium tracking-wide">Old Roman stuff</text>
   </g>
 
   <g transform="translate(96.11, 85.41)">

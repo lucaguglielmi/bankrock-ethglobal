@@ -8,7 +8,7 @@ baseline — the record of what was wrong on 2026-09-12, not of what is wrong no
 **Read it before answering "what's next?".** One line per item, with the spec that governs it and
 the single condition that makes it real.
 
-Branch `exit-from-demo-mode`. `bash scripts/spec-checks.sh` runs 21 checks and is blocking in CI
+Branch `main`. `bash scripts/spec-checks.sh` runs 21 checks and is blocking in CI
 (the 21st is `D-034`, the committed configuration against `contracts/deployments/*.json`).
 
 ## The three states
@@ -28,7 +28,7 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 | # | What | Spec | Becomes real when |
 | --- | --- | --- | --- |
 | S-1 | Cross-chain deposit (the bridge modal) | 15 Part 6, 04 | A bridge is integrated. Cut from MVP scope; it stays a badged `DEMO` beat. **Its button renders only under `NEXT_PUBLIC_DEMO_MODE=true`**: with the flag off the rock page offers "Fund this rock" instead — the Rock Account, its balances, the two token contracts and the Etherscan link, all REAL. |
-| S-4 | **The magic tap link** (`GET /api/demo/tap?key=…`) forges a genuine SDM pair for a *synthetic* tag with the real master key and redirects into the real tap flow — verification, counter, attestation and the on-chain awakening are the production path; only the chip is simulated. Exists only while the Worker secret `DEMO_TAP_SECRET` is set (404 otherwise); every use is logged `DEMO_TAP_FORGED`. Added 2026-09-13 for the recording, before the prototype tag was programmed. | 06, 18 §4.3 | The tag is programmed and the secret is unset — delete this row then. |
+| S-4 | **The magic tap link** (`GET /api/demo/tap?key=…`) forges a genuine SDM pair for a *synthetic* tag with the real master key and redirects into the real tap flow — verification, counter, attestation and the on-chain awakening are the production path; only the chip is simulated. Exists only while the Worker secret `DEMO_TAP_SECRET` is set (404 otherwise); every use is logged `DEMO_TAP_FORGED`. Added 2026-09-13 for the recording, before the prototype tag was programmed. **Rock 3, the live demo rock, was awakened through this link with the synthetic tag `04DE3057A11E80`; its on-chain counter (367523) is minutes since 2026-01-01, not a chip read count. No physical chip has been tapped yet.** | 06, 18 §4.3 | The tag is programmed and the secret is unset — delete this row then. |
 | S-3 | The judge scenario switcher's sample views | 15 D-013, 17 | Never. It exists only to pick which badged sample renders, only under the flag, and it can set neither the attestation nor a balance. |
 | S-5 | **Rock #420, the stage demo** (`web/src/demo/rock-420/`, `/rock/420`). The whole rock is a pretend that lives in the browser: a record owned by whoever is signed in, 25,000 USDC + 12.5 WETH held, a Wide stream allowing 18,000 USDC / 9 WETH and a Tight stream allowing 12,000 USDC / 6 WETH with fees from a few dozen trades, a seeded provenance (awakened, funded, two strategies started, ten trades, one gift received), a visitor account with 50,000 USDC + 25 WETH. Add funds, start / add / stop a strategy, trade (priced by the real `quoteExactIn` mirror), gift and cancel, mark lost, retire — every action mutates that browser state, answers a `DEMO` capability and **returns no transaction hash** (D-014); every read is a `DEMO` capability, so the SIMULATED badge renders where the value does, a banner above the identity row names it a demo, and the Contracts tab shows a reason instead of an account. State is persisted under `localStorage["bankrock.demo.rock420.v1"]` and the banner's "Reset demo" puts the seed back. **The gate is the id alone** — `isDemoRockId(id)`, one seam at the top of each of `useRock`, `useAquaStrategy`, `useRockAccount`, `useRockActions`, `useHandoverMessage`, `useRockOnchainEvents`, `useTakerActions` and `rock-activity.tsx` — **so it is served regardless of `NEXT_PUBLIC_DEMO_MODE`**, on the production deployment too. No read of rock 420 reaches the registry, Aqua, an RPC or D1; no other rock id changes behaviour. One caveat: the trade panel's quote comes from `GET /api/rocks/420/quote`, which prices the seed streams and answers `state: "DEMO"` with `source: "demo"`; the panel accepts that state, prints the source under "Where this price comes from" and badges it SIMULATED. | 15 D-013 / D-014, 17 Part 5 | Never — it is the stage prop. Delete the directory, the eight one-line seams and this row when the demo is retired. |
 
@@ -63,7 +63,7 @@ what the WP-2 live run proves, and that is the line that gets deleted when it do
 ## 4. Unavailable until a secret is set
 
 **2026-09-12 evening:** nine secrets were set on the Worker `web` with `wrangler secret bulk`
-(`ADMIN_*`, `CRON_SECRET`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RELAYER_PRIVATE_KEY`,
+(`ADMIN_PASSWORD`, `ADMIN_JWT_SECRET`, `ADMIN_API_KEY`, `CRON_SECRET`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RELAYER_PRIVATE_KEY`,
 `FAUCET_PRIVATE_KEY`, `SEPOLIA_RPC_URL`). K-3, K-4, K-7 and K-8 are deleted: attester set and equal
 to the registry's, relayer set and funded with the cap committed, RPC set, D1 live with migrations
 applied. What remains needs something other than a secret.
@@ -92,7 +92,6 @@ most dangerous category on this page, because it looks finished.
 
 | # | What | Spec | Fixed when |
 | --- | --- | --- | --- |
-| W-1 | `https://www.bank-rock.com/` (the bare root only) returns 308 to a literal `:path*` | 15 R-1, D-022, 12 §1 | **Diagnosed 2026-09-12 with the zone API: there is no dashboard redirect rule** (the zone has no dynamic-redirect ruleset). The 308 is the app's own `next.config.ts` redirect: the OpenNext adapter leaves `:path*` unsubstituted for the empty path, while `/rock/1` redirects correctly. Fixed by a dedicated root rule plus `/:path+`; deleted when `curl -sIL https://www.bank-rock.com/` ends 200 on the live site. |
 | W-2 | The CI responsive job configures no chain, so the two spec 17 Part 7 checks that need a live rock (items 7, 8) skip rather than run; the Lighthouse budget (item 10) is not run at all | 17 U4, 09 D-031 | That job's environment points at a deployed registry, and the Lighthouse budget is measured by hand against the public deployment. The static checks and the rest of the matrix are blocking today. |
 
 ---

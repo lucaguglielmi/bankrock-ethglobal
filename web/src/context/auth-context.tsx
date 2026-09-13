@@ -12,8 +12,8 @@
  * the second implicit demo flag it derived. With no configured Privy app, sign-in is
  * UNAVAILABLE — `unavailable: true` with a reason the UI renders — and no address is ever shown.
  *
- * `isDemoMode` now means exactly one thing: NEXT_PUBLIC_DEMO_MODE is on (D-013). It is no longer
- * a synonym for "Privy is not configured".
+ * There is no demo flag here, implicit or otherwise: "Privy is not configured" is `unavailable`
+ * and nothing else.
  */
 
 import React, {
@@ -25,7 +25,6 @@ import React, {
 } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useAccount } from "wagmi";
-import { isDemoMode } from "@/lib/demo";
 
 const LAST_LOGIN_METHOD_KEY = "bankrock_last_login_method";
 
@@ -71,8 +70,6 @@ export interface BankRockAuthContextType {
   user: AuthUser | null;
   address?: string;
   isEmbedded: boolean;
-  /** True only when NEXT_PUBLIC_DEMO_MODE is on (D-013). */
-  isDemoMode: boolean;
   lastLoginMethod: string | null;
   /** True when sign-in cannot work at all — render an UNAVAILABLE state, not a login button. */
   unavailable: boolean;
@@ -200,7 +197,6 @@ export function BankRockAuthProvider({ children }: { children: React.ReactNode }
         user,
         address,
         isEmbedded: user?.wallet?.walletClientType === "privy",
-        isDemoMode: isDemoMode(),
         lastLoginMethod,
         unavailable: false,
         login,
@@ -242,7 +238,6 @@ export function UnavailableAuthProvider({
         user: null,
         address: undefined,
         isEmbedded: false,
-        isDemoMode: isDemoMode(),
         lastLoginMethod,
         unavailable: true,
         unavailableReason: reason,

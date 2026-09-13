@@ -4,7 +4,6 @@ import { Toaster } from "sonner";
 import "./globals.css";
 import ClientProviders from "@/components/client-providers";
 import { Header } from "@/components/header";
-import { DemoBanner } from "@/components/ui/demo-banner";
 import { BottomDock } from "@/components/ui/bottom-dock";
 import { VersionCheck } from "@/components/version-check";
 import { RegisterServiceWorker } from "@/components/chrome/register-sw";
@@ -61,7 +60,6 @@ export default function RootLayout({
     >
       <body className="min-h-dvh flex flex-col font-sans bg-white text-ink selection:bg-black selection:text-white">
         <ClientProviders>
-          <DemoBanner />
           <Header />
           {children}
         </ClientProviders>

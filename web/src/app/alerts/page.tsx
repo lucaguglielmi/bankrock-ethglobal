@@ -27,7 +27,8 @@ const TOPICS = [
   {
     id: "highSlippage",
     title: "Poor price",
-    description: "When a rebalance would accept a noticeably worse price.",
+    // After the hackathon: an agent that rebalances within bounds (D-010) may need this topic; no rebalancer exists today (D-035), so it describes visitor trades.
+    description: "When a trade against your rock settles at a noticeably worse price than its quote.",
   },
   {
     id: "profitLoss",

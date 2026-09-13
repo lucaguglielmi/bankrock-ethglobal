@@ -22,13 +22,12 @@ import { Button } from "@/components/ui/button";
 import { CodeBlock } from "@/components/ui/code-block";
 import { Term } from "@/components/ui/term";
 import { addresses } from "@/lib/chain";
-import { isDemoMode } from "@/lib/demo";
 import { cn } from "@/lib/ui/cn";
 
 const REPO_URL = "https://github.com/lucaguglielmi/bankrock-ethglobal/tree/main/mcp";
 
-/** The rock the demo opens. Rock 1 is retired; rock 3 is the live one. */
-const DEMO_ROCK_HREF = "/rock/3";
+/** The rock "Open a rock" opens. Rock 1 is retired; rock 3 is the funded live one. */
+const LIVE_ROCK_HREF = "/rock/3";
 
 const AGENT_PROMPT = `You are connected to the Bank Rock MCP server. It is read-only.
 
@@ -186,7 +185,6 @@ const TOOLS: Tool[] = [
 export default function McpPage() {
   const [tab, setTab] = useState<ConfigTab>("claude");
   const [copiedPrompt, setCopiedPrompt] = useState(false);
-  const demoMode = isDemoMode();
 
   const copyPrompt = async () => {
     try {
@@ -226,12 +224,10 @@ export default function McpPage() {
               {copiedPrompt ? <Check aria-hidden /> : <Copy aria-hidden />}
               {copiedPrompt ? "Prompt copied" : "Copy the starter prompt"}
             </Button>
-            {demoMode ? (
-              <Button size="lg" variant="outline" render={<Link href={DEMO_ROCK_HREF} />}>
-                Open a rock
-                <ArrowRight aria-hidden />
-              </Button>
-            ) : null}
+            <Button size="lg" variant="outline" render={<Link href={LIVE_ROCK_HREF} />}>
+              Open a rock
+              <ArrowRight aria-hidden />
+            </Button>
             <Button
               size="lg"
               variant="ghost"
@@ -389,11 +385,9 @@ export default function McpPage() {
           <Link href="/shop" className="hover:text-ink">
             Shop
           </Link>
-          {demoMode ? (
-            <Link href={DEMO_ROCK_HREF} className="hover:text-ink">
-              Open a rock
-            </Link>
-          ) : null}
+          <Link href={LIVE_ROCK_HREF} className="hover:text-ink">
+            Open a rock
+          </Link>
         </footer>
       </div>
     </main>

@@ -4,7 +4,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Bank Rock — Tangible DeFi",
     short_name: "Bank Rock",
-    description: "A physical interface to self-custodial liquidity and agentic Aqua strategies.",
+    // After the hackathon: agent-driven strategies through scoped session keys (D-010) are planned; not built, so not claimed.
+    description: "A physical interface to a self-custodial liquidity account.",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",
