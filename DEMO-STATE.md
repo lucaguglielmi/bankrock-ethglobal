@@ -8,14 +8,14 @@ baseline — the record of what was wrong on 2026-09-12, not of what is wrong no
 **Read it before answering "what's next?".** One line per item, with the spec that governs it and
 the single condition that makes it real.
 
-Branch `exit-from-demo-mode`. `bash scripts/spec-checks.sh` runs 21 checks and is blocking in CI
+Branch `main`. `bash scripts/spec-checks.sh` runs 21 checks and is blocking in CI
 (the 21st is `D-034`, the committed configuration against `contracts/deployments/*.json`).
 
 ## The three states
 
 | State | Meaning |
 | --- | --- |
-| `SIMULATED` | A number or an outcome is invented. It carries a visible badge and needs `NEXT_PUBLIC_DEMO_MODE=true`. |
+| `SIMULATED` | A number or an outcome is invented. It carries a visible badge. There is no build flag: only rock #420 answers this state, gated by its id alone. |
 | `UNAVAILABLE` | The real backing is not reachable. The UI says what is missing and shows no value. |
 | `REAL` | A live contract, RPC or database answered. |
 
@@ -27,17 +27,19 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 
 | # | What | Spec | Becomes real when |
 | --- | --- | --- | --- |
-| S-1 | Cross-chain deposit (the bridge modal) | 15 Part 6, 04 | A bridge is integrated. Cut from MVP scope; it stays a badged `DEMO` beat. **Its button renders only under `NEXT_PUBLIC_DEMO_MODE=true`**: with the flag off the rock page offers "Fund this rock" instead — the Rock Account, its balances, the two token contracts and the Etherscan link, all REAL. |
-| S-4 | **The magic tap link** (`GET /api/demo/tap?key=…`) — **TESTING ONLY, WILL BE REMOVED BEFORE MAINNET** (security review 2026-09-13, R-1: while the secret is set it can forge a tap for any tag uid, so keep it unset except during a recording) — forges a genuine SDM pair for a *synthetic* tag with the real master key and redirects into the real tap flow — verification, counter, attestation and the on-chain awakening are the production path; only the chip is simulated. Exists only while the Worker secret `DEMO_TAP_SECRET` is set (404 otherwise); every use is logged `DEMO_TAP_FORGED`. Added 2026-09-13 for the recording, before the prototype tag was programmed. | 06, 18 §4.3 | The tag is programmed and the secret is unset — delete this row then. |
-| S-3 | The judge scenario switcher's sample views | 15 D-013, 17 | Never. It exists only to pick which badged sample renders, only under the flag, and it can set neither the attestation nor a balance. |
-| S-5 | **Rock #420, the stage demo** (`web/src/demo/rock-420/`, `/rock/420`). The whole rock is a pretend that lives in the browser: a record owned by whoever is signed in, 25,000 USDC + 12.5 WETH held, a Wide stream allowing 18,000 USDC / 9 WETH and a Tight stream allowing 12,000 USDC / 6 WETH with fees from a few dozen trades, a seeded provenance (awakened, funded, two strategies started, ten trades, one gift received), a visitor account with 50,000 USDC + 25 WETH. Add funds, start / add / stop a strategy, trade (priced by the real `quoteExactIn` mirror), gift and cancel, mark lost, retire — every action mutates that browser state, answers a `DEMO` capability and **returns no transaction hash** (D-014); every read is a `DEMO` capability, so the SIMULATED badge renders where the value does, a banner above the identity row names it a demo, and the Contracts tab shows a reason instead of an account. State is persisted under `localStorage["bankrock.demo.rock420.v1"]` and the banner's "Reset demo" puts the seed back. **The gate is the id alone** — `isDemoRockId(id)`, one seam at the top of each of `useRock`, `useAquaStrategy`, `useRockAccount`, `useRockActions`, `useHandoverMessage`, `useRockOnchainEvents`, `useTakerActions` and `rock-activity.tsx` — **so it is served regardless of `NEXT_PUBLIC_DEMO_MODE`**, on the production deployment too. No read of rock 420 reaches the registry, Aqua, an RPC or D1; no other rock id changes behaviour. One caveat: the trade panel's quote comes from `GET /api/rocks/420/quote`, which prices the seed streams and answers `state: "DEMO"` with `source: "demo"`; the panel accepts that state, prints the source under "Where this price comes from" and badges it SIMULATED. | 15 D-013 / D-014, 17 Part 5 | Never — it is the stage prop. Delete the directory, the eight one-line seams and this row when the demo is retired. |
+| S-4 | **The magic tap link** (`GET /api/demo/tap?key=…`) — **TESTING ONLY, WILL BE REMOVED BEFORE MAINNET** (security review 2026-09-13, R-1: while the secret is set it can forge a tap for any tag uid, so keep it unset except during a recording) — forges a genuine SDM pair for a *synthetic* tag with the real master key and redirects into the real tap flow — verification, counter, attestation and the on-chain awakening are the production path; only the chip is simulated. Exists only while the Worker secret `DEMO_TAP_SECRET` is set (404 otherwise); every use is logged `DEMO_TAP_FORGED`. Added 2026-09-13 for the recording, before the prototype tag was programmed. **Rock 3, the live demo rock, was awakened through this link with the synthetic tag `04DE3057A11E80`; its on-chain counter (367523) is minutes since 2026-01-01, not a chip read count. No physical chip has been tapped yet.** | 06, 18 §4.3 | The tag is programmed and the secret is unset — delete this row then. |
+| S-5 | **Rock #420, the stage demo** (`web/src/demo/rock-420/`, `/rock/420`). The whole rock is a pretend that lives in the browser: a record owned by whoever is signed in, 25,000 USDC + 12.5 WETH held, a Wide stream allowing 18,000 USDC / 9 WETH and a Tight stream allowing 12,000 USDC / 6 WETH with fees from a few dozen trades, a seeded provenance (awakened, funded, two strategies started, ten trades, one gift received), a visitor account with 50,000 USDC + 25 WETH. Add funds, start / add / stop a strategy, trade (priced by the real `quoteExactIn` mirror), gift and cancel, mark lost, retire — every action mutates that browser state, answers a `DEMO` capability and **returns no transaction hash** (D-014); every read is a `DEMO` capability, so the SIMULATED badge renders where the value does, a banner above the identity row names it a demo, and the Contracts tab shows a reason instead of an account. State is persisted under `localStorage["bankrock.demo.rock420.v1"]` and the banner's "Reset demo" puts the seed back. **The gate is the id alone** — `isDemoRockId(id)`, one seam at the top of each of `useRock`, `useAquaStrategy`, `useRockAccount`, `useRockActions`, `useHandoverMessage`, `useRockOnchainEvents`, `useTakerActions` and `rock-activity.tsx` — **so it is served on the production deployment too; there is no build flag**. No read of rock 420 reaches the registry, Aqua, an RPC or D1; no other rock id changes behaviour. One caveat: the trade panel's quote comes from `GET /api/rocks/420/quote`, which prices the seed streams and answers `state: "DEMO"` with `source: "demo"`; the panel accepts that state, prints the source under "Where this price comes from" and badges it SIMULATED. | 15 D-013 / D-014, 17 Part 5 | Never — it is the stage prop. Delete the directory, the eight one-line seams and this row when the demo is retired. |
+
+The cross-chain bridge sheet (formerly S-1) and the judge scenario switcher's sample views
+(formerly S-3) were removed on 2026-09-13 together with the `NEXT_PUBLIC_DEMO_MODE` build flag,
+so nothing in this section depends on a flag any more. A bridge is N-10 below.
 
 ## 2. Unavailable — no path at all, on purpose
 
 | # | What | Spec | Becomes real when |
 | --- | --- | --- | --- |
 | N-1 | AR / WebXR view | 15 Part 6, 08 must-have 12 | Never for this submission. Cut; the demo's opening beat no longer mentions it. |
-| N-2 | Alert delivery | 15 Part 6 | A delivery pipeline is built. Preferences persist behind a verified Privy token; nothing dispatches. |
+| N-2 | Alert delivery (email and Web Push) | 15 Part 6 | The project is on mainnet and a delivery pipeline is built. Preferences persist behind a verified Privy token; nothing dispatches — **intentionally**: delivery stays sandboxed until mainnet, a decision rather than a missing feature. |
 | N-3 | Fiat on-ramp / off-ramp (Flows G and H fiat legs) | 08 | Out of scope. Note that Flow H's on-chain leg is real: docking *is* the withdrawal. |
 | N-4 | ERC-7579 scoped session keys for the MCP runtime | 15 Part 6, 09 D-010 | Post-hackathon. MCP is read-only (D-008, D-019). |
 | N-5 | ERC-20 token paymaster ("self-sustaining rock") | 15 Part 6, 09 D-011 | Post-hackathon. The verifying paymaster alone covers the zero-gas beat. |
@@ -45,6 +47,7 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 | N-7 | Replacement tags; creator registration UI | 15 Part 6, 02 Flows A and F | Cut. `markLost` / `clearLost` exist and are informational only — they freeze nothing. |
 | N-8 | A second strategy sharing one reserve | 04, 15 P3.8 | Unblocked: it is one more `streamIndex`. The catalogue now offers three (Wide 30 bps / Tight 5 bps / Patient 100 bps, `web/src/lib/aqua/strategy.ts`) and the Liquidity tab shows one card per live stream, never a total (`docs/dashboard-strategies.md`). Whether a second one is shipped on the demo rock is item 4 in spec 08's fallback order. |
 | N-9 | An APY or APR figure, anywhere | 09 D-004 | Never. A CI grep enforces its absence in `web/src/components`. |
+| N-10 | Cross-chain deposit (a bridge into the Rock Account) | 04 | After the hackathon. The rock page offers "Fund this rock" instead — the Rock Account address, its balances, the two token contracts and the Etherscan link, all REAL. |
 
 ## 3. Unavailable until something is deployed
 
@@ -63,7 +66,7 @@ what the WP-2 live run proves, and that is the line that gets deleted when it do
 ## 4. Unavailable until a secret is set
 
 **2026-09-12 evening:** nine secrets were set on the Worker `web` with `wrangler secret bulk`
-(`ADMIN_*`, `CRON_SECRET`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RELAYER_PRIVATE_KEY`,
+(`ADMIN_PASSWORD`, `ADMIN_JWT_SECRET`, `ADMIN_API_KEY`, `CRON_SECRET`, `ATTESTATION_SIGNER_PRIVATE_KEY`, `NXP_MASTER_KEY`, `RELAYER_PRIVATE_KEY`,
 `FAUCET_PRIVATE_KEY`, `SEPOLIA_RPC_URL`). K-3, K-4, K-7 and K-8 are deleted: attester set and equal
 to the registry's, relayer set and funded with the cap committed, RPC set, D1 live with migrations
 applied. What remains needs something other than a secret.
@@ -73,7 +76,7 @@ applied. What remains needs something other than a secret.
 | K-1 | Sign-in and any wallet address on screen | 16 #1 | `NEXT_PUBLIC_PRIVY_APP_ID` is set and the origin and chain are configured in the Privy dashboard. |
 | K-2 | The "Verified Physical" badge | 16 #18, 06 | `NXP_MASTER_KEY` matches the key written to the tags. |
 | K-6 | The ETH faucet | 16 #16 | `FAUCET_PRIVATE_KEY` is set and funded. There is no default key. |
-| K-9 | Any email at all | 16 #19, #33 | `RESEND_API_KEY` plus SPF/DKIM verification of `bank-rock.com`. Until then the sandbox sender reaches only the account owner's inbox. |
+| K-9 | Any email at all | 16 #19, #20, #33, #38, #39 | Partly real now: the shop's two contact forms (`POST /api/contact`) send an operator notification and a submitter acknowledgement through Resend once `RESEND_API_KEY` and `CONTACT_NOTIFY_EMAIL` (or `ALERT_EMAIL_ADDRESS`) are set, and the response says per email whether the provider accepted it. Alert delivery stays intentionally sandboxed until the project is on mainnet. Both paths share the sender caveat: until SPF/DKIM verification of `bank-rock.com` and a `*_FROM_ADDRESS` on it, the Resend sandbox sender reaches only the account owner's inbox — so the acknowledgement to anyone else is refused, and reported as such. |
 
 ## 5. Real in code, unproven in the world
 
@@ -92,7 +95,6 @@ most dangerous category on this page, because it looks finished.
 
 | # | What | Spec | Fixed when |
 | --- | --- | --- | --- |
-| W-1 | `https://www.bank-rock.com/` (the bare root only) returns 308 to a literal `:path*` | 15 R-1, D-022, 12 §1 | **Diagnosed 2026-09-12 with the zone API: there is no dashboard redirect rule** (the zone has no dynamic-redirect ruleset). The 308 is the app's own `next.config.ts` redirect: the OpenNext adapter leaves `:path*` unsubstituted for the empty path, while `/rock/1` redirects correctly. Fixed by a dedicated root rule plus `/:path+`; deleted when `curl -sIL https://www.bank-rock.com/` ends 200 on the live site. |
 | W-2 | The CI responsive job configures no chain, so the two spec 17 Part 7 checks that need a live rock (items 7, 8) skip rather than run; the Lighthouse budget (item 10) is not run at all | 17 U4, 09 D-031 | That job's environment points at a deployed registry, and the Lighthouse budget is measured by hand against the public deployment. The static checks and the rest of the matrix are blocking today. |
 
 ---

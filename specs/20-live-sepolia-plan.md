@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Branch `live-sepolia` (kept in step with `main`; everything below is merged to `main` as it
+Branch `main` (everything below is merged to `main` as it
 lands). The previous batch (`exit-from-demo-mode`) removed every fabricated value, rebuilt the UI
 phone-first, rewrote and audited the contracts, and got the deploy pipeline green. What it could
 not do is run anything against the world. [`../DEMO-STATE.md`](../DEMO-STATE.md) §3–§5 is the

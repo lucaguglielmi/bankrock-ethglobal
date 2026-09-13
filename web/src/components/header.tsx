@@ -8,7 +8,6 @@ import { ArrowRight, Menu, Volume2, VolumeX } from "lucide-react";
 import { useAudio } from "@/context/audio-context";
 import { useAuth } from "@/context/auth-context";
 import { truncateMiddle } from "@/lib/ui/format";
-import { isDemoMode } from "@/lib/demo";
 import { LoginButton } from "@/components/login-button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Sheet } from "@/components/ui/sheet";
@@ -25,13 +24,16 @@ const HOW_IT_WORKS_LINKS = [
   { href: "/learn/security", label: "Security" },
 ] as const;
 
-const MCP_LINK = { href: "/mcp", label: "MCP endpoint" } as const;
+const MCP_LINK = { href: "/mcp", label: "AI Oracle" } as const;
+
+/** The funded live rock on Sepolia. Rock 1 is retired; this is the only in-app path to a real rock page. */
+const LIVE_ROCK_LINK = { href: "/rock/3", label: "Live rock" } as const;
 
 /**
  * Fixed site header (spec 17 §4.3, L-2, L-3). Below `md` the nav links
  * collapse into a `Sheet`; from `md` up they render inline as before. The
- * `Live Demo` entry only exists while NEXT_PUBLIC_DEMO_MODE is on (spec 15
- * D-013).
+ * `Live rock` entry is always present and points at the funded live rock;
+ * it reads as active on every `/rock/*` page.
  */
 export function Header() {
   const pathname = usePathname();
@@ -39,10 +41,9 @@ export function Header() {
   const auth = useAuth();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [signingOut, setSigningOut] = React.useState(false);
-  const demoMode = isDemoMode();
 
   const isLinkActive = (href: string) => pathname === href;
-  const isLiveDemoActive = pathname.startsWith("/rock");
+  const isRockActive = pathname.startsWith("/rock");
 
   const soundLabel = isMuted ? "Unmute sounds" : "Mute sounds";
 
@@ -52,7 +53,13 @@ export function Header() {
       style={{ height: "var(--header-h)", zIndex: "var(--z-header)" }}
     >
       <nav aria-label="Main navigation" className="flex h-[calc(var(--header-h)-var(--safe-top))] items-center justify-between px-[var(--gutter)]">
-        <Link href="/" aria-label="Bank Rock home" className="min-w-0 shrink hover:opacity-70 motion-safe:transition-opacity">
+        {/* Every header link is a 44 x 44 px target at least (spec 17 item 3); the underline that
+            marks the active inline link sits on an inner span so the box keeps that size. */}
+        <Link
+          href="/"
+          aria-label="Bank Rock home"
+          className="flex h-11 min-w-0 shrink items-center hover:opacity-70 motion-safe:transition-opacity"
+        >
           <Image
             src="/brand/logo-animated.svg"
             alt="Bank Rock"
@@ -71,29 +78,34 @@ export function Header() {
               key={link.href}
               href={link.href}
               className={cn(
-                "text-sm motion-safe:transition-opacity",
+                "flex h-11 min-w-11 items-center justify-center text-sm motion-safe:transition-opacity",
                 isLinkActive(link.href)
-                  ? "border-b border-ink pb-0.5 font-semibold text-ink"
+                  ? "font-semibold text-ink"
                   : "font-medium text-ink-2 hover:opacity-70"
               )}
             >
-              {link.label}
+              <span className={isLinkActive(link.href) ? "border-b border-ink pb-0.5" : undefined}>
+                {link.label}
+              </span>
             </Link>
           ))}
-          {demoMode ? (
-            <Link
-              href="/rock/1"
+          <Link
+            href={LIVE_ROCK_LINK.href}
+            className={cn(
+              "flex h-11 min-w-11 items-center justify-center text-sm motion-safe:transition-colors",
+              isRockActive ? "font-semibold text-ink" : "font-medium text-ink-3 hover:text-ink"
+            )}
+          >
+            <span
               className={cn(
-                "flex items-center gap-1 text-sm motion-safe:transition-colors",
-                isLiveDemoActive
-                  ? "border-b border-ink pb-0.5 font-semibold text-ink"
-                  : "font-medium text-ink-3 hover:text-ink"
+                "flex items-center gap-1",
+                isRockActive ? "border-b border-ink pb-0.5" : undefined
               )}
             >
-              Live Demo
+              {LIVE_ROCK_LINK.label}
               <ArrowRight className="size-3.5" />
-            </Link>
-          ) : null}
+            </span>
+          </Link>
           <IconButton aria-label={soundLabel} onClick={toggleMute}>
             {isMuted ? <VolumeX /> : <Volume2 />}
           </IconButton>
@@ -168,19 +180,17 @@ export function Header() {
               {link.label}
             </Link>
           ))}
-          {demoMode ? (
-            <Link
-              href="/rock/1"
-              onClick={() => setMenuOpen(false)}
-              className={cn(
-                "flex h-12 items-center gap-1.5 text-base",
-                isLiveDemoActive ? "font-semibold text-ink" : "font-medium text-ink-2"
-              )}
-            >
-              Live Demo
-              <ArrowRight className="size-4" />
-            </Link>
-          ) : null}
+          <Link
+            href={LIVE_ROCK_LINK.href}
+            onClick={() => setMenuOpen(false)}
+            className={cn(
+              "flex h-12 items-center gap-1.5 text-base",
+              isRockActive ? "font-semibold text-ink" : "font-medium text-ink-2"
+            )}
+          >
+            {LIVE_ROCK_LINK.label}
+            <ArrowRight className="size-4" />
+          </Link>
 
           <p className="mt-3 flex h-10 items-center text-label font-semibold uppercase tracking-wide text-ink-3">
             How does it work

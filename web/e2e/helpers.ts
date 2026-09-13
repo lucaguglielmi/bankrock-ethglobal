@@ -3,19 +3,20 @@ import type { Page } from "@playwright/test";
 /**
  * Shared helpers for specs/17-mobile-ui-and-typography.md Part 7's browser checks.
  *
- * Every route is read against a `NEXT_PUBLIC_DEMO_MODE=true` build with no chain configured
- * (no `NEXT_PUBLIC_REGISTRY_ADDRESS` in CI) — the state spec 17's own preamble assumes ("so every
- * surface renders") and spec 15 Part 3 calls `UNAVAILABLE`. `/rock/1` and `/rock/2` therefore
- * show the honest empty state plus, in demo mode, a disabled `RockSample` — never the live
- * `Trade`/`Give`/`cross-chain` UI, which only mounts once a rock record actually reads `REAL`.
- * Checks 7 and 8, which need those controls, detect this and skip with a clear reason (per the
- * task) instead of failing on data nobody configured for CI.
+ * Every route is read against a plain production build — there is no build flag — with no chain
+ * configured (no `NEXT_PUBLIC_REGISTRY_ADDRESS` in CI), the state spec 15 Part 3 calls
+ * `UNAVAILABLE`. `/rock/1` and `/rock/2` therefore show the honest empty state and nothing else,
+ * never the live `Trade`/`Give` UI, which only mounts once a rock record actually reads `REAL`.
+ * `/rock/420` is the stage demo (`src/demo/rock-420`), gated by its id alone: it renders a full,
+ * badged rock page from browser state and needs no chain, so it is where the rock dashboard's
+ * layout, its primary action (item 7) and its "Add funds" sheet (item 8) are checked.
  */
 
 export const ROUTES = [
   "/",
   "/rock/1",
   "/rock/2",
+  "/rock/420",
   "/shop",
   "/mcp",
   "/alerts",
@@ -175,9 +176,24 @@ export function fontFamilyStartsWithInter(fontFamily: string): boolean {
 
 /**
  * Navigates to a route and waits for the page to be visually settled: fonts loaded (item 5
- * depends on the real font, not a fallback, having applied) and no pending navigation.
+ * depends on the real font, not a fallback, having applied), no pending navigation, and every
+ * entrance animation finished. The landing hero's `motion-safe:animate-in fade-in` runs for ~1.7 s
+ * after load (500/700 ms delays plus a 1 s fade), and `networkidle` resolves well inside that, so
+ * item 9 would otherwise sample its copy and buttons at partial opacity and report a contrast
+ * violation that the settled page does not have. Only finite animations are awaited — the map
+ * pin's `animate-ping` and its kin loop forever — and a cap keeps a stalled one from hanging a test.
  */
 export async function gotoAndSettle(page: Page, route: Route): Promise<void> {
   await page.goto(route, { waitUntil: "networkidle" });
   await page.evaluate(() => document.fonts.ready).catch(() => undefined);
+  await page
+    .evaluate(() => {
+      const finite = document
+        .getAnimations()
+        .filter((animation) => Number.isFinite(animation.effect?.getTiming().iterations ?? Infinity))
+        .map((animation) => animation.finished.catch(() => undefined));
+      const cap = new Promise<void>((resolve) => setTimeout(resolve, 5_000));
+      return Promise.race([Promise.all(finite), cap]);
+    })
+    .catch(() => undefined);
 }

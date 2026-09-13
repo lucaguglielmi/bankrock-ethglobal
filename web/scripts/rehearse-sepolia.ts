@@ -294,8 +294,6 @@ function exportEnvironment(deployment: Deployment): void {
   process.env.NEXT_PUBLIC_WETH_ADDRESS = deployment.weth;
   process.env.REGISTRY_DEPLOY_BLOCK = deployment.registryDeployBlock.toString();
   process.env.AQUA_APP_DEPLOY_BLOCK = deployment.appDeployBlock.toString();
-  // Demo mode must never be on for a rehearsal: every value below has to be real (D-013).
-  process.env.NEXT_PUBLIC_DEMO_MODE = "false";
 }
 
 /* -------------------------------------------------------------------------- */

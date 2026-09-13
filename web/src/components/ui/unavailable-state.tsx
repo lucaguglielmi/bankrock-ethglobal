@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 
 /**
  * The honest empty state for a capability in the `UNAVAILABLE` state (spec
- * 15 Part 3; spec 17 Part 5): its real backing is unreachable and demo mode
- * is off, so nothing is substituted for it.
+ * 15 Part 3; spec 17 Part 5): its real backing is unreachable, so nothing is
+ * substituted for it — there is no simulated fallback to fall through to.
  */
 export interface UnavailableStateProps {
   /** One sentence explaining what is missing, in plain language. */

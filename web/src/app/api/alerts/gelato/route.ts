@@ -7,6 +7,12 @@
  *  - `message` was interpolated raw into the email HTML. It is escaped (SA-7);
  *  - the route no longer answers `{ success: true, mocked: true }` when RESEND_API_KEY is unset.
  *    Nothing was sent, so it says so (S-5).
+ *
+ * Like every alert path, this one is intentionally sandboxed until the project is on mainnet: the
+ * sender stays on the Resend sandbox domain on purpose (DEMO-STATE K-9).
+ *
+ * After the hackathon: a keeper that rebalances may return (D-010); none exists today (D-035), so
+ * the mail body no longer names one.
  */
 
 import { NextResponse } from "next/server";
@@ -50,7 +56,7 @@ export async function POST(req: Request) {
       subject: "Bank Rock: keeper automation alert",
       html: `
         <h2>Keeper automation alert</h2>
-        <p>An automated rebalance operation reported a problem.</p>
+        <p>An operational alert was reported.</p>
         <p><strong>Details:</strong> ${escapeHtml(message)}</p>
         <p><small>Automated message from Bank Rock.</small></p>
       `,

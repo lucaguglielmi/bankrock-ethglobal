@@ -119,7 +119,7 @@ const STANDING_FORM: RockFormParams = {
   rockScale: [1.15, 1.5, 1.3],
   liquidDistort: 0.15,
   liquidScale: [0.6, 0.6, 0.15],
-  liquidPosition: [-0.6, 1.2, 1.0],
+  liquidPosition: [-0.4, 0.85, 1.2],
   liquidColor: new THREE.Color("#0055ff"),
 };
 
@@ -209,12 +209,12 @@ function RockMesh({ isHovered, isCompact }: RockMeshProps) {
         <mesh ref={rockRef} castShadow receiveShadow>
           <icosahedronGeometry args={[1, 16]} />
           <MeshDistortMaterial ref={rockMaterialRef} color="#f2f2f2" roughness={0.9} metalness={0.05} distort={0.3} speed={0.5} />
-          <Html position={[-0.8, -0.2, 0.5]}>
+          <Html position={[0.8, -0.1, 0.5]}>
             <div
-              className={`${labelClass} flex-row-reverse -translate-x-full ${isHovered ? "translate-y-0 opacity-100 delay-300" : "translate-y-2 opacity-0"}`}
+              className={`${labelClass} ${isHovered ? "translate-y-0 opacity-100 delay-300" : "translate-y-2 opacity-0"}`}
             >
               <div className="size-1.5 rounded-full bg-[#001144]" />
-              <div className="ml-2 h-px w-20 bg-[#001144]/80 md:ml-4 md:w-48" />
+              <div className="mr-2 h-px w-12 bg-[#001144]/80 md:mr-4 md:w-32" />
               a normal rock
             </div>
           </Html>
@@ -247,7 +247,7 @@ function RockMesh({ isHovered, isCompact }: RockMeshProps) {
             <Html position={[0.1, -0.1, 0]}>
               <div className={`${labelClass} ${isHovered ? "translate-y-0 opacity-100 delay-500" : "translate-y-2 opacity-0"}`}>
                 <div className="size-1.5 rounded-full bg-[#001144]" />
-                <div className="mr-2 h-px w-24 bg-[#001144]/80 md:mr-4 md:w-48" />
+                <div className="mr-2 h-px w-12 bg-[#001144]/80 md:mr-4 md:w-32" />
                 a tiny NFC sensor
               </div>
             </Html>
@@ -270,10 +270,10 @@ function RockMesh({ isHovered, isCompact }: RockMeshProps) {
             />
             <Sparkles count={40} scale={0.9} size={2.5} speed={0.4} opacity={1} color="#ffffff" />
             <Sparkles count={20} scale={1.2} size={3.5} speed={0.8} opacity={0.8} color="#aaddff" />
-            <Html position={[0.5, 0.5, 0.1]}>
+            <Html position={[0.4, 0.3, 0.1]}>
               <div className={`${labelClass} ${isHovered ? "translate-y-0 opacity-100 delay-700" : "translate-y-2 opacity-0"}`}>
                 <div className="size-1.5 rounded-full bg-[#001144]" />
-                <div className="mr-2 h-px w-24 bg-[#001144]/80 md:mr-4 md:w-48" />
+                <div className="mr-2 h-px w-12 bg-[#001144]/80 md:mr-4 md:w-32" />
                 a sparkly silicon
               </div>
             </Html>
@@ -402,7 +402,7 @@ export function RockCanvas() {
     return (
       <div ref={wrapperRef} className="pointer-events-none absolute inset-0 z-0 touch-pan-y">
         {/* eslint-disable-next-line @next/next/no-img-element -- decorative background, not an LCP-critical <Image> */}
-        <img src="/rocks/rock1.jpg" alt="" className="size-full object-cover" />
+        <img src="/rocks/rock2.jpg" alt="" className="size-full object-cover" />
       </div>
     );
   }

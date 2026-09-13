@@ -9,6 +9,7 @@
  */
 
 import * as React from "react";
+import { Skull } from "lucide-react";
 import { Sheet, SheetBody } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { CapabilityResult } from "@/components/sheets/capability-result";
@@ -75,7 +76,8 @@ export function ArchiveRockSheet({
         disabled={!confirmed || isPending}
         onClick={handleArchive}
       >
-        <span className="motion-safe:transition-opacity">
+        <span className="flex items-center justify-center gap-2 motion-safe:transition-opacity">
+          <Skull aria-hidden />
           {isPending ? "Retiring…" : "Retire this rock"}
         </span>
       </Button>

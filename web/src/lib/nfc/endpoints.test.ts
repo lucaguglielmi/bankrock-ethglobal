@@ -10,9 +10,31 @@ import { keccak256, zeroAddress, type Hex } from "viem";
 
 import { GET, POST } from "@/app/api/nfc/verify/route";
 import { verifyNtagSignature } from "@/actions/verify-ntag";
-import { resetSharedMemoryCounterStore } from "./counter-store";
 import { aesCbcEncrypt } from "./crypto";
 import { computeSdmMac, deriveSessionKeys } from "./sdm";
+
+/**
+ * Same injected counter store as verify.test.ts, for the same reason: the verifier fails closed
+ * without D1, so a unit test hands it a `MemoryCounterStore` explicitly, and flips `available`
+ * off to see the production refusal.
+ */
+const counterStore = vi.hoisted(() => ({
+  available: true,
+  reset: () => {},
+}));
+
+vi.mock("./counter-store", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./counter-store")>();
+  const memory = new actual.MemoryCounterStore();
+  counterStore.reset = () => memory.reset();
+  return {
+    ...actual,
+    resolveCounterStore: async () =>
+      counterStore.available
+        ? { available: true, kind: "memory", store: memory }
+        : { available: false, reason: "counter_store_unavailable" },
+  };
+});
 
 const MASTER_KEY_HEX = "00112233445566778899AABBCCDDEEFF";
 const MASTER_KEY = Buffer.from(MASTER_KEY_HEX, "hex");
@@ -112,7 +134,6 @@ function tap(counter: number): { e: string; c: string } {
 
 const ENV_KEYS = [
   "NXP_MASTER_KEY",
-  "NEXT_PUBLIC_DEMO_MODE",
   "ATTESTATION_SIGNER_PRIVATE_KEY",
   "NEXT_PUBLIC_REGISTRY_ADDRESS",
 ] as const;
@@ -126,8 +147,8 @@ beforeEach(() => {
     delete process.env[key];
   }
   process.env.NXP_MASTER_KEY = MASTER_KEY_HEX;
-  process.env.NEXT_PUBLIC_DEMO_MODE = "true";
-  resetSharedMemoryCounterStore();
+  counterStore.available = true;
+  counterStore.reset();
   registry.boundRockId = null;
   registry.boundUnavailable = false;
   registry.rocks.clear();
@@ -142,7 +163,7 @@ afterEach(() => {
     if (saved[key] === undefined) delete process.env[key];
     else process.env[key] = saved[key];
   }
-  resetSharedMemoryCounterStore();
+  counterStore.reset();
 });
 
 function configureSigner(): void {
@@ -289,6 +310,17 @@ describe("GET /api/nfc/verify", () => {
     const { e, c } = tap(7);
     const response = await GET(new Request(url({ rockId: "1", e, c })));
     await expect(response.json()).resolves.toEqual({ verified: false, reason: "unconfigured" });
+  });
+
+  it("fails closed when no durable counter store is reachable, with a valid CMAC", async () => {
+    counterStore.available = false;
+    const { e, c } = tap(7);
+    const response = await GET(new Request(url({ rockId: "1", e, c })));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      verified: false,
+      reason: "counter_store_unavailable",
+    });
   });
 });
 

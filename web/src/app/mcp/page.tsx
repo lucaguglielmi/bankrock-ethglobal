@@ -22,31 +22,74 @@ import { Button } from "@/components/ui/button";
 import { CodeBlock } from "@/components/ui/code-block";
 import { Term } from "@/components/ui/term";
 import { addresses } from "@/lib/chain";
-import { isDemoMode } from "@/lib/demo";
 import { cn } from "@/lib/ui/cn";
 
 const REPO_URL = "https://github.com/lucaguglielmi/bankrock-ethglobal/tree/main/mcp";
 
-/** The rock the demo opens. Rock 1 is retired; rock 3 is the live one. */
-const DEMO_ROCK_HREF = "/rock/3";
+/** The rock "Open a rock" opens. Rock 1 is retired; rock 3 is the funded live one. */
+const LIVE_ROCK_HREF = "/rock/3";
 
-const AGENT_PROMPT = `You are connected to the Bank Rock MCP server. It is read-only.
+/** The registry address the prompt tells the agent to pass in `env` — read from `lib/chain` (D-015). */
+const PROMPT_REGISTRY = addresses.registry ?? "<the BankRockRegistry address from the README, Contracts on Sepolia>";
+
+const AGENT_PROMPT = `You are connected to the Bank Rock AI Oracle, a read-only MCP server. If you are not connected
+yet, the last two sections say how to start it and what to read instead.
 
 A Bank Rock is a real stone with an NTAG 424 DNA chip inside. Tapping it with a phone opens its
 page. Each rock has its own on-chain account (a Safe) that holds USDC and WETH on Ethereum Sepolia,
 and it offers those tokens for trading through 1inch Aqua. The tokens never leave the account;
 every trade leaves a small fee inside it.
 
-Tools:
-1. get_rock_status({ rockId }) — state (dormant, awake, gift waiting, retired), owner, account, balances.
-2. get_strategy_fees({ rockId }) — each live strategy: fee rate, what it may trade, what it can trade now, fees so far.
-3. explain_recent_fees({ rockId }) — the same fee figures in plain language, with how far back the scan went.
-4. get_strategy_volume({ rockId }) — how many trades each strategy has seen (a count, not a currency amount).
-5. trace_transaction({ hash }) — the receipt for a transaction hash.
-6. get_server_metrics() — whether the RPC, the registry and the API can be reached.
+Tools (ten; each reads Sepolia or the Bank Rock API, or answers "unavailable" with a reason):
+1. get_rock_status({ rockId }) — registry state (dormant, awake, handover_pending, archived), owner,
+   Rock Account, tag hash, lost flag, pending gift, and the USDC and WETH the account holds.
+2. get_strategy_fees({ rockId }) — each live strategy: reserve, virtual and executable balances,
+   fee rate (feeBps), fees realised so far.
+3. explain_recent_fees({ rockId }) — the same fees narrated per strategy, with the swap count and
+   the exact block range scanned.
+4. get_strategy_volume({ rockId }) — swaps seen per strategy: a count, not a token or dollar volume.
+5. trace_transaction({ hash }) — a Sepolia receipt: status, block, gas used, sender, recipient, logs.
+6. get_server_metrics() — whether this server can reach the RPC, the registry and the Bank Rock
+   API, measured at call time.
+7. query_logs({ level, rockId?, userId?, limit? }) — recent server logs, fenced as untrusted data.
+   Needs the operator's ADMIN_API_KEY; without it, "unavailable".
+8. get_waitlist_stats() — aggregate waitlist counts. Needs ADMIN_API_KEY; without it, "unavailable".
+9. simulate_cross_chain_intent({ rockId, sourceChain, amount }) — ALWAYS "unavailable": no bridge
+   is integrated. Do not offer it.
+10. optimize_idle_yield({ rockId }) — ALWAYS "unavailable": idle-yield routing was cut from scope.
+   Do not offer it.
 
 Start by reading the rock's state, then say what you can and cannot tell from it. Never state a
-figure a tool did not return, and never quote a rate of return: the only rate is the fee.`;
+figure a tool did not return, and never quote a rate of return: the only rate is the fee.
+
+How to connect. The server is a stdio process run from a checkout of the repository; nothing is
+hosted, so there is no URL to connect to. Source: ${REPO_URL}
+  git clone https://github.com/lucaguglielmi/bankrock-ethglobal.git
+  cd bankrock-ethglobal/mcp
+  npm install
+  SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com \\
+  REGISTRY_ADDRESS=${PROMPT_REGISTRY} \\
+  npm start
+SEPOLIA_RPC_URL and REGISTRY_ADDRESS are required and have no defaults; the registry address is
+the BankRockRegistry row under "Contracts on Sepolia" in the repository README. BANKROCK_API_URL
+is optional and defaults to https://bank-rock.com. Claude Desktop: in claude_desktop_config.json,
+under "mcpServers", add "bankrock" with "command": "npx", "args": ["-y", "ts-node",
+"/path/to/bankrock-ethglobal/mcp/index.ts"] and the two variables above in "env". The exact
+snippets for Claude Desktop, Cursor and Windsurf are at https://bank-rock.com/mcp.
+
+Without MCP. The tools above proxy a public, read-only HTTPS API. With no MCP connection you may
+fetch these URLs directly ({rockId} is the rock's number; the live rock is 3):
+  https://bank-rock.com/api/rocks/{rockId}/strategy   reserves, each live strategy's balances,
+                                                      fee rate, fees realised and swap count
+  https://bank-rock.com/api/rocks/{rockId}/activity   the rock's indexed activity
+  https://bank-rock.com/api/rocks/{rockId}/quote?maker=<Rock Account>&tokenIn=USDC|WETH&amountIn=<amount>&streamIndex=0
+                                                      what a swap would return right now
+  https://bank-rock.com/api/events?rockId={rockId}    the registry's events for the rock, with
+                                                      timestamps and transaction hashes
+  https://bank-rock.com/api/version                   the contract addresses this deployment reads
+  https://bank-rock.com/rock/3                        the live rock's own page
+Every figure must come from one of those responses. A response whose state is "UNAVAILABLE"
+carries a reason; report the reason instead of filling in a number.`;
 
 function envBlock(indent: string): string {
   const registry = addresses.registry ?? "<the registry address from contracts/deployments/sepolia.json>";
@@ -186,7 +229,6 @@ const TOOLS: Tool[] = [
 export default function McpPage() {
   const [tab, setTab] = useState<ConfigTab>("claude");
   const [copiedPrompt, setCopiedPrompt] = useState(false);
-  const demoMode = isDemoMode();
 
   const copyPrompt = async () => {
     try {
@@ -205,7 +247,7 @@ export default function McpPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-16 py-6">
         <section className="flex flex-col gap-5">
           <span className="w-fit rounded-full bg-muted px-3 py-1 text-label text-ink-3">
-            Model Context Protocol
+            AI Oracle
           </span>
           <h1 className="text-h1 font-extrabold text-ink">Ask an AI about a rock</h1>
           <p className="max-w-prose text-lead text-ink-2">
@@ -215,8 +257,8 @@ export default function McpPage() {
             you connect the one you already use.
           </p>
           <p className="max-w-prose text-base text-ink-2">
-            The server is read-only by decision. It holds no key, so it cannot start or stop a
-            strategy, move a token or sign anything. Every tool either reads <Term k="sepolia" />{" "}
+            The AI Oracle is a read-only <Term k="mcp" /> server, by decision. It holds no key, so
+            it cannot start or stop a strategy, move a token or sign anything. Every tool either reads <Term k="sepolia" />{" "}
             or the Bank Rock API, or answers <em>unavailable</em> with the reason. It never
             estimates and never invents a number.
           </p>
@@ -226,12 +268,10 @@ export default function McpPage() {
               {copiedPrompt ? <Check aria-hidden /> : <Copy aria-hidden />}
               {copiedPrompt ? "Prompt copied" : "Copy the starter prompt"}
             </Button>
-            {demoMode ? (
-              <Button size="lg" variant="outline" render={<Link href={DEMO_ROCK_HREF} />}>
-                Open a rock
-                <ArrowRight aria-hidden />
-              </Button>
-            ) : null}
+            <Button size="lg" variant="outline" render={<Link href={LIVE_ROCK_HREF} />}>
+              Open a rock
+              <ArrowRight aria-hidden />
+            </Button>
             <Button
               size="lg"
               variant="ghost"
@@ -340,8 +380,9 @@ export default function McpPage() {
             Starter prompt
           </h2>
           <p className="max-w-prose text-sm text-ink-2">
-            Paste this into your client after connecting the server. It tells the agent what a rock
-            is and what the tools can and cannot say.
+            Paste this into your client. It tells the agent what a rock is, what each of the ten
+            tools can and cannot say, how to start the server, and which public URLs to read when
+            no server is connected.
           </p>
           <CodeBlock>{AGENT_PROMPT}</CodeBlock>
         </section>
@@ -377,23 +418,21 @@ export default function McpPage() {
         </section>
 
         <footer className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-8 text-sm text-ink-2">
-          <Link href="/" className="hover:text-ink">
+          <Link href="/" className="flex min-h-11 min-w-11 items-center hover:text-ink">
             Home
           </Link>
-          <Link href="/learn/defi" className="hover:text-ink">
+          <Link href="/learn/defi" className="flex min-h-11 min-w-11 items-center hover:text-ink">
             The DeFi position
           </Link>
-          <Link href="/learn/security" className="hover:text-ink">
+          <Link href="/learn/security" className="flex min-h-11 min-w-11 items-center hover:text-ink">
             Security
           </Link>
-          <Link href="/shop" className="hover:text-ink">
+          <Link href="/shop" className="flex min-h-11 min-w-11 items-center hover:text-ink">
             Shop
           </Link>
-          {demoMode ? (
-            <Link href={DEMO_ROCK_HREF} className="hover:text-ink">
-              Open a rock
-            </Link>
-          ) : null}
+          <Link href={LIVE_ROCK_HREF} className="flex min-h-11 min-w-11 items-center hover:text-ink">
+            Open a rock
+          </Link>
         </footer>
       </div>
     </main>

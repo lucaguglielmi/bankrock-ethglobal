@@ -15,8 +15,8 @@
  *  - notification permission is requested only when the person presses the button (spec 14).
  *
  * Typography per spec 17: titles `text-sm` 600, descriptions `text-sm text-ink-2`, badges and
- * column headers `text-label`, the input `text-base`; every checkbox is 24 px inside a 44 px
- * label, every button at least 40 px.
+ * column headers `text-label`, the input `text-base`; every checkbox is a 24 px box whose input
+ * is a 44 px target (`Checkbox`) inside a 44 px label, every button at least 40 px.
  */
 
 import { useState, useSyncExternalStore } from "react";
@@ -32,6 +32,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import {
   ALERT_TOPIC_IDS,
@@ -103,7 +104,7 @@ const CHANNELS: { id: AlertChannel; label: string; describe: (title: string) => 
 ];
 
 const DELIVERY_NOTE =
-  "Nothing is sent yet. Preferences are stored, but there is no delivery pipeline behind them.";
+  "Nothing is sent yet. Preferences are stored, but there is no delivery pipeline behind them — by design until Bank Rock is on mainnet.";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -363,11 +364,10 @@ export function RockAlerts({ rockId }: { rockId: string | number }) {
                               "sm:justify-center sm:self-stretch",
                             )}
                           >
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={isOn}
                               onChange={() => toggleTopic(topic.id, channel.id)}
-                              className="size-6 shrink-0 accent-ink"
+                              className="-m-2.5"
                             />
                             <span className="sr-only">{channel.describe(topic.title)}</span>
                             <span aria-hidden className="text-sm text-ink-2 sm:hidden">
@@ -409,7 +409,7 @@ export function RockAlerts({ rockId }: { rockId: string | number }) {
             </Button>
             <p className="max-w-prose text-sm text-ink-3">
               Allowing notifications only sets a permission on this device. Nothing is sent until
-              delivery exists.
+              delivery exists — by design until Bank Rock is on mainnet.
             </p>
           </div>
 

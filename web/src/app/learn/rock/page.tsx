@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Term } from "@/components/ui/term";
+import { ActivationFlowDiagram } from "@/components/activation-flow-diagram";
 
 /**
  * "The physical" — what a Bank Rock is, what the chip inside it does, and what one tap sets in
@@ -60,7 +61,10 @@ export default function RockPage() {
                 its real record on <Term k="sepolia" />. Until the chip is programmed, a private
                 demo link plays the part of the chip and hands the rest of the flow the same signed
                 code a real tap would; everything after that point — the check, the counter, the{" "}
-                <Term k="attestation" />, the on-chain awakening — is the real path. Rock 420 is a
+                <Term k="attestation" />, the on-chain awakening — is the real path. Rock 3 was
+                awakened through that link with the synthetic tag 04DE3057A11E80; its on-chain
+                counter (367523) is minutes since 2026-01-01, not a chip read count. No physical
+                chip has been tapped yet. Rock 420 is a
                 stage prop: it lives only in your browser, is badged as a demo on every value, and
                 touches nothing on chain. The full list of what is still simulated is public in the
                 repository&rsquo;s <span className="font-semibold">DEMO-STATE.md</span>.
@@ -71,8 +75,8 @@ export default function RockPage() {
           <div className="order-1 flex flex-col gap-6 md:order-2">
             <div className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-3xl border border-border bg-muted shadow-xl">
               <Image
-                src="/infographics/photo_rock_silicon_nfc.jpg"
-                alt="A polished rock with the NFC chip and a drop of resin set into it"
+                src="/infographics/photo_rock_red_resin.jpg"
+                alt="A black rock held in a hand with a red glittery resin drop"
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 50vw"
@@ -93,14 +97,8 @@ export default function RockPage() {
         {/* What one tap does */}
         <section className="grid grid-cols-1 items-center gap-12 md:grid-cols-2 lg:gap-24">
           <div className="order-1 flex justify-center">
-            <div className="relative aspect-square w-full max-w-md overflow-hidden rounded-3xl border border-border bg-white shadow-xl">
-              <Image
-                src="/infographics/activation_flow.jpg"
-                alt="From a tap on the rock to an account on the chain, in four steps"
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 50vw"
-              />
+            <div className="w-full max-w-md">
+              <ActivationFlowDiagram />
             </div>
           </div>
 
@@ -179,6 +177,44 @@ export default function RockPage() {
               and everything in it. Whoever taps a gifted rock without being named for it sees only
               its public page.
             </p>
+          </div>
+        </section>
+      
+        {/* A Quirky History Lesson */}
+        <section className="grid grid-cols-1 items-center gap-12 pt-8 md:grid-cols-2 lg:gap-24">
+          <div className="order-2 flex flex-col gap-6 md:order-1">
+            <h2 className="text-h2 font-bold">A short history of liquidity</h2>
+            <div className="flex flex-col gap-4 text-base text-ink-2">
+              <p>
+                In the 15th century, <strong className="font-medium text-ink">Lorenzo de&rsquo; Medici</strong> and his family revolutionised the global banking system right here in Florence. They scaled the use of double-entry bookkeeping, letters of credit, and holding companies — effectively inventing modern finance as we know it.
+              </p>
+              <p>
+                Exactly 530 years later, the very first Bank Rock was gathered from the rocky bed of the Arno river near Florence, ready to launch the next great financial revolution: Decentralised Finance. 
+              </p>
+              <p>
+                We like to think Lorenzo would have appreciated the sheer irony of replacing an entire banking empire with an ordinary river stone.
+              </p>
+            </div>
+          </div>
+
+          <div className="order-1 flex justify-center md:order-2">
+            <div className="relative mx-auto aspect-[3/4] w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-muted shadow-xl">
+              <Image
+                src="/infographics/medici.jpg"
+                alt="Portrait of Lorenzo de' Medici"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+              />
+              {/* Comic bubble */}
+              <div className="absolute right-4 top-8 -rotate-6 rounded-2xl border-2 border-ink bg-white px-4 py-2 shadow-lg sm:right-8 sm:top-10">
+                <p className="text-base font-bold text-ink sm:text-lg">
+                  &ldquo;Banks are so 1330&rdquo;
+                </p>
+                {/* Comic bubble tail */}
+                <div className="absolute -bottom-[9px] left-6 h-4 w-4 rotate-45 border-b-2 border-r-2 border-ink bg-white" />
+              </div>
+            </div>
           </div>
         </section>
       </article>

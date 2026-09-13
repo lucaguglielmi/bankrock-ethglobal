@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MissingEnvError, optionalEnv, real, demo, unavailable, isAvailable, requireEnv } from "./demo";
 
 describe("capability states", () => {
@@ -39,32 +39,5 @@ describe("requireEnv", () => {
   it("returns the trimmed value when set", () => {
     process.env.TEST_SECRET_SET = " value ";
     expect(requireEnv("TEST_SECRET_SET")).toBe("value");
-  });
-});
-
-describe("isDemoMode", () => {
-  // `env` is frozen at module load because Next inlines NEXT_PUBLIC_* at build time, so each
-  // case re-imports the module with the variable already set.
-  it("is true only for the exact string 'true' (D-013)", async () => {
-    for (const [value, expected] of [
-      ["true", true],
-      ["false", false],
-      ["TRUE", false],
-      ["1", false],
-      ["yes", false],
-      ["", false],
-    ] as const) {
-      process.env.NEXT_PUBLIC_DEMO_MODE = value;
-      vi.resetModules();
-      const mod = await import("./demo");
-      expect(mod.isDemoMode(), `NEXT_PUBLIC_DEMO_MODE="${value}"`).toBe(expected);
-    }
-  });
-
-  it("defaults to false when unset", async () => {
-    delete process.env.NEXT_PUBLIC_DEMO_MODE;
-    vi.resetModules();
-    const mod = await import("./demo");
-    expect(mod.isDemoMode()).toBe(false);
   });
 });

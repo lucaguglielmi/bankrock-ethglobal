@@ -3,10 +3,10 @@
 /**
  * The alerts page (spec 17 Part 5 "Alerts"; spec 15 Part 3 "Alerts delivery: UNAVAILABLE").
  *
- * Typography and targets fixed: `text-base` body and inputs, 24 px checkbox with a 44 px label,
- * 48 and 56 px buttons, nothing below 13 px, and the full-viewport-height wrapper replaced by the
- * page frame in `globals.css`. `usePrivy()` is replaced by `useAuth()`, which is safe when no
- * Privy app is configured (A-2).
+ * Typography and targets fixed: `text-base` body and inputs, a 24 px checkbox whose input is a
+ * 44 px target (`Checkbox`) inside a 44 px label, 48 and 56 px buttons, nothing below 13 px, and
+ * the full-viewport-height wrapper replaced by the page frame in `globals.css`. `usePrivy()` is
+ * replaced by `useAuth()`, which is safe when no Privy app is configured (A-2).
  *
  * The page also stops implying that saving a preference means an alert will arrive: nothing
  * dispatches yet, and it says so before asking for an address.
@@ -15,6 +15,7 @@
 import { useState } from "react";
 import { BellRing, Check, Info, Mail, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/ui/cn";
 
@@ -27,7 +28,8 @@ const TOPICS = [
   {
     id: "highSlippage",
     title: "Poor price",
-    description: "When a rebalance would accept a noticeably worse price.",
+    // After the hackathon: an agent that rebalances within bounds (D-010) may need this topic; no rebalancer exists today (D-035), so it describes visitor trades.
+    description: "When a trade against your rock settles at a noticeably worse price than its quote.",
   },
   {
     id: "profitLoss",
@@ -97,7 +99,8 @@ export default function AlertsPage() {
           <h1 className="text-h1 font-extrabold text-ink">Stay on top of your rocks.</h1>
           <p className="max-w-prose text-lead text-ink-2">
             Choose what is worth telling you about. Nothing is sent yet — there is no delivery
-            behind these preferences — so this is a standing request, not a subscription.
+            behind these preferences — so this is a standing request, not a subscription. That is
+            by design until Bank Rock is on mainnet.
           </p>
         </header>
 
@@ -155,13 +158,12 @@ export default function AlertsPage() {
                         isOn ? "border-ink" : "border-border hover:bg-muted",
                       )}
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={isOn}
                         onChange={() =>
                           setSelected((previous) => ({ ...previous, [topic.id]: !previous[topic.id] }))
                         }
-                        className="mt-0.5 size-6 shrink-0 accent-ink"
+                        className="-m-2.5"
                       />
                       <span className="flex flex-col gap-1">
                         <span className="text-sm font-semibold text-ink">{topic.title}</span>
@@ -175,11 +177,10 @@ export default function AlertsPage() {
           </div>
 
           <label className="flex min-h-11 cursor-pointer items-start gap-3">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={consent}
               onChange={(changed) => setConsent(changed.target.checked)}
-              className="mt-0.5 size-6 shrink-0 accent-ink"
+              className="-m-2.5"
             />
             <span className="max-w-prose text-sm text-ink-2">
               Store my email address so Bank Rock can write to me. I can ask for it to be removed

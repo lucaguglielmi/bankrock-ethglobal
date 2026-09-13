@@ -47,13 +47,10 @@ jobs:
       - name: Test
         run: npm test
 
-      # The production build must never be produced with demo mode on. The flag defaults to
-      # false, and it is also set here explicitly so that a change to that default cannot turn
-      # CI's build into a simulated one without this line changing too (spec 15 D-013).
+      # The same build the deploy job produces: no secrets, no build flags. Every surface that
+      # needs a secret or a chain reads UNAVAILABLE with a reason instead (spec 15 D-013, D-017).
       - name: Build
         run: npm run build
-        env:
-          NEXT_PUBLIC_DEMO_MODE: "false"
 
   contracts:
     name: Contracts
@@ -179,14 +176,13 @@ jobs:
       - name: Install Playwright's Chromium
         run: npx playwright install --with-deps chromium
 
-      # Built in demo mode so every surface renders (spec 17 Part 7's own preamble). No chain is
-      # configured here, so a rock page reads UNAVAILABLE and shows its honest empty state
-      # (spec 15 Part 3) — the browser checks are written to skip, not fail, the assertions that
-      # depend on a real registry (see the comment at the top of web/e2e/responsive.spec.ts).
-      - name: Build (demo mode)
+      # A plain production build; there is no build flag. No chain is configured here, so
+      # /rock/1 and /rock/2 read UNAVAILABLE and show their honest empty state (spec 15 Part 3),
+      # while /rock/420 — the stage demo, gated by its id alone — renders a full rock page. The
+      # browser checks are written around that (see the comment at the top of
+      # web/e2e/responsive.spec.ts).
+      - name: Build
         run: npm run build
-        env:
-          NEXT_PUBLIC_DEMO_MODE: "true"
 
       # `npm run e2e` starts `next start` itself via Playwright's `webServer` (playwright.config.ts).
       - name: Run the spec 17 Part 7 browser checks

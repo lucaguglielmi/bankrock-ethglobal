@@ -59,9 +59,6 @@
     // The browser's own Sepolia reads (Safe derivation, receipts, balances). Public, keyless; a
     // measured, working endpoint (D-036). Server-side reads use the SEPOLIA_RPC_URL secret.
     "NEXT_PUBLIC_SEPOLIA_RPC_URL": "https://ethereum-sepolia-rpc.publicnode.com",
-    // D-013: only the literal "true" enables simulation. Production is never a simulation, and
-    // .github/workflows/deploy.yml pins the same value in the build job.
-    "NEXT_PUBLIC_DEMO_MODE": "false",
     // contracts/deployments/sepolia.json
     "NEXT_PUBLIC_REGISTRY_ADDRESS": "0x2A3101Fc525C6DBEc39bef45034E23b13f28F757",
     "REGISTRY_DEPLOY_BLOCK": "11689716",

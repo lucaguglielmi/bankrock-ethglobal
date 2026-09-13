@@ -62,7 +62,8 @@ export function NewsletterSignup() {
           <span>Genesis Batch</span>
         </div>
 
-        <h2 className="mb-6 max-w-2xl text-h2 font-bold">Notify me on launch.</h2>
+        {/* After the hackathon: an announcement email to this list when the first batch has a date and a place; nothing dispatches today (DEMO-STATE N-2, K-9), so no notification is promised. */}
+        <h2 className="mb-6 max-w-2xl text-h2 font-bold">Get on the list for the first batch.</h2>
 
         <p className="mx-auto mb-10 max-w-prose text-lead text-ink-2">
           Subscribe to know when and where the first batch of OG Bank Rocks will be released.{" "}
@@ -78,7 +79,7 @@ export function NewsletterSignup() {
             </div>
             <h3 className="mb-2 text-h3 font-semibold">You&apos;re on the list</h3>
             <p className="text-sm text-ink-2">
-              We&apos;ll dispatch an alert with exact coordinates, dates, and booth location before the genesis drop goes live.
+              Your address is stored. No email goes out yet; we are keeping the list for the first-batch announcement.
             </p>
             <div className="mt-4 text-caption text-ink-3">{email}</div>
           </div>
@@ -107,7 +108,7 @@ export function NewsletterSignup() {
                 </>
               ) : (
                 <>
-                  <span>Notify Me</span>
+                  <span>Join the list</span>
                   <ArrowRight className="size-4" aria-hidden />
                 </>
               )}
@@ -119,10 +120,10 @@ export function NewsletterSignup() {
           <p className="motion-safe:animate-in motion-safe:fade-in mt-3 text-sm text-danger">{errorMessage}</p>
         )}
 
+        {/* After the hackathon: booth access at the launch event is an idea, not a promise; the stones are picked from riverbeds near Florence, not forged. */}
         <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-3">
           <span>✓ Zero spam</span>
-          <span>✓ Exclusive booth access</span>
-          <span>✓ Hand-forged in Tuscany</span>
+          <span>✓ Picked by hand near Florence</span>
         </div>
       </div>
     </section>

@@ -270,7 +270,7 @@ export default function DefiPage() {
             <li>
               It has no automated rebalancer and no AI that trades. The{" "}
               <Link href="/mcp" className="text-link underline-offset-4 hover:underline">
-                MCP endpoint
+                AI Oracle
               </Link>{" "}
               can read a rock and explain it; it cannot move anything.
             </li>
