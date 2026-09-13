@@ -97,7 +97,8 @@ export default function AlertsPage() {
           <h1 className="text-h1 font-extrabold text-ink">Stay on top of your rocks.</h1>
           <p className="max-w-prose text-lead text-ink-2">
             Choose what is worth telling you about. Nothing is sent yet — there is no delivery
-            behind these preferences — so this is a standing request, not a subscription.
+            behind these preferences — so this is a standing request, not a subscription. That is
+            by design until Bank Rock is on mainnet.
           </p>
         </header>
 

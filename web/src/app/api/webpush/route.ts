@@ -10,6 +10,10 @@
  * DID the token names, never one the client asserts. `send` is a scheduled/operator action gated
  * on `x-cron-secret`. VAPID keys come from `requireEnv` with no defaults — unset means the
  * capability is `UNAVAILABLE` (503), never a silent no-op (D-013).
+ *
+ * Delivery is intentionally sandboxed until the project is on mainnet: `send` is an operator
+ * action, no event ever fires a push on its own, and that is a decision rather than a gap
+ * (DEMO-STATE N-2).
  */
 
 import { NextResponse } from "next/server";

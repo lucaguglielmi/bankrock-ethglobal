@@ -311,7 +311,7 @@ source — every state, error and event has a plain-English `@notice`.
 | Contracts | **Solidity** 0.8.24 (registry) / 0.8.30 (vendored Aqua, taker), **Hardhat 3** with Solidity tests, OpenZeppelin 5 | `contracts/` |
 | AI | **Model Context Protocol** server (`@modelcontextprotocol/sdk`), stdio | `mcp/` |
 | Tests | **Vitest** (unit), **Playwright** + axe (viewport × route matrix), Hardhat/Forge-style `.t.sol` suites (unit + fuzz) | plus 21 static spec checks in `scripts/spec-checks.sh` |
-| PWA | Serwist service worker built by `web/scripts/build-sw.mjs` as a `prebuild` step | Web Push optional |
+| PWA | Serwist service worker built by `web/scripts/build-sw.mjs` as a `prebuild` step | Web Push optional; its delivery is sandboxed on purpose until mainnet |
 
 ---
 
@@ -464,9 +464,10 @@ capability with no transaction hash, a banner naming it a demo and a *Reset demo
 served regardless of the demo flag and never touches the registry, Aqua, an RPC or the database.
 **Rock 3 is the real one.**
 
-**Unavailable on purpose, with no path:** AR view; alert delivery (preferences persist, nothing
-is sent); fiat on/off-ramp; session keys for an AI runtime; an ERC-20 gas paymaster; idle yield
-into lending protocols; replacement tags; and **any APY or APR figure, ever**.
+**Unavailable on purpose, with no path:** AR view; alert delivery and Web Push (preferences
+persist, nothing is sent — sandboxed intentionally until the project is on mainnet); fiat
+on/off-ramp; session keys for an AI runtime; an ERC-20 gas paymaster; idle yield into lending
+protocols; replacement tags; and **any APY or APR figure, ever**.
 
 **Designed, not implemented:** balancing a one-token top-up inside the ship operation against a
 Bank Rock house stream ([`specs/21-balance-and-ship.md`](./specs/21-balance-and-ship.md), D-038).

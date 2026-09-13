@@ -423,7 +423,7 @@ judge:
 | Archive and start over | REAL (needs config) | Registry; releases the tag binding (D-028) |
 | Cross-chain deposit | DEMO (badged) | Nothing — no bridge is integrated |
 | Keeper rebalance | UNAVAILABLE in data, DEMO in UI | Nothing — it invents no position |
-| Alerts delivery | UNAVAILABLE | Nothing — the pipeline is cut (Part 6) |
+| Alerts delivery | UNAVAILABLE | Nothing — the pipeline is cut (Part 6), intentionally, until the project is on mainnet |
 | Admin dashboard | REAL (needs config) | D1 bound; admin session required |
 | MCP tools | REAL (partial) | `SEPOLIA_RPC_URL` + registry address; reads only |
 | User identity (Privy sign-in) | REAL (needs config) | `NEXT_PUBLIC_PRIVY_APP_ID`; no fake wallet left |
@@ -714,7 +714,7 @@ which are hereby cut from MVP scope:
 | Cross-chain intent bridging | 03, 04 | Remains `DEMO` with a badge. Honest simulation is acceptable here; it is explicitly a "platform potential" beat, not a must-have. |
 | ERC-20 token paymaster | 05, D-011 | The verifying paymaster alone satisfies the zero-gas demo beat. |
 | Idle yield (Aave/Morpho) | 04 | Not a must-have; adds a second protocol integration during a phase that has none working. |
-| Alerts delivery pipeline | — | The settings UI stays, marked `UNAVAILABLE`. Building delivery before any real event exists is premature. |
+| Alerts delivery pipeline | — | The settings UI stays, marked `UNAVAILABLE`. Building delivery before any real event exists is premature; delivery stays sandboxed on purpose until the project is on mainnet. |
 | Replacement tags, creator registration UI | 02 Flows A, F | Already listed as first to cut in spec 08's fallback order. |
 
 This ordering is consistent with spec 08: *"Never cut the real NFC interaction, Privy onboarding,

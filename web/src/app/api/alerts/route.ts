@@ -17,7 +17,9 @@
  * topic is a 400, an unknown topic key is ignored (`parseTopicsInput`).
  *
  * Preferences persist; delivery does not exist. Spec 15 Part 6 cuts the delivery pipeline, so the
- * response states plainly that no alert can currently be dispatched.
+ * response states plainly that no alert can currently be dispatched. That is intentional: alert
+ * delivery stays sandboxed until the project is on mainnet — a decision, not a missing feature
+ * (DEMO-STATE N-2).
  */
 
 import { NextResponse } from "next/server";
@@ -31,7 +33,7 @@ import {
 import { logger } from "@/lib/telemetry";
 
 const DELIVERY_NOTE =
-  "Alert delivery is not implemented: preferences are stored, but nothing dispatches them yet.";
+  "Alert delivery is sandboxed on purpose until Bank Rock is on mainnet: preferences are stored, but nothing dispatches them yet.";
 
 function rockIdFrom(value: unknown): string | null {
   const raw = String(value ?? "").trim();

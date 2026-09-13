@@ -14,6 +14,9 @@
  *    (D-014, D-004);
  *  - the response reports what actually happened, because `sendAlertEmail` no longer claims
  *    success for mail it did not send (S-5).
+ *
+ * Alert delivery itself is intentionally sandboxed until the project is on mainnet; this route
+ * only proves the sender is configured (DEMO-STATE N-2, K-9).
  */
 
 import { NextResponse } from "next/server";
@@ -39,7 +42,7 @@ export async function POST(req: Request) {
     topicTitle: "Email delivery test",
     severity: "info",
     summary:
-      "This message confirms that Bank Rock can reach your inbox. It contains no balances, no figures and no transaction — alert delivery itself is not implemented.",
+      "This message confirms that Bank Rock can reach your inbox. It contains no balances, no figures and no transaction — alert delivery itself stays sandboxed on purpose until Bank Rock is on mainnet.",
   });
 
   logger.info("Operator email delivery test", {

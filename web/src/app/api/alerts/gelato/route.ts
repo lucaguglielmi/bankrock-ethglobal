@@ -7,6 +7,9 @@
  *  - `message` was interpolated raw into the email HTML. It is escaped (SA-7);
  *  - the route no longer answers `{ success: true, mocked: true }` when RESEND_API_KEY is unset.
  *    Nothing was sent, so it says so (S-5).
+ *
+ * Like every alert path, this one is intentionally sandboxed until the project is on mainnet: the
+ * sender stays on the Resend sandbox domain on purpose (DEMO-STATE K-9).
  */
 
 import { NextResponse } from "next/server";

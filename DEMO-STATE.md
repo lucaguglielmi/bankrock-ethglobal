@@ -37,7 +37,7 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 | # | What | Spec | Becomes real when |
 | --- | --- | --- | --- |
 | N-1 | AR / WebXR view | 15 Part 6, 08 must-have 12 | Never for this submission. Cut; the demo's opening beat no longer mentions it. |
-| N-2 | Alert delivery | 15 Part 6 | A delivery pipeline is built. Preferences persist behind a verified Privy token; nothing dispatches. |
+| N-2 | Alert delivery (email and Web Push) | 15 Part 6 | The project is on mainnet and a delivery pipeline is built. Preferences persist behind a verified Privy token; nothing dispatches — **intentionally**: delivery stays sandboxed until mainnet, a decision rather than a missing feature. |
 | N-3 | Fiat on-ramp / off-ramp (Flows G and H fiat legs) | 08 | Out of scope. Note that Flow H's on-chain leg is real: docking *is* the withdrawal. |
 | N-4 | ERC-7579 scoped session keys for the MCP runtime | 15 Part 6, 09 D-010 | Post-hackathon. MCP is read-only (D-008, D-019). |
 | N-5 | ERC-20 token paymaster ("self-sustaining rock") | 15 Part 6, 09 D-011 | Post-hackathon. The verifying paymaster alone covers the zero-gas beat. |
@@ -73,7 +73,7 @@ applied. What remains needs something other than a secret.
 | K-1 | Sign-in and any wallet address on screen | 16 #1 | `NEXT_PUBLIC_PRIVY_APP_ID` is set and the origin and chain are configured in the Privy dashboard. |
 | K-2 | The "Verified Physical" badge | 16 #18, 06 | `NXP_MASTER_KEY` matches the key written to the tags. |
 | K-6 | The ETH faucet | 16 #16 | `FAUCET_PRIVATE_KEY` is set and funded. There is no default key. |
-| K-9 | Any email at all | 16 #19, #33 | `RESEND_API_KEY` plus SPF/DKIM verification of `bank-rock.com`. Until then the sandbox sender reaches only the account owner's inbox. |
+| K-9 | Any email at all | 16 #19, #33 | `RESEND_API_KEY` plus SPF/DKIM verification of `bank-rock.com`. Until then the alert sender stays on the Resend sandbox and reaches only the account owner's inbox — intentionally, and until the project is on mainnet. |
 
 ## 5. Real in code, unproven in the world
 
