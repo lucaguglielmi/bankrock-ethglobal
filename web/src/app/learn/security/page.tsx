@@ -54,6 +54,12 @@ export default function SecurityPage() {
                 We believe in full observability. Our MCP server exposes raw, structured server logs to you and your AI agents. You can trace exactly what the backend did during any transaction, removing the opaque &quot;black box&quot; nature of traditional web apps.
               </AccordionContent>
             </AccordionItem>
+            <AccordionItem value="item-5">
+              <AccordionTrigger className="text-lg font-semibold">5. Anonymous Shipping (Future Privacy)</AccordionTrigger>
+              <AccordionContent className="text-ink-2 text-base leading-relaxed">
+                Hardware shouldn&apos;t be a physical liability. In the future, we plan to implement completely anonymous shipping. Your physical delivery address will never be retained in our databases, meaning your physical rock will never be intrinsically associated with your real-world identity.
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
         </section>
 
