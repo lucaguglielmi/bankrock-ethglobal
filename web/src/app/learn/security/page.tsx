@@ -100,7 +100,7 @@ export default function SecurityPage() {
           <div className="space-y-2">
             <h3 className="text-xl font-bold">Find a flaw? Tell us.</h3>
             <p className="text-ink-2">
-              If you see something we aren&apos;t doing well, drop a message below. It goes straight to our database and console.
+              If you see something we aren&apos;t doing well, drop a message below.
             </p>
           </div>
           
