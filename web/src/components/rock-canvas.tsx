@@ -116,10 +116,10 @@ const RESTING_FORMS: RockFormParams[] = [
 /** The calmer, more upright pose the rock settles into on hover or tap. */
 const STANDING_FORM: RockFormParams = {
   rockDistort: 0.18,
-  rockScale: [1.05, 1.75, 1.2],
+  rockScale: [1.15, 1.5, 1.3],
   liquidDistort: 0.15,
   liquidScale: [0.6, 0.6, 0.15],
-  liquidPosition: [-0.7, 1.4, 1.05],
+  liquidPosition: [-0.6, 1.2, 1.0],
   liquidColor: new THREE.Color("#0055ff"),
 };
 
@@ -166,8 +166,10 @@ function RockMesh({ isHovered, isCompact }: RockMeshProps) {
 
     if (rockRef.current) {
       rockRef.current.scale.lerp(new THREE.Vector3(...target.rockScale), delta * 4);
-      const targetZ = isHovered ? 0.5 : 0;
+      const targetZ = isHovered ? 0.85 : 0;
       rockRef.current.rotation.z = THREE.MathUtils.lerp(rockRef.current.rotation.z, targetZ, delta * 4);
+      const targetX = isHovered ? -0.3 : 0;
+      rockRef.current.rotation.x = THREE.MathUtils.lerp(rockRef.current.rotation.x, targetX, delta * 4);
     }
 
     if (rockMaterialRef.current) {
@@ -202,7 +204,7 @@ function RockMesh({ isHovered, isCompact }: RockMeshProps) {
 
   return (
     <Float speed={isHovered ? 0.5 : 1.5} rotationIntensity={isHovered ? 0.1 : 0.3} floatIntensity={isHovered ? 0.2 : 1.0}>
-      <group ref={groupRef} scale={isCompact ? 0.55 : 1} position={isCompact ? [0, -0.8, 0] : [0, 0, 0]}>
+      <group ref={groupRef} scale={isCompact ? 0.6 : 1} position={[0, 0.4, 0]}>
         {/* Main Stone */}
         <mesh ref={rockRef} castShadow receiveShadow>
           <icosahedronGeometry args={[1, 16]} />
@@ -411,7 +413,7 @@ export function RockCanvas() {
           tracks the visible stone at every viewport width, and carries the touch-action the
           Canvas itself does not need since it never receives pointer events. */}
       <div
-        className="pointer-events-auto absolute z-10 aspect-square w-[80vw] max-w-[600px] translate-y-[10vh] touch-pan-y rounded-full md:translate-y-0"
+        className="pointer-events-auto absolute z-10 aspect-square w-[80vw] max-w-[600px] -translate-y-[10vh] touch-pan-y rounded-full"
         onMouseEnter={handleHoverEnter}
         onMouseLeave={handleHoverLeave}
         onClick={handleToggle}
