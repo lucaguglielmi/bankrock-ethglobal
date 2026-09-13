@@ -41,6 +41,13 @@ jobs:
     # for the whole job, not just a build step.
     #
     # Only the two Cloudflare credentials are needed to publish.
+    #
+    # NOTE (security review 2026-09-13, R-2) — TO BE FIXED BEFORE PRODUCTION. The Cloudflare token
+    # (Workers, D1 and DNS scopes) is set at job level, so `npm ci` and every dependency install
+    # script it runs can read it. Before mainnet: scope the two Cloudflare secrets to the "Apply
+    # D1 migrations" and "Build and deploy" steps, install with `npm ci --ignore-scripts`, run the
+    # OpenNext build in a step without the token, and confirm the `production` environment has
+    # required reviewers. Accepted as is for the testnet demo.
     env:
       NEXT_PUBLIC_DEMO_MODE: "false"
       # Either name works; the browser-visible key and the server key are the same Pimlico key.

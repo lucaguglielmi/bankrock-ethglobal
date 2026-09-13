@@ -51,6 +51,14 @@
  * the giver can still be locked out of their own row by a stranger who gets there first. Closing
  * that needs the caller's *wallet*, and a Privy token carries a DID, not an address. Recorded so
  * it is a known residual rather than an assumed fix.
+ *
+ * TEMPORARY — WILL BE FIXED BEFORE MAINNET (security review 2026-09-13, R-3). Because the row is
+ * first-writer-wins on a Privy DID and nothing binds a DID to the rock's on-chain owner, any
+ * signed-in account can pre-store a forged row for any rock and lock its real owner out of
+ * gifting until the row is removed by hand. The fix is to prove the wallet before accepting a
+ * write — a signature from `rock.owner` over (rockId, recipient, userOpHash), or Privy's
+ * linked-wallet lookup — and to let the on-chain owner overwrite or discard regardless of
+ * `creatorDid`. Left as is for the testnet demo.
  */
 
 import { NextResponse } from "next/server";
@@ -165,6 +173,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // The operation must carry the one call this row is for. Both addresses come from the registry
   // and from the body already checked above, never from the operation itself.
+  //
+  // TEMPORARY — TO BE FIXED BEFORE MAINNET (security review 2026-09-13, R-4 and R-13): this is
+  // a substring match, so a batch that carries extra calls alongside the swap passes, and the
+  // operation is signed without a `validUntil`. Before mainnet, decode
+  // `executeUserOp(to, value, data, operation)` and require an exact `swapOwner` payload, and
+  // sign with `validUntil` set to the gift's expiry.
   if (!isAddress(rock.value.owner, { strict: false })) {
     return NextResponse.json(
       { state: "UNAVAILABLE", reason: "This rock has no readable owner to hand over from" },

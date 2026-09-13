@@ -14,9 +14,18 @@
 import { NextResponse } from "next/server";
 import { createAdminSession } from "@/lib/auth";
 import { MissingEnvError, requireEnv } from "@/lib/demo";
-import { consumeIpRateLimit } from "@/lib/rate-limit";
+import { requireIpRateLimit, requireRateLimit } from "@/lib/rate-limit";
 import { timingSafeEqualString, unavailableResponse } from "@/lib/secure";
 import { logger } from "@/lib/telemetry";
+
+function limitResponse(limit: { status?: 429 | 503; reason?: string }) {
+  return NextResponse.json(
+    limit.status === 503
+      ? { state: "UNAVAILABLE", reason: limit.reason }
+      : { error: limit.reason ?? "Too Many Requests" },
+    { status: limit.status ?? 429 },
+  );
+}
 
 export async function POST(req: Request) {
   let expected: string;
@@ -33,10 +42,15 @@ export async function POST(req: Request) {
     throw err;
   }
 
-  const limit = await consumeIpRateLimit(req, "admin-login", 10, 15 * 60 * 1000);
-  if (!limit.allowed) {
-    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
-  }
+  // Both limits fail closed (security review 2026-09-13, R-10): a limiter that cannot count is
+  // not a limit on a password prompt, and "the ledger is unreachable" must not mean "unlimited
+  // guesses". The per-IP bucket bounds one client; the global bucket bounds everyone together, so
+  // spreading guesses across many addresses still meets a ceiling.
+  const ipLimit = await requireIpRateLimit(req, "admin-login", 10, 15 * 60 * 1000);
+  if (!ipLimit.ok) return limitResponse(ipLimit);
+
+  const globalLimit = await requireRateLimit("admin-login:global", 50, 15 * 60 * 1000);
+  if (!globalLimit.ok) return limitResponse(globalLimit);
 
   try {
     const { password } = (await req.json()) as { password?: string };

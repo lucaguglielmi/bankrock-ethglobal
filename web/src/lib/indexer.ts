@@ -17,7 +17,12 @@
  *    only after the events in that range are stored, and with no D1 binding the indexer does
  *    exactly what it did before: a full, chunked scan from `REGISTRY_DEPLOY_BLOCK`;
  *  - with no registry address, no deploy block or an unreachable RPC, the result is UNAVAILABLE
- *    with the reason. An empty list only ever means the chain holds no events.
+ *    with the reason. An empty list only ever means the chain holds no events;
+ *  - the mirror and the cursor stop `INDEXER_CONFIRMATIONS` blocks below the head (security
+ *    review 2026-09-13, R-17). The mirror only ever adds rows, so a log that a reorganisation
+ *    later removes would otherwise stay in the history for good. The unconfirmed tail is still
+ *    scanned and answered on every call — a transaction mined seconds ago is shown — it is just
+ *    not written down until it has settled.
  */
 
 import { eq } from "drizzle-orm";
@@ -80,6 +85,25 @@ export interface IndexerEvent {
 
 const TX_HASH_REGEX = /^0x[0-9a-fA-F]{64}$/;
 const NUMERIC_REGEX = /^\d+$/;
+
+/**
+ * How many blocks below the head an event must sit before it is mirrored and the cursor moves
+ * past it. Three Sepolia blocks is about forty seconds; a deeper reorganisation than that is
+ * rare enough that the mirror can be rebuilt by hand if it ever happens.
+ */
+export const INDEXER_CONFIRMATIONS = BigInt(3);
+
+/**
+ * The newest block whose events are settled enough to mirror: the head minus the confirmation
+ * depth, never below zero. Pure, so the boundary can be tested without a chain.
+ */
+export function confirmedHead(
+  currentBlock: bigint,
+  confirmations: bigint = INDEXER_CONFIRMATIONS,
+): bigint {
+  const head = currentBlock - confirmations;
+  return head < BigInt(0) ? BigInt(0) : head;
+}
 
 /** Registry event name -> provenance type. Events not listed here are not about a rock. */
 export const EVENT_TYPE_BY_NAME: Record<string, IndexerEventType> = {
@@ -395,14 +419,21 @@ export async function getRockOnchainEvents(
 
   try {
     const currentBlock = await client.getBlockNumber();
-    const ranges = buildBlockRanges(fromBlock, currentBlock);
+    // Only blocks a few confirmations below the head are mirrored and counted by the cursor
+    // (review R-17). The tail above that is scanned as well, so the answer is as fresh as the
+    // chain — it is just not written down until it has settled.
+    const safeHead = confirmedHead(currentBlock);
+    const ranges = buildBlockRanges(fromBlock, safeHead);
+    const tailFrom = safeHead + BigInt(1) > fromBlock ? safeHead + BigInt(1) : fromBlock;
+    const tailRanges = buildBlockRanges(tailFrom, currentBlock);
 
     logger.info("Indexing registry events", {
       action: "INDEXER_FETCH_START",
       rockId: cacheKey,
       fromBlock: fromBlock.toString(),
       toBlock: currentBlock.toString(),
-      chunks: ranges.length,
+      confirmedToBlock: safeHead.toString(),
+      chunks: ranges.length + tailRanges.length,
       resumed: cursor !== null,
     });
 
@@ -420,33 +451,41 @@ export async function getRockOnchainEvents(
     // Every rock's events, not just this one's: the cursor is shared, so a range scanned for one
     // rock must be mirrored in full or another rock's history would be skipped for good.
     const scanned: IndexerEvent[] = [];
+    // Events in the unconfirmed tail: answered, never mirrored, never behind the cursor.
+    const unconfirmed: IndexerEvent[] = [];
 
-    for (const range of ranges) {
-      // One address-filtered query per chunk, then decode. The registry emits few logs, and
-      // filtering by topic per event name would be seven round trips for the same data.
-      const logs = await client.getLogs({
-        address: registry as Address,
-        fromBlock: range.fromBlock,
-        toBlock: range.toBlock,
-      });
+    const scanRanges = async (blockRanges: BlockRange[], into: IndexerEvent[]) => {
+      for (const range of blockRanges) {
+        // One address-filtered query per chunk, then decode. The registry emits few logs, and
+        // filtering by topic per event name would be seven round trips for the same data.
+        const logs = await client.getLogs({
+          address: registry as Address,
+          fromBlock: range.fromBlock,
+          toBlock: range.toBlock,
+        });
 
-      for (const log of logs) {
-        if (log.blockNumber === null) continue;
-        const epochMs = await readBlockTimestamp(log.blockNumber);
-        const event = decodeRegistryLog(log, epochMs);
-        if (event) scanned.push(event);
+        for (const log of logs) {
+          if (log.blockNumber === null) continue;
+          const epochMs = await readBlockTimestamp(log.blockNumber);
+          const event = decodeRegistryLog(log, epochMs);
+          if (event) into.push(event);
+        }
       }
-    }
+    };
 
-    const fresh = scanned.filter((event) => event.rockId === cacheKey);
+    await scanRanges(ranges, scanned);
+    await scanRanges(tailRanges, unconfirmed);
+
+    const fresh = [...scanned, ...unconfirmed].filter((event) => event.rockId === cacheKey);
     let events = sortEventsNewestFirst(fresh);
 
     if (d1) {
       const mirrored = await mirrorToDatabase(scanned);
       // Only ever advance the cursor over blocks whose events are durably stored. A cursor ahead
       // of the mirror skips history permanently, which is the one failure this cache must not have.
-      if (mirrored) {
-        await advanceIndexerCursor(d1, cursorId, currentBlock);
+      // And only as far as the confirmed head: the tail is read again on the next poll.
+      if (mirrored && safeHead >= fromBlock) {
+        await advanceIndexerCursor(d1, cursorId, safeHead);
       }
 
       const stored = await readStoredEvents(cacheKey);
@@ -469,7 +508,7 @@ export async function getRockOnchainEvents(
       action: "INDEXER_FETCH_SUCCESS",
       rockId: cacheKey,
       eventsFound: events.length,
-      eventsScanned: scanned.length,
+      eventsScanned: scanned.length + unconfirmed.length,
       latencyMs: Date.now() - start,
     });
 

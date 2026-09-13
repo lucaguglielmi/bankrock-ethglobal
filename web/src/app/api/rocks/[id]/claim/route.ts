@@ -296,6 +296,13 @@ async function isClaimable(
 /**
  * Submits the giver's pre-signed Safe owner swap, if there is one for this recipient.
  *
+ * TEMPORARY — TO BE FIXED BEFORE MAINNET (security review 2026-09-13, R-4). A landed swap plus
+ * the registry's `isOwner(recipient)` check proves the recipient is *a* signer, not the *only*
+ * one: a giver who added a second signer or a module before gifting keeps control of the account
+ * after the claim. Before mainnet, read `getOwners`, `getThreshold`, `getModulesPaginated` and
+ * `getGuard` here after the receipt and refuse the claim unless the owners are exactly the
+ * recipient, the threshold is 1, and there are no modules and no guard.
+ *
  * The stored operation names its recipient. If the rock was given openly — "whoever taps it" —
  * there is no stored operation, because there was no address to sign for at the time, and this
  * returns UNAVAILABLE with that reason rather than silently doing nothing.

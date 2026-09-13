@@ -15,6 +15,26 @@ const nextConfig: NextConfig = {
   // this is consistent with the adapter rather than in conflict with it, and it keeps a plain
   // `next build` producing the same output shape.
   output: "standalone",
+  poweredByHeader: false,
+  // Browser security headers (security review 2026-09-13, R-9). Kept to the set that cannot
+  // interfere with Privy, Pimlico, Google Fonts or the service worker: no `script-src` policy yet,
+  // only `frame-ancestors`, so nothing the page loads changes. HSTS is set without
+  // `includeSubDomains` or `preload` so a subdomain served without TLS is not broken by it.
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
+        ],
+      },
+    ];
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: Date.now().toString(),
   },

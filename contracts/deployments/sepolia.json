@@ -3,5 +3,8 @@
   "deployBlock": 11689716,
   "attester": "0xF27ccB37FCDab74116D4Ad8E1F980879e6D979a4",
   "txHash": "0x76609e5cccaf7b8dac7a108fd58787a6f3ea34309d62a65e92b48a7f939be313",
-  "chainId": 11155111
+  "chainId": 11155111,
+  "owner": "0x66D1bCE0C9Ea1aDDa7B6a8b8Fa52bDbDA52e3d0F",
+  "pendingOwner": "0x42645Ce4Dd0b766DE53ee483CBF54BCEA670f9b2",
+  "pendingOwnerNote": "Read on chain 2026-09-13. The pending owner is one of the maintainer's own wallets; acceptOwnership() has not been called yet. Recorded so the transfer is not mistaken for a takeover (security review R-5)."
 }

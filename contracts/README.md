@@ -86,6 +86,11 @@ and claims. `owner()` is the administrator — it can rotate the attester and pa
 never move a rock or a coin. `paused()` tells you whether new awakenings, gifts and claims are
 being accepted.
 
+On Sepolia the owner is the deployer wallet and `pendingOwner()` names a second wallet that also
+belongs to the maintainer; the transfer has simply not been accepted yet. Both are recorded in
+`deployments/sepolia.json` so the pending transfer is not mistaken for a takeover (security
+review 2026-09-13, R-5).
+
 ### `MAX_ATTESTATION_LIFETIME` and `MAX_HANDOVER_DURATION`
 
 `900` (15 minutes) and `7776000` (90 days), in seconds. An attestation valid for longer than the

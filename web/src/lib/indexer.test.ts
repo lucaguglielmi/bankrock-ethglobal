@@ -3,8 +3,10 @@ import { encodeAbiParameters, encodeEventTopics } from "viem";
 import { BANK_ROCK_REGISTRY_ABI } from "@/lib/chain/abi/registry";
 import {
   EVENT_TYPE_BY_NAME,
+  INDEXER_CONFIRMATIONS,
   MAX_BLOCK_CHUNK,
   buildBlockRanges,
+  confirmedHead,
   decodeRegistryLog,
   sanitizeRockId,
   sanitizeTxHash,
@@ -268,5 +270,41 @@ describe("EVENT_TYPE_BY_NAME", () => {
     );
     // The instant-transfer event is gone with the function that emitted it (D-020).
     expect(EVENT_TYPE_BY_NAME.RockOwnershipTransferred).toBeUndefined();
+  });
+});
+
+describe("confirmedHead", () => {
+  it("stops the mirror a fixed number of blocks below the head", () => {
+    expect(confirmedHead(BigInt(1000))).toBe(BigInt(1000) - INDEXER_CONFIRMATIONS);
+    expect(confirmedHead(BigInt(1000), BigInt(5))).toBe(BigInt(995));
+  });
+
+  it("never goes below the genesis block", () => {
+    expect(confirmedHead(BigInt(0))).toBe(BigInt(0));
+    expect(confirmedHead(BigInt(1))).toBe(BigInt(0));
+    expect(confirmedHead(INDEXER_CONFIRMATIONS)).toBe(BigInt(0));
+  });
+
+  it("splits a scan into a confirmed range and an unconfirmed tail with no gap or overlap", () => {
+    const fromBlock = BigInt(100);
+    const head = BigInt(2500);
+    const safeHead = confirmedHead(head);
+    const confirmed = buildBlockRanges(fromBlock, safeHead);
+    const tailFrom = safeHead + BigInt(1) > fromBlock ? safeHead + BigInt(1) : fromBlock;
+    const tail = buildBlockRanges(tailFrom, head);
+
+    expect(confirmed[confirmed.length - 1].toBlock).toBe(safeHead);
+    expect(tail[0].fromBlock).toBe(safeHead + BigInt(1));
+    expect(tail[tail.length - 1].toBlock).toBe(head);
+    expect(tail.every((r) => r.fromBlock > safeHead)).toBe(true);
+  });
+
+  it("scans only the tail when the cursor is already at the confirmed head", () => {
+    const head = BigInt(2500);
+    const safeHead = confirmedHead(head);
+    const fromBlock = safeHead + BigInt(1);
+    expect(buildBlockRanges(fromBlock, safeHead)).toEqual([]);
+    const tailFrom = safeHead + BigInt(1) > fromBlock ? safeHead + BigInt(1) : fromBlock;
+    expect(buildBlockRanges(tailFrom, head)).toEqual([{ fromBlock, toBlock: head }]);
   });
 });

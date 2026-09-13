@@ -2,7 +2,7 @@
  * The gift message that accompanies a handover (Flow E).
  *
  * Only `keccak256(message)` goes on chain — a gift note is not public record. The plaintext is
- * stored here so the recipient can read it after claiming.
+ * stored here so the recipient can read it on the claim screen, while the gift is outstanding.
  *
  * POST is self-verifying rather than ownership-checked: the message is accepted only if it hashes
  * to the `messageHash` the registry already holds for this rock's outstanding handover. The owner
@@ -14,10 +14,15 @@
  * address, so "is this the named recipient" is not a question this route can answer honestly. A
  * signed-in reader who already knows the rock id can read a gift note; nothing more sensitive
  * than that is stored here, and the alternative — pretending to check — would be worse.
+ *
+ * What GET does not do (security review 2026-09-13, R-11): serve notes from gifts that are over.
+ * It answers only for the hash the registry holds *now*. With no outstanding handover there is no
+ * note, and with the registry unreadable the answer is UNAVAILABLE — never "the most recent note
+ * we have", which handed every past gift note for a rock to any signed-in reader, indefinitely.
  */
 
 import { NextResponse } from "next/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { requirePrivyIdentity } from "@/lib/auth/privy";
 import { getDb, NO_DATABASE_REASON } from "@/lib/db";
 import { handoverMessages } from "@/lib/db/schema";
@@ -126,23 +131,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ state: "UNAVAILABLE", reason: NO_DATABASE_REASON }, { status: 503 });
   }
 
+  // The registry decides which note, if any, is current. No outstanding gift means no note.
   const rock = await readRock(id);
-  const handoverHash = rock.state === "REAL" ? rock.value.handover?.messageHash : undefined;
+  if (rock.state === "UNAVAILABLE") {
+    return NextResponse.json({ state: "UNAVAILABLE", reason: rock.reason }, { status: 503 });
+  }
+  const handoverHash = rock.value.handover?.messageHash;
+  if (!handoverHash) {
+    return NextResponse.json({ state: "REAL", message: null });
+  }
 
-  const row = handoverHash
-    ? await db
-        .select()
-        .from(handoverMessages)
-        .where(
-          and(eq(handoverMessages.rockId, id), eq(handoverMessages.messageHash, handoverHash)),
-        )
-        .get()
-    : await db
-        .select()
-        .from(handoverMessages)
-        .where(eq(handoverMessages.rockId, id))
-        .orderBy(desc(handoverMessages.createdAt))
-        .get();
+  const row = await db
+    .select()
+    .from(handoverMessages)
+    .where(and(eq(handoverMessages.rockId, id), eq(handoverMessages.messageHash, handoverHash)))
+    .get();
 
   if (!row) {
     return NextResponse.json({ state: "REAL", message: null });

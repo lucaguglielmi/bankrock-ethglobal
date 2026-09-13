@@ -47,8 +47,33 @@ function unavailable(reason: string, extra: Record<string, unknown> = {}): ToolR
   return json({ status: "unavailable", reason, ...extra });
 }
 
+/**
+ * A failure description that is safe to put in front of a model (security review 2026-09-13,
+ * R-16).
+ *
+ * viem's error text includes the transport URL, and an RPC URL usually carries the provider's API
+ * key in its path or query. Prefer viem's `shortMessage`, which has no URL, and otherwise cut
+ * every URL down to its origin, so a key never reaches the transcript or the client's logs.
+ */
+function describeError(error: unknown): string {
+  if (!(error instanceof Error)) return "unknown error";
+  const short = (error as { shortMessage?: unknown }).shortMessage;
+  const message = typeof short === "string" && short.trim() !== "" ? short : error.message;
+  return `${error.name}: ${redactUrls(message)}`;
+}
+
+function redactUrls(text: string): string {
+  return text.replace(/https?:\/\/[^\s"'`<>()]+/g, (url) => {
+    try {
+      return `${new URL(url).origin}/…`;
+    } catch {
+      return "<url>";
+    }
+  });
+}
+
 function errorResult(tool: string, error: unknown): ToolResult {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = describeError(error);
   return {
     content: [
       {
@@ -254,7 +279,7 @@ async function getRockStatus(args: Record<string, unknown> | undefined): Promise
     } catch (error) {
       // The registry read succeeded, so still return the rock. A failed token read is reported
       // as unavailable rather than being allowed to fail the whole tool or to become a zero.
-      const message = error instanceof Error ? error.message : String(error);
+      const message = describeError(error);
       balances = { status: "unavailable", reason: `token balance read failed: ${message}` };
     }
   }
@@ -303,7 +328,7 @@ async function traceTransaction(args: Record<string, unknown> | undefined): Prom
   try {
     receipt = await viem.getTransactionReceipt({ hash });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = describeError(error);
     return unavailable(
       `no transaction receipt for ${hash} on ${CHAIN_NAME}. It may be pending, dropped, or from ` +
         `another chain. (${message})`,
@@ -371,7 +396,7 @@ async function getServerMetrics(): Promise<ToolResult> {
         latestBlock: blockNumber.toString(),
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = describeError(error);
       chain = { status: "unavailable", reason: `RPC endpoint is unreachable: ${message}` };
     }
   }
@@ -392,7 +417,7 @@ async function getServerMetrics(): Promise<ToolResult> {
             reason: `no bytecode at ${config.registryAddress} on ${CHAIN_NAME}.`,
           };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = describeError(error);
       registry = { status: "unavailable", address: config.registryAddress, reason: message };
     }
   }

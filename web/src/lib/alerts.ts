@@ -177,7 +177,15 @@ export async function getAlertPreferences(
   });
 }
 
-/** Writes preferences. The first writer claims the rock; later writes must be the same DID. */
+/**
+ * Writes preferences. The first writer claims the rock; later writes must be the same DID.
+ *
+ * TEMPORARY — WILL BE FIXED BEFORE MAINNET (security review 2026-09-13, R-3): a Privy DID is not
+ * the rock's owner, so any signed-in account can claim the preferences row of any rock before its
+ * owner does. Before mainnet, bind writes to the on-chain owner (wallet signature or Privy
+ * linked-wallet lookup) and make the ownership check part of the upsert itself
+ * (`… ON CONFLICT DO UPDATE … WHERE owner_did = ?`) so two first writers cannot race.
+ */
 export async function saveAlertPreferences(
   rockId: string | number,
   ownerDid: string,

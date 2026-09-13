@@ -8,6 +8,11 @@
  * Ownership: the first authenticated caller to claim a rock's vanity name owns it, and later
  * writes must come from the same Privy DID. Registry-based ownership replaces this in Phase 2,
  * when a rock has an on-chain owner to check against.
+ *
+ * TEMPORARY — WILL BE FIXED BEFORE MAINNET (security review 2026-09-13, R-3 and R-12): any
+ * signed-in account can claim any rock's row first, and `id` is not passed through `parseRockId`,
+ * so non-numeric and zero-padded ids become separate rows. Before mainnet, bind the write to the
+ * rock's on-chain owner and canonicalise the id.
  */
 
 import { NextResponse } from "next/server";

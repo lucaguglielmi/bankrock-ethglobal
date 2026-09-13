@@ -1,4 +1,18 @@
 /**
+ * =============================================================================================
+ * DEMO / TESTING ONLY — THIS ROUTE WILL BE REMOVED BEFORE MAINNET.
+ *
+ * It exists so the app can be exercised end to end without tapping a physical rock: it forges a
+ * genuine SDM pair under the production master key for a synthetic tag and hands it to the real
+ * verify → attest → awaken path. Nothing here belongs in a deployment that holds value.
+ *
+ * Security review 2026-09-13, finding R-1: while `DEMO_TAP_SECRET` is set, whoever holds it can
+ * mint a valid tap for ANY tag uid, including a real rock's, and the forged read counter (minutes
+ * since 2026-01-01) leaves a real tag's replay counter far behind for good. Keep the secret unset
+ * except during a recording, never paste the link into a recorded browser, and delete this file
+ * together with DEMO-STATE S-4 before mainnet.
+ * =============================================================================================
+ *
  * DEMO ONLY — a "magic link" that plays the part of the NFC chip.
  *
  * Added 2026-09-13 for the recorded demo, before the prototype tag was programmed. It is not a

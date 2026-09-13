@@ -29,6 +29,13 @@ jobs:
       run:
         working-directory: ./web
 
+    # NOTE (security review 2026-09-13, R-2) — TO BE FIXED BEFORE PRODUCTION. These secrets are
+    # set at job level, so they are in the environment of `npm ci` and of every dependency install
+    # script it runs, and this job has no `environment:` protection. Before mainnet: move them to
+    # the `env:` of the Rehearse step only, install with `npm ci --ignore-scripts`, put the job
+    # behind a GitHub environment with required reviewers, and rehearse with a throwaway attester
+    # and relayer instead of the production keys. Accepted as is for the testnet demo.
+    #
     # Every value comes from a repository secret; none is committed (spec 16). The funder is the
     # only one that has to hold tokens — the three people in the story (owner, taker, recipient)
     # are fresh keys the script generates per run.

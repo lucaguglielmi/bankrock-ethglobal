@@ -560,6 +560,13 @@ contract BankRockRegistry is Ownable2Step, Pausable, EIP712 {
         // The attester's word is not sufficient on its own. Ask the account itself whether it
         // answers to the new owner, so that the ordering the relay route follows by convention
         // holds for every caller as an invariant.
+        //
+        // TEMPORARY — TO BE FIXED BEFORE MAINNET (security review 2026-09-13, R-4). `isOwner`
+        // proves inclusion, not exclusive control: a giver who adds a second signer or enables a
+        // module on the Rock Account before gifting still controls it after this claim, and
+        // through `_requireRockController` still controls the rock. The mainnet fix additionally
+        // requires `!_accountAnswersTo(att.smartAccount, previousOwner)` here, and has the claim
+        // route read the account's owners, threshold, modules and guard before relaying.
         if (!_accountAnswersTo(att.smartAccount, att.subject)) {
             revert AccountDoesNotAnswerToOwner(att.smartAccount, att.subject);
         }
