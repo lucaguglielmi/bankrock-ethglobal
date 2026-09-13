@@ -16,7 +16,7 @@
  * a missing address must never read as "this rock is idle" (D-013).
  */
 
-import { Loader2 } from "lucide-react";
+import { ArrowRightLeft, Loader2 } from "lucide-react";
 import type { Address } from "viem";
 import type { Capability } from "@/lib/demo";
 import type { StrategyView } from "@/hooks/useAquaStrategy";
@@ -89,15 +89,19 @@ export function TradeTab({
 
   if (streams.length === 0) {
     return (
-      <section className="flex flex-col items-center gap-4 rounded-2xl border border-border px-4 py-10 text-center">
-        <p className="max-w-prose text-base text-ink-2">This rock is not trading yet.</p>
+      <section className="flex flex-col items-center gap-4 rounded-3xl border border-border px-4 py-12 text-center">
+        <ArrowRightLeft aria-hidden className="size-8 text-ink-4" />
+        <div className="flex flex-col gap-1">
+          <p className="max-w-prose text-base text-ink-2">This rock is not trading yet.</p>
+          {isOwner ? null : (
+            <p className="max-w-prose text-sm text-ink-3">Only its owner can start it.</p>
+          )}
+        </div>
         {isOwner ? (
           <Button type="button" size="default" onClick={onGoToLiquidity}>
             Start earning
           </Button>
-        ) : (
-          <p className="max-w-prose text-sm text-ink-3">Only its owner can start it.</p>
-        )}
+        ) : null}
       </section>
     );
   }

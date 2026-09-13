@@ -8,23 +8,27 @@
  * formula (N-6), a hardcoded mainnet pair of token addresses, a receipt naming the wrong network,
  * a synthesized hash in the success state (D-014) and a swipe-to-swap gesture whose knob
  * disappeared under the clip before its 200 px threshold on a 360 px phone (L-6). Then it became
- * a `Sheet`.
+ * a `Sheet`, then three stacked cards.
  *
- * What it is now: `TradePanel`, inline content for the rock dashboard's Trade tab. Every number
- * on screen comes from `GET /api/rocks/[id]/quote` — the amount out, the fee in basis points and
- * the price impact in basis points, all from the same source that will execute the swap. Nothing
- * is computed here except the slippage floor, which is arithmetic on the quote. The confirmation
- * is one 56 px button at the bottom of the panel (L-6, §4.5) whose label morphs with the state
- * (STEERING.md); it calls `useTakerActions().swap`, and the receipt is whatever that returns — a
- * real hash, or an honest reason.
+ * What it is now: `TradePanel`, inline content for the rock dashboard's Trade tab — one card with
+ * two halves ("Top up the rock" / "Send from the rock"), a flip button riding the divider between
+ * them, the deal-quality row always in view, the rest of the quote behind a "Details" disclosure,
+ * and the one 56 px button in a footer band whose label morphs with the state (STEERING.md). Every
+ * number on screen comes from `GET /api/rocks/[id]/quote` — the amount out, the fee in basis points
+ * and the price impact in basis points, all from the same source that will execute the swap — or
+ * from a real balance read of the visitor's account. Nothing is computed here except the slippage
+ * floor and the per-unit rate, both of which are arithmetic on the quote. The button calls
+ * `useTakerActions().swap`, and the receipt is whatever that returns — a real hash, or an honest
+ * reason.
  *
- * A rock may have several live streams at once. When it does, a "Trade against" chip row picks the
- * one the quote and the swap are aimed at, defaulting to the lowest fee.
+ * A rock may have several live streams at once. When it does, a "Trading against" chip row above
+ * the card picks the one the quote and the swap are aimed at, defaulting to the lowest fee.
  *
  * The panel also shows **the account the swap comes from**: the visitor's personal Safe (D-029,
- * salt 0) and its two balances. Its address sits behind a "Show address" disclosure so no hex is
- * on screen at load, but it is one tap away: an account that holds nothing says so, and blocks the
- * button, before anything is signed — and the visitor can see where to send tokens.
+ * salt 0) and its two balances, in a compact row under the card. Its address sits behind a "Show
+ * address" disclosure so no hex is on screen at load, but it is one tap away: an account that
+ * holds nothing says so, and blocks the button, before anything is signed — and the visitor can
+ * see where to send tokens.
  *
  * The `TradeModal` sheet wrapper is gone: the tabbed dashboard renders `TradePanel` inline
  * through `rock/tabs/trade-tab.tsx`, and nothing else opened the sheet.
@@ -32,18 +36,19 @@
 
 import * as React from "react";
 import { formatUnits, parseUnits, type Address } from "viem";
-import { ArrowUpDown, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Collapsible } from "@base-ui/react/collapsible";
+import { ArrowUpDown, ChevronDown, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 // Aliased: `Address` is viem's address *type* in this file, and the primitive is a component.
 import { Address as AddressLine } from "@/components/ui/address";
 import { Amount } from "@/components/ui/amount";
-import { UnavailableState } from "@/components/ui/unavailable-state";
+import { TokenIcon } from "@/components/ui/token-icon";
 import { HelpTerm } from "@/components/ui/popover";
 import { CapabilityResult } from "@/components/sheets/capability-result";
 import { defaultStream, TradeStreamPicker } from "@/components/rock/trade-stream-picker";
 import { cn } from "@/lib/ui/cn";
-import { defaultMaxFractionDigits, formatAmount } from "@/lib/ui/format";
+import { defaultMaxFractionDigits, formatAmount, toDisplayNumber } from "@/lib/ui/format";
 import { explorer, tokens, type TokenSymbol } from "@/lib/chain";
 import type { Capability } from "@/lib/demo";
 import { useAuth } from "@/context/auth-context";
@@ -69,7 +74,7 @@ export interface TradePanelProps {
   /** The rock's account — the maker the quote and the swap are aimed at. */
   maker?: Address;
   /**
-   * The rock's live streams. With more than one, a "Trade against" picker chooses which stream
+   * The rock's live streams. With more than one, a "Trading against" picker chooses which stream
    * the quote and the swap use; the lowest fee is selected first.
    */
   streams?: readonly ParsedStream[];
@@ -134,24 +139,44 @@ function formatBps(bps: number): string {
   return `${(bps / 100).toFixed(2)}%`;
 }
 
+/**
+ * How many decimals a per-unit rate needs to be legible: two for anything at or above one, and
+ * enough to show three meaningful digits for anything smaller ("0.00099 WETH", not "0.0010").
+ */
+function rateFractionDigits(rate: number): number {
+  if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) return 2;
+  return Math.min(8, Math.ceil(-Math.log10(rate)) + 2);
+}
+
+/**
+ * The token on one side of the swap. It shows which token that side is in, and tapping it
+ * switches the pair around — with two tokens, "pay with the other one" is the only other choice.
+ * Ink-filled on the side the visitor is paying from; outlined on the side the rock pays out.
+ */
 function TokenChip({
   symbol,
-  selected,
-  onSelect,
+  side,
+  onFlip,
 }: {
   symbol: TokenSymbol;
-  selected: boolean;
-  onSelect: (symbol: TokenSymbol) => void;
+  side: "in" | "out";
+  onFlip: () => void;
 }) {
+  const other = otherToken(symbol);
   return (
     <Button
       type="button"
-      variant={selected ? "default" : "outline"}
-      aria-pressed={selected}
-      onClick={() => onSelect(symbol)}
-      className="h-11 rounded-full px-4 text-sm font-semibold"
+      variant={side === "in" ? "default" : "outline"}
+      aria-label={
+        side === "in"
+          ? `Paying with ${symbol}. Pay with ${other} instead`
+          : `Receiving ${symbol}. Receive ${other} instead`
+      }
+      onClick={onFlip}
+      className="h-11 gap-2 rounded-full pl-3 pr-4 text-sm font-semibold"
     >
-      {symbol}
+      <TokenIcon symbol={symbol} className="size-5" />
+      <span aria-hidden>{symbol}</span>
     </Button>
   );
 }
@@ -183,6 +208,8 @@ export function TradePanel({
   const [swapError, setSwapError] = React.useState<string | null>(null);
 
   const addressRegionId = React.useId();
+  const amountInputId = React.useId();
+  const amountHintId = React.useId();
 
   /* ---------------------------------------------------------------------- */
   /* Which stream. Pinned by the caller, chosen by the visitor, or cheapest.  */
@@ -292,11 +319,6 @@ export function TradePanel({
     setSwapError(null);
   }, []);
 
-  const handleSelectTokenIn = React.useCallback((symbol: TokenSymbol) => {
-    setTokenIn(symbol);
-    setSwapError(null);
-  }, []);
-
   const handleSelectStream = React.useCallback((index: number) => {
     setChosenStream(index);
     setSwapError(null);
@@ -359,6 +381,13 @@ export function TradePanel({
         : shortfall
           ? `This account holds ${formatUnits(heldIn, decimalsIn)} ${tokenIn}. Send more to its address first.`
           : null;
+
+  /** "Max": the whole balance the account really holds, as the exact decimal string. */
+  const handleMax = React.useCallback(() => {
+    if (heldIn === null || heldIn === BigInt(0)) return;
+    setAmountIn(formatUnits(heldIn, decimalsIn));
+    setSwapError(null);
+  }, [heldIn, decimalsIn]);
 
   const handleSwap = React.useCallback(async () => {
     if (!maker || quote.status !== "real" || minAmountOut === null || shortfall || exceedsStream) {
@@ -435,6 +464,16 @@ export function TradePanel({
         })
       : null;
 
+  /**
+   * The per-unit rate of *this* quote — amount out over amount in, nothing else. It is not a
+   * market price and is not read from anywhere but the quote; it is hidden when there is none.
+   */
+  const rate =
+    quote.status === "real" && hasAmount
+      ? toDisplayNumber(BigInt(quote.value.amountOut), decimalsOut) / Number(trimmedAmount)
+      : null;
+  const rateShown = rate !== null && Number.isFinite(rate) && rate > 0;
+
   const primaryLabel = !authenticated
     ? "Sign in to trade"
     : isPending
@@ -449,35 +488,52 @@ export function TradePanel({
 
   const primaryBusy = authenticated && (isPending || quote.status === "loading");
 
+  /* ---------------------------------------------------------------------- */
+  /* Receipt: in place of the card body, with the way back.                  */
+  /* ---------------------------------------------------------------------- */
+
   if (result) {
     return (
-      <div className={cn("flex flex-col gap-6", className)}>
-        <CapabilityResult
-          result={result}
-          title="Swap done"
-          description="The rock's reserve and its earnings have moved with it."
-          rows={
-            result.state !== "UNAVAILABLE" ? (
-              <>
-                <dt className="text-ink-3">You received</dt>
-                <dd className="justify-self-end">
-                  <Amount
-                    value={result.value.amountOut}
-                    decimals={decimalsOut}
-                    symbol={tokenOut}
-                    size="sm"
-                  />
-                </dd>
-              </>
-            ) : null
-          }
-        />
-        <Button type="button" size="lg" className="w-full" onClick={handleReset}>
-          Trade again
-        </Button>
+      <div className={cn("flex flex-col gap-4", className)}>
+        <section className="rounded-3xl border border-border bg-background">
+          <div className="p-5">
+            <CapabilityResult
+              result={result}
+              title="Swap done"
+              description="The rock's reserve and its earnings have moved with it."
+              rows={
+                result.state !== "UNAVAILABLE" ? (
+                  <>
+                    <dt className="text-ink-3">You received</dt>
+                    <dd className="justify-self-end">
+                      <span className="inline-flex items-center gap-1.5">
+                        <TokenIcon symbol={tokenOut} className="size-4 text-ink-3" />
+                        <Amount
+                          value={result.value.amountOut}
+                          decimals={decimalsOut}
+                          symbol={tokenOut}
+                          size="sm"
+                        />
+                      </span>
+                    </dd>
+                  </>
+                ) : null
+              }
+            />
+          </div>
+          <div className="border-t border-border p-4">
+            <Button type="button" size="lg" className="w-full" onClick={handleReset}>
+              Trade again
+            </Button>
+          </div>
+        </section>
       </div>
     );
   }
+
+  /* ---------------------------------------------------------------------- */
+  /* The card.                                                               */
+  /* ---------------------------------------------------------------------- */
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
@@ -485,98 +541,140 @@ export function TradePanel({
         <TradeStreamPicker streams={streams} value={streamIndex} onChange={handleSelectStream} />
       ) : null}
 
-      {/* You pay */}
-      <section className="rounded-2xl border border-border p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <label htmlFor="trade-amount" className="text-label uppercase text-ink-3">
-            You pay
+      <section className="rounded-3xl border border-border bg-background">
+        {/* Top half — what goes into the rock */}
+        <div className="flex flex-col gap-3 p-5 pb-7">
+          <label htmlFor={amountInputId} className="text-label uppercase text-ink-3">
+            Top up the rock
           </label>
-          <div className="flex flex-wrap gap-2">
-            <TokenChip
-              symbol="USDC"
-              selected={tokenIn === "USDC"}
-              onSelect={handleSelectTokenIn}
+          <div className="flex items-center gap-3">
+            <input
+              id={amountInputId}
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="0"
+              value={amountIn}
+              onChange={(event) => {
+                setAmountIn(event.target.value);
+                setSwapError(null);
+              }}
+              aria-describedby={amountHintId}
+              className="-mx-1 min-w-0 flex-1 rounded-lg bg-transparent px-1 text-num-lg font-bold tabular-nums text-ink outline-none placeholder:text-ink-4"
             />
-            <TokenChip
-              symbol="WETH"
-              selected={tokenIn === "WETH"}
-              onSelect={handleSelectTokenIn}
-            />
+            <TokenChip symbol={tokenIn} side="in" onFlip={handleFlip} />
+          </div>
+          <div className="flex min-h-10 items-center justify-between gap-3">
+            {heldIn !== null ? (
+              <>
+                <p id={amountHintId} className="text-sm text-ink-3">
+                  Your account holds{" "}
+                  <Amount
+                    value={heldIn}
+                    decimals={decimalsIn}
+                    symbol={tokenIn}
+                    size="sm"
+                    className="text-ink-2"
+                  />
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={heldIn === BigInt(0)}
+                  onClick={handleMax}
+                  className="-mr-3 text-ink-2"
+                >
+                  Max
+                </Button>
+              </>
+            ) : (
+              <p id={amountHintId} className="text-sm text-ink-3">
+                Type the amount of {tokenIn} to swap.
+              </p>
+            )}
           </div>
         </div>
-        <input
-          id="trade-amount"
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="0.0"
-          value={amountIn}
-          onChange={(event) => {
-            setAmountIn(event.target.value);
-            setSwapError(null);
-          }}
-          aria-describedby="trade-amount-hint"
-          className="mt-2 w-full bg-transparent text-num-lg font-bold tabular-nums text-ink outline-none placeholder:text-ink-4"
-        />
-        <p id="trade-amount-hint" className="mt-1 text-sm text-ink-3">
-          Type the amount of {tokenIn} you want to swap.
-        </p>
-      </section>
 
-      <div className="flex justify-center">
-        <IconButton
-          aria-label={`Swap direction: pay ${tokenOut} instead`}
-          variant="outline"
-          onClick={handleFlip}
-          className="rounded-full"
-        >
-          <ArrowUpDown />
-        </IconButton>
-      </div>
-
-      {/* You receive */}
-      <section className="rounded-2xl border border-border p-4">
-        <span className="text-label uppercase text-ink-3">You receive</span>
-        <div className="mt-2 min-h-12">
-          {quote.status === "real" ? (
-            <Amount
-              value={BigInt(quote.value.amountOut)}
-              decimals={decimalsOut}
-              symbol={tokenOut}
-              size="lg"
-            />
-          ) : quote.status === "loading" ? (
-            <span role="status" className="flex items-center gap-2 text-base text-ink-3">
-              <Loader2 aria-hidden className="size-5 motion-safe:animate-spin" />
-              Getting the price…
-            </span>
-          ) : (
-            <span className="text-num-lg font-bold tabular-nums text-ink-4">—</span>
-          )}
+        {/* The divider, with the flip button riding it */}
+        <div className="relative border-t border-border">
+          <IconButton
+            aria-label={`Swap direction: pay ${tokenOut} instead`}
+            variant="outline"
+            onClick={handleFlip}
+            className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background shadow-xs"
+          >
+            <ArrowUpDown />
+          </IconButton>
         </div>
 
-        {/* The quote, as a two-column definition list at text-sm (Part 5) */}
-        <dl className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-3 border-t border-border pt-4 text-sm">
-          <dt className="text-ink-3">
-            <HelpTerm term="How good a deal is this?">
-              Big orders move the price against you: you end up with less than the headline rate
-              suggests. The bar shows how far this order moves it — short and green is a good
-              deal. It is measured from the quote that will execute, never guessed.
-            </HelpTerm>
-          </dt>
-          <dd className="justify-self-end">
+        {/* Bottom half — what the rock sends back */}
+        <div className="flex flex-col gap-3 p-5 pt-7">
+          <span className="text-label uppercase text-ink-3">Send from the rock</span>
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              {quote.status === "real" ? (
+                <>
+                  <Amount
+                    value={BigInt(quote.value.amountOut)}
+                    decimals={decimalsOut}
+                    size="lg"
+                    className="truncate"
+                  />
+                  <span className="sr-only">{tokenOut}</span>
+                </>
+              ) : (
+                <span
+                  role={quote.status === "loading" ? "status" : undefined}
+                  className={cn(
+                    "text-num-lg font-bold tabular-nums text-ink-4",
+                    quote.status === "loading" && "motion-safe:animate-pulse",
+                  )}
+                >
+                  <span aria-hidden>—</span>
+                  {quote.status === "loading" ? (
+                    <span className="sr-only">Getting a quote…</span>
+                  ) : null}
+                </span>
+              )}
+            </div>
+            <TokenChip symbol={tokenOut} side="out" onFlip={handleFlip} />
+          </div>
+          {rateShown && rate !== null ? (
+            <p className="text-sm text-ink-3">
+              <Amount value={1} symbol={tokenIn} size="sm" className="text-ink-2" />
+              <span aria-hidden> → </span>
+              <span className="sr-only"> gets </span>
+              <Amount
+                value={rate}
+                symbol={tokenOut}
+                maxFractionDigits={rateFractionDigits(rate)}
+                size="sm"
+                className="text-ink-2"
+              />{" "}
+              for this trade
+            </p>
+          ) : quote.status === "unavailable" ? (
+            <p className="max-w-prose text-sm text-ink-2">{quote.reason}</p>
+          ) : null}
+        </div>
+
+        {/* The deal, always in view; the rest of the quote behind "Details" */}
+        <div className="flex flex-col border-t border-border px-5 py-3">
+          <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
+            <span className="text-ink-3">
+              <HelpTerm term="How good a deal is this?">
+                Big orders move the price against you: you end up with less than the headline rate
+                suggests. The bar shows how far this order moves it — short and green is a good
+                deal. It is measured from the quote that will execute, never guessed.
+              </HelpTerm>
+            </span>
             {quote.status === "real" && impact ? (
               <span className="flex items-center gap-2">
-                <span
-                  aria-hidden
-                  className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"
-                >
+                <span aria-hidden className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
                   <span
-                    className={cn(
-                      "block h-full rounded-full motion-safe:transition-all",
-                      impact.bar,
-                    )}
+                    className={cn("block h-full rounded-full motion-safe:transition-all", impact.bar)}
                     style={{
                       width: `${Math.min(
                         100,
@@ -585,93 +683,155 @@ export function TradePanel({
                     }}
                   />
                 </span>
-                <span className={cn("font-medium tabular-nums", impact.text)}>
-                  {impact.word} · {formatBps(quote.value.priceImpactBps)}
+                <span
+                  className={cn(
+                    "rounded-full bg-muted px-2.5 py-0.5 text-caption font-semibold",
+                    impact.text,
+                  )}
+                >
+                  {impact.word}
+                </span>
+                <span className="font-medium tabular-nums text-ink">
+                  {formatBps(quote.value.priceImpactBps)}
                 </span>
               </span>
             ) : (
-              <span className="text-ink-3">—</span>
+              <span className="text-ink-4">—</span>
             )}
-          </dd>
+          </div>
 
-          <dt className="text-ink-3">What the rock earns</dt>
-          <dd className="justify-self-end text-right font-medium tabular-nums text-ink">
-            {quote.status === "real" ? `${formatBps(quote.value.feeBps)} of what you put in` : "—"}
-          </dd>
+          <Collapsible.Root>
+            <Collapsible.Trigger className="group/details flex h-11 w-full items-center justify-between rounded-lg text-sm text-ink-3 outline-none hover:text-ink">
+              <span>Details</span>
+              <ChevronDown
+                aria-hidden
+                className="size-4 motion-safe:transition-transform group-aria-expanded/details:rotate-180"
+              />
+            </Collapsible.Trigger>
+            <Collapsible.Panel className="h-(--collapsible-panel-height) overflow-hidden motion-safe:transition-[height] motion-safe:duration-200 data-ending-style:h-0 data-starting-style:h-0">
+              <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-3 pb-3 pt-1 text-sm">
+                <dt className="text-ink-3">What the rock earns</dt>
+                <dd className="justify-self-end text-right font-medium tabular-nums text-ink">
+                  {quote.status === "real"
+                    ? `${formatBps(quote.value.feeBps)} of what you put in`
+                    : "—"}
+                </dd>
 
-          <dt className="text-ink-3">
-            <HelpTerm term="The least you will accept">
-              If the price moves between now and the moment the swap settles, the trade is
-              cancelled rather than filled at a worse rate. The allowance is 0.5%.
-            </HelpTerm>
-          </dt>
-          <dd className="justify-self-end text-right">
-            {minAmountOut !== null ? (
-              <Amount value={minAmountOut} decimals={decimalsOut} symbol={tokenOut} size="sm" />
-            ) : (
-              <span className="font-medium text-ink">—</span>
-            )}
-          </dd>
+                <dt className="text-ink-3">
+                  <HelpTerm term="The least you will accept">
+                    If the price moves between now and the moment the swap settles, the trade is
+                    cancelled rather than filled at a worse rate. The allowance is 0.5%.
+                  </HelpTerm>
+                </dt>
+                <dd className="justify-self-end text-right">
+                  {minAmountOut !== null ? (
+                    <Amount value={minAmountOut} decimals={decimalsOut} symbol={tokenOut} size="sm" />
+                  ) : (
+                    <span className="font-medium text-ink">—</span>
+                  )}
+                </dd>
 
-          <dt className="text-ink-3">Where this price comes from</dt>
-          <dd className="justify-self-end text-right font-medium text-ink">
-            {quote.status === "real" ? quote.value.source : "The rock's own strategy"}
-          </dd>
-        </dl>
+                <dt className="text-ink-3">Where this price comes from</dt>
+                <dd className="justify-self-end text-right font-medium text-ink">
+                  {quote.status === "real" ? quote.value.source : "The rock's own strategy"}
+                </dd>
+              </dl>
+            </Collapsible.Panel>
+          </Collapsible.Root>
+        </div>
+
+        {/* Footer band: what stands in the way, then the one button */}
+        <div className="flex flex-col gap-3 border-t border-border p-4">
+          {swapError ? (
+            <p role="alert" className="text-sm text-danger">
+              {swapError}
+            </p>
+          ) : null}
+          {exceedsStream && payableOut !== null ? (
+            <p className="max-w-prose text-sm text-warning">
+              This strategy can pay out at most{" "}
+              <Amount value={payableOut} decimals={decimalsOut} symbol={tokenOut} size="sm" /> right
+              now. Try a smaller amount{streams.length > 1 ? " or another strategy" : ""}.
+            </p>
+          ) : null}
+          <Button
+            type="button"
+            size="lg"
+            className="h-auto min-h-14 w-full whitespace-normal py-3 text-center"
+            disabled={authenticated && !canSwap}
+            aria-busy={primaryBusy || undefined}
+            onClick={authenticated ? handleSwap : handleSignIn}
+          >
+            <span className="motion-safe:transition-opacity">{primaryLabel}</span>
+            {primaryBusy ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : null}
+          </Button>
+          <p className="max-w-prose text-caption text-ink-3">
+            A swap is never risk-free: the price can move between the quote you see and the trade
+            that settles.
+          </p>
+        </div>
       </section>
 
-      {quote.status === "unavailable" ? (
-        <UnavailableState reason={quote.reason} className="px-4 py-6" />
-      ) : null}
-
       {/* The account the swap comes from (D-029: one personal Safe per visitor) */}
-      <section className="flex flex-col gap-3 rounded-2xl border border-border p-4">
-        <h3 className="text-h3 font-semibold text-ink">You pay from</h3>
+      <section className="flex flex-col gap-2 px-1">
         {!authenticated ? (
-          <p className="max-w-prose text-sm text-ink-3">
-            Your own account — one per person, not tied to any rock. Sign in to see it.
-          </p>
+          <div className="flex flex-col gap-1">
+            <span className="text-label uppercase text-ink-3">Paying from your account</span>
+            <p className="max-w-prose text-sm text-ink-3">
+              Your own account — one per person, not tied to any rock. Sign in to see it.
+            </p>
+          </div>
         ) : account.state === "UNAVAILABLE" ? (
-          <p className="max-w-prose text-sm text-ink-2">{account.reason}</p>
+          <div className="flex flex-col gap-1">
+            <span className="text-label uppercase text-ink-3">Paying from your account</span>
+            <p className="max-w-prose text-sm text-ink-2">{account.reason}</p>
+          </div>
         ) : (
           <>
-            {balances.state === "UNAVAILABLE" ? (
-              <p className="max-w-prose text-sm text-ink-2">{balances.reason}</p>
-            ) : (
-              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-                <Amount
-                  value={balances.value.usdc}
-                  decimals={tokens.USDC.decimals}
-                  symbol="USDC"
-                  size="sm"
-                />
-                <Amount
-                  value={balances.value.weth}
-                  decimals={tokens.WETH.decimals}
-                  symbol="WETH"
-                  size="sm"
-                />
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <div className="flex flex-col gap-1">
+                <span className="text-label uppercase text-ink-3">Paying from your account</span>
+                {balances.state === "UNAVAILABLE" ? (
+                  <p className="max-w-prose text-sm text-ink-2">{balances.reason}</p>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="inline-flex items-center gap-1.5">
+                      <TokenIcon symbol="USDC" className="size-4 text-ink-3" />
+                      <Amount
+                        value={balances.value.usdc}
+                        decimals={tokens.USDC.decimals}
+                        symbol="USDC"
+                        size="sm"
+                      />
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <TokenIcon symbol="WETH" className="size-4 text-ink-3" />
+                      <Amount
+                        value={balances.value.weth}
+                        decimals={tokens.WETH.decimals}
+                        symbol="WETH"
+                        size="sm"
+                      />
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
-            <p className="max-w-prose text-sm text-ink-3">
-              Your own account — one per person, not tied to any rock. Gas is paid for you, but
-              the tokens you swap have to be in it.
-            </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-expanded={addressShown}
+                aria-controls={addressRegionId}
+                onClick={() => setAddressShown((shown) => !shown)}
+                className="-mx-3 text-ink-2"
+              >
+                {addressShown ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+                {addressShown ? "Hide address" : "Show address"}
+              </Button>
+            </div>
             {fundingMessage ? (
               <p className="max-w-prose text-sm text-warning">{fundingMessage}</p>
             ) : null}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-expanded={addressShown}
-              aria-controls={addressRegionId}
-              onClick={() => setAddressShown((shown) => !shown)}
-              className="-ml-3 self-start text-ink-2"
-            >
-              {addressShown ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
-              {addressShown ? "Hide address" : "Show address"}
-            </Button>
             {addressShown ? (
               <div id={addressRegionId} className="flex flex-col gap-1">
                 <AddressLine
@@ -679,47 +839,18 @@ export function TradePanel({
                   explorerHref={explorer.address(account.value)}
                 />
                 <p className="text-caption text-ink-3">
-                  Send USDC or WETH on Sepolia here to trade with it.
+                  Send USDC or WETH on Sepolia here to trade with it. Gas is paid for you, but the
+                  tokens you swap have to be in it.
                 </p>
               </div>
-            ) : null}
+            ) : (
+              <p className="max-w-prose text-caption text-ink-3">
+                Gas is paid for you, but the tokens you swap have to be in this account.
+              </p>
+            )}
           </>
         )}
       </section>
-
-      {/* Primary action, always last (STEERING.md: one button, morphing between states) */}
-      <div className="flex flex-col gap-2">
-        {swapError ? (
-          <p role="alert" className="text-sm text-danger">
-            {swapError}
-          </p>
-        ) : null}
-        {quote.status === "unavailable" && hasAmount ? (
-          <p className="text-sm text-ink-2">{quote.reason}</p>
-        ) : null}
-        {exceedsStream && payableOut !== null ? (
-          <p className="max-w-prose text-sm text-warning">
-            This strategy can pay out at most{" "}
-            <Amount value={payableOut} decimals={decimalsOut} symbol={tokenOut} size="sm" /> right
-            now. Try a smaller amount{streams.length > 1 ? " or another strategy" : ""}.
-          </p>
-        ) : null}
-        <Button
-          type="button"
-          size="lg"
-          className="h-auto min-h-14 w-full whitespace-normal py-3 text-center"
-          disabled={authenticated && !canSwap}
-          aria-busy={primaryBusy || undefined}
-          onClick={authenticated ? handleSwap : handleSignIn}
-        >
-          <span className="motion-safe:transition-opacity">{primaryLabel}</span>
-          {primaryBusy ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : null}
-        </Button>
-        <p className="max-w-prose text-caption text-ink-3">
-          A swap is never risk-free: the price can move between the quote you see and the trade
-          that settles.
-        </p>
-      </div>
     </div>
   );
 }

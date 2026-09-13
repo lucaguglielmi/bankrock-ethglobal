@@ -25,6 +25,7 @@ import type { ReactNode } from "react";
 import { Amount } from "@/components/ui/amount";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { formatFeeRate } from "@/components/rock/util";
+import { StrategyArt } from "@/components/rock/strategy-art";
 import type { ParsedStream } from "@/hooks/useAquaStrategy";
 import { tokens } from "@/lib/chain";
 
@@ -45,9 +46,12 @@ export function StreamCard({ stream, action }: StreamCardProps) {
   return (
     <article className="flex flex-col gap-5 rounded-3xl border border-border p-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h3 className="text-h3 font-semibold text-ink">{streamName(stream)}</h3>
-          <p className="text-sm text-ink-2">Earns {formatFeeRate(stream.feeBps)} of every trade</p>
+        <div className="flex min-w-0 items-center gap-3">
+          <StrategyArt label={stream.label} className="size-10 text-ink" />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h3 className="text-h3 font-semibold text-ink">{streamName(stream)}</h3>
+            <p className="text-sm text-ink-2">Earns {formatFeeRate(stream.feeBps)} of every trade</p>
+          </div>
         </div>
         {action}
       </header>

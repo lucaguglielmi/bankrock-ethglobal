@@ -1,16 +1,17 @@
 "use client";
 
 /**
- * "Trade against" — which of a rock's live streams a swap is aimed at.
+ * "Trading against" — which of a rock's live streams a swap is aimed at.
  *
  * A rock may run several strategies at once, one per catalogue preset, each with its own fee and
  * its own balances (`docs/dashboard-strategies.md`). The quote route and the swap both take a
  * `streamIndex`, so the choice has to be made before either is asked. The picker renders only when
  * there is a choice to make: with one live stream it is absent and that stream is used.
  *
- * Chips are 44 px and wrap rather than shrink (spec 17 §4.5). Each is labelled with the preset's
- * name and its fee — the fee is the authenticated half of "what the rock earns" (`formatFeeRate`)
- * and is never annualised (D-004).
+ * It is one small row above the trade card: the label, then the chips. Chips are 44 px and wrap
+ * rather than shrink (spec 17 §4.5). Each is labelled with the preset's name and its fee — the fee
+ * is the authenticated half of "what the rock earns" (`formatFeeRate`) and is never annualised
+ * (D-004).
  */
 
 import * as React from "react";
@@ -47,9 +48,13 @@ export function TradeStreamPicker({ streams, value, onChange, className }: Trade
   if (streams.length < 2) return null;
 
   return (
-    <div role="group" aria-labelledby={labelId} className={cn("flex flex-col gap-2", className)}>
+    <div
+      role="group"
+      aria-labelledby={labelId}
+      className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 px-1", className)}
+    >
       <span id={labelId} className="text-label uppercase text-ink-3">
-        Trade against
+        Trading against
       </span>
       <div className="flex flex-wrap gap-2">
         {streams.map((stream) => {
@@ -62,9 +67,13 @@ export function TradeStreamPicker({ streams, value, onChange, className }: Trade
               variant={selected ? "default" : "outline"}
               aria-pressed={selected}
               onClick={() => onChange(index)}
-              className="h-11 rounded-full px-4 text-sm font-semibold"
+              className="h-11 gap-1.5 rounded-full px-4 text-sm font-semibold"
             >
-              {streamLabel(stream)} · {formatFeeRate(stream.feeBps)}
+              <span>{streamLabel(stream)}</span>
+              <span aria-hidden className={selected ? "text-primary-foreground/60" : "text-ink-4"}>
+                ·
+              </span>
+              <span className="tabular-nums">{formatFeeRate(stream.feeBps)}</span>
             </Button>
           );
         })}
