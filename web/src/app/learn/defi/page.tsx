@@ -1,4 +1,6 @@
 import Image from "next/image";
+import { AquaArchitectureDiagram } from "@/components/aqua-architecture-diagram";
+
 import Link from "next/link";
 import { Term } from "@/components/ui/term";
 
@@ -90,13 +92,7 @@ export default function DefiPage() {
         <section className="grid grid-cols-1 items-center gap-12 md:grid-cols-2 lg:gap-24">
           <div className="order-1 flex justify-center">
             <div className="relative aspect-square w-full max-w-md overflow-hidden rounded-3xl border border-border bg-white shadow-xl">
-              <Image
-                src="/infographics/aqua_architecture.jpg"
-                alt="The Rock Account, Aqua, the pricing contract and the trade router"
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 50vw"
-              />
+              <AquaArchitectureDiagram />
             </div>
           </div>
           <div className="order-2 flex flex-col gap-6">
