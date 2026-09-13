@@ -16,6 +16,15 @@ const NAV_LINKS = [
   { href: "/shop", label: "Shop" },
 ] as const;
 
+/** The explainer pages, grouped under one heading in the phone menu. */
+const HOW_IT_WORKS_LINKS = [
+  { href: "/learn/rock", label: "The physical" },
+  { href: "/learn/defi", label: "The DeFi position" },
+  { href: "/learn/security", label: "Security" },
+] as const;
+
+const MCP_LINK = { href: "/mcp", label: "MCP endpoint" } as const;
+
 /**
  * Fixed site header (spec 17 §4.3, L-2, L-3). Below `md` the nav links
  * collapse into a `Sheet`; from `md` up they render inline as before. The
@@ -127,6 +136,34 @@ export function Header() {
               <ArrowRight className="size-4" />
             </Link>
           ) : null}
+
+          <p className="mt-3 flex h-10 items-center text-label font-semibold uppercase tracking-wide text-ink-3">
+            How does it work
+          </p>
+          {HOW_IT_WORKS_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setMenuOpen(false)}
+              className={cn(
+                "flex h-12 items-center pl-3 text-base",
+                isLinkActive(link.href) ? "font-semibold text-ink" : "font-medium text-ink-2"
+              )}
+            >
+              {link.label}
+            </Link>
+          ))}
+
+          <Link
+            href={MCP_LINK.href}
+            onClick={() => setMenuOpen(false)}
+            className={cn(
+              "mt-3 flex h-12 items-center text-base",
+              isLinkActive(MCP_LINK.href) ? "font-semibold text-ink" : "font-medium text-ink-2"
+            )}
+          >
+            {MCP_LINK.label}
+          </Link>
         </nav>
       </Sheet>
     </header>
