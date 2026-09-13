@@ -256,12 +256,16 @@ export default function McpPage() {
             and what <Term k="fee">fees</Term> they have kept. Bank Rock runs no AI of its own;
             you connect the one you already use.
           </p>
-          <p className="max-w-prose text-base text-ink-2">
-            The AI Oracle is a read-only <Term k="mcp" /> server, by decision. It holds no key, so
-            it cannot start or stop a strategy, move a token or sign anything. Every tool either reads <Term k="sepolia" />{" "}
-            or the Bank Rock API, or answers <em>unavailable</em> with the reason. It never
-            estimates and never invents a number.
-          </p>
+          <div className="flex flex-col gap-2">
+            <p className="max-w-prose text-base text-ink-2">
+              For this testnet demo, the AI Oracle is strictly a read-only <Term k="mcp" /> server. It holds no key, so
+              it cannot start or stop a strategy, move a token or sign anything. Every tool either reads <Term k="sepolia" />{" "}
+              or the Bank Rock API. However, we are actively looking for secure ways to authenticate your AI agent, so you can soon control your rock directly from your AI chat!
+            </p>
+            <Link href="/shop" className="text-base font-semibold text-link underline-offset-4 hover:underline">
+              Tell us how you would approach this technically, and win a Bank Rock for your help!
+            </Link>
+          </div>
 
           <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
             <Button size="lg" onClick={copyPrompt}>
