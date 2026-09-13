@@ -166,7 +166,12 @@ describe("readRockStreams — probing the catalogue", () => {
 
   it("asks Aqua once per catalogue preset, whatever the catalogue's length", async () => {
     const result = await readModule.readRockStreams({ rockId: ROCK_ID, maker: MAKER, app: APP });
-    expect(result.state).toBe("UNAVAILABLE");
+    // Nothing shipped is a REAL, empty answer — not an error — so the owner's way in stays on
+    // screen (main, 2026-09-13).
+    expect(result.state).toBe("REAL");
+    if (result.state !== "REAL") return;
+    expect(result.value.streams).toEqual([]);
+    expect(result.value.stopped).toEqual([]);
     expect(state.calls.filter((name) => name === "safeBalances")).toHaveLength(
       DEFAULT_STREAMS.length,
     );

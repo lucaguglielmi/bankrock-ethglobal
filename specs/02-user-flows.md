@@ -67,6 +67,11 @@ Registration does not create or fund a wallet.
 12. The application confirms the live stream by recomputing `strategyHash` and reading
     `Aqua.safeBalances`. **No tokens moved:** shipping is an allowance over balances that stay in
     the Rock Account's own wallet, and the UI says so rather than showing a deposit.
+12. **Balance first (D-038, spec 21).** If the reserve holds only one token, the ship sheet
+    pre-selects *Balance first*: the same operation swaps half of the surplus token for the other
+    through the taker against Bank Rock's house stream, then ships both. The sheet shows the
+    resulting pair and the house fee before the tap. The signature is silent for embedded wallets
+    (D-039); the tap is the acknowledgement.
 
 The UI must distinguish pending, confirmed and failed onchain operations.
 

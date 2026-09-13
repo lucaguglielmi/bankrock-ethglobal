@@ -71,7 +71,9 @@ Explain that scanning identifies the object; Privy identifies and authorizes the
 
 ### 0:55–1:35 — Aqua liquidity
 
-Show the Rock Account's actual two-token reserve. Open or reveal the Aqua strategy and explain that the assets remain with the maker while Aqua tracks strategy balances.
+Show the Rock Account's actual reserve. If it holds only USDC, tap *Start earning* with *Balance
+first* on: one silent signature converts half against Bank Rock's house stream and ships both
+(spec 21). Explain that the assets remain with the maker while Aqua tracks strategy balances.
 
 If ready, show two streams sharing the reserve.
 

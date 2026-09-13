@@ -111,6 +111,18 @@ Bank Rock employs a **Dual-Mode Paymaster Strategy**:
    - Once fees are accrued, subsequent operational UserOperations (such as strategy rebalancing or docking) can pay their own gas fees directly using the accumulated USDC via an ERC-20 Paymaster.
    - The rock mathematically pays for its own maintenance using its earned yield.
 
+## Signing (D-039)
+
+Embedded-wallet signatures are requested without Privy's confirmation sheet
+(`embeddedWallets.showWalletUIs: false`). The app's own control is the acknowledgement, so:
+
+- a signature is requested only inside a handler that starts from a user tap on a control whose
+  label names the action (Awaken, Start earning, Give, Cash in, Retire, Trade) — never from an
+  effect, a timer, a route change or a network event;
+- the sheet behind that control states the on-chain effect in tokens before the tap;
+- one UserOperation per tap;
+- external wallets keep their own confirmation; the copy says so before the tap.
+
 ## Ownership transfer
 
 Ownership transfer must not mean transferring an embedded wallet's private key.

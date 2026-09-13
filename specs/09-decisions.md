@@ -651,6 +651,41 @@ is the awakening path and is named for it; `buildSmartAccountClient` takes an ex
 `aqua-position-card.tsx` (owner buttons disabled with the reason, never silently absent);
 `web/src/lib/rock-account.authority.test.ts`; `web/scripts/rehearse-sepolia.ts` (step 5).
 
+### D-038 — A one-token deposit is balanced inside the ship operation, against a house stream
+
+**Decision:** when a rock's reserve holds only one of the two tokens, the ship sheet offers
+*Balance first*: the same sponsored UserOperation that ships the stream first swaps part of the
+surplus token for the other through `XYCSwapTaker`, against a **house stream** — a large
+USDC/WETH strategy on our own `XYCSwap` app, shipped by an operator-controlled maker. One tap,
+one signature, atomic. Spec: [`21-balance-and-ship.md`](./21-balance-and-ship.md).
+
+**Why a house stream and not a DEX:** Sepolia has no dependable USDC/WETH pool for Circle's
+USDC, and an external venue is a second audit surface. The house stream uses only the contracts
+reviewed in spec 19 and the path the visitor swap already takes; on mainnet the same code can
+point at any Aqua maker. The house maker's address is public configuration (D-034); its strategy
+bytes are recomputed by the client from a pinned salt, never trusted from configuration.
+
+**Consequence:** no contract change. `shipStrategy` gains a five-call batch; the sheet shows the
+resulting pair and the house fee before the tap; every failure is `UNAVAILABLE` with its reason
+and the reserve untouched. Automatic conversion *on deposit* is not part of this — it needs a
+session key (D-010, post-hackathon).
+
+### D-039 — Embedded-wallet signatures are silent; the app's own tap is the acknowledgement
+
+**Decision:** `PrivyProvider` is configured with `embeddedWallets.showWalletUIs: false`, so an
+operation the app asks the embedded wallet to sign does not open Privy's confirmation sheet. The
+acknowledgement is the tap on a control whose sheet states the on-chain effect in tokens.
+External wallets keep their own confirmation, which the app cannot and must not suppress.
+
+**Rule, checked in review:** the app requests a signature only inside a handler that starts from
+a user tap on a control naming the action; never from an effect, a timer, a route change or a
+network event; one UserOperation per tap; the effect shown before the tap. Spec 05 "Signing".
+
+**Why:** the duplicate prompt was observed on the phone during the first live activation
+(2026-09-13): the app's confirm step followed by Privy's, on a sponsored operation the user had
+already chosen. Two confirmations for one intent is worse UX and no more security, because the
+second sheet shows less than the first.
+
 ## Open product questions
 
 1. **Is the hackathon's main story gifting, a public micro-exchange, or both?** Gifting is the core product journey; public tap-to-trade is the primary demonstration of the liquidity.

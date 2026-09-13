@@ -34,6 +34,7 @@ Working line: **Liquidity you can hold.**
 | [18-demo-readiness.md](./18-demo-readiness.md) | What is still missing to run the three-minute demo end to end on a physical rock: the beat-by-beat state, the operator blockers, the tag's exact SDM settings, and the day-before checklist | Active |
 | [19-contract-review-and-hardening.md](./19-contract-review-and-hardening.md) | The security review and Etherscan-readability standard every contract must pass before deployment, the process and evidence that sign it off, the status of the completed audit, and the pre-mainnet list | Active |
 | [20-live-sepolia-plan.md](./20-live-sepolia-plan.md) | Going live on Sepolia: status of the deployment, the live rehearsal script and live check, the physical tag test, the demo rehearsal, and the parallel work packages | Active |
+| [21-balance-and-ship.md](./21-balance-and-ship.md) | One tap from a one-token deposit to a trading rock: the conversion inside the ship operation against a house stream, and silent embedded-wallet signing | Active |
 
 ## Spec rules
 

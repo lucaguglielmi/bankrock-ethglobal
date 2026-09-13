@@ -268,10 +268,9 @@ export async function readRockStreams(
     .filter((entry): entry is { stopped: bigint } => entry !== null && "stopped" in entry)
     .map((entry) => entry.stopped);
 
-  if (streams.length === 0) {
-    return unavailable("This rock has no live Aqua strategy");
-  }
-
+  // No stream shipped (or every one docked) is an ordinary, REAL answer — an empty list with the
+  // actual balances — not an error: the owner's "Start earning" control lives behind it
+  // (2026-09-13: reporting it as UNAVAILABLE hid that control on the live demo rock).
   return real({
     rockId: String(params.rockId),
     maker,

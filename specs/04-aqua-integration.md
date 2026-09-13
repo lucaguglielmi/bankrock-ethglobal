@@ -73,6 +73,12 @@ nothing** — it is pricing logic plus two calls into Aqua; **the maker keeps ev
 maker approves **Aqua**, once, for every strategy — never the app. The taker, by contrast,
 approves the **periphery**. Getting either backwards is a revert, not a silent loss.
 
+**The house stream (D-038).** Bank Rock itself ships one large USDC/WETH strategy on the same
+app from an operator-controlled maker. Rocks funded with one token convert half of it against
+that stream inside their own ship operation, through the taker periphery (spec 21). It is an
+ordinary maker strategy; the app reads it like any other, and its 5 bps fee stays in the house
+reserve.
+
 ## Strategy direction
 
 **Decision: constant-product strategy — realised as `XYCSwap.Strategy` (D-030)**

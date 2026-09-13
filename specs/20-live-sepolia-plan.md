@@ -149,6 +149,7 @@ down. The agent turns the findings into a `specs/08` amendment and the final `DE
 | WP-10 | **CI gates.** Branch protection on `main`: CI green + one PR review required, no direct pushes (the logo commit went to `main` around the gates). The responsive job gets a chain (registry address as a CI variable) so items 7–8 stop skipping. | 12, 17 U4 | S |
 | WP-11 | **Perimeter lows** still open: P-9, P-12, P-16, P-17 (see `web/audit/2026-09-12-perimeter.md`). | 19 | S |
 | WP-12 | **Post-gift owner actions** (found by the WP-2 dry run). For an awakened rock the app must use the registry's `smartAccount` and ask that Safe `isOwner(wallet)`, instead of re-deriving the account from (wallet, tag) and refusing the mismatch — otherwise the recipient of a gift can never archive, ship, dock or re-gift from the app. **Blocks Flow K after Flow E and therefore the stage restart after the gift beat.** | 02 Flows E/K, 09 D-037 | M |
+| WP-14 | **Balance and ship** (spec 21, D-038, D-039): one-token deposits convert against a house stream inside the ship operation; embedded-wallet signatures silent. Operator part: fund and ship the house stream. | 21 | M |
 | WP-13 | **Dependency alignment.** `web/.npmrc` `legacy-peer-deps=true` masks a peer conflict introduced by a direct `ox ^1.7.4` dependency (commit c189e5a) that nothing imports; `permissionless` wants `ox ^0.8`. Remove the direct `ox` dependency (or pin `^0.8.9`), delete `.npmrc`, regenerate the lockfile, and prove `npm ci` passes without the override. | 12 | S |
 
 ---
