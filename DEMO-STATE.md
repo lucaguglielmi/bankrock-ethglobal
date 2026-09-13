@@ -28,6 +28,7 @@ There is no fourth state, and no `catch` block substitutes a plausible value for
 | # | What | Spec | Becomes real when |
 | --- | --- | --- | --- |
 | S-1 | Cross-chain deposit (the bridge modal) | 15 Part 6, 04 | A bridge is integrated. Cut from MVP scope; it stays a badged `DEMO` beat. **Its button renders only under `NEXT_PUBLIC_DEMO_MODE=true`**: with the flag off the rock page offers "Fund this rock" instead — the Rock Account, its balances, the two token contracts and the Etherscan link, all REAL. |
+| S-4 | **The magic tap link** (`GET /api/demo/tap?key=…`) forges a genuine SDM pair for a *synthetic* tag with the real master key and redirects into the real tap flow — verification, counter, attestation and the on-chain awakening are the production path; only the chip is simulated. Exists only while the Worker secret `DEMO_TAP_SECRET` is set (404 otherwise); every use is logged `DEMO_TAP_FORGED`. Added 2026-09-13 for the recording, before the prototype tag was programmed. | 06, 18 §4.3 | The tag is programmed and the secret is unset — delete this row then. |
 | S-3 | The judge scenario switcher's sample views | 15 D-013, 17 | Never. It exists only to pick which badged sample renders, only under the flag, and it can set neither the attestation nor a balance. |
 
 ## 2. Unavailable — no path at all, on purpose
