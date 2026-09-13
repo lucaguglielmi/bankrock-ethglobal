@@ -85,12 +85,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       config={{
         // D-033: Ethereum Sepolia is the only chain. Listing mainnet or an L2 here would let an
         // embedded wallet switch to a network where funds are real, for an app whose every
-        // contract lives on Sepolia. Login methods must also be enabled in the Privy dashboard
-        // (User management → Authentication); Apple is not listed because it needs an Apple
-        // developer configuration the project does not have.
+        // contract lives on Sepolia.
+        //
+        // No `loginMethods` here on purpose: Privy then offers exactly the methods enabled in the
+        // dashboard (User management → Authentication). A list in code that names a method the
+        // dashboard has not enabled produces "Login with Google not allowed" on the phone
+        // (observed 2026-09-13), and the dashboard is the only place the methods are actually
+        // configured, so it is the only place they are declared.
         defaultChain: sepolia,
         supportedChains: [sepolia],
-        loginMethods: ["email", "google", "wallet"],
         appearance: {
           theme: "light",
           accentColor: "#000000",
