@@ -6,6 +6,8 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { ArrowRight, Menu, Volume2, VolumeX } from "lucide-react";
 import { useAudio } from "@/context/audio-context";
+import { useAuth } from "@/context/auth-context";
+import { truncateMiddle } from "@/lib/ui/format";
 import { isDemoMode } from "@/lib/demo";
 import { LoginButton } from "@/components/login-button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -34,7 +36,9 @@ const MCP_LINK = { href: "/mcp", label: "MCP endpoint" } as const;
 export function Header() {
   const pathname = usePathname();
   const { isMuted, toggleMute } = useAudio();
+  const auth = useAuth();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [signingOut, setSigningOut] = React.useState(false);
   const demoMode = isDemoMode();
 
   const isLinkActive = (href: string) => pathname === href;
@@ -110,6 +114,47 @@ export function Header() {
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Menu">
         <nav className="flex flex-col py-2">
+          {/* Account first: "Sign in / Register" when signed out, "Log out" when signed in. The
+              same `login` / `logout` the header button uses; nothing here fabricates a state
+              (an unavailable sign-in shows its reason, never a button that would fail). */}
+          {auth.ready && auth.unavailable ? (
+            <p className="flex min-h-12 items-center text-base font-medium text-ink-3">
+              {auth.unavailableReason ?? "Sign-in is not configured."}
+            </p>
+          ) : auth.ready && auth.authenticated ? (
+            <button
+              type="button"
+              disabled={signingOut}
+              onClick={async () => {
+                setSigningOut(true);
+                try {
+                  await auth.logout();
+                } finally {
+                  setSigningOut(false);
+                  setMenuOpen(false);
+                }
+              }}
+              className="flex h-12 items-center justify-between text-left text-base font-medium text-ink-2"
+            >
+              <span>{signingOut ? "Logging out…" : "Log out"}</span>
+              {auth.address ? (
+                <span className="font-mono text-label text-ink-3">{truncateMiddle(auth.address)}</span>
+              ) : null}
+            </button>
+          ) : auth.ready ? (
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                void auth.login();
+              }}
+              className="flex h-12 items-center text-left text-base font-semibold text-ink"
+            >
+              Sign in / Register
+            </button>
+          ) : null}
+          <div className="my-1 border-t border-border" />
+
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
