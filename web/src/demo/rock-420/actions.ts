@@ -185,6 +185,84 @@ export function shipDemoStrategy(
   return { state: next, result: demo({ strategyHash }) };
 }
 
+export interface TopUpDemoParams {
+  streamIndex: number;
+  /** How much more USDC the stream may trade, in base units. Zero leaves the token alone. */
+  usdcAmount: bigint;
+  /** How much more WETH the stream may trade, in base units. Zero leaves the token alone. */
+  wethAmount: bigint;
+}
+
+/**
+ * Makes more of the rock available to a live stream — the demo's `Aqua.push` from the rock's own
+ * account. The virtual balances rise and nothing else does: no token moves, the fee is untouched,
+ * and the allowance is raised to at least the new virtual balance, as `topUpStrategy` leaves it
+ * once the push has spent its share. Making *less* available is `dockDemoStrategy`.
+ */
+export function topUpDemoStrategy(
+  state: DemoRockState,
+  params: TopUpDemoParams,
+  now: number = Date.now(),
+): DemoOutcome<{ streamIndex: number; virtual: DemoAmounts }> {
+  if (state.state === "archived") return refuse(state, "A retired rock has no owner actions left");
+  if (state.state === "handover_pending") {
+    return refuse(state, "This rock is being handed over, so its strategies cannot change");
+  }
+  const stream = liveStream(state, params.streamIndex);
+  if (!stream) {
+    return refuse(state, `This rock has no live Aqua strategy at stream ${params.streamIndex}`);
+  }
+  if (params.usdcAmount < ZERO || params.wethAmount < ZERO) {
+    return refuse(state, "A strategy cannot be topped up by a negative amount");
+  }
+  if (params.usdcAmount === ZERO && params.wethAmount === ZERO) {
+    return refuse(state, "Enter an amount of USDC or WETH to make available");
+  }
+  if (params.usdcAmount > state.holdings.usdc || params.wethAmount > state.holdings.weth) {
+    return refuse(state, "This rock does not hold that much");
+  }
+
+  const nextStream: DemoStream = {
+    ...stream,
+    virtual: {
+      usdc: stream.virtual.usdc + params.usdcAmount,
+      weth: stream.virtual.weth + params.wethAmount,
+    },
+  };
+
+  const parts = [
+    params.usdcAmount > ZERO ? fmt(params.usdcAmount, "USDC") : null,
+    params.wethAmount > ZERO ? fmt(params.wethAmount, "WETH") : null,
+  ].filter((part): part is string => part !== null);
+
+  const next = withRow(
+    {
+      ...state,
+      streams: state.streams.map((candidate) =>
+        candidate.streamIndex === stream.streamIndex ? nextStream : candidate,
+      ),
+      allowance: {
+        usdc:
+          state.allowance.usdc >= nextStream.virtual.usdc
+            ? state.allowance.usdc
+            : nextStream.virtual.usdc,
+        weth:
+          state.allowance.weth >= nextStream.virtual.weth
+            ? state.allowance.weth
+            : nextStream.virtual.weth,
+      },
+    },
+    now,
+    {
+      kind: "top-up",
+      type: "hardware",
+      title: "Strategy topped up",
+      description: `${parts.join(" and ")} more allowed to trade on the ${stream.label} stream, still at ${formatFeeRate(stream.feeBps)} per trade. Nothing left the account.`,
+    },
+  );
+  return { state: next, result: demo({ streamIndex: stream.streamIndex, virtual: nextStream.virtual }) };
+}
+
 /** Closes a stream. Docking *is* the withdrawal: nothing comes back because nothing ever left. */
 export function dockDemoStrategy(
   state: DemoRockState,

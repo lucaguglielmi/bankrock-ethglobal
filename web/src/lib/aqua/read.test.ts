@@ -38,11 +38,21 @@ interface ShippedLog {
   args: { maker: Address; app: Address; strategyHash: Hex };
 }
 
+/** `Pulled` has the same shape as `Pushed`; a swap emits one of each in one transaction. */
+type PulledLog = PushedLog;
+
+/** The `Pulled` a swap emits beside its `Pushed`: same transaction, the other token. */
+function pullFor(push: PushedLog, amount: bigint = BigInt(1)): PulledLog {
+  const token = push.args.token.toLowerCase() === USDC.toLowerCase() ? WETH : USDC;
+  return { ...push, args: { ...push.args, token, amount } };
+}
+
 const state = {
   head: BigInt(0),
   ranges: [] as LoggedRange[],
   pushed: [] as PushedLog[],
   shipped: [] as ShippedLog[],
+  pulled: [] as PulledLog[],
   failFrom: null as bigint | null,
   /** Strategy hashes `safeBalances` answers for, with their virtual balances. */
   live: new Map<string, readonly [bigint, bigint]>(),
@@ -98,6 +108,7 @@ const client = {
     }
     const within = (block: bigint) => block >= fromBlock && block <= toBlock;
     if (event.name === "Pushed") return state.pushed.filter((log) => within(log.blockNumber));
+    if (event.name === "Pulled") return state.pulled.filter((log) => within(log.blockNumber));
     return state.shipped.filter((log) => within(log.blockNumber));
   },
 };
@@ -138,6 +149,7 @@ beforeEach(async () => {
   state.ranges = [];
   state.pushed = [];
   state.shipped = [];
+  state.pulled = [];
   state.failFrom = null;
   state.live = new Map();
   state.docked = new Set();
@@ -300,12 +312,13 @@ describe("readAccruedFees — chunking (D-036)", () => {
     }
   });
 
-  it("asks for Shipped over the same chunk as Pushed, so a launch push is never split off", async () => {
+  it("asks for Shipped and Pulled over the same chunk as Pushed, so a launch or a swap is never split", async () => {
     state.head = BigInt(1000 + 3_000);
     await readFees();
     const spans = (event: string) =>
       pushedRange(event).map((range) => `${range.fromBlock}-${range.toBlock}`);
     expect(spans("Shipped")).toEqual(spans("Pushed"));
+    expect(spans("Pulled")).toEqual(spans("Pushed"));
   });
 });
 
@@ -346,6 +359,7 @@ describe("readAccruedFees — resuming", () => {
         args: { maker: MAKER, app: APP, strategyHash: STRATEGY_HASH, token: USDC, amount: BigInt(10_000) },
       },
     ];
+    state.pulled = state.pushed.map((push) => pullFor(push));
     state.head = BigInt(3_000);
 
     const first = await readFees();
@@ -385,6 +399,7 @@ describe("readAccruedFees — resuming", () => {
         args: { maker: MAKER, app: APP, strategyHash: STRATEGY_HASH },
       },
     ];
+    state.pulled = [pullFor(state.pushed[1])];
     state.head = BigInt(4_000);
 
     const result = await readFees();
@@ -393,6 +408,60 @@ describe("readAccruedFees — resuming", () => {
       expect(result.value.earned.usdc).toBe(BigInt(0));
       expect(result.value.earned.weth).toBe(BigInt(60));
       expect(result.value.swapCount).toBe(1);
+    }
+  });
+
+  it("does not count a push with no pull in its transaction — the owner's top-up is not a trade", async () => {
+    state.pushed = [
+      {
+        // The owner made more USDC available to the strategy (Edit → `Aqua.push`). No `Shipped`
+        // and no `Pulled` in this transaction: nothing was traded, so no fee was earned.
+        blockNumber: BigInt(2_000),
+        transactionHash: "0xtopup",
+        args: { maker: MAKER, app: APP, strategyHash: STRATEGY_HASH, token: USDC, amount: BigInt(5_000_000) },
+      },
+      {
+        blockNumber: BigInt(2_500),
+        transactionHash: "0xswap",
+        args: { maker: MAKER, app: APP, strategyHash: STRATEGY_HASH, token: USDC, amount: BigInt(10_000) },
+      },
+    ];
+    state.pulled = [pullFor(state.pushed[1])];
+    state.head = BigInt(3_000);
+
+    const result = await readFees();
+    expect(result.state).toBe("REAL");
+    if (result.state === "REAL") {
+      // Only the swap: 10,000 at 30 bps. The 5,000,000 top-up would have booked 15,000 of fees.
+      expect(result.value.earned.usdc).toBe(BigInt(30));
+      expect(result.value.earned.weth).toBe(BigInt(0));
+      expect(result.value.swapCount).toBe(1);
+    }
+  });
+
+  it("does not let a pull for another strategy in the same transaction vouch for a push", async () => {
+    const other = `0x${"2".repeat(64)}` as Hex;
+    state.pushed = [
+      {
+        blockNumber: BigInt(2_000),
+        transactionHash: "0xbatch",
+        args: { maker: MAKER, app: APP, strategyHash: STRATEGY_HASH, token: USDC, amount: BigInt(10_000) },
+      },
+    ];
+    state.pulled = [
+      {
+        blockNumber: BigInt(2_000),
+        transactionHash: "0xbatch",
+        args: { maker: MAKER, app: APP, strategyHash: other, token: WETH, amount: BigInt(1) },
+      },
+    ];
+    state.head = BigInt(3_000);
+
+    const result = await readFees();
+    expect(result.state).toBe("REAL");
+    if (result.state === "REAL") {
+      expect(result.value.swapCount).toBe(0);
+      expect(result.value.earned.usdc).toBe(BigInt(0));
     }
   });
 
@@ -410,6 +479,7 @@ describe("readAccruedFees — resuming", () => {
         },
       },
     ];
+    state.pulled = state.pushed.map((push) => pullFor(push));
     state.head = BigInt(3_000);
 
     const result = await readFees();

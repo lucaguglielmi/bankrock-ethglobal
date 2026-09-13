@@ -182,8 +182,10 @@ wallet and virtual balance. The fee is the slice of the input the curve never pa
 1. the **rate** is `feeBps`, read from the strategy — and it is authenticated by the chain, because
    a strategy whose `feeBps` differs by one basis point hashes differently and has no balances;
 2. the **cumulative amount** is `Σ (Pushed.amount · feeBps / 10000)` over that strategy's `Pushed`
-   events, skipping the one `ship` emits per token at launch (same transaction as `Shipped`). This
-   is `readAccruedFees()` in `web/src/lib/aqua/read.ts`, and it is a chain read, not a model;
+   events, counting only the pushes a swap made — a `Pushed` whose transaction also carries a
+   `Pulled` for the same strategy — so the one `ship` emits per token at launch and a maker's own
+   top-up (`Aqua.push` from the Rock Account, the dashboard's *Edit*) are both excluded. This is
+   `readAccruedFees()` in `web/src/lib/aqua/read.ts`, and it is a chain read, not a model;
 3. when the RPC cannot serve the log range, show the fee **rate** and mark the cumulative figure
    `UNAVAILABLE`. Do not derive it from balance deltas: inventory also moves with the trade
    direction, so `virtual − shipped` is P&L, not fees, and presenting it as fees would be a

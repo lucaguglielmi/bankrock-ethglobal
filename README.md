@@ -147,6 +147,7 @@ For a rock:
 | strategy / stream | `XYCSwap` (the reference constant-product app, deployed by us unmodified) plus one immutable `Strategy{maker, USDC, WETH, feeBps, salt}`, addressed by `strategyHash = keccak256(abi.encode(strategy))` |
 | fee tier | `feeBps`: **Wide 30 bps (0.30%)**, **Tight 5 bps (0.05%)**, **Patient 100 bps (1.00%)** — stream indexes 0, 1, 2 |
 | *Start earning* (ship) | `USDC.approve(Aqua)`, `WETH.approve(Aqua)`, `Aqua.ship(app, strategy, [USDC, WETH], [a, b])` in one sponsored batch. **Moves no tokens.** |
+| *Edit* (push) | `Aqua.push(maker, app, strategyHash, token, amount)` from the rock's own account, once per token added, behind an allowance-aware approval to Aqua. **Only raises what the strategy may trade; moves no tokens.** The fee is fixed; making less available is *Stop*. |
 | *Stop* / *Cash in* (dock) | `Aqua.dock(app, strategyHash, [USDC, WETH])`. **Returns nothing, because nothing left.** A docked strategy can never be revived; a new one gets a new stream index. |
 
 **Why nothing is deposited.** `ship` writes an allowance; it does not transfer. `balanceOf(Aqua)`
@@ -175,7 +176,7 @@ TypeScript test (`web/src/lib/aqua/strategy.test.ts`) and a Solidity test
 and virtual balance. The fee is the slice of the input the curve never paid out; it accrues inside
 the rock's own reserve and shows up as growth of the invariant. There is nothing to collect. The
 dashboard shows the **rate** (from the strategy) and the **cumulative fee**, summed from Aqua's own
-`Pushed` events for that strategy (`amount · feeBps / 10000`, skipping the two `ship` emits). When
+`Pushed` events for that strategy (`amount · feeBps / 10000`, counting only a `Pushed` whose transaction also carries a `Pulled` — a swap — so the two `ship` emits and an owner's *Edit* top-ups are skipped). When
 the RPC cannot serve the log range, the figure is shown as unavailable — never derived from
 balance deltas, because `virtual − shipped` is P&L, not fees. **Nothing is ever annualised. There
 is no APY or APR anywhere, and a CI grep enforces it** (D-004).

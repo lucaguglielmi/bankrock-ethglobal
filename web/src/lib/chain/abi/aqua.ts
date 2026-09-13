@@ -39,6 +39,24 @@ export const AQUA_ABI = [
     outputs: [],
   },
   {
+    // `push(maker, app, strategyHash, token, amount)` — IAqua.sol. Anyone may call it; it only
+    // ever *raises* the strategy's virtual balance and does `safeTransferFrom(msg.sender, maker,
+    // amount)` with Aqua as spender. A taker uses it to pay for a swap (NOTES.md §5); the maker
+    // itself uses it to make more of its own reserve available to a live strategy — a
+    // self-transfer that spends the maker's allowance to Aqua and moves nothing.
+    type: "function",
+    name: "push",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "maker", type: "address" },
+      { name: "app", type: "address" },
+      { name: "strategyHash", type: "bytes32" },
+      { name: "token", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
     type: "function",
     name: "rawBalances",
     stateMutability: "view",

@@ -12,8 +12,10 @@
  *   funded       the headline reserve, then either the strategy picker (owner) or one sentence
  *                (visitor), because nothing is trading yet;
  *   live         the headline reserve, one card per live stream, a way to the Trade tab, and for
- *                the owner a quiet Stop per stream and, while presets remain, an "Add another
- *                strategy" row of compact cards, each opening the ship sheet on that preset.
+ *                the owner a quiet Edit and Stop per stream and, while presets remain, an "Add
+ *                another strategy" row of compact cards, each opening the ship sheet on that
+ *                preset. Edit can only make more of the rock available to a stream (the fee is
+ *                fixed, an allowance is never lowered short of docking); Stop is how to make less.
  *
  * Nothing on the tab is an address. Addresses appear only inside the sheets a person opens.
  *
@@ -27,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { SimulatedBadge } from "@/components/ui/simulated-badge";
 import { UnavailableState } from "@/components/ui/unavailable-state";
+import { EditStrategySheet } from "@/components/rock/edit-strategy-sheet";
 import { FundingWait } from "@/components/rock/funding-wait";
 import { FundRockSheet } from "@/components/rock/fund-rock-sheet";
 import { ReserveHeadline, type Reserves } from "@/components/rock/reserve-headline";
@@ -86,10 +89,19 @@ export function LiquidityTab({
   const [isFundOpen, setFundOpen] = useState(false);
   const [shipRequest, setShipRequest] = useState<ShipRequest | null>(null);
   const [stopping, setStopping] = useState<ParsedStream | null>(null);
+  // The stream being edited stays set while the sheet animates closed; `isEditOpen` is what
+  // opens and closes it.
+  const [editing, setEditing] = useState<ParsedStream | null>(null);
+  const [isEditOpen, setEditOpen] = useState(false);
 
   const ownerBlockedReason =
     ownerActions && ownerActions.state === "UNAVAILABLE" ? ownerActions.reason : null;
   const streams = strategy.state === "UNAVAILABLE" ? [] : strategy.value.streams;
+  // After a save the page refetches; the sheet should show the stream as it now reads, not as it
+  // was when Edit was tapped.
+  const editingStream = editing
+    ? (streams.find((stream) => stream.streamIndex === editing.streamIndex) ?? editing)
+    : null;
   // A docked stream can never be revived (NOTES §4), so stopped indexes are used up too.
   const stopped = strategy.state === "UNAVAILABLE" ? [] : strategy.value.stopped;
   const usedIndexes = [...streams.map((stream) => stream.streamIndex), ...stopped];
@@ -201,14 +213,29 @@ export function LiquidityTab({
             stream={stream}
             action={
               isOwner ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={ownerBlockedReason !== null}
-                  onClick={() => setStopping(stream)}
-                >
-                  Stop
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={ownerBlockedReason !== null}
+                    title={ownerBlockedReason ?? undefined}
+                    onClick={() => {
+                      setEditing(stream);
+                      setEditOpen(true);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={ownerBlockedReason !== null}
+                    title={ownerBlockedReason ?? undefined}
+                    onClick={() => setStopping(stream)}
+                  >
+                    Stop
+                  </Button>
+                </div>
               ) : undefined
             }
           />
@@ -312,6 +339,23 @@ export function LiquidityTab({
         excludeStreamIndexes={usedIndexes}
         onShipped={onRefresh}
       />
+
+      {editingStream ? (
+        <EditStrategySheet
+          open={isEditOpen}
+          onOpenChange={setEditOpen}
+          rockId={rockId}
+          stream={editingStream}
+          reserves={reserves}
+          onSaved={onRefresh}
+          onStopInstead={() => {
+            // Making less available is not an edit: close this sheet and open Stop for the same
+            // stream.
+            setEditOpen(false);
+            setStopping(editingStream);
+          }}
+        />
+      ) : null}
 
       <StopStrategySheet
         open={stopping !== null}

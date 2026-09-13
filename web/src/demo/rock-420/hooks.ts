@@ -45,6 +45,7 @@ import {
   setDemoLost,
   shipDemoStrategy,
   swapDemo,
+  topUpDemoStrategy,
   type DemoOutcome,
 } from "./actions";
 import { DEMO_ACTION_DELAY_MS, DEMO_ADDRESSES, DEMO_ROCK_ID } from "./constants";
@@ -310,6 +311,12 @@ export function useDemoRockActions(): UseDemoRockActions {
     [ownerAction],
   );
 
+  const topUpStrategy = useCallback(
+    (rockId: string, params: { streamIndex: number; usdcAmount: bigint; wethAmount: bigint }) =>
+      ownerAction(rockId, () => topUpDemoStrategy(readDemoRockState(), params)),
+    [ownerAction],
+  );
+
   const fundDemo = useCallback(
     (amounts: DemoAmounts) =>
       withPending(async (): Promise<Capability<DemoAmounts>> => {
@@ -331,6 +338,7 @@ export function useDemoRockActions(): UseDemoRockActions {
     clearLost,
     shipStrategy,
     dockStrategy,
+    topUpStrategy,
     fundDemo,
     isPending,
     availability,

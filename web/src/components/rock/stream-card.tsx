@@ -31,7 +31,11 @@ import { tokens } from "@/lib/chain";
 
 export interface StreamCardProps {
   stream: ParsedStream;
-  /** An owner-only control for the header row — the quiet "Stop" button. */
+  /**
+   * Owner-only controls for the header row — the quiet "Edit" and "Stop" buttons. Edit can only
+   * make more of the rock available (a strategy's fee is fixed and its allowance never lowered
+   * short of docking); Stop is the way to make less available.
+   */
   action?: ReactNode;
 }
 

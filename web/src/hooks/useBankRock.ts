@@ -34,7 +34,14 @@ import { createPimlicoClient } from "permissionless/clients/pimlico";
 import { http } from "viem";
 import { chain, ENTRY_POINT_07_ADDRESS } from "@/lib/chain";
 import { real, unavailable, type Capability, env } from "@/lib/demo";
-import { buildDockCalls, buildShipCalls, getAquaAddresses, readRockStreams } from "@/lib/aqua";
+import {
+  buildDockCalls,
+  buildPushCalls,
+  buildShipCalls,
+  getAquaAddresses,
+  readRockStreams,
+  type TokenPairAmounts,
+} from "@/lib/aqua";
 import {
   approvalCalls,
   checkAwakenAttestation,
@@ -128,6 +135,15 @@ export interface UseRockActions {
   ): Promise<Capability<{ txHash: Hex; strategyHash: Hex }>>;
   /** Closes one. Also moves no tokens — docking *is* the withdrawal (NOTES.md §4). */
   dockStrategy(rockId: string, streamIndex: number): Promise<Capability<{ txHash: Hex }>>;
+  /**
+   * Makes more of the rock available to a live stream — the only edit Aqua allows. `Aqua.push`
+   * from the rock's own account: the virtual balance rises, no token moves, the fee is untouched.
+   * Making *less* available is `dockStrategy`. UNAVAILABLE when the stream is not live.
+   */
+  topUpStrategy(
+    rockId: string,
+    params: { streamIndex: number; usdcAmount: bigint; wethAmount: bigint },
+  ): Promise<Capability<{ txHash: Hex }>>;
   isPending: boolean;
   availability: RockActionsAvailability;
 }
@@ -802,6 +818,103 @@ function useChainRockActions(enabled: boolean): UseRockActions {
     [withPending, ownerClientFor],
   );
 
+  /**
+   * Makes more of the rock available to a live stream ("Edit" on the Liquidity tab).
+   *
+   * A strategy's bytes are immutable and a docked one can never be revived (NOTES.md §4), so the
+   * fee cannot change and an allowance cannot be lowered short of `dock`. What can change is the
+   * virtual balance, upwards: `Aqua.push(maker, app, strategyHash, token, amount)` may be called
+   * by anyone and only ever adds. Called by the Rock Account itself its transfer is from the rock
+   * to the rock — nothing moves — but it is a `transferFrom` with Aqua as spender, so it spends
+   * the rock's allowance to Aqua, and the approvals in front of it are sized for that.
+   *
+   * One sponsored batch: allowance-aware approvals to Aqua, then one `push` per token added.
+   */
+  const topUpStrategy = useCallback(
+    (
+      rockId: string,
+      params: { streamIndex: number; usdcAmount: bigint; wethAmount: bigint },
+    ) =>
+      withPending(async (): Promise<Capability<{ txHash: Hex }>> => {
+        if (parseRockId(rockId) === null) return unavailable(`"${rockId}" is not a rock id`);
+        if (params.usdcAmount < BigInt(0) || params.wethAmount < BigInt(0)) {
+          return unavailable("A strategy cannot be topped up by a negative amount");
+        }
+        if (params.usdcAmount === BigInt(0) && params.wethAmount === BigInt(0)) {
+          return unavailable("Enter an amount of USDC or WETH to make available");
+        }
+
+        const owner = await ownerClientFor(rockId);
+        if (owner.state === "UNAVAILABLE") return unavailable(owner.reason);
+        const { client, smartAccount } = owner.value;
+
+        const aqua = getAquaAddresses();
+        if (aqua.state === "UNAVAILABLE") return unavailable(aqua.reason);
+
+        // The stream must be live: `push` reverts `PushToNonActiveStrategyPrevented` otherwise,
+        // and a docked stream's allowance can never come back (NOTES.md §4).
+        const live = await findShippedStream({
+          rockId,
+          maker: smartAccount,
+          streamIndex: params.streamIndex,
+          usdc: aqua.value.usdc,
+          weth: aqua.value.weth,
+          app: aqua.value.app,
+        });
+        if (live.state === "UNAVAILABLE") return unavailable(live.reason);
+
+        const plan = buildPushCalls({
+          maker: smartAccount,
+          strategyHash: live.value.strategyHash,
+          usdcAmount: params.usdcAmount,
+          wethAmount: params.wethAmount,
+        });
+        if (plan.state === "UNAVAILABLE") return unavailable(plan.reason);
+
+        // Approve Aqua for `newVirtual + pushAmount` per token pushed, where
+        // `newVirtual = virtual + pushAmount`. The push itself is `safeTransferFrom(rock, rock,
+        // pushAmount)` with Aqua as spender, so it consumes `pushAmount` of this allowance as it
+        // lands; what remains is exactly `newVirtual`, which is what the stream's pulls need to
+        // settle the whole of what it now offers. Sizing the approval at `newVirtual` alone would
+        // leave the allowance `pushAmount` short after the push, and the stream's executable
+        // amount (`min(virtual, held, allowance)`) would fall below what it advertises.
+        //
+        // `buildApprovals` reads the allowance that exists and emits nothing when it already
+        // covers this; a lower one is reset through zero, because Circle's USDC reverts on a
+        // non-zero to non-zero `approve`.
+        const wants: { token: Address; amount: bigint }[] = [];
+        if (params.usdcAmount > BigInt(0)) {
+          const newVirtual = live.value.virtual.usdc + params.usdcAmount;
+          wants.push({ token: aqua.value.usdc, amount: newVirtual + params.usdcAmount });
+        }
+        if (params.wethAmount > BigInt(0)) {
+          const newVirtual = live.value.virtual.weth + params.wethAmount;
+          wants.push({ token: aqua.value.weth, amount: newVirtual + params.wethAmount });
+        }
+
+        const approvals = await buildApprovals({
+          owner: smartAccount,
+          spender: aqua.value.aqua,
+          wants,
+        });
+        if (approvals.state === "UNAVAILABLE") return unavailable(approvals.reason);
+
+        try {
+          const userOpHash = await client.sendUserOperation({
+            calls: [...approvals.value, ...(plan.value.calls as Call[])],
+          });
+          const receipt = await client.waitForUserOperationReceipt({ hash: userOpHash });
+          if (!receipt.success) {
+            return unavailable("The strategy was not changed: the operation reverted on chain");
+          }
+          return real({ txHash: receipt.receipt.transactionHash });
+        } catch (err) {
+          return unavailable(publicReasonWith("The strategy was not changed", err));
+        }
+      }),
+    [withPending, ownerClientFor],
+  );
+
   return {
     awaken,
     initiateHandover,
@@ -813,6 +926,7 @@ function useChainRockActions(enabled: boolean): UseRockActions {
     clearLost,
     shipStrategy,
     dockStrategy,
+    topUpStrategy,
     isPending,
     availability,
   };
@@ -870,7 +984,7 @@ async function findShippedStream(params: {
   usdc: Address;
   weth: Address;
   app: Address;
-}): Promise<Capability<{ strategyHash: Hex; feeBps: bigint }>> {
+}): Promise<Capability<{ strategyHash: Hex; feeBps: bigint; virtual: TokenPairAmounts }>> {
   const view = await readRockStreams({
     rockId: params.rockId,
     maker: params.maker,
@@ -885,7 +999,12 @@ async function findShippedStream(params: {
     return unavailable(`This rock has no live Aqua strategy at stream ${params.streamIndex}`);
   }
 
-  return real({ strategyHash: stream.strategyHash, feeBps: stream.feeBps });
+  return real({
+    strategyHash: stream.strategyHash,
+    feeBps: stream.feeBps,
+    // The virtual balances as they stand, for a top-up to size its approvals against.
+    virtual: stream.virtual,
+  });
 }
 
 /* -------------------------------------------------------------------------- */

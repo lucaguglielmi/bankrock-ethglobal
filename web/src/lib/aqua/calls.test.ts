@@ -175,6 +175,103 @@ describe("buildDockCalls", () => {
   });
 });
 
+describe("buildPushCalls", () => {
+  const STRATEGY_HASH = `0x${"1".repeat(64)}` as const;
+
+  it("is one push per token being added, against Aqua, naming the rock as maker", async () => {
+    const aqua = await load();
+    const plan = aqua.buildPushCalls({
+      maker: MAKER,
+      strategyHash: STRATEGY_HASH,
+      usdcAmount: BigInt(500_000_000),
+      wethAmount: BigInt(10) ** BigInt(17),
+    });
+    expect(plan.state).toBe("REAL");
+    if (plan.state !== "REAL") return;
+
+    const { calls } = plan.value;
+    expect(calls).toHaveLength(2);
+    for (const [index, token, amount] of [
+      [0, USDC, BigInt(500_000_000)],
+      [1, WETH, BigInt(10) ** BigInt(17)],
+    ] as const) {
+      // Against Aqua itself — the app never receives a call from the maker.
+      expect(calls[index].to).toBe(AQUA_ADDRESS);
+      expect(calls[index].value).toBe(BigInt(0));
+      const decoded = decodeFunctionData({ abi: AQUA, data: calls[index].data });
+      expect(decoded.functionName).toBe("push");
+      expect(decoded.args?.[0]).toBe(MAKER);
+      expect(decoded.args?.[1]).toBe(APP);
+      expect(decoded.args?.[2]).toBe(STRATEGY_HASH);
+      expect(decoded.args?.[3]).toBe(token);
+      expect(decoded.args?.[4]).toBe(amount);
+    }
+  });
+
+  it("skips a token whose amount is zero", async () => {
+    const aqua = await load();
+    const plan = aqua.buildPushCalls({
+      maker: MAKER,
+      strategyHash: STRATEGY_HASH,
+      usdcAmount: BigInt(0),
+      wethAmount: BigInt(1),
+    });
+    if (plan.state !== "REAL") throw new Error("expected REAL");
+    expect(plan.value.calls).toHaveLength(1);
+    const decoded = decodeFunctionData({ abi: AQUA, data: plan.value.calls[0].data });
+    expect(decoded.args?.[3]).toBe(WETH);
+  });
+
+  it("builds no approvals: those depend on the allowance on chain, which bytes cannot read", async () => {
+    const aqua = await load();
+    const plan = aqua.buildPushCalls({
+      maker: MAKER,
+      strategyHash: STRATEGY_HASH,
+      usdcAmount: BigInt(1),
+      wethAmount: BigInt(1),
+    });
+    if (plan.state !== "REAL") throw new Error("expected REAL");
+    for (const call of plan.value.calls) {
+      expect(call.to).not.toBe(USDC);
+      expect(call.to).not.toBe(WETH);
+    }
+  });
+
+  it("refuses nothing at all, and a negative amount", async () => {
+    const aqua = await load();
+    expect(
+      aqua.buildPushCalls({
+        maker: MAKER,
+        strategyHash: STRATEGY_HASH,
+        usdcAmount: BigInt(0),
+        wethAmount: BigInt(0),
+      }).state,
+    ).toBe("UNAVAILABLE");
+    expect(
+      aqua.buildPushCalls({
+        maker: MAKER,
+        strategyHash: STRATEGY_HASH,
+        usdcAmount: BigInt(-1),
+        wethAmount: BigInt(0),
+      }).state,
+    ).toBe("UNAVAILABLE");
+  });
+
+  it("is UNAVAILABLE, naming the variable, when Aqua itself is unset", async () => {
+    const aqua = await load({ NEXT_PUBLIC_AQUA_ADDRESS: undefined });
+    const plan = aqua.buildPushCalls({
+      maker: MAKER,
+      strategyHash: STRATEGY_HASH,
+      usdcAmount: BigInt(1),
+      wethAmount: BigInt(0),
+    });
+    expect(plan.state).toBe("UNAVAILABLE");
+    if (plan.state === "UNAVAILABLE") {
+      expect(plan.reason).toContain("NEXT_PUBLIC_AQUA_ADDRESS");
+    }
+  });
+});
+
 describe("buildSwapCall", () => {
   async function plan(overrides: Record<string, string | undefined> = {}) {
     const aqua = await load(overrides);

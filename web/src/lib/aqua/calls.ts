@@ -11,6 +11,9 @@
  *
  *   ship  →  USDC.approve(Aqua, a), WETH.approve(Aqua, b), Aqua.ship(app, strategy, [USDC, WETH], [a, b])
  *            The maker approves **Aqua**, never the app (spec 16 §1.5 item 2).
+ *   push  →  Aqua.push(maker, app, strategyHash, token, amount), once per token being added.
+ *            The maker's own top-up of a live strategy: raises the virtual balance, moves nothing,
+ *            spends the maker's allowance to Aqua (it is a `transferFrom` from the rock to the rock).
  *   swap  →  tokenIn.approve(taker, amountIn), XYCSwapTaker.swapExactIn(app, strategy, …)
  *            The taker approves the **periphery**, because XYCSwap calls `xycSwapCallback` back
  *            into its caller and an EOA or plain Safe cannot answer it (NOTES.md §5).
@@ -180,6 +183,82 @@ export function buildDockCalls(params: DockParams): Capability<{ calls: Call[]; 
         value: BigInt(0),
       },
     ],
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Push (top up)                                                               */
+/* -------------------------------------------------------------------------- */
+
+export interface PushParams {
+  /** The Rock Account — the strategy's maker, and here also the caller. */
+  maker: Address;
+  strategyHash: Hex;
+  /** How much more USDC this stream may trade, in base units. Zero skips the token. */
+  usdcAmount: bigint;
+  /** How much more WETH this stream may trade, in base units. Zero skips the token. */
+  wethAmount: bigint;
+  /** Override the app address. Defaults to the configured one. */
+  app?: Address;
+}
+
+export interface PushPlan {
+  /** One `push` per token with a non-zero amount, USDC first. */
+  calls: Call[];
+  addresses: AquaAddresses;
+  usdcAmount: bigint;
+  wethAmount: bigint;
+}
+
+/**
+ * Making more of the rock available to a live strategy — the only "edit" Aqua allows.
+ *
+ * A strategy's bytes are immutable and a docked one can never be revived (NOTES.md §4), so the
+ * fee cannot change and nothing can be taken back short of `dock`. What *can* change is the
+ * virtual balance, and only upwards: `Aqua.push(maker, app, strategyHash, token, amount)` may be
+ * called by anyone and adds `amount` to the strategy's balance for `token`
+ * (`Aqua.sol`, `push`; it reverts `PushToNonActiveStrategyPrevented` for a docked or unshipped
+ * strategy).
+ *
+ * Called by the Rock Account itself, its `safeTransferFrom(msg.sender, maker, amount)` is a
+ * transfer from the rock to the rock — no token leaves the account — but it is still a
+ * `transferFrom` with Aqua as spender, so it **spends `amount` of the rock's allowance to Aqua**.
+ * The submitting layer must approve for that on top of what the pulls will need
+ * (`useBankRock.topUpStrategy`). Approvals are not built here: they depend on the allowance that
+ * exists on chain, which a bytes-only module does not read.
+ */
+export function buildPushCalls(params: PushParams): Capability<PushPlan> {
+  const addresses = getAquaAddresses({ app: params.app });
+  if (addresses.state === "UNAVAILABLE") return unavailable(addresses.reason);
+  const { aqua, app, usdc, weth } = addresses.value;
+
+  if (params.usdcAmount < BigInt(0) || params.wethAmount < BigInt(0)) {
+    return unavailable("A strategy cannot be topped up by a negative amount");
+  }
+  if (params.usdcAmount === BigInt(0) && params.wethAmount === BigInt(0)) {
+    return unavailable("Enter an amount of USDC or WETH to make available");
+  }
+
+  const maker = getAddress(params.maker);
+  const pushCall = (token: Address, amount: bigint): Call => ({
+    to: aqua,
+    data: encodeFunctionData({
+      abi: AQUA_ABI,
+      functionName: "push",
+      args: [maker, app, params.strategyHash, token, amount],
+    }),
+    value: BigInt(0),
+  });
+
+  const calls: Call[] = [];
+  if (params.usdcAmount > BigInt(0)) calls.push(pushCall(usdc, params.usdcAmount));
+  if (params.wethAmount > BigInt(0)) calls.push(pushCall(weth, params.wethAmount));
+
+  return real({
+    calls,
+    addresses: addresses.value,
+    usdcAmount: params.usdcAmount,
+    wethAmount: params.wethAmount,
   });
 }
 

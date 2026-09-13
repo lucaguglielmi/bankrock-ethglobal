@@ -9,6 +9,7 @@ import {
   openDemoHandover,
   shipDemoStrategy,
   swapDemo,
+  topUpDemoStrategy,
 } from "./actions";
 import { DEMO_ADDRESSES, DEMO_ROCK_ID, isDemoRockId } from "./constants";
 import { demoQuote } from "./quote";
@@ -140,6 +141,70 @@ describe("strategies", () => {
     ).toBe("UNAVAILABLE");
     const docked = dockDemoStrategy(seed, 1, NOW).state;
     expect(shipDemoStrategy(docked, { streamIndex: 1, feeBps: 5, ...amounts }, NOW).result.state).toBe("UNAVAILABLE");
+  });
+
+  it("tops up a live stream: more allowed, nothing moved, the fee untouched, and DEMO", () => {
+    const seed = seedDemoRock(NOW);
+    const wide = seed.streams[0];
+    const { state, result } = topUpDemoStrategy(
+      seed,
+      { streamIndex: 0, usdcAmount: usdc("2000"), wethAmount: weth("1") },
+      NOW,
+    );
+    expect(result.state).toBe("DEMO");
+    if (result.state !== "DEMO") return;
+    expect("txHash" in result.value).toBe(false);
+    expect(result.value.virtual).toEqual({
+      usdc: wide.virtual.usdc + usdc("2000"),
+      weth: wide.virtual.weth + weth("1"),
+    });
+
+    const after = state.streams[0];
+    expect(after.virtual).toEqual(result.value.virtual);
+    expect(after.feeBps).toBe(wide.feeBps);
+    expect(after.fees).toEqual(wide.fees);
+    // A top-up moves nothing and is not a trade.
+    expect(state.holdings).toEqual(seed.holdings);
+    expect(state.taker).toEqual(seed.taker);
+    // The allowance covers at least the new virtual balance: 18,000 → 20,000 USDC; WETH was
+    // already 9 for a stream that now allows 10, so it rises to 10.
+    expect(state.allowance).toEqual({ usdc: usdc("20000"), weth: weth("10") });
+    expect(state.activity[0].title).toBe("Strategy topped up");
+    expect("txHash" in state.activity[0]).toBe(false);
+    // The other stream is untouched.
+    expect(state.streams[1]).toEqual(seed.streams[1]);
+  });
+
+  it("tops up one token alone, and never lowers an allowance that was already wider", () => {
+    const seed = seedDemoRock(NOW);
+    const { state, result } = topUpDemoStrategy(
+      seed,
+      { streamIndex: 1, usdcAmount: usdc("1000"), wethAmount: weth(0) },
+      NOW,
+    );
+    expect(result.state).toBe("DEMO");
+    // Tight allowed 12,000 USDC; now 13,000. The 18,000 allowance already covers it.
+    expect(state.streams[1].virtual.usdc).toBe(usdc("13000"));
+    expect(state.streams[1].virtual.weth).toBe(seed.streams[1].virtual.weth);
+    expect(state.allowance).toEqual(seed.allowance);
+  });
+
+  it("refuses a stream that is not live, nothing at all, and more than the rock holds — leaving the state alone", () => {
+    const seed = seedDemoRock(NOW);
+    const notLive = topUpDemoStrategy(seed, { streamIndex: 2, usdcAmount: usdc("1"), wethAmount: weth(0) }, NOW);
+    expect(notLive.result.state).toBe("UNAVAILABLE");
+    expect(notLive.state).toBe(seed);
+
+    const nothing = topUpDemoStrategy(seed, { streamIndex: 0, usdcAmount: usdc(0), wethAmount: weth(0) }, NOW);
+    expect(nothing.result.state).toBe("UNAVAILABLE");
+    expect(nothing.state).toBe(seed);
+
+    const tooMuch = topUpDemoStrategy(seed, { streamIndex: 0, usdcAmount: usdc("25001"), wethAmount: weth(0) }, NOW);
+    expect(tooMuch.result.state).toBe("UNAVAILABLE");
+    expect(tooMuch.state).toBe(seed);
+
+    const docked = dockDemoStrategy(seed, 0, NOW).state;
+    expect(topUpDemoStrategy(docked, { streamIndex: 0, usdcAmount: usdc("1"), wethAmount: weth(0) }, NOW).result.state).toBe("UNAVAILABLE");
   });
 
   it("docks a stream: it is gone, marked stopped, and nothing came back", () => {
@@ -308,6 +373,7 @@ describe("no result is ever REAL", () => {
       fundDemoRock(seed, { usdc: usdc("1"), weth: weth(0) }, NOW).result,
       shipDemoStrategy(seed, { streamIndex: 2, feeBps: 100, usdcAmount: usdc("1"), wethAmount: weth("0.001") }, NOW).result,
       dockDemoStrategy(seed, 0, NOW).result,
+      topUpDemoStrategy(seed, { streamIndex: 0, usdcAmount: usdc("1"), wethAmount: weth(0) }, NOW).result,
       swapDemo(seed, { streamIndex: 0, tokenIn: "USDC", amountIn: usdc("1"), minAmountOut: BigInt(0) }, NOW).result,
       openDemoHandover(seed, { recipient: A_WALLET, expiresAt: Math.floor(NOW / 1000) + 60 }, NOW).result,
       archiveDemoRock(seed, NOW).result,

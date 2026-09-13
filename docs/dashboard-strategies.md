@@ -51,11 +51,35 @@ annualised figure of any kind; the only rate on screen is the fee.
 ## "Add another strategy"
 
 Ship a preset that is not yet live: `unshippedOptions([...live indexes, ...stopped indexes])`
-from `ship-options.ts` gives the choices. A strategy is immutable: a fee tier can't be edited,
-only stopped, and a different tier is started as a new stream. Shipping moves no tokens — it
+from `ship-options.ts` gives the choices. A strategy's bytes are immutable: its **fee is fixed**
+for life, and a different tier is started as a new stream. What *can* change is how much of the
+rock the stream may trade, and only upwards — see "Edit" below. Shipping moves no tokens — it
 grants Aqua an allowance over balances that stay in the Rock Account — so the sheet's
 consequence line stays literal ("the rock keeps its tokens; this is how much this strategy may
 trade"). When every preset has been used, the button disappears rather than disabling.
+
+## "Edit" (push — make more available)
+
+Each live card has an **Edit** beside its Stop. The fee cannot be edited and an allowance cannot
+be lowered, so the sheet says so in its first line and offers the one change Aqua allows:
+**raising the stream's virtual balance** with `Aqua.push(maker, app, strategyHash, token, amount)`,
+called from the rock's own account (`buildPushCalls` in `lib/aqua/calls.ts`,
+`topUpStrategy` in `hooks/useBankRock.ts`). `push` may be called by anyone and only ever adds;
+called by the maker it is a `transferFrom(rock → rock)` with Aqua as spender — **no tokens
+move**, but it spends `amount` of the rock's allowance to Aqua. The hook therefore approves Aqua
+for `newVirtual + pushAmount` per token (allowance-aware, through zero for Circle's USDC), so
+that after the push lands the allowance equals the new virtual balance and the stream's pulls can
+settle everything it now offers.
+
+The sheet takes the amounts to *add* (each capped at what the rock holds, at least one non-zero),
+states the total the stream will then allow, and carries a quiet "To make less available, stop
+this strategy" line with a *Stop instead* link. Reducing what a stream offers is not an edit; it
+is Stop.
+
+A top-up emits `Pushed` with no `Pulled` beside it. `readAccruedFees` counts a `Pushed` as trade
+input **only when its transaction also carries a `Pulled` for the same strategy** (a swap pulls the
+output and then has the taker push the input, in one transaction), and never when it shares a
+transaction with `Shipped`. A top-up is therefore not a trade and earns no fee.
 
 ## "Stop" (dock)
 
@@ -82,7 +106,7 @@ reserve; say so once, in the confirmation line.
 | Reserve line and one card per live stream | yes, read-only | yes |
 | Executable per stream | yes | yes |
 | Earned fees per stream | yes | yes |
-| Add another strategy / Stop | no | yes |
+| Add another strategy / Edit / Stop | no | yes |
 | Trade | yes | yes (against their own rock is allowed) |
 
 A rock with no live stream shows the reserve line and, for the owner, the Add button as the

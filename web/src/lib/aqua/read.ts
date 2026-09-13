@@ -389,14 +389,25 @@ export function planFeeScan(
  * XYCSwap keeps no fee accumulator. The taker's whole `amountIn` is pushed into the maker's
  * reserve while the curve prices only `amountIn * (10000 - feeBps) / 10000`, so the fee is the
  * remainder — `amountIn * feeBps / 10000`, in the input token, per swap
- * (`contracts/aqua/NOTES.md` §6). Each swap's `amountIn` is one `Pushed` event, and the `Pushed`
- * events `ship` emits at launch are excluded by the transaction they share with `Shipped`.
+ * (`contracts/aqua/NOTES.md` §6). Each swap's `amountIn` is one `Pushed` event — but not every
+ * `Pushed` is a swap. Two other things emit it for the same strategy and neither is a trade:
+ *
+ *  - `ship` emits one per token at launch, in the same transaction as `Shipped`;
+ *  - the owner's top-up ("Edit" on the Liquidity tab, `Aqua.push` from the rock's own account)
+ *    emits one per token added, with no `Shipped` and no `Pulled` beside it.
+ *
+ * What tells a swap apart is the `Pulled`: `XYCSwap.swapExactIn` pulls the output from the maker
+ * and *then* has the taker push the input, in one transaction (NOTES.md §5). So a `Pushed` is
+ * counted only when its transaction also carries a `Pulled` for the same strategy, and — belt and
+ * braces — never when it shares a transaction with `Shipped`. A top-up counted as a trade would
+ * book `topUp · feeBps / 10000` of fees the rock never earned.
  *
  * The scan is chunked at 2,000 blocks (`lib/block-range`, D-036) and resumed from the last block
  * already scanned for this (app, strategy) pair, so a fifteen-second poll fetches the handful of
- * blocks that are new instead of the whole history twice per stream. `Shipped` and `Pushed` are
- * fetched over the same chunk, which is what keeps the launch-push exclusion sound: `ship` emits
- * both in one transaction, therefore in one block, therefore never split across two chunks.
+ * blocks that are new instead of the whole history twice per stream. `Shipped`, `Pulled` and
+ * `Pushed` are fetched over the same chunk, which is what keeps the pairing sound: a swap's pull
+ * and push, like a launch's ship and push, share one transaction, therefore one block, therefore
+ * are never split across two chunks.
  *
  * When any chunk fails this returns UNAVAILABLE. A short scan is never reported as a total: the
  * whole chunks that did land are kept for the next poll to build on, and the caller is told the
@@ -446,7 +457,7 @@ export async function readAccruedFees(
 
   for (const range of buildBlockRanges(plan.scanFrom, head)) {
     try {
-      const [pushed, shipped] = await Promise.all([
+      const [pushed, shipped, pulled] = await Promise.all([
         client.getLogs({
           address: aqua,
           event: AQUA_EVENTS_ABI[3],
@@ -459,12 +470,23 @@ export async function readAccruedFees(
           fromBlock: range.fromBlock,
           toBlock: range.toBlock,
         }),
+        client.getLogs({
+          address: aqua,
+          event: AQUA_EVENTS_ABI[2],
+          fromBlock: range.fromBlock,
+          toBlock: range.toBlock,
+        }),
       ]);
 
+      const txOf = (log: { transactionHash?: Hex | null }) =>
+        log.transactionHash?.toLowerCase() ?? "";
+
       const shipTxs = new Set(
-        shipped
-          .filter((log) => matchesStrategy(log.args, filter))
-          .map((log) => log.transactionHash?.toLowerCase() ?? ""),
+        shipped.filter((log) => matchesStrategy(log.args, filter)).map(txOf),
+      );
+      // A transaction that pulled from this strategy is a swap; only its pushes are trade input.
+      const swapTxs = new Set(
+        pulled.filter((log) => matchesStrategy(log.args, filter)).map(txOf),
       );
 
       // Counted per chunk and merged only once the chunk is whole, so a failure halfway through
@@ -474,7 +496,10 @@ export async function readAccruedFees(
 
       for (const log of pushed) {
         if (!matchesStrategy(log.args, filter)) continue;
-        if (shipTxs.has(log.transactionHash?.toLowerCase() ?? "")) continue;
+        const tx = txOf(log);
+        if (shipTxs.has(tx)) continue;
+        // No pull in this transaction: a launch or the owner's top-up, not a trade.
+        if (!swapTxs.has(tx)) continue;
         const token = (log.args.token ?? "").toLowerCase();
         const amount = log.args.amount ?? BigInt(0);
         const fee = (amount * feeBps) / BPS_BASE;
